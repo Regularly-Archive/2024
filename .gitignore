@@ -9,3 +9,6 @@ MongoRepository/Poc.MongoRepository/bin/
 MongoRepository/Poc.MongoRepository/.vs/
 MongoRepository/MongoRepository/obj/
 MongoRepository/.vs/
+HttpClientTesting/.vs/
+HttpClientTesting/bin/
+HttpClientTesting/obj/
