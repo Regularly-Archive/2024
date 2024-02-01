@@ -3,3 +3,9 @@ SwaggerWithExamples/obj/
 SwaggerWithExamples/.vs/
 Poc.MongoProxy/obj/
 Poc.MongoProxy/.vs/
+MongoRepository/Poc.MongoRepository/obj/
+MongoRepository/Poc.MongoRepository/bin/Debug/net8.0/runtimes/osx/native/libmongocrypt.dylib
+MongoRepository/Poc.MongoRepository/bin/
+MongoRepository/Poc.MongoRepository/.vs/
+MongoRepository/MongoRepository/obj/
+MongoRepository/.vs/
