@@ -1,5 +1,6 @@
 using Moq.Protected;
 using Newtonsoft.Json;
+using RichardSzalay.MockHttp;
 using Shouldly;
 using System.Net;
 using System.Net.Http.Json;
@@ -78,6 +79,25 @@ public class HttpClient_BehaviouralTest
 
         response.ShouldSatisfyAllConditions(
             () => response.StatusCode.ShouldBe(HttpStatusCode.BadRequest),
+            () => response.Content.ShouldBeOfType(typeof(StringContent)),
+            async () => (await response.Content.ReadAsStringAsync()).ShouldBe(payload)
+        );
+    }
+
+    [Fact]
+    public async Task It_Should_Return_Json_Payload_After_Requested()
+    {
+        var payload = JsonConvert.SerializeObject(new { code = 0, success = true });
+
+        var mockHttp = new MockHttpMessageHandler();
+        mockHttp.When(HttpMethod.Get, "http://localhost:8080/api/products")
+                .Respond("application/json", payload);
+
+        var client = mockHttp.ToHttpClient();
+        var response = await client.GetAsync("http://localhost:8080/api/products");
+
+        response.ShouldSatisfyAllConditions(
+            () => response.StatusCode.ShouldBe(HttpStatusCode.OK),
             () => response.Content.ShouldBeOfType(typeof(StringContent)),
             async () => (await response.Content.ReadAsStringAsync()).ShouldBe(payload)
         );
