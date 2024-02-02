@@ -12,3 +12,8 @@ MongoRepository/.vs/
 HttpClientTesting/.vs/
 HttpClientTesting/bin/
 HttpClientTesting/obj/
+HttpClientTesting/HttpClientTesting/.vs/
+HttpClientTesting/HttpClientTesting/bin/
+HttpClientTesting/WeatherAPI/obj/
+HttpClientTesting/WeatherAPI/bin/
+HttpClientTesting/HttpClientTesting/obj/
