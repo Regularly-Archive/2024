@@ -71,7 +71,7 @@ if __name__ == "__main__":
     console = Console()
     console.print("[bold red]---------------------------------")
     choices = load_store_files(OUTPUT_DIR)
-    choice = Prompt.ask("[bold] Chat with your own knowledge! Please select a store file [bold]", default=choices[0], show_default=True, choices=choices)
+    choice = Prompt.ask("[bold] Chat with your own knowledge! Please select a vectors storage file [bold]", default=choices[0], show_default=True, choices=choices)
     chain = get_basic_qa_chain("http://localhost:8080/v1/", 'sk-1234567', choice)
     console.print("[bold red]---------------------------------")
     
