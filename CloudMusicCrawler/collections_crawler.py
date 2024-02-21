@@ -19,7 +19,7 @@ async def extract_collections(page):
     return { "created_collections": list(created_collections), "saved_collections": list(saved_collections)}
 
 def extract_created_collections(html):
-    soup = BeautifulSoup(html)
+    soup = BeautifulSoup(html, "lxml")
     ele_lis = soup.find_all("li")
     for ele_li in ele_lis:
         ele_li_img = ele_li.find("img")
@@ -27,7 +27,7 @@ def extract_created_collections(html):
         yield { "title": ele_li_a['title'], "cover": ele_li_img['src'], "url": "https://music.163.com/#" + ele_li_a['href']}
 
 def extract_saved_collections(html):
-    soup = BeautifulSoup(html)
+    soup = BeautifulSoup(html, "lxml")
     ele_lis = soup.find_all("li")
     for ele_li in ele_lis:
         ele_li_img = ele_li.find("img")

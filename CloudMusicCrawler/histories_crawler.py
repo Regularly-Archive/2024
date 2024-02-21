@@ -23,7 +23,7 @@ async def switch_histories(page, showAll=True):
     await contentFrame.page.get_by_test_id(eleId).click()
 
 def extract(html):
-    soup = BeautifulSoup(html)
+    soup = BeautifulSoup(html, "lxml")
     ele_ul = soup.find("ul")
     ele_lis = ele_ul.find_all("li")
     for ele_li in ele_lis:
