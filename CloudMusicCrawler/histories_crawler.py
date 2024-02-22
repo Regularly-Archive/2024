@@ -7,17 +7,23 @@ async def run_extract(playwright: Playwright, target):
     browser = await chromium.launch()
     page = await browser.new_page()
     await page.goto(target)
+    total = await extract_total(page)
     weekly_histories = await extract_histories(page)
     await switch_histories(page)
     time.sleep(2.5)
     all_histories = await extract_histories(page)
     await browser.close()
-    return {"weekly": weekly_histories, "all": all_histories}
+    return {"total": total, "weekly": weekly_histories, "all": all_histories}
 
 async def extract_histories(page):
     contentFrame = page.main_frame.child_frames[0]
     html = await contentFrame.inner_html("#m-record")
     return list(extract(html))
+
+async def extract_total(page):
+    contentFrame = page.main_frame.child_frames[0]
+    html = await contentFrame.inner_html("h4")
+    return html
 
 async def switch_histories(page, showAll=True):
     contentFrame = page.main_frame.child_frames[0]
@@ -38,5 +44,5 @@ def extract(html):
             "title": ele_span_song.get_text(), 
             "artist": "" if ele_span_artist == None else ele_span_artist.get_text(), 
             "url": "https://music.163.com/#" + ele_span_song['href'],
-            "percentage": "" if ele_span_percent == None else ele_span_percent.attrs["style"].replace('width:','')
+            "percentage": "" if ele_span_percent == None else ele_span_percent.attrs["style"].replace('width:','').replace(';','')
         }

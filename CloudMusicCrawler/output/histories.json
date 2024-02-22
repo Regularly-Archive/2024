@@ -1,604 +1,605 @@
 {
+  "total": "累积听歌5604首",
   "weekly": [
     {
       "title": "霜天晓角",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=26344028",
-      "percent": "100%;"
+      "percentage": "100%"
     },
     {
       "title": "青龙镇.雨.变奏(兰生青龙镇雨中抉择)",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=132487",
-      "percent": "100%;"
-    },
-    {
-      "title": "高山流水 LIVE3",
-      "artist": "骆集益",
-      "url": "https://music.163.com/#/song?id=28936595",
-      "percent": "80%;"
-    },
-    {
-      "title": "沧海飞尘变奏快(馋鸡起飞)",
-      "artist": "骆集益",
-      "url": "https://music.163.com/#/song?id=28196558",
-      "percent": "80%;"
-    },
-    {
-      "title": "剑歌行.变调",
-      "artist": "骆集益",
-      "url": "https://music.163.com/#/song?id=26344017",
-      "percent": "80%;"
+      "percentage": "100%"
     },
     {
       "title": "剑啸川河",
       "artist": "薄彩生",
       "url": "https://music.163.com/#/song?id=35957035",
-      "percent": "60%;"
+      "percentage": "80%"
+    },
+    {
+      "title": "高山流水 LIVE3",
+      "artist": "骆集益",
+      "url": "https://music.163.com/#/song?id=28936595",
+      "percentage": "80%"
+    },
+    {
+      "title": "沧海飞尘变奏快(馋鸡起飞)",
+      "artist": "骆集益",
+      "url": "https://music.163.com/#/song?id=28196558",
+      "percentage": "80%"
+    },
+    {
+      "title": "剑歌行.变调",
+      "artist": "骆集益",
+      "url": "https://music.163.com/#/song?id=26344017",
+      "percentage": "80%"
     },
     {
       "title": "在水一方(沧海飞尘变奏)",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196559",
-      "percent": "60%;"
-    },
-    {
-      "title": "战斗BMG-星罗岩",
-      "artist": "骆集益",
-      "url": "https://music.163.com/#/song?id=28196502",
-      "percent": "60%;"
-    },
-    {
-      "title": "战斗BGM-势如破竹",
-      "artist": "骆集益",
-      "url": "https://music.163.com/#/song?id=28196495",
-      "percent": "60%;"
-    },
-    {
-      "title": "战斗BGM-纪山",
-      "artist": "骆集益",
-      "url": "https://music.163.com/#/song?id=28196480",
-      "percent": "60%;"
-    },
-    {
-      "title": "剑歌行",
-      "artist": "骆集益",
-      "url": "https://music.163.com/#/song?id=26344041",
-      "percent": "60%;"
+      "percentage": "60%"
     },
     {
       "title": "流月城突变(流月城钢琴曲)",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196549",
-      "percent": "40%;"
+      "percentage": "60%"
     },
     {
       "title": "战斗BGM-太华山道",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196505",
-      "percent": "40%;"
+      "percentage": "60%"
+    },
+    {
+      "title": "战斗BMG-星罗岩",
+      "artist": "骆集益",
+      "url": "https://music.163.com/#/song?id=28196502",
+      "percentage": "60%"
     },
     {
       "title": "苍梧谣(星罗岩女仙)",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196501",
-      "percent": "40%;"
+      "percentage": "60%"
     },
     {
       "title": "星罗岩(星罗岩)",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196500",
-      "percent": "40%;"
+      "percentage": "60%"
     },
     {
       "title": "百草祭曲(百草谷)",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196499",
-      "percent": "40%;"
+      "percentage": "60%"
+    },
+    {
+      "title": "战斗BGM-势如破竹",
+      "artist": "骆集益",
+      "url": "https://music.163.com/#/song?id=28196495",
+      "percentage": "60%"
+    },
+    {
+      "title": "战斗BGM-纪山",
+      "artist": "骆集益",
+      "url": "https://music.163.com/#/song?id=28196480",
+      "percentage": "60%"
+    },
+    {
+      "title": "剑歌行",
+      "artist": "骆集益",
+      "url": "https://music.163.com/#/song?id=26344041",
+      "percentage": "60%"
     },
     {
       "title": "战斗BGM-浑邪王之灵",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196496",
-      "percent": "40%;"
+      "percentage": "40%"
     },
     {
       "title": "捐毒遗音(捐毒地宫)",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196494",
-      "percent": "40%;"
+      "percentage": "40%"
     },
     {
       "title": "战斗BGM-捐毒",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196493",
-      "percent": "40%;"
+      "percentage": "40%"
     },
     {
       "title": "陇首云飞(捐毒遗迹)",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196492",
-      "percent": "40%;"
+      "percentage": "40%"
     },
     {
       "title": "风起云涌(长城)",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196491",
-      "percent": "40%;"
+      "percentage": "40%"
     },
     {
       "title": "桃源仙境(变奏)",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196490",
-      "percent": "40%;"
+      "percentage": "40%"
     },
     {
       "title": "战斗BGM-长安侠义",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196481",
-      "percent": "40%;"
+      "percentage": "40%"
     },
     {
       "title": "小重山(变奏慢)",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196479",
-      "percent": "40%;"
+      "percentage": "40%"
     },
     {
       "title": "小重山(纪山)",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196478",
-      "percent": "40%;"
+      "percentage": "40%"
     },
     {
       "title": "青冥剑誓",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=26344023",
-      "percent": "40%;"
+      "percentage": "40%"
     },
     {
       "title": "Garden",
       "artist": "77 Bombay Street",
       "url": "https://music.163.com/#/song?id=25780279",
-      "percent": "40%;"
+      "percentage": "40%"
     },
     {
       "title": "Forest of the Ancients",
       "artist": "Fox Sailor",
       "url": "https://music.163.com/#/song?id=1849523929",
-      "percent": "40%;"
+      "percentage": "40%"
     },
     {
       "title": "Stayin Alive",
       "artist": "Bee Gees",
       "url": "https://music.163.com/#/song?id=1496761513",
-      "percent": "40%;"
+      "percentage": "40%"
     },
     {
       "title": "PLANET",
       "artist": "ラムジ",
       "url": "https://music.163.com/#/song?id=812400",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "无疆-轻琴謦磬",
       "artist": "陈致逸",
       "url": "https://music.163.com/#/song?id=573415984",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "Ezio's Family",
       "artist": "6＆9",
       "url": "https://music.163.com/#/song?id=549433680",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "Love Mail",
       "artist": "nico",
       "url": "https://music.163.com/#/song?id=512823124",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "EXEC_COSMPFLIPS",
       "artist": "KOKIA",
       "url": "https://music.163.com/#/song?id=498555679",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "女神のKISS",
       "artist": "PES",
       "url": "https://music.163.com/#/song?id=495789",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "他好像一条狗",
       "artist": "曹槽",
       "url": "https://music.163.com/#/song?id=488054002",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "Fragrance",
       "artist": "Galen Crew",
       "url": "https://music.163.com/#/song?id=461080215",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "Solid Rain Theme",
       "artist": "An Pierlé",
       "url": "https://music.163.com/#/song?id=41658249",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "跋扈万里",
       "artist": "薄彩生",
       "url": "https://music.163.com/#/song?id=35957034",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "月浊雨斜",
       "artist": "薄彩生",
       "url": "https://music.163.com/#/song?id=35957029",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "斩荆破甲",
       "artist": "薄彩生",
       "url": "https://music.163.com/#/song?id=35957026",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "最后一役",
       "artist": "薄彩生",
       "url": "https://music.163.com/#/song?id=35957018",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "伤",
       "artist": "薄彩生",
       "url": "https://music.163.com/#/song?id=35957012",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "鸣(鼓)",
       "artist": "薄彩生",
       "url": "https://music.163.com/#/song?id=35957011",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "Lemon Tree",
       "artist": "Fool's Garden",
       "url": "https://music.163.com/#/song?id=35724589",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "临危变调一",
       "artist": "曾志豪",
       "url": "https://music.163.com/#/song?id=34179763",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "破晦",
       "artist": "曾志豪",
       "url": "https://music.163.com/#/song?id=34179752",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "策风",
       "artist": "曾志豪",
       "url": "https://music.163.com/#/song?id=34179731",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "镜中人(配乐版)",
       "artist": "曾志豪",
       "url": "https://music.163.com/#/song?id=34179704",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "Chase by Chase Basis",
       "artist": "Chris Tilton",
       "url": "https://music.163.com/#/song?id=29724715",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "Too Far",
       "artist": "Anna F",
       "url": "https://music.163.com/#/song?id=28442976",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "热气球要去往哪里",
       "artist": "潼二潼子",
       "url": "https://music.163.com/#/song?id=28432492",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "沧海飞尘(环绕长安开篇staff表)",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196557",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "雪霁长空(太华山道)",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196504",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "战斗BMG-星罗岩火龙",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196503",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "桃源仙境(家园)",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196489",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "空山灵雨(静水湖)",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196488",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "苗情竹韵(朗德寨)",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196487",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "战斗BGM-翻天印",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196486",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "法网如天(翻天印)",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196485",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "陆离海(变调)",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196484",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "陆离海(海市)",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196483",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "妖幻夜雨(江陵古道)",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196482",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "团子杂耍(竹笋包子团)",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196477",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "夜(江陵古道)",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196476",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "帝都胜景(长安)",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196475",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "慈恩寺(长安慈恩寺)",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196474",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "Sleepyhead",
       "artist": "Galen Crew",
       "url": "https://music.163.com/#/song?id=27588470",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "Everybody Loves You",
       "artist": "Galen Crew",
       "url": "https://music.163.com/#/song?id=27588469",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "What If I Loved You",
       "artist": "Galen Crew",
       "url": "https://music.163.com/#/song?id=27588467",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "Freedom Fighter",
       "artist": "Lorne Balfe",
       "url": "https://music.163.com/#/song?id=27580049",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "铁柱镇妖",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=26344106",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "道法无边",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=26344090",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "禁魔咒.变调",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=26344072",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "雪暖晴岚",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=26344031",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "自渡·乔口",
       "artist": "河图",
       "url": "https://music.163.com/#/song?id=2120110735",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "那一别你眉轻抚",
       "artist": "格雷西西",
       "url": "https://music.163.com/#/song?id=2119753461",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "风烟之末",
       "artist": "叶里",
       "url": "https://music.163.com/#/song?id=2116713419",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "又惊春",
       "artist": "河图",
       "url": "https://music.163.com/#/song?id=2108866912",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "ダブル・プッシュ・オフ。(feat.水槽 & A4。)",
       "artist": "MAISONdes",
       "url": "https://music.163.com/#/song?id=2101541215",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "大风吹倒梧桐树",
       "artist": "候泽润",
       "url": "https://music.163.com/#/song?id=2100795733",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "逍遥如歌",
       "artist": "李逍遥",
       "url": "https://music.163.com/#/song?id=2099371051",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "拥抱(づ′A`)づ",
       "artist": "灯灯",
       "url": "https://music.163.com/#/song?id=2096387917",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "No Footsteps to Follow",
       "artist": "Galen Crew",
       "url": "https://music.163.com/#/song?id=2095219544",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "精灵集会",
       "artist": "atoroeato",
       "url": "https://music.163.com/#/song?id=2091634339",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "姑娘别哭泣",
       "artist": "柯柯柯啊",
       "url": "https://music.163.com/#/song?id=2078700726",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "星光就在前方",
       "artist": "抠抠",
       "url": "https://music.163.com/#/song?id=2078042511",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "Struggle",
       "artist": "Dios",
       "url": "https://music.163.com/#/song?id=2073451892",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "Clan (5am mix)",
       "artist": "milet",
       "url": "https://music.163.com/#/song?id=2073406122",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "「讨厌离开˃̣̣̥᷄⌓˂̣̣̥᷅」(Prod.MORROW)",
       "artist": "Justice正一",
       "url": "https://music.163.com/#/song?id=2073220573",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "巾帼天门",
       "artist": "于毅",
       "url": "https://music.163.com/#/song?id=2066700868",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "Escaping Gravity",
       "artist": "TheFatRat",
       "url": "https://music.163.com/#/song?id=2061683275",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "Hazel Eyes",
       "artist": "Sabrina Jordan",
       "url": "https://music.163.com/#/song?id=2060499808",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "以爱为囚",
       "artist": "卡捷琳娜（凯丽）",
       "url": "https://music.163.com/#/song?id=2050912767",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "姑娘在远方",
       "artist": "柯柯柯啊",
       "url": "https://music.163.com/#/song?id=2022196813",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "白云喝了人间酒",
       "artist": "一颗狼星_许篮心",
       "url": "https://music.163.com/#/song?id=2020615639",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "小小",
       "artist": "梨香JZH",
       "url": "https://music.163.com/#/song?id=2013152190",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "乌兰巴托的夜",
       "artist": "葱香科学家（王悠然）",
       "url": "https://music.163.com/#/song?id=2002712975",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "蝉",
       "artist": "戴林港",
       "url": "https://music.163.com/#/song?id=1991318618",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "Regardez-moi",
       "artist": "Molière l'opéra urbain",
       "url": "https://music.163.com/#/song?id=1987173869",
-      "percent": "20%;"
+      "percentage": "20%"
     }
   ],
   "all": [
@@ -606,601 +607,601 @@
       "title": "战斗BGM-太华山道",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196505",
-      "percent": "100%;"
+      "percentage": "100%"
     },
     {
       "title": "战斗BGM-势如破竹",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196495",
-      "percent": "64%;"
+      "percentage": "64%"
     },
     {
       "title": "In Motion",
       "artist": "Trent Reznor",
       "url": "https://music.163.com/#/song?id=1061853",
-      "percent": "63%;"
+      "percentage": "63%"
     },
     {
       "title": "我曾爱的无名氏",
       "artist": "我本庸俗",
       "url": "https://music.163.com/#/song?id=1449648807",
-      "percent": "53%;"
+      "percentage": "52%"
     },
     {
       "title": "剑歌行.变调",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=26344017",
-      "percent": "47%;"
+      "percentage": "47%"
     },
     {
       "title": "平凡之路",
       "artist": "朴树",
       "url": "https://music.163.com/#/song?id=28815250",
-      "percent": "44%;"
+      "percentage": "44%"
     },
     {
       "title": "苍龙抱云 LIVE",
       "artist": "小旭音乐",
       "url": "https://music.163.com/#/song?id=28936555",
-      "percent": "43%;"
+      "percentage": "43%"
     },
     {
       "title": "飛天~伝説の最期~",
       "artist": "佐藤直紀",
       "url": "https://music.163.com/#/song?id=29366817",
-      "percent": "40%;"
+      "percentage": "40%"
     },
     {
       "title": "江湖",
       "artist": "许嵩",
       "url": "https://music.163.com/#/song?id=428095913",
-      "percent": "37%;"
+      "percentage": "37%"
     },
     {
       "title": "Golden Slumbers (Remastered)",
       "artist": "The Beatles",
       "url": "https://music.163.com/#/song?id=4336369",
-      "percent": "37%;"
+      "percentage": "37%"
     },
     {
       "title": "战斗BMG-星罗岩",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196502",
-      "percent": "36%;"
+      "percentage": "36%"
     },
     {
       "title": "新世 ～守るべき者～",
       "artist": "佐藤直紀",
       "url": "https://music.163.com/#/song?id=28872039",
-      "percent": "35%;"
+      "percentage": "35%"
     },
     {
       "title": "Broken Heart of Gold",
       "artist": "ONE OK ROCK",
       "url": "https://music.163.com/#/song?id=1847642478",
-      "percent": "33%;"
+      "percentage": "33%"
     },
     {
       "title": "Main Theme",
       "artist": "Gareth Coker",
       "url": "https://music.163.com/#/song?id=1426940268",
-      "percent": "29%;"
+      "percentage": "29%"
     },
     {
       "title": "Arrietty's Song（Instrumental Version）",
       "artist": "Cécile Corbel",
       "url": "https://music.163.com/#/song?id=2324438",
-      "percent": "27%;"
+      "percentage": "27%"
     },
     {
       "title": "喜剧之王插曲 - Here We Are Again",
       "artist": "凉城",
       "url": "https://music.163.com/#/song?id=41656941",
-      "percent": "26%;"
+      "percentage": "26%"
     },
     {
       "title": "Arrietty’s Song (カラオケ)",
       "artist": "Cécile Corbel",
       "url": "https://music.163.com/#/song?id=2324515",
-      "percent": "25%;"
+      "percentage": "25%"
     },
     {
       "title": "冕旒不惊",
       "artist": "薄彩生",
       "url": "https://music.163.com/#/song?id=35957032",
-      "percent": "24%;"
+      "percentage": "24%"
     },
     {
       "title": "净妖御魔",
       "artist": "周志华",
       "url": "https://music.163.com/#/song?id=28921903",
-      "percent": "23%;"
+      "percentage": "23%"
     },
     {
       "title": "御剑斩妖",
       "artist": "小旭音乐",
       "url": "https://music.163.com/#/song?id=28921901",
-      "percent": "23%;"
+      "percentage": "23%"
     },
     {
       "title": "辰虫木娄",
       "artist": "薄彩生",
       "url": "https://music.163.com/#/song?id=35957023",
-      "percent": "22%;"
+      "percentage": "22%"
     },
     {
       "title": "The Sound of Silence (寂静之声) - 钢琴曲",
       "artist": "幽蓝键",
       "url": "https://music.163.com/#/song?id=480612081",
-      "percent": "22%;"
+      "percentage": "22%"
     },
     {
       "title": "How It Was Done",
       "artist": "David Arnold",
       "url": "https://music.163.com/#/song?id=28244941",
-      "percent": "20%;"
+      "percentage": "20%"
     },
     {
       "title": "蛟龙洗巷",
       "artist": "薄彩生",
       "url": "https://music.163.com/#/song?id=35957030",
-      "percent": "18%;"
+      "percentage": "18%"
     },
     {
       "title": "陆小凤传奇OST",
       "artist": "卢文博",
       "url": "https://music.163.com/#/song?id=33850712",
-      "percent": "17%;"
+      "percentage": "17%"
     },
     {
       "title": "My First Borrowing",
       "artist": "Cécile Corbel",
       "url": "https://music.163.com/#/song?id=22797186",
-      "percent": "17%;"
+      "percentage": "17%"
     },
     {
       "title": "主題歌Arrietty's Song",
       "artist": "Cécile Corbel",
       "url": "https://music.163.com/#/song?id=2324487",
-      "percent": "17%;"
+      "percentage": "16%"
     },
     {
       "title": "剑魂",
       "artist": "李炜",
       "url": "https://music.163.com/#/song?id=453491466",
-      "percent": "16%;"
+      "percentage": "16%"
     },
     {
       "title": "半纸心事",
       "artist": "国风堂",
       "url": "https://music.163.com/#/song?id=1914628093",
-      "percent": "16%;"
+      "percentage": "16%"
     },
     {
       "title": "HEART OF SWORD~夜明け前~",
       "artist": "T.M.Revolution",
       "url": "https://music.163.com/#/song?id=405625",
-      "percent": "16%;"
+      "percentage": "16%"
     },
     {
       "title": "Lone Mountain",
       "artist": "Two Feathers",
       "url": "https://music.163.com/#/song?id=1878758627",
-      "percent": "14%;"
+      "percentage": "14%"
     },
     {
       "title": "Mighty Long Fall",
       "artist": "ONE OK ROCK",
       "url": "https://music.163.com/#/song?id=30590157",
-      "percent": "14%;"
+      "percentage": "14%"
     },
     {
       "title": "月浊雨斜",
       "artist": "薄彩生",
       "url": "https://music.163.com/#/song?id=35957029",
-      "percent": "14%;"
+      "percentage": "14%"
     },
     {
       "title": "Venice Rooftops",
       "artist": "Jesper Kyd",
       "url": "https://music.163.com/#/song?id=18649292",
-      "percent": "13%;"
+      "percentage": "13%"
     },
     {
       "title": "天黑黑 (Remastered)",
       "artist": "孙燕姿",
       "url": "https://music.163.com/#/song?id=1366289604",
-      "percent": "13%;"
+      "percentage": "13%"
     },
     {
       "title": "雅俗共赏 (Live)",
       "artist": "许嵩",
       "url": "https://music.163.com/#/song?id=1873375675",
-      "percent": "13%;"
+      "percentage": "13%"
     },
     {
       "title": "風立ちぬ",
       "artist": "和楽器バンド",
       "url": "https://music.163.com/#/song?id=554241187",
-      "percent": "12%;"
+      "percentage": "12%"
     },
     {
       "title": "叹服",
       "artist": "许嵩",
       "url": "https://music.163.com/#/song?id=167841",
-      "percent": "12%;"
+      "percentage": "12%"
     },
     {
       "title": "星月神话",
       "artist": "金莎",
       "url": "https://music.163.com/#/song?id=247512",
-      "percent": "11%;"
+      "percentage": "11%"
     },
     {
       "title": "断桥残雪",
       "artist": "许嵩",
       "url": "https://music.163.com/#/song?id=167937",
-      "percent": "11%;"
+      "percentage": "11%"
     },
     {
       "title": "无关风雪与夜话",
       "artist": "河图",
       "url": "https://music.163.com/#/song?id=1895056902",
-      "percent": "11%;"
+      "percentage": "11%"
     },
     {
       "title": "敬酒不吃",
       "artist": "许嵩",
       "url": "https://music.163.com/#/song?id=167730",
-      "percent": "11%;"
+      "percentage": "11%"
     },
     {
       "title": "紫のゆかり、ふたたび",
       "artist": "Rin'",
       "url": "https://music.163.com/#/song?id=22817061",
-      "percent": "11%;"
+      "percentage": "11%"
     },
     {
       "title": "秋千坠",
       "artist": "许嵩",
       "url": "https://music.163.com/#/song?id=1430289462",
-      "percent": "10%;"
+      "percentage": "10%"
     },
     {
       "title": "千古",
       "artist": "许嵩",
       "url": "https://music.163.com/#/song?id=34040693",
-      "percent": "10%;"
+      "percentage": "10%"
     },
     {
       "title": "惊鸿一面",
       "artist": "许嵩",
       "url": "https://music.163.com/#/song?id=28854182",
-      "percent": "10%;"
+      "percentage": "10%"
     },
     {
       "title": "踏莎调 LIVE",
       "artist": "小旭音乐",
       "url": "https://music.163.com/#/song?id=28921907",
-      "percent": "10%;"
+      "percentage": "10%"
     },
     {
       "title": "The Beginning",
       "artist": "ONE OK ROCK",
       "url": "https://music.163.com/#/song?id=26095964",
-      "percent": "9%;"
+      "percentage": "9%"
     },
     {
       "title": "アンナチュラル Unnatural Death",
       "artist": "得田真裕",
       "url": "https://music.163.com/#/song?id=543965748",
-      "percent": "9%;"
+      "percentage": "9%"
     },
     {
       "title": "天涯",
       "artist": "任贤齐",
       "url": "https://music.163.com/#/song?id=144380",
-      "percent": "9%;"
+      "percentage": "9%"
     },
     {
       "title": "vs. 〜知覚と快楽の螺旋〜",
       "artist": "福山雅治",
       "url": "https://music.163.com/#/song?id=22779923",
-      "percent": "9%;"
+      "percentage": "9%"
     },
     {
       "title": "Rites of Passage",
       "artist": "Yanni",
       "url": "https://music.163.com/#/song?id=2103928",
-      "percent": "9%;"
+      "percentage": "9%"
     },
     {
       "title": "战斗",
       "artist": "林坤信",
       "url": "https://music.163.com/#/song?id=132188",
-      "percent": "9%;"
+      "percentage": "9%"
     },
     {
       "title": "今年勇",
       "artist": "许嵩",
       "url": "https://music.163.com/#/song?id=448144319",
-      "percent": "9%;"
+      "percentage": "9%"
     },
     {
       "title": "战斗BGM-纪山",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=28196480",
-      "percent": "8%;"
+      "percentage": "8%"
     },
     {
       "title": "再见二丁目",
       "artist": "杨千嬅",
       "url": "https://music.163.com/#/song?id=316938",
-      "percent": "8%;"
+      "percentage": "8%"
     },
     {
       "title": "剑之旅II",
       "artist": "吴欣叡",
       "url": "https://music.163.com/#/song?id=32548529",
-      "percent": "8%;"
+      "percentage": "8%"
     },
     {
       "title": "如果没有你",
       "artist": "莫文蔚",
       "url": "https://music.163.com/#/song?id=277111",
-      "percent": "8%;"
+      "percentage": "8%"
     },
     {
       "title": "紫禁花园 (2012版)",
       "artist": "李志辉",
       "url": "https://music.163.com/#/song?id=30413272",
-      "percent": "8%;"
+      "percentage": "8%"
     },
     {
       "title": "Ezio's Family",
       "artist": "6＆9",
       "url": "https://music.163.com/#/song?id=549433680",
-      "percent": "8%;"
+      "percentage": "8%"
     },
     {
       "title": "修罗之扉",
       "artist": "曾志豪",
       "url": "https://music.163.com/#/song?id=31341363",
-      "percent": "8%;"
+      "percentage": "8%"
     },
     {
       "title": "Silly",
       "artist": "家入レオ",
       "url": "https://music.163.com/#/song?id=29744742",
-      "percent": "8%;"
+      "percentage": "8%"
     },
     {
       "title": "Arrietty's Song (借りぐらしのアリエッティ)",
       "artist": "Cécile Corbel",
       "url": "https://music.163.com/#/song?id=470759251",
-      "percent": "8%;"
+      "percentage": "8%"
     },
     {
       "title": "En La Mar",
       "artist": "Cécile Corbel",
       "url": "https://music.163.com/#/song?id=2324651",
-      "percent": "7%;"
+      "percentage": "7%"
     },
     {
       "title": "The Beginning (Against The Current Cover)",
       "artist": "Against the Current",
       "url": "https://music.163.com/#/song?id=408277200",
-      "percent": "7%;"
+      "percentage": "7%"
     },
     {
       "title": "山の向こうへ",
       "artist": "松本穂香",
       "url": "https://music.163.com/#/song?id=1301299102",
-      "percent": "7%;"
+      "percentage": "7%"
     },
     {
       "title": "The Beginning (Unplugged Ver.)",
       "artist": "ONE OK ROCK",
       "url": "https://music.163.com/#/song?id=411315225",
-      "percent": "7%;"
+      "percentage": "7%"
     },
     {
       "title": "Lemon",
       "artist": "米津玄師",
       "url": "https://music.163.com/#/song?id=536622304",
-      "percent": "7%;"
+      "percentage": "7%"
     },
     {
       "title": "Ni La Fuerza Del Destino",
       "artist": "Yanni",
       "url": "https://music.163.com/#/song?id=32694623",
-      "percent": "7%;"
+      "percentage": "7%"
     },
     {
       "title": "Mighty Long Fall (Unplugged Ver.)",
       "artist": "ONE OK ROCK",
       "url": "https://music.163.com/#/song?id=411315224",
-      "percent": "7%;"
+      "percentage": "7%"
     },
     {
       "title": "下完这场雨",
       "artist": "后弦",
       "url": "https://music.163.com/#/song?id=434550534",
-      "percent": "7%;"
+      "percentage": "7%"
     },
     {
       "title": "霜天晓角.变调",
       "artist": "骆集益",
       "url": "https://music.163.com/#/song?id=26344052",
-      "percent": "7%;"
+      "percentage": "7%"
     },
     {
       "title": "将军令",
       "artist": "五月天",
       "url": "https://music.163.com/#/song?id=29728114",
-      "percent": "7%;"
+      "percentage": "7%"
     },
     {
       "title": "浮云奔浪",
       "artist": "曾志豪",
       "url": "https://music.163.com/#/song?id=35253065",
-      "percent": "7%;"
+      "percentage": "7%"
     },
     {
       "title": "Where are you",
       "artist": "AniFace",
       "url": "https://music.163.com/#/song?id=453843751",
-      "percent": "7%;"
+      "percentage": "7%"
     },
     {
       "title": "Everybody Wants To Rule The World",
       "artist": "Lorde",
       "url": "https://music.163.com/#/song?id=27965145",
-      "percent": "6%;"
+      "percentage": "6%"
     },
     {
       "title": "降温",
       "artist": "许嵩",
       "url": "https://music.163.com/#/song?id=167727",
-      "percent": "6%;"
+      "percentage": "6%"
     },
     {
       "title": "星月神话（笛子ver.）",
       "artist": "董敏",
       "url": "https://music.163.com/#/song?id=430793672",
-      "percent": "6%;"
+      "percentage": "6%"
     },
     {
       "title": "英雄寞 (08版射雕英雄传主题曲)",
       "artist": "",
       "url": "https://music.163.com/#/song?id=191048",
-      "percent": "6%;"
+      "percentage": "6%"
     },
     {
       "title": "等到烟火清凉",
       "artist": "许嵩",
       "url": "https://music.163.com/#/song?id=28987652",
-      "percent": "6%;"
+      "percentage": "6%"
     },
     {
       "title": "Lemon（翻自 米津玄師）",
       "artist": "Akie秋绘",
       "url": "https://music.163.com/#/song?id=543681750",
-      "percent": "6%;"
+      "percentage": "6%"
     },
     {
       "title": "庞贝",
       "artist": "许嵩",
       "url": "https://music.163.com/#/song?id=1842802205",
-      "percent": "6%;"
+      "percentage": "6%"
     },
     {
       "title": "惘然记",
       "artist": "河图",
       "url": "https://music.163.com/#/song?id=1865399109",
-      "percent": "6%;"
+      "percentage": "6%"
     },
     {
       "title": "法医学は未来のための仕事",
       "artist": "得田真裕",
       "url": "https://music.163.com/#/song?id=543965767",
-      "percent": "6%;"
+      "percentage": "6%"
     },
     {
       "title": "半城烟沙 (合唱版)",
       "artist": "许嵩",
       "url": "https://music.163.com/#/song?id=1496833377",
-      "percent": "6%;"
+      "percentage": "6%"
     },
     {
       "title": "With an Orchid",
       "artist": "Yanni",
       "url": "https://music.163.com/#/song?id=20744788",
-      "percent": "6%;"
+      "percentage": "6%"
     },
     {
       "title": "世界终结前一天",
       "artist": "孙燕姿",
       "url": "https://music.163.com/#/song?id=1900093943",
-      "percent": "6%;"
+      "percentage": "6%"
     },
     {
       "title": "Traces",
       "artist": "Ever So Blue",
       "url": "https://music.163.com/#/song?id=1431399910",
-      "percent": "6%;"
+      "percentage": "6%"
     },
     {
       "title": "昆虫幻想",
       "artist": "丢火车",
       "url": "https://music.163.com/#/song?id=351297",
-      "percent": "6%;"
+      "percentage": "6%"
     },
     {
       "title": "碧海潮生曲",
       "artist": "胡伟立",
       "url": "https://music.163.com/#/song?id=29401654",
-      "percent": "6%;"
+      "percentage": "6%"
     },
     {
       "title": "多余的解释",
       "artist": "许嵩",
       "url": "https://music.163.com/#/song?id=167873",
-      "percent": "6%;"
+      "percentage": "6%"
     },
     {
       "title": "丁家鑫 - 电视剧《射雕英雄传》主题曲－铁血丹心",
       "artist": "丁家鑫",
       "url": "https://music.163.com/#/song?id=527008881",
-      "percent": "5%;"
+      "percentage": "5%"
     },
     {
       "title": "寒衣调",
       "artist": "河图",
       "url": "https://music.163.com/#/song?id=101138",
-      "percent": "5%;"
+      "percentage": "5%"
     },
     {
       "title": "刀间鼓",
       "artist": "曾志豪",
       "url": "https://music.163.com/#/song?id=35253061",
-      "percent": "5%;"
+      "percentage": "5%"
     },
     {
       "title": "Five Hundred Miles（500英里）",
       "artist": "水冰火星",
       "url": "https://music.163.com/#/song?id=456869610",
-      "percent": "5%;"
+      "percentage": "5%"
     },
     {
       "title": "清白之年",
       "artist": "朴树",
       "url": "https://music.163.com/#/song?id=475072295",
-      "percent": "5%;"
+      "percentage": "5%"
     },
     {
       "title": "九转功成 影之刃两周年纪念特别Remix",
       "artist": "薄彩生",
       "url": "https://music.163.com/#/song?id=431795042",
-      "percent": "5%;"
+      "percentage": "5%"
     },
     {
       "title": "樱散零乱",
       "artist": "慕寒",
       "url": "https://music.163.com/#/song?id=28568215",
-      "percent": "5%;"
+      "percentage": "5%"
     },
     {
       "title": "剑器近",
       "artist": "曾志豪",
       "url": "https://music.163.com/#/song?id=35253083",
-      "percent": "5%;"
+      "percentage": "5%"
     },
     {
       "title": "The Well",
       "artist": "Shine Dion",
       "url": "https://music.163.com/#/song?id=4281048",
-      "percent": "5%;"
+      "percentage": "5%"
     }
   ]
 }
