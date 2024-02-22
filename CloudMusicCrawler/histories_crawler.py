@@ -1,5 +1,6 @@
 from playwright.async_api import Playwright
 from bs4 import BeautifulSoup
+import time
 
 async def run_extract(playwright: Playwright, target):
     chromium = playwright.chromium
@@ -7,7 +8,8 @@ async def run_extract(playwright: Playwright, target):
     page = await browser.new_page()
     await page.goto(target)
     weekly_histories = await extract_histories(page)
-    #await switch_histories(page)
+    await switch_histories(page)
+    time.sleep(2.5)
     all_histories = await extract_histories(page)
     await browser.close()
     return {"weekly": weekly_histories, "all": all_histories}
@@ -19,8 +21,8 @@ async def extract_histories(page):
 
 async def switch_histories(page, showAll=True):
     contentFrame = page.main_frame.child_frames[0]
-    eleId = "songsall" if showAll else "songsweek"
-    await contentFrame.page.get_by_test_id(eleId).click()
+    eleId = "#songsall" if showAll else "#songsweek"
+    await contentFrame.locator(eleId).click()
 
 def extract(html):
     soup = BeautifulSoup(html, "lxml")
@@ -30,5 +32,11 @@ def extract(html):
         ele_span_text = ele_li.find("span", class_="txt")
         ele_span_song = ele_span_text.find("a")
         ele_span_artist = ele_span_song.next_sibling
-        ele_span_artist = ele_span_artist.find("a")
-        yield { "title": ele_span_song.get_text(), "artist": ele_span_artist.get_text(), "url": "https://music.163.com/#" + ele_span_song['href']}
+        ele_span_artist = ele_span_artist.find("a") if ele_span_artist != None else None
+        ele_span_percent = ele_li.find("span", class_="bg")
+        yield { 
+            "title": ele_span_song.get_text(), 
+            "artist": "" if ele_span_artist == None else ele_span_artist.get_text(), 
+            "url": "https://music.163.com/#" + ele_span_song['href'],
+            "percentage": "" if ele_span_percent == None else ele_span_percent.attrs["style"].replace('width:','')
+        }
