@@ -5,6 +5,7 @@ from langchain.vectorstores.base import VectorStoreRetriever
 from langchain.memory import ConversationBufferMemory
 from rich.console import Console
 from rich.prompt import Prompt
+from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 import os, pickle, glob
 
 os.environ["OPENAI_API_KEY"] = ""
@@ -22,7 +23,8 @@ def get_basic_qa_chain(baseUrl='', apiKey='', storeFilePath=''):
         temperature=0, 
         openai_api_base=baseUrl, 
         openai_api_key=apiKey,
-        streaming=True
+        streaming=True,
+        callbacks=[StreamingStdOutCallbackHandler()]
     )
     retriever = load_retriever(storeFilePath)
     memory = ConversationBufferMemory(
@@ -79,12 +81,14 @@ if __name__ == "__main__":
     while True:
         default_question = "请根据你掌握的知识，介绍一下《追风筝的人》这本书的主要内容"
         question = Prompt.ask("[blue]Question[blue]", default=default_question, show_default=False)
-        result = chain.invoke(question)
-        console.print("[green]Answer: [/green]" + result['answer'] + "\r\n" + "[green]Reference: [/green]")
+        for chunk in chain.stream(question):
+            print(chunk)
 
-        for i in range(len(result['source_documents'])):
-            document = result['source_documents'][i]
-            if 'page' in document.metadata.keys():
-                console.print(f"{i+1}. {document.metadata['source']} - {document.metadata['page']} \r\n {document.page_content.strip()}\r\n")
-            else:
-                console.print(f"{i+1}. {document.metadata['source']} \r\n {document.page_content.strip()}\r\n")
+        # console.print("[green]Answer: [/green]" + result['answer'] + "\r\n" + "[green]Reference: [/green]")
+
+        # for i in range(len(result['source_documents'])):
+        #     document = result['source_documents'][i]
+        #     if 'page' in document.metadata.keys():
+        #         console.print(f"{i+1}. {document.metadata['source']} - {document.metadata['page']} \r\n {document.page_content.strip()}\r\n")
+        #     else:
+        #         console.print(f"{i+1}. {document.metadata['source']} \r\n {document.page_content.strip()}\r\n")
