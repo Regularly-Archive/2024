@@ -68,7 +68,8 @@ def create_vectors_store_from_web(url, outputPath):
     with open(outputPath, "wb") as f:
         pickle.dump(vectorstore, f)
 
-create_vectors_store_from_text("./input/金庸武侠小说全集", "./output/金庸武侠小说全集.pkl")
-create_vectors_store_from_generic("D:\Projects\hugo-blog\content\posts", "*.md", "./output/个人博客.pkl")
-create_vectors_store_from_pdf("./input/文学作品", "./output/文学作品.pkl")
-create_vectors_store_from_web("https://learn.microsoft.com/zh-cn/aspnet/core/tutorials/min-web-api?view=aspnetcore-8.0&tabs=visual-studio", "./output/MSDN.pkl")
+if __name__ == '__main__':
+    create_vectors_store_from_text("./input/金庸武侠小说全集", "./output/金庸武侠小说全集.pkl")
+    create_vectors_store_from_generic("D:\Projects\hugo-blog\content\posts", "*.md", "./output/个人博客.pkl")
+    create_vectors_store_from_pdf("./input/文学作品", "./output/文学作品.pkl")
+    create_vectors_store_from_web("https://learn.microsoft.com/zh-cn/aspnet/core/tutorials/min-web-api?view=aspnetcore-8.0&tabs=visual-studio", "./output/MSDN.pkl")
