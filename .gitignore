@@ -18,3 +18,5 @@ HttpClientTesting/WeatherAPI/obj/
 HttpClientTesting/WeatherAPI/bin/
 HttpClientTesting/HttpClientTesting/obj/
 KnowledgeBase/output/
+KnowledgeBase/uploads/
+KnowledgeBase/__pycache__/
