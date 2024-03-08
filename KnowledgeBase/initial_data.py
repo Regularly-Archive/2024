@@ -1,6 +1,9 @@
 from langchain.text_splitter import CharacterTextSplitter, RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import DirectoryLoader, TextLoader, PyPDFLoader, WebBaseLoader
 from langchain_community.vectorstores.faiss import FAISS
+# pip install pgvector
+from langchain.vectorstores.pgvector import PGVector
+from langchain.vectorstores.pgembedding import PGEmbedding
 from langchain_community.embeddings import HuggingFaceEmbeddings
 import os, pickle
 

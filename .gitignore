@@ -20,3 +20,6 @@ HttpClientTesting/HttpClientTesting/obj/
 KnowledgeBase/output/
 KnowledgeBase/uploads/
 KnowledgeBase/__pycache__/
+PostgreSQL.Embedding/.vs/
+PostgreSQL.Embedding/PostgreSQL.Embedding/obj/
+PostgreSQL.Embedding/PostgreSQL.Embedding/Upload/
