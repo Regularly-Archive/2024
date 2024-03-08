@@ -8,5 +8,6 @@
         public string Prompt { get; set; }
         public string TextModel { get; set; }
         public int ServiceProvider { get; set; }
+        public int Temperature { get; set; }
     }
 }
