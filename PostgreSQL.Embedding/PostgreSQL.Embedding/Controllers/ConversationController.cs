@@ -10,19 +10,19 @@ namespace PostgreSQL.Embedding.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class ChatController : ControllerBase
+    public class ConversationController : ControllerBase
     {
-        private readonly IConversationService _chatService;
-        public ChatController(IConversationService chatService)
+        private readonly IConversationService _conversationService;
+        public ConversationController(IConversationService conversationService)
         {
-            _chatService = chatService;
+            _conversationService = conversationService;
         }
 
         [HttpPost]
         [Route("{appId}")]
         public async Task Chat(OpenAIModel model, string appId)
         {
-            await _chatService.Chat(model, appId, HttpContext);
+            await _conversationService.Invoke(model, appId, HttpContext);
         }
     }
 }

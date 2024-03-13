@@ -25,7 +25,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient();
-builder.Services.AddScoped<IConversationService, conversationService>();
+builder.Services.AddScoped<IConversationService, ConversationService>();
 builder.Services.AddScoped<IUserInfoService, UserInfoService>();
 builder.Services.AddScoped<IEmbeddingService, SKEmbeddingService>();
 builder.Services.AddScoped<IKernelService, KernalService>();
