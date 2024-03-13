@@ -17,7 +17,7 @@ using System.Text;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
-    public class RAGChatService
+    public class RAGConversationService
     {
         private readonly Kernel _kernel;
         private readonly LlmApp _app;
@@ -39,7 +39,7 @@ namespace PostgreSQL.Embedding.LlmServices
         The Question is: {{$question}}.
         ";
 
-        public RAGChatService(Kernel kernel, LlmApp app, IServiceProvider serviceProvider, IMemoryService memoryService)
+        public RAGConversationService(Kernel kernel, LlmApp app, IServiceProvider serviceProvider, IMemoryService memoryService)
         {
             _kernel = kernel;
             _app = app;

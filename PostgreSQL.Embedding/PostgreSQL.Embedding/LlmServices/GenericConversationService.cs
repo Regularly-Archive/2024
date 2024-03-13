@@ -8,11 +8,11 @@ using System.Text;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
-    public class GenericChatService
+    public class GenericConversationService
     {
         private readonly Kernel _kernel;
         private readonly LlmApp _app;
-        public GenericChatService(Kernel kernel, LlmApp app)
+        public GenericConversationService(Kernel kernel, LlmApp app)
         {
             _kernel = kernel;
             _app = app;

@@ -13,13 +13,13 @@ using System.Text;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
-    public class conversationService : IConversationService
+    public class ConversationService : IConversationService
     {
         private readonly IMemoryService _memoryService;
         private readonly IKernelService _kernelService;
         private readonly IServiceProvider _serviceProvider;
         private readonly SimpleClient<LlmApp> _llmAppRepository;
-        public conversationService(IServiceProvider serviceProvider, SimpleClient<LlmApp> llmAppRepository, IKernelService kernelService, IMemoryService memoryService)
+        public ConversationService(IServiceProvider serviceProvider, SimpleClient<LlmApp> llmAppRepository, IKernelService kernelService, IMemoryService memoryService)
         {
             _kernelService = kernelService;
             _memoryService = memoryService;
@@ -27,7 +27,7 @@ namespace PostgreSQL.Embedding.LlmServices
             _llmAppRepository = llmAppRepository;
         }
 
-        public async Task Chat(OpenAIModel model, string sk, HttpContext HttpContext)
+        public async Task Invoke(OpenAIModel model, string sk, HttpContext HttpContext)
         {
             // Todo: 从 sk 中解析应用信息
             var appId = long.Parse(sk);
@@ -39,11 +39,11 @@ namespace PostgreSQL.Embedding.LlmServices
             switch (app.AppType)
             {
                 case (int)LlmAppType.Chat:
-                    var genericChatService = new GenericChatService(kernel, app);
+                    var genericChatService = new GenericConversationService(kernel, app);
                     await genericChatService.HandleChat(model, HttpContext, input);
                     break;
                 case (int)LlmAppType.Knowledge:
-                    var knowledgeBasedChatService = new RAGChatService(kernel, app, _serviceProvider, _memoryService);
+                    var knowledgeBasedChatService = new RAGConversationService(kernel, app, _serviceProvider, _memoryService);
                     await knowledgeBasedChatService.HandleKnowledge(HttpContext, input);
                     break;
             }
