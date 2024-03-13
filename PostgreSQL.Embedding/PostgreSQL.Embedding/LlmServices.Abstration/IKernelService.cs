@@ -1,9 +1,10 @@
 ﻿using Microsoft.SemanticKernel;
+using PostgreSQL.Embedding.DataAccess.Entities;
 
 namespace PostgreSQL.Embedding.LlmServices.Abstration
 {
     public interface IKernelService
     {
-        Kernel GetKernel(long appId);
+        Task<Kernel> GetKernel(LlmApp app);
     }
 }
