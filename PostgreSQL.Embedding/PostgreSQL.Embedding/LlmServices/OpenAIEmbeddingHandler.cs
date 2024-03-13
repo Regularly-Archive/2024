@@ -1,22 +1,32 @@
 ﻿using Microsoft.Extensions.Options;
 using PostgreSQL.Embedding.Common;
+using PostgreSQL.Embedding.DataAccess.Entities;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
     public class OpenAIEmbeddingHandler : HttpClientHandler
     {
+        private readonly LlmModel _llmModel;
         private readonly IOptions<LlmConfig> _llmConfigOptions;
-        private readonly LlmServiceProvider _llmServiceProvider;
-        public OpenAIEmbeddingHandler(IOptions<LlmConfig> llmConfigOptions, LlmServiceProvider llmServiceProvider)
+        public OpenAIEmbeddingHandler(LlmModel llmModel, IOptions<LlmConfig> llmConfigOptions)
         {
+            _llmModel = llmModel;
             _llmConfigOptions = llmConfigOptions;
-            _llmServiceProvider = llmServiceProvider;
         }
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            var requestUrl = string.Format(_llmConfigOptions.Value?.EmbeddingEndpoint, _llmServiceProvider.ToString());
-            request.RequestUri = new Uri(requestUrl);
+            var llmServiceProvider = (LlmServiceProvider)_llmModel.ServiceProvider;
+            if (llmServiceProvider != LlmServiceProvider.OpenAI)
+            {
+                var requestUrl = string.Format(_llmConfigOptions.Value?.EmbeddingEndpoint, llmServiceProvider.ToString());
+                request.RequestUri = new Uri(requestUrl);
+            }
+
+            if (!string.IsNullOrEmpty(_llmModel.BaseUrl))
+            {
+                request.RequestUri = new Uri(_llmModel.BaseUrl);
+            }
             return base.SendAsync(request, cancellationToken);
         }
     }

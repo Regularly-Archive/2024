@@ -43,7 +43,6 @@ namespace PostgreSQL.Embedding.LlmServices.LLama
             OpenAIResult result = new OpenAIResult();
             result.created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             result.choices = new List<ChoicesModel>() { new ChoicesModel() { message = new OpenAIMessage() { role = "assistant" } } };
-
             result.choices[0].message.content = await _lLamaChatService.ChatAsync(questions); ;
             HttpContext.Response.ContentType = "application/json";
             await HttpContext.Response.WriteAsync(JsonConvert.SerializeObject(result));

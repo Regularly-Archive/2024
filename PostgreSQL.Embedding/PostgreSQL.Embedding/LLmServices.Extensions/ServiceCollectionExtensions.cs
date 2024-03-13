@@ -1,4 +1,7 @@
-﻿using PostgreSQL.Embedding.LlmServices.LLama;
+﻿using Azure.AI.OpenAI;
+using PostgreSQL.Embedding.Common.Confirguration;
+using PostgreSQL.Embedding.LlmServices.HuggingFace;
+using PostgreSQL.Embedding.LlmServices.LLama;
 
 namespace PostgreSQL.Embedding.LLmServices.Extensions
 {
@@ -10,6 +13,15 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
                 .AddSingleton<LLamaChatService>()
                 .AddSingleton<LLamaEmbeddingService>()
                 .AddSingleton<LLamaService>();
+        }
+
+        public static IServiceCollection AddHuggingFace(this IServiceCollection services)
+        {
+            services
+                .AddSingleton<HuggingFaceEmbeddingService>()
+                .AddSingleton<HuggingFaceService>();
+
+            return services;
         }
     }
 }

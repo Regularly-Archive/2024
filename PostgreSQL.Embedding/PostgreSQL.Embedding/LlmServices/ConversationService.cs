@@ -2,31 +2,38 @@
 using Microsoft.KernelMemory;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
-using Microsoft.SemanticKernel.Plugins.Core;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
+using SqlSugar;
 using System.Reflection.Metadata;
 using System.Text;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
-    public class ChatService : IChatService
+    public class conversationService : IConversationService
     {
+        private readonly IMemoryService _memoryService;
+        private readonly IKernelService _kernelService;
         private readonly IServiceProvider _serviceProvider;
-        public ChatService(IServiceProvider serviceProvider)
+        private readonly SimpleClient<LlmApp> _llmAppRepository;
+        public conversationService(IServiceProvider serviceProvider, SimpleClient<LlmApp> llmAppRepository, IKernelService kernelService, IMemoryService memoryService)
         {
+            _kernelService = kernelService;
+            _memoryService = memoryService;
             _serviceProvider = serviceProvider;
+            _llmAppRepository = llmAppRepository;
         }
 
         public async Task Chat(OpenAIModel model, string sk, HttpContext HttpContext)
         {
             // Todo: 从 sk 中解析应用信息
+            var appId = long.Parse(sk);
 
-            var app = new LlmApp();
-            var kernel = CreateKernel(app);
+            var app = _llmAppRepository.GetById(appId);
+            var kernel = await _kernelService.GetKernel(app);
 
             var input = await SummarizeHistories(model, kernel);
             switch (app.AppType)
@@ -36,25 +43,10 @@ namespace PostgreSQL.Embedding.LlmServices
                     await genericChatService.HandleChat(model, HttpContext, input);
                     break;
                 case (int)LlmAppType.Knowledge:
-                    var knowledgeBasedChatService = new KnowledgeBaseChatService(kernel, app, _serviceProvider);
+                    var knowledgeBasedChatService = new RAGChatService(kernel, app, _serviceProvider, _memoryService);
                     await knowledgeBasedChatService.HandleKnowledge(HttpContext, input);
                     break;
             }
-        }
-
-        private Kernel CreateKernel(LlmApp app)
-        {
-            var options = _serviceProvider.GetRequiredService<IOptions<LlmConfig>>();
-
-            // 提取 App 的服务提供商
-            app.ServiceProvider = (int)LlmServiceProvider.LLama;
-
-            var httpClient = new HttpClient(new OpenAIChatHandler(options, (LlmServiceProvider)app.ServiceProvider));
-            var kernel = Kernel.CreateBuilder()
-                .AddOpenAIChatCompletion(modelId: app.TextModel, apiKey: "sk-1234567890", httpClient: httpClient)
-                .Build();
-
-            return kernel;
         }
 
         private async Task<string> SummarizeHistories(OpenAIModel model, Kernel kernel)

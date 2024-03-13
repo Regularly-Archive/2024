@@ -2,7 +2,7 @@
 
 namespace PostgreSQL.Embedding.LlmServices.Abstration
 {
-    public interface IChatService
+    public interface IConversationService
     {
         Task Chat(OpenAIModel model, string sk, HttpContext HttpContext);
     }

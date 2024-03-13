@@ -5,6 +5,7 @@ using LLamaSharp.KernelMemory;
 using LLama;
 using System;
 using PostgreSQL.Embedding.LlmServices.Abstration;
+using DocumentFormat.OpenXml.InkML;
 
 namespace PostgreSQL.Embedding.LlmServices.LLama
 {
@@ -49,6 +50,7 @@ namespace PostgreSQL.Embedding.LlmServices.LLama
                 _continue = true;
             }
             _logger.LogInformation("Input: {text}", input);
+            HandleChatHistories();
             var outputs = _session.ChatAsync(
                 new ChatHistory.Message(AuthorRole.User, input),
                 new InferenceParams()
@@ -64,7 +66,7 @@ namespace PostgreSQL.Embedding.LlmServices.LLama
                 result += output;
             }
 
-            return result;
+            return result.Trim();
         }
 
         public async IAsyncEnumerable<string> ChatStreamAsync(string input)
@@ -76,7 +78,7 @@ namespace PostgreSQL.Embedding.LlmServices.LLama
             }
 
             _logger.LogInformation(input);
-
+            HandleChatHistories();
             var outputs = _session.ChatAsync(
                 new ChatHistory.Message(AuthorRole.User, input!)
                 , new InferenceParams()
@@ -90,6 +92,13 @@ namespace PostgreSQL.Embedding.LlmServices.LLama
                 _logger.LogInformation(output);
                 yield return output;
             }
+        }
+
+        private void HandleChatHistories()
+        {
+
+            _session.History.Messages.Clear();
+            _session.History.AddMessage(AuthorRole.System, SystemPrompt);
         }
     }
 }

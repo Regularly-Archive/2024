@@ -14,17 +14,27 @@ using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.LlmServices;
 using DocumentFormat.OpenXml.Office2016.Drawing.ChartDrawing;
 using Microsoft.VisualBasic.FileIO;
+using SqlSugar;
+using PostgreSQL.Embedding.Services;
+using Microsoft.Extensions.Azure;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<IConversationService, conversationService>();
+builder.Services.AddScoped<IUserInfoService, UserInfoService>();
 builder.Services.AddScoped<IEmbeddingService, SKEmbeddingService>();
+builder.Services.AddScoped<IKernelService, KernalService>();
+builder.Services.AddScoped<IMemoryService, PostgreSQL.Embedding.LlmServices.MemoryService>();
 builder.Services.AddDbContext<VectorsDbContext>(opt =>
 {
     opt.UseNpgsql(builder.Configuration["ConnectionStrings:Default"], x => x.UseVector());
 });
+
 builder.Services.AddSingleton<LLamaEmbedder>(sp =>
 {
     var modelPath = Path.Combine(builder.Environment.ContentRootPath, builder.Configuration["LLamaConfig:ModelPath"]!);
@@ -33,7 +43,20 @@ builder.Services.AddSingleton<LLamaEmbedder>(sp =>
     var embedder = new LLamaEmbedder(weights, @params);
     return embedder;
 });
-builder.Services.AddLLama();
+builder.Services.AddScoped<ISqlSugarClient, SqlSugarClient>(sp =>
+{
+    var sqlSugarClient = new SqlSugarClient(new ConnectionConfig()
+    {
+        DbType = DbType.PostgreSQL,
+        InitKeyType = InitKeyType.Attribute,
+        IsAutoCloseConnection = true,
+        ConnectionString = builder.Configuration["ConnectionStrings:Default"]
+    });
+
+    return sqlSugarClient;
+});
+builder.Services.AddScoped(typeof(SimpleClient<>));
+builder.Services.AddLLama().AddHuggingFace();
 builder.Services.Configure<LlmConfig>(builder.Configuration.GetSection(nameof(LlmConfig)));
 builder.Services.AddSingleton<ILlmServiceFactory, LlmServiceFactory>();
 builder.Services.AddScoped<IKnowledgeBaseService, KnowledgeBaseService>();

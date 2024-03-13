@@ -53,7 +53,7 @@ namespace PostgreSQL.Embedding.LlmServices
             }
 
             var temperature = _app.Temperature / 100;
-            OpenAIPromptExecutionSettings settings = new() { Temperature = temperature };
+            OpenAIPromptExecutionSettings settings = new() { Temperature = (double)temperature };
             var func = _kernel.CreateFunctionFromPrompt(_app.Prompt, settings);
             var chatResult = _kernel.InvokeStreamingAsync<StreamingChatMessageContent>(function: func, arguments: new KernelArguments() { ["input"] = input });
 
@@ -81,7 +81,7 @@ namespace PostgreSQL.Embedding.LlmServices
             }
 
             var temperature = _app.Temperature / 100;
-            var settings = new OpenAIPromptExecutionSettings() { Temperature = temperature };
+            var settings = new OpenAIPromptExecutionSettings() { Temperature = (double)temperature };
             var func = _kernel.CreateFunctionFromPrompt(_app.Prompt, settings);
             var chatResult = await _kernel.InvokeAsync(function: func, arguments: new KernelArguments() { ["input"] = input });
             var answers = chatResult.GetValue<string>();
