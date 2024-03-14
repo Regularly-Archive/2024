@@ -31,7 +31,7 @@ namespace PostgreSQL.Embedding.LlmServices
             _knowledgeBaseRepository = serviceProvider.GetService<SimpleClient<KnowledgeBase>>();
         }
 
-        public async Task<T> CreateByApp<T>(LlmApp app) where T : class, IKernelMemory
+        public async Task<MemoryServerless> CreateByApp(LlmApp app)
         {
             var generationModel = await _llmModelRepository.GetFirstAsync(x => x.ModelType == (int)ModelType.TextGeneration && x.ModelName == app.TextModel);
 
@@ -45,7 +45,7 @@ namespace PostgreSQL.Embedding.LlmServices
             var postgresConfig = new PostgresConfig()
             {
                 ConnectionString = _configuration["ConnectionStrings:Default"]!,
-                TableNamePrefix = "sk_",
+                TableNamePrefix = $"sk_",
             };
 
             // Todo
@@ -66,7 +66,7 @@ namespace PostgreSQL.Embedding.LlmServices
                     OverlappingTokens = DefaultTextPartitioningOptions.OverlappingTokens
                 });
 
-            return memoryBuilder.Build<T>();
+            return memoryBuilder.Build<MemoryServerless>();
         }
 
         public async Task<MemoryServerless> CreateByKnowledgeBase(KnowledgeBase knowledgeBase)
@@ -81,7 +81,7 @@ namespace PostgreSQL.Embedding.LlmServices
             var postgresConfig = new PostgresConfig()
             {
                 ConnectionString = _configuration["ConnectionStrings:Default"]!,
-                TableNamePrefix = "sk_"
+                TableNamePrefix = $"sk_"
             };
 
             // Todo

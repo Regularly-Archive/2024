@@ -40,11 +40,12 @@ namespace PostgreSQL.Embedding.LlmServices
             {
                 case (int)LlmAppType.Chat:
                     var genericChatService = new GenericConversationService(kernel, app);
-                    await genericChatService.HandleChat(model, HttpContext, input);
+                    await genericChatService.InvokeAsync(model, HttpContext, input);
                     break;
                 case (int)LlmAppType.Knowledge:
-                    var knowledgeBasedChatService = new RAGConversationService(kernel, app, _serviceProvider, _memoryService);
-                    await knowledgeBasedChatService.HandleKnowledge(HttpContext, input);
+                    var memoryServerless = await _memoryService.CreateByApp(app);
+                    var ragChatService = new RAGConversationService(kernel, app, _serviceProvider, memoryServerless);
+                    await ragChatService.InvokeAsync(model, HttpContext, input);
                     break;
             }
         }

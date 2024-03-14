@@ -18,34 +18,40 @@ namespace PostgreSQL.Embedding.LlmServices
             _app = app;
         }
 
-        public async Task HandleChat(OpenAIModel model, HttpContext HttpContext, string input)
+        public async Task InvokeAsync(OpenAIModel model, HttpContext HttpContext, string input)
         {
             if (model.stream)
             {
                 var stramingResult = new OpenAIStreamResult();
                 stramingResult.created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                 stramingResult.choices = new List<StreamChoicesModel>() { new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant" } } };
-                await HandleStramingChat(HttpContext, stramingResult, input);
+                await InvokeStramingChat(HttpContext, stramingResult, input);
                 HttpContext.Response.ContentType = "application/json";
                 await HttpContext.Response.WriteAsync(JsonConvert.SerializeObject(stramingResult));
                 await HttpContext.Response.CompleteAsync();
-                return;
             }
             else
             {
                 var result = new OpenAIResult();
                 result.created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                 result.choices = new List<ChoicesModel>() { new ChoicesModel() { message = new OpenAIMessage() { role = "assistant" } } };
-                result.choices[0].message.content = await HandleNormalChat(input);
+                result.choices[0].message.content = await InvokeChat(input);
                 HttpContext.Response.ContentType = "application/json";
                 await HttpContext.Response.WriteAsync(JsonConvert.SerializeObject(result));
                 await HttpContext.Response.CompleteAsync();
             }
         }
 
-        private async Task HandleStramingChat(HttpContext HttpContext, OpenAIStreamResult result, string input)
+        /// <summary>
+        /// 流式聊天
+        /// </summary>
+        /// <param name="HttpContext"></param>
+        /// <param name="result"></param>
+        /// <param name="input"></param>
+        /// <returns></returns>
+        private async Task InvokeStramingChat(HttpContext HttpContext, OpenAIStreamResult result, string input)
         {
-            HttpContext.Response.Headers.Add("Content-Type", "text/event-stream");
+            HttpContext.Response.Headers.ContentType = new Microsoft.Extensions.Primitives.StringValues("text/event-stream");
 
             if (string.IsNullOrEmpty(_app.Prompt) || !_app.Prompt.Contains("{{$input}}"))
             {
@@ -72,7 +78,12 @@ namespace PostgreSQL.Embedding.LlmServices
             await HttpContext.Response.CompleteAsync();
         }
 
-        private async Task<string> HandleNormalChat(string input)
+        /// <summary>
+        /// 普通聊天
+        /// </summary>
+        /// <param name="input"></param>
+        /// <returns></returns>
+        private async Task<string> InvokeChat(string input)
         {
             string result = "";
             if (string.IsNullOrEmpty(_app.Prompt) || !_app.Prompt.Contains("{{$input}}"))
