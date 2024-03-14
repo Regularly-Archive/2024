@@ -96,5 +96,31 @@ namespace PostgreSQL.Embedding.Controllers
                 ImportingTaskId = embeddingTaskId
             });
         }
+
+        [HttpGet("{knowledgeBaseId}/details")]
+        public async Task<JsonResult> GetKnowledgeBaseDetails(long knowledgeBaseId)
+        {
+            var details = await _knowledgeBaseService.GetKnowledgeBaseDetails(knowledgeBaseId);
+            return new JsonResult(details);
+        }
+
+        [HttpGet("{knowledgeBaseId}/details/{fileName}")]
+        public async Task<JsonResult> GetKnowledgeBaseDetailsWithFileName(long knowledgeBaseId, string fileName = null)
+        {
+            var details = await _knowledgeBaseService.GetKnowledgeBaseDetails(knowledgeBaseId, fileName);
+            return new JsonResult(details);
+        }
+
+        [HttpDelete("{knowledgeBaseId}/details")]
+        public async Task DeleteKnowledges(long knowledgeBaseId)
+        {
+            await _knowledgeBaseService.DeleteKnowledgesById(knowledgeBaseId);
+        }
+
+        [HttpDelete("{knowledgeBaseId}/details/{fileName}")]
+        public async Task DeleteKnowledges(long knowledgeBaseId, string fileName)
+        {
+            await _knowledgeBaseService.DeleteKnowledgesByFileName(knowledgeBaseId, fileName);
+        }
     }
 }
