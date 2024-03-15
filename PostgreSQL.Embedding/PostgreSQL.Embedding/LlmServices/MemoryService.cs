@@ -18,25 +18,25 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly IConfiguration _configuration;
         private readonly IServiceProvider _serviceProvider;
         
-        private readonly SimpleClient<LlmModel> _llmModelRepository;
-        private readonly SimpleClient<LlmAppKnowledge> _llmAppKnowledgeRepository;
-        private readonly SimpleClient<KnowledgeBase> _knowledgeBaseRepository;
+        private readonly IRepository<LlmModel> _llmModelRepository;
+        private readonly IRepository<LlmAppKnowledge> _llmAppKnowledgeRepository;
+        private readonly IRepository<KnowledgeBase> _knowledgeBaseRepository;
 
         public MemoryService(IConfiguration configuration, IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;
             _configuration = configuration;
-            _llmModelRepository = serviceProvider.GetService<SimpleClient<LlmModel>>();
-            _llmAppKnowledgeRepository = serviceProvider.GetService<SimpleClient<LlmAppKnowledge>>();
-            _knowledgeBaseRepository = serviceProvider.GetService<SimpleClient<KnowledgeBase>>();
+            _llmModelRepository = serviceProvider.GetService<IRepository<LlmModel>>();
+            _llmAppKnowledgeRepository = serviceProvider.GetService<IRepository<LlmAppKnowledge>>();
+            _knowledgeBaseRepository = serviceProvider.GetService<IRepository<KnowledgeBase>>();
         }
 
         public async Task<MemoryServerless> CreateByApp(LlmApp app)
         {
-            var generationModel = await _llmModelRepository.GetFirstAsync(x => x.ModelType == (int)ModelType.TextGeneration && x.ModelName == app.TextModel);
+            var generationModel = await _llmModelRepository.SingleOrDefaultAsync(x => x.ModelType == (int)ModelType.TextGeneration && x.ModelName == app.TextModel);
 
             var embeddingModelId = await GetEmbeddingModelByKnowledges(app);
-            var embeddingModel = await _llmModelRepository.GetFirstAsync(x => x.ModelType == (int)ModelType.TextEmbedding && x.ModelName == embeddingModelId); 
+            var embeddingModel = await _llmModelRepository.SingleOrDefaultAsync(x => x.ModelType == (int)ModelType.TextEmbedding && x.ModelName == embeddingModelId); 
 
             var options = _serviceProvider.GetRequiredService<IOptions<LlmConfig>>();
             var embeddingHttpClient = new HttpClient(new OpenAIEmbeddingHandler(embeddingModel, options));
@@ -45,7 +45,7 @@ namespace PostgreSQL.Embedding.LlmServices
             var postgresConfig = new PostgresConfig()
             {
                 ConnectionString = _configuration["ConnectionStrings:Default"]!,
-                TableNamePrefix = $"sk_",
+                TableNamePrefix = GenerateTableNamePrefix(embeddingModel),
             };
 
             // Todo
@@ -71,8 +71,8 @@ namespace PostgreSQL.Embedding.LlmServices
 
         public async Task<MemoryServerless> CreateByKnowledgeBase(KnowledgeBase knowledgeBase)
         {
-            var embeddingModel = await _llmModelRepository.GetFirstAsync(x => x.ModelType == (int)ModelType.TextEmbedding && x.ModelName == knowledgeBase.EmbeddingModel);
-            var generationModel = await _llmModelRepository.GetFirstAsync(x => x.ModelType == (int)ModelType.TextGeneration && x.ModelName == "gpt-3.5-turbo");
+            var embeddingModel = await _llmModelRepository.SingleOrDefaultAsync(x => x.ModelType == (int)ModelType.TextEmbedding && x.ModelName == knowledgeBase.EmbeddingModel);
+            var generationModel = await _llmModelRepository.SingleOrDefaultAsync(x => x.ModelType == (int)ModelType.TextGeneration && x.ModelName == "gpt-3.5-turbo");
 
             var options = _serviceProvider.GetRequiredService<IOptions<LlmConfig>>();
             var embeddingHttpClient = new HttpClient(new OpenAIEmbeddingHandler(embeddingModel, options));
@@ -81,7 +81,7 @@ namespace PostgreSQL.Embedding.LlmServices
             var postgresConfig = new PostgresConfig()
             {
                 ConnectionString = _configuration["ConnectionStrings:Default"]!,
-                TableNamePrefix = $"sk_"
+                TableNamePrefix = GenerateTableNamePrefix(embeddingModel),
             };
 
             // Todo
@@ -113,13 +113,23 @@ namespace PostgreSQL.Embedding.LlmServices
             return memoryBuilder.Build<MemoryServerless>();
         }
 
+        private string GenerateTableNamePrefix(LlmModel embeddingModel)
+        {
+            var hashCode = embeddingModel.ModelName.GetHashCode();
+            
+            if (hashCode > 0) return $"sk-{hashCode}-";
+            if (hashCode < 0) return $"sk{hashCode}-";
+
+            return "sk-";
+        }
+
         private async Task<string> GetEmbeddingModelByKnowledges(LlmApp app)
         {
-            var llmAppKnowledges = await _llmAppKnowledgeRepository.GetListAsync(x => x.AppId == app.Id);
+            var llmAppKnowledges = await _llmAppKnowledgeRepository.FindAsync(x => x.AppId == app.Id);
             if (llmAppKnowledges.Any())
             {
                 var knowledgeBaseId = llmAppKnowledges.FirstOrDefault().KnowledgeBaseId;
-                var knowledageBase = await _knowledgeBaseRepository.GetByIdAsync(knowledgeBaseId);
+                var knowledageBase = await _knowledgeBaseRepository.GetAsync(knowledgeBaseId);
                 if (knowledageBase != null)
                     return knowledageBase.EmbeddingModel;
             }

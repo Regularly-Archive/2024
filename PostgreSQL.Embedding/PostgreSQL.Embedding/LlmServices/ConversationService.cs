@@ -5,6 +5,7 @@ using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Models;
+using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using SqlSugar;
@@ -18,8 +19,8 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly IMemoryService _memoryService;
         private readonly IKernelService _kernelService;
         private readonly IServiceProvider _serviceProvider;
-        private readonly SimpleClient<LlmApp> _llmAppRepository;
-        public ConversationService(IServiceProvider serviceProvider, SimpleClient<LlmApp> llmAppRepository, IKernelService kernelService, IMemoryService memoryService)
+        private readonly IRepository<LlmApp> _llmAppRepository;
+        public ConversationService(IServiceProvider serviceProvider, IRepository<LlmApp> llmAppRepository, IKernelService kernelService, IMemoryService memoryService)
         {
             _kernelService = kernelService;
             _memoryService = memoryService;
@@ -32,7 +33,7 @@ namespace PostgreSQL.Embedding.LlmServices
             // Todo: 从 sk 中解析应用信息
             var appId = long.Parse(sk);
 
-            var app = _llmAppRepository.GetById(appId);
+            var app = await _llmAppRepository.GetAsync(appId);
             var kernel = await _kernelService.GetKernel(app);
 
             var input = await SummarizeHistories(model, kernel);
