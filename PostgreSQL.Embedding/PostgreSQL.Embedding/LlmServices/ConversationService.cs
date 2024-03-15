@@ -20,12 +20,20 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly IKernelService _kernelService;
         private readonly IServiceProvider _serviceProvider;
         private readonly IRepository<LlmApp> _llmAppRepository;
-        public ConversationService(IServiceProvider serviceProvider, IRepository<LlmApp> llmAppRepository, IKernelService kernelService, IMemoryService memoryService)
+        private readonly IChatHistoryService _chatHistoryService;
+        public ConversationService(
+            IServiceProvider serviceProvider,
+            IRepository<LlmApp> llmAppRepository,
+            IKernelService kernelService,
+            IMemoryService memoryService,
+            IChatHistoryService chatHistoryService
+            )
         {
             _kernelService = kernelService;
             _memoryService = memoryService;
             _serviceProvider = serviceProvider;
             _llmAppRepository = llmAppRepository;
+            _chatHistoryService = chatHistoryService;
         }
 
         public async Task Invoke(OpenAIModel model, string sk, HttpContext HttpContext)
@@ -36,16 +44,16 @@ namespace PostgreSQL.Embedding.LlmServices
             var app = await _llmAppRepository.GetAsync(appId);
             var kernel = await _kernelService.GetKernel(app);
 
-            var input = await SummarizeHistories(model, kernel);
+            var input = model.messages[model.messages.Count - 1].content;
             switch (app.AppType)
             {
                 case (int)LlmAppType.Chat:
-                    var genericChatService = new GenericConversationService(kernel, app);
+                    var genericChatService = new GenericConversationService(kernel, app, _chatHistoryService);
                     await genericChatService.InvokeAsync(model, HttpContext, input);
                     break;
                 case (int)LlmAppType.Knowledge:
                     var memoryServerless = await _memoryService.CreateByApp(app);
-                    var ragChatService = new RAGConversationService(kernel, app, _serviceProvider, memoryServerless);
+                    var ragChatService = new RAGConversationService(kernel, app, _serviceProvider, memoryServerless, _chatHistoryService);
                     await ragChatService.InvokeAsync(model, HttpContext, input);
                     break;
             }

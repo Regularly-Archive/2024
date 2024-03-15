@@ -55,6 +55,9 @@
     <None Update="Assets\Models\TinyLlama-1.1B\TinyLlama-1.1B-ggml-model-q4_0.bin">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="Common\Prompts\Default.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="Common\Prompts\RAGPrompt.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

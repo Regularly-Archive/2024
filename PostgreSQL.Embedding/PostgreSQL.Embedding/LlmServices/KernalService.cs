@@ -24,7 +24,9 @@ namespace PostgreSQL.Embedding.LlmServices
         {
             var options = _serviceProvider.GetRequiredService<IOptions<LlmConfig>>();
 
-            var llmModel = await _llmModelRepository.SingleOrDefaultAsync(x => x.ModelType == (int)ModelType.TextGeneration && x.ModelName == app.TextModel);
+            var llmModel = await _llmModelRepository.SingleOrDefaultAsync(
+                x => x.ModelType == (int)ModelType.TextGeneration && x.ModelName == app.TextModel
+            );
 
             var httpClient = new HttpClient(new OpenAIChatHandler(llmModel, options));
             var kernel = Kernel.CreateBuilder()

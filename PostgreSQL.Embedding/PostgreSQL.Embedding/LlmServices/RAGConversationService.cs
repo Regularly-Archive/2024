@@ -26,9 +26,10 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly IConfiguration _configuration;
         private readonly IRepository<LlmAppKnowledge> _llmAppKnowledgeRepository;
         private readonly MemoryServerless _memoryServerless;
+        private readonly IChatHistoryService _chatHistoryService;
         private readonly string _promptTemplate;
 
-        public RAGConversationService(Kernel kernel, LlmApp app, IServiceProvider serviceProvider, MemoryServerless memoryServerless)
+        public RAGConversationService(Kernel kernel, LlmApp app, IServiceProvider serviceProvider, MemoryServerless memoryServerless, IChatHistoryService chatHistoryService)
         {
             _kernel = kernel;
             _app = app;
@@ -37,6 +38,7 @@ namespace PostgreSQL.Embedding.LlmServices
             _llmAppKnowledgeRepository = _serviceProvider.GetService<IRepository<LlmAppKnowledge>>();
             _memoryServerless = memoryServerless;
             _promptTemplate = LoadPromptTemplate("RAGPrompt.txt");
+            _chatHistoryService = chatHistoryService;
         }
 
         public async Task InvokeAsync(OpenAIModel model, HttpContext HttpContext, string input)
