@@ -57,6 +57,7 @@ builder.Services.AddScoped<ISqlSugarClient, SqlSugarClient>(sp =>
 });
 builder.Services.AddScoped(typeof(SimpleClient<>));
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+builder.Services.AddScoped<IChatHistoryService, ChatHistoryService>();
 builder.Services.AddLLama().AddHuggingFace();
 builder.Services.Configure<LlmConfig>(builder.Configuration.GetSection(nameof(LlmConfig)));
 builder.Services.AddSingleton<ILlmServiceFactory, LlmServiceFactory>();

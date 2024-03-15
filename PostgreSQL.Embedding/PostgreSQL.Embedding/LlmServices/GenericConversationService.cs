@@ -5,6 +5,7 @@ using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using System.Text;
+using PostgreSQL.Embedding.LLmServices.Extensions;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
@@ -12,23 +13,31 @@ namespace PostgreSQL.Embedding.LlmServices
     {
         private readonly Kernel _kernel;
         private readonly LlmApp _app;
-        public GenericConversationService(Kernel kernel, LlmApp app)
+        private readonly string _promptTemplate;
+        private readonly string _defaultPrompt = "You are a helpful AI bot.";
+        private readonly IChatHistoryService _chatHistoryService;
+        private string _conversationId;
+        public GenericConversationService(Kernel kernel, LlmApp app, IChatHistoryService chatHistoryService)
         {
             _kernel = kernel;
             _app = app;
+            _promptTemplate = LoadPromptTemplate("Default.txt");
+            _chatHistoryService = chatHistoryService;
         }
 
-        public async Task InvokeAsync(OpenAIModel model, HttpContext HttpContext, string input)
+        public async Task InvokeAsync(OpenAIModel model, HttpContext httpContext, string input)
         {
+            _conversationId = httpContext.GetOrCreateConversationId();
+            await _chatHistoryService.AddUserMessage(_app.Id, _conversationId, input);
             if (model.stream)
             {
                 var stramingResult = new OpenAIStreamResult();
                 stramingResult.created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                 stramingResult.choices = new List<StreamChoicesModel>() { new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant" } } };
-                await InvokeStramingChat(HttpContext, stramingResult, input);
-                HttpContext.Response.ContentType = "application/json";
-                await HttpContext.Response.WriteAsync(JsonConvert.SerializeObject(stramingResult));
-                await HttpContext.Response.CompleteAsync();
+                await InvokeStramingChat(httpContext, stramingResult, input);
+                httpContext.Response.ContentType = "application/json";
+                await httpContext.Response.WriteAsync(JsonConvert.SerializeObject(stramingResult));
+                await httpContext.Response.CompleteAsync();
             }
             else
             {
@@ -36,9 +45,9 @@ namespace PostgreSQL.Embedding.LlmServices
                 result.created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                 result.choices = new List<ChoicesModel>() { new ChoicesModel() { message = new OpenAIMessage() { role = "assistant" } } };
                 result.choices[0].message.content = await InvokeChat(input);
-                HttpContext.Response.ContentType = "application/json";
-                await HttpContext.Response.WriteAsync(JsonConvert.SerializeObject(result));
-                await HttpContext.Response.CompleteAsync();
+                httpContext.Response.ContentType = "application/json";
+                await httpContext.Response.WriteAsync(JsonConvert.SerializeObject(result));
+                await httpContext.Response.CompleteAsync();
             }
         }
 
@@ -53,18 +62,21 @@ namespace PostgreSQL.Embedding.LlmServices
         {
             HttpContext.Response.Headers.ContentType = new Microsoft.Extensions.Primitives.StringValues("text/event-stream");
 
-            if (string.IsNullOrEmpty(_app.Prompt) || !_app.Prompt.Contains("{{$input}}"))
-            {
-                _app.Prompt = _app.Prompt + "{{$input}}";
-            }
+            if (string.IsNullOrEmpty(_app.Prompt))
+                _app.Prompt = _defaultPrompt;
 
             var temperature = _app.Temperature / 100;
-            OpenAIPromptExecutionSettings settings = new() { Temperature = (double)temperature };
+            var settings = new OpenAIPromptExecutionSettings() { Temperature = (double)temperature };
             var func = _kernel.CreateFunctionFromPrompt(_app.Prompt, settings);
-            var chatResult = _kernel.InvokeStreamingAsync<StreamingChatMessageContent>(function: func, arguments: new KernelArguments() { ["input"] = input });
+            var chatResult = _kernel.InvokeStreamingAsync<StreamingChatMessageContent>(
+                function: func,
+                arguments: new KernelArguments() { ["input"] = input, ["system"] = _app.Prompt }
+            );
 
+            var answerBuilder = new StringBuilder();
             await foreach (var content in chatResult)
             {
+                if (!string.IsNullOrEmpty(content.Content)) answerBuilder.Append(content.Content);
                 result.choices[0].delta.content = content.Content ?? string.Empty;
                 string message = $"data: {JsonConvert.SerializeObject(result)}\n\n";
                 await HttpContext.Response.WriteAsync(message, Encoding.UTF8);
@@ -72,9 +84,9 @@ namespace PostgreSQL.Embedding.LlmServices
                 await Task.Delay(TimeSpan.FromMilliseconds(50));
             }
 
+            await _chatHistoryService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());
             await HttpContext.Response.WriteAsync("data: [DONE]");
             await HttpContext.Response.Body.FlushAsync();
-
             await HttpContext.Response.CompleteAsync();
         }
 
@@ -85,19 +97,39 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <returns></returns>
         private async Task<string> InvokeChat(string input)
         {
-            string result = "";
-            if (string.IsNullOrEmpty(_app.Prompt) || !_app.Prompt.Contains("{{$input}}"))
-            {
-                _app.Prompt = _app.Prompt + "{{$input}}";
-            }
+            if (string.IsNullOrEmpty(_app.Prompt))
+                _app.Prompt = _defaultPrompt;
 
             var temperature = _app.Temperature / 100;
             var settings = new OpenAIPromptExecutionSettings() { Temperature = (double)temperature };
-            var func = _kernel.CreateFunctionFromPrompt(_app.Prompt, settings);
-            var chatResult = await _kernel.InvokeAsync(function: func, arguments: new KernelArguments() { ["input"] = input });
-            var answers = chatResult.GetValue<string>();
-            if (!string.IsNullOrEmpty(answers)) return answers;
-            return result;
+            var func = _kernel.CreateFunctionFromPrompt(_promptTemplate, settings);
+            var chatResult = await _kernel.InvokeAsync(
+                function: func,
+                arguments: new KernelArguments() { ["input"] = input, ["system"] = _app.Prompt }
+            );
+            var answer = chatResult.GetValue<string>();
+            if (!string.IsNullOrEmpty(answer))
+            {
+                await _chatHistoryService.AddSystemMessage(_app.Id, _conversationId, answer);
+                return answer;
+            }
+            return string.Empty;
+        }
+
+        /// <summary>
+        /// 加载提示词模板
+        /// </summary>
+        /// <param name="fileName"></param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentException"></exception>
+        private string LoadPromptTemplate(string fileName)
+        {
+            var promptDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Common/Prompts");
+            var promptTemplate = Path.Combine(promptDirectory, fileName);
+            if (!File.Exists(promptTemplate))
+                throw new ArgumentException($"The prompt template file '{promptTemplate}' can not be found.");
+
+            return File.ReadAllText(promptTemplate);
         }
     }
 }

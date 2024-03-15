@@ -9,9 +9,9 @@ namespace PostgreSQL.Embedding.Common.Models.WebApi
         public int code { get; set; }
         public string message { get; set; }
 
-        public static JsonResult Success<T>(T data, string message = "")
+        public static JsonResult Success<T>(T data, string message = null)
         {
-            var result = new ApiResult { code = (int)HttpStatusCode.OK, data = data, message = message };
+            var result = new ApiResult { code = (int)HttpStatusCode.OK, data = data, message = message ?? "success" };
             return new JsonResult(result);
         }
 
