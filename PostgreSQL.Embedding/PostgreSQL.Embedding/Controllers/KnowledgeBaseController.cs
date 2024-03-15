@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using PostgreSQL.Embedding.Common.Models;
+using PostgreSQL.Embedding.Common.Models.WebApi;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 
@@ -20,10 +21,10 @@ namespace PostgreSQL.Embedding.Controllers
         }
 
         [HttpPost]
-        public JsonResult CreateKnowledgeBase(KnowledgeBase knowledgeBase)
+        public async Task<JsonResult> CreateKnowledgeBase(KnowledgeBase knowledgeBase)
         {
-            var kb = _knowledgeBaseService.CreateKnowledgeBase(knowledgeBase);
-            return new JsonResult(kb);
+            var kb = await _knowledgeBaseService.CreateKnowledgeBase(knowledgeBase);
+            return ApiResult.Success(kb);
         }
 
         [HttpPut]
@@ -37,14 +38,14 @@ namespace PostgreSQL.Embedding.Controllers
         public async Task<JsonResult> KnowledgeSearch(long knowledgeBaseId, [FromQuery] string question, [FromQuery] double minRelevance, [FromQuery] int limit)
         {
             var searchResults = await _knowledgeBaseService.SearchAsync(knowledgeBaseId, question, minRelevance, limit);
-            return new JsonResult(searchResults);
+            return ApiResult.Success(searchResults);
         }
 
         [HttpPost("{knowledgeBaseId}/ask")]
         public async Task<JsonResult> KnowledgeBaseAsk(long knowledgeBaseId, [FromQuery] string question, [FromQuery] double minRelevance)
         {
-            var searchResults = await _knowledgeBaseService.AskAsync(knowledgeBaseId, question, minRelevance);
-            return new JsonResult(searchResults);
+            var askResults = await _knowledgeBaseService.AskAsync(knowledgeBaseId, question, minRelevance);
+            return ApiResult.Success(askResults);
         }
 
         [HttpPost("{knowledgeBaseId}/embedding/files")]
@@ -78,7 +79,7 @@ namespace PostgreSQL.Embedding.Controllers
                 
             }
 
-            return new JsonResult(new ImportingTaskResult()
+            return ApiResult.Success(new ImportingTaskResult()
             {
                 KnowledgeBaseId = knowledgeBaseId.ToString(),
                 ImportingTaskId = embeddingTaskId
@@ -91,7 +92,7 @@ namespace PostgreSQL.Embedding.Controllers
             var embeddingTaskId = Guid.NewGuid().ToString("N");
             _knowledgeBaseService.ImportKnowledgeFromUrl(embeddingTaskId, knowledgeBaseId, url);
 
-            return new JsonResult(new ImportingTaskResult()
+            return ApiResult.Success(new ImportingTaskResult()
             {
                 KnowledgeBaseId = knowledgeBaseId.ToString(),
                 ImportingTaskId = embeddingTaskId
