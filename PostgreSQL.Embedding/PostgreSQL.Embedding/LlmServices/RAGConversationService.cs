@@ -24,7 +24,7 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly LlmApp _app;
         private readonly IServiceProvider _serviceProvider;
         private readonly IConfiguration _configuration;
-        private readonly SimpleClient<LlmAppKnowledge> _llmAppKnowledgeRepository;
+        private readonly IRepository<LlmAppKnowledge> _llmAppKnowledgeRepository;
         private readonly MemoryServerless _memoryServerless;
         private readonly string _promptTemplate;
 
@@ -34,7 +34,7 @@ namespace PostgreSQL.Embedding.LlmServices
             _app = app;
             _serviceProvider = serviceProvider;
             _configuration = serviceProvider.GetRequiredService<IConfiguration>();
-            _llmAppKnowledgeRepository = _serviceProvider.GetService<SimpleClient<LlmAppKnowledge>>();
+            _llmAppKnowledgeRepository = _serviceProvider.GetService<IRepository<LlmAppKnowledge>>();
             _memoryServerless = memoryServerless;
             _promptTemplate = LoadPromptTemplate("RAGPrompt.txt");
         }
@@ -147,7 +147,7 @@ namespace PostgreSQL.Embedding.LlmServices
         private async Task<string> BuildKnowledgeContext(string input)
         {
             var filters = new List<MemoryFilter>();
-            var llmKappKnowledges = await _llmAppKnowledgeRepository.GetListAsync(x => x.AppId == _app.Id);
+            var llmKappKnowledges = await _llmAppKnowledgeRepository.FindAsync(x => x.AppId == _app.Id);
             if (llmKappKnowledges.Any())
             {
                 foreach (var knowledgeBase in llmKappKnowledges)

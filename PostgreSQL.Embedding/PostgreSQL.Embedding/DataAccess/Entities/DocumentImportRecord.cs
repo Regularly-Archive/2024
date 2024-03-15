@@ -16,5 +16,14 @@ namespace PostgreSQL.Embedding.DataAccess.Entities
 
         [SugarColumn(ColumnName = "queue_status")]
         public int QueueStatus { get; set; }
+
+        [SugarColumn(ColumnName = "process_start_time", IsNullable = true)]
+        public DateTime ProcessStartTime { get; set; }
+
+        [SugarColumn(ColumnName = "process_end_time", IsNullable = true)]
+        public DateTime ProcessEndTime { get; set; }
+
+        [SugarColumn(ColumnName = "process_duration_time", IsNullable = true)]
+        public double ProcessDuartionTime {  get; set; }
     }
 }

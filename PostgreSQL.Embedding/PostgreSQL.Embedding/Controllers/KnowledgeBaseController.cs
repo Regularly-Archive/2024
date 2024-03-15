@@ -48,7 +48,7 @@ namespace PostgreSQL.Embedding.Controllers
         }
 
         [HttpPost("{knowledgeBaseId}/embedding/files")]
-        public JsonResult CreateEmbeddingFromFile(long knowledgeBaseId, List<IFormFile> files)
+        public async Task<JsonResult> CreateEmbeddingFromFile(long knowledgeBaseId, List<IFormFile> files)
         {
             var embeddingTaskId = Guid.NewGuid().ToString("N");
             var embedingTaskFolder = Path.Combine(_webHostEnvironment.ContentRootPath, "Upload", embeddingTaskId);
@@ -74,7 +74,8 @@ namespace PostgreSQL.Embedding.Controllers
 
             if (uploadedFiles.Any())
             {
-                _knowledgeBaseService.ImportKnowledgeFromFiles(embeddingTaskId, knowledgeBaseId, uploadedFiles);
+                await _knowledgeBaseService.ImportKnowledgeFromFiles(embeddingTaskId, knowledgeBaseId, uploadedFiles);
+                
             }
 
             return new JsonResult(new ImportingTaskResult()

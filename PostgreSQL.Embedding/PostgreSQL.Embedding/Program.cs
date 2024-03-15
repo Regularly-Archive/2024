@@ -56,6 +56,7 @@ builder.Services.AddScoped<ISqlSugarClient, SqlSugarClient>(sp =>
     return sqlSugarClient;
 });
 builder.Services.AddScoped(typeof(SimpleClient<>));
+builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 builder.Services.AddLLama().AddHuggingFace();
 builder.Services.Configure<LlmConfig>(builder.Configuration.GetSection(nameof(LlmConfig)));
 builder.Services.AddSingleton<ILlmServiceFactory, LlmServiceFactory>();
@@ -104,7 +105,8 @@ builder.Services.AddSingleton<MemoryServerless>(serviceProvider =>
 
     return memoryBuilder.Build<MemoryServerless>();
 });
-
+builder.Services.AddSingleton<KnowledgeImportingQueueService>();
+builder.Services.AddHostedService<KnowledgeImportingQueueService>();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
