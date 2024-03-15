@@ -100,7 +100,7 @@ namespace PostgreSQL.Embedding.DataAccess
             else
             {
                 entity.UpdatedAt = DateTime.Now;
-                entity.UpdatedBy = _userInfoService.GetCurrentUser().Identity?.Name ?? Constants.Admin;
+                entity.UpdatedBy = _userInfoService.GetCurrentUser()?.Identity?.Name ?? Constants.Admin;
             }
         }
     }   

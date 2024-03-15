@@ -9,6 +9,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Common\NewFolder\**" />
+    <Content Remove="Common\NewFolder\**" />
+    <EmbeddedResource Remove="Common\NewFolder\**" />
+    <None Remove="Common\NewFolder\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="LLamaSharp" Version="0.10.0" />
     <PackageReference Include="LLamaSharp.Backend.Cpu" Version="0.10.0" />
     <PackageReference Include="LLamaSharp.kernel-memory" Version="0.10.0" />
