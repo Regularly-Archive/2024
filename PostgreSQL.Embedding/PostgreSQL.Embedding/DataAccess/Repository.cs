@@ -24,10 +24,10 @@ namespace PostgreSQL.Embedding.DataAccess
 
     public class Repository<T> : SimpleClient<T>, IRepository<T> where T : BaseEntity, new()
     {
-        private readonly IUserInfoService _userInfoService;
-        public Repository(ISqlSugarClient db, IUserInfoService userInfoService) : base(db)
+        private readonly IHttpContextAccessor _httpContextAccessor;
+        public Repository(ISqlSugarClient db, IHttpContextAccessor httpContextAccessor) : base(db)
         {
-            _userInfoService = userInfoService;
+            _httpContextAccessor = httpContextAccessor;
         }
         public Task<T> AddAsync(T entity)
         {
@@ -93,14 +93,14 @@ namespace PostgreSQL.Embedding.DataAccess
             if (isCreate)
             {
                 entity.CreatedAt = DateTime.Now;
-                entity.CreatedBy = _userInfoService.GetCurrentUser().Identity?.Name ?? Constants.Admin;
+                entity.CreatedBy = _httpContextAccessor.HttpContext?.User?.Identity?.Name ?? Constants.Admin;
                 entity.UpdatedAt = entity.CreatedAt;
                 entity.UpdatedBy = entity.CreatedBy;
             } 
             else
             {
                 entity.UpdatedAt = DateTime.Now;
-                entity.UpdatedBy = _userInfoService.GetCurrentUser()?.Identity?.Name ?? Constants.Admin;
+                entity.UpdatedBy = _httpContextAccessor.HttpContext?.User?.Identity?.Name ?? Constants.Admin;
             }
         }
     }   

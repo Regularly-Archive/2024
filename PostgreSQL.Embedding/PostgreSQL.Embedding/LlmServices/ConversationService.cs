@@ -1,15 +1,9 @@
-﻿using Microsoft.Extensions.Options;
-using Microsoft.KernelMemory;
-using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.Connectors.OpenAI;
-using Newtonsoft.Json;
+﻿using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
-using SqlSugar;
-using System.Reflection.Metadata;
 using System.Text;
 
 namespace PostgreSQL.Embedding.LlmServices

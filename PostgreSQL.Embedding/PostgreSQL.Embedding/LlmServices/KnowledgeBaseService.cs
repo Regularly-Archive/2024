@@ -1,8 +1,4 @@
-﻿using Azure.Search.Documents.Indexes.Models;
-using HtmlAgilityPack;
-using Irony.Ast;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.KernelMemory;
+﻿using Microsoft.KernelMemory;
 using Microsoft.KernelMemory.Handlers;
 using Microsoft.KernelMemory.Pipeline;
 using PostgreSQL.Embedding.Common;
@@ -12,8 +8,6 @@ using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using SqlSugar;
-using System;
-using System.Runtime.CompilerServices;
 using Constants = PostgreSQL.Embedding.Common.Constants;
 
 namespace PostgreSQL.Embedding.LlmServices

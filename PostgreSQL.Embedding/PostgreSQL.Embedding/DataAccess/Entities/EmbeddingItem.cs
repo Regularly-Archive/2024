@@ -1,5 +1,4 @@
 ﻿using Pgvector;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PostgreSQL.Embedding.DataAccess.Entities
 {

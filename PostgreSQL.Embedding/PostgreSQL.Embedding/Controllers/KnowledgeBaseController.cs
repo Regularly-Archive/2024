@@ -1,6 +1,4 @@
-﻿using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.Common.Models.WebApi;
 using PostgreSQL.Embedding.DataAccess.Entities;
