@@ -63,16 +63,19 @@ namespace PostgreSQL.Embedding.DataAccess
 
         public Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate)
         {
+            if (predicate == null) predicate = x => true;
             return base.GetListAsync(predicate);
         }
 
         public Task<T> SingleOrDefaultAsync(Expression<Func<T, bool>> predicate)
         {
+            if (predicate == null) throw new ArgumentNullException(nameof(predicate));
             return base.GetFirstAsync(predicate);
         }
 
         Task<int> IRepository<T>.CountAsync(Expression<Func<T, bool>> predicate)
         {
+           if (predicate == null) predicate = x => true;
            return base.CountAsync(predicate);
         }
 
@@ -84,6 +87,7 @@ namespace PostgreSQL.Embedding.DataAccess
 
         public Task<List<T>> PaginateAsync(Expression<Func<T, bool>> predicate, int pageIndex, int pageSize)
         {
+            if (predicate == null) predicate = x => true;
             var pageModel = new PageModel() { PageIndex = pageIndex, PageSize = pageSize };
             return base.GetPageListAsync(predicate, pageModel);
         }
