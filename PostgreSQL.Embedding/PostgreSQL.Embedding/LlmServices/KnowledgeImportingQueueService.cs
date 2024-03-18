@@ -1,6 +1,4 @@
-﻿using Microsoft.Extensions.Hosting;
-using PostgreSQL.Embedding.LlmServices.Abstration;
-using System.Threading;
+﻿using PostgreSQL.Embedding.LlmServices.Abstration;
 
 namespace PostgreSQL.Embedding.LlmServices
 {

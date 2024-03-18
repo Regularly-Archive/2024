@@ -9,18 +9,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Common\NewFolder\**" />
-    <Content Remove="Common\NewFolder\**" />
-    <EmbeddedResource Remove="Common\NewFolder\**" />
-    <None Remove="Common\NewFolder\**" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="LLamaSharp" Version="0.10.0" />
     <PackageReference Include="LLamaSharp.Backend.Cpu" Version="0.10.0" />
     <PackageReference Include="LLamaSharp.kernel-memory" Version="0.10.0" />
     <PackageReference Include="LLamaSharp.semantic-kernel" Version="0.10.0" />
     <PackageReference Include="Mapster" Version="7.4.0" />
+    <PackageReference Include="Masuit.Tools.Core" Version="2.6.9.4" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.3" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.2">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -35,6 +30,7 @@
     <PackageReference Include="Pgvector.EntityFrameworkCore" Version="0.2.0" />
     <PackageReference Include="SqlSugarCore" Version="5.1.4.145" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.4.1" />
   </ItemGroup>
 
   <ItemGroup>
