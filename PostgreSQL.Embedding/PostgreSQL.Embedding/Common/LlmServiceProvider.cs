@@ -1,9 +1,11 @@
-﻿namespace PostgreSQL.Embedding.Common
+﻿using System.ComponentModel;
+
+namespace PostgreSQL.Embedding.Common
 {
     public enum LlmServiceProvider
     {
-        OpenAI = 0,
-        LLama = 1,
-        HuggingFace = 2
+        [Description("OpenAI")] OpenAI = 0,
+        [Description("LLama")] LLama = 1,
+        [Description("HuggingFace")] HuggingFace = 2
     }
 }
