@@ -1,8 +1,10 @@
-﻿namespace PostgreSQL.Embedding.Common
+﻿using System.ComponentModel;
+
+namespace PostgreSQL.Embedding.Common
 {
     public enum ModelType
     {
-        TextGeneration  = 0,
-        TextEmbedding = 1
+        [Description("文本生成")] TextGeneration = 0,
+        [Description("文本嵌入")] TextEmbedding = 1
     }
 }
