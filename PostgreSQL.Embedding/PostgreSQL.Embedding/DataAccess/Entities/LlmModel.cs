@@ -19,5 +19,8 @@ namespace PostgreSQL.Embedding.DataAccess.Entities
 
         [SugarColumn(ColumnName = "service_provider", IsNullable = false)]
         public int ServiceProvider { get; set; }
+
+        [SugarColumn(ColumnName = "is_builtin_model", DefaultValue = "FALSE", IsNullable = true)]
+        public bool IsBuiltinModel { get; set; }
     }
 }

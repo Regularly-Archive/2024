@@ -28,7 +28,7 @@ namespace PostgreSQL.Embedding.Controllers
         public async Task<JsonResult> Register([FromBody] RegisterRequest registerRequest)
         {
             await _useInfoService.RegisterAsync(registerRequest);
-            return ApiResult.Success<object>(null, "注册成功");
+            return ApiResult.Success(new { }, "注册成功");
         }
     }
 }   
