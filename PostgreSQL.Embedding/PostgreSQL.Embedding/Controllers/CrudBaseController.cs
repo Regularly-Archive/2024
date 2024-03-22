@@ -18,24 +18,31 @@ namespace PostgreSQL.Embedding.Controllers
         }
 
         [HttpGet("{id}")]
-        public async Task<JsonResult> SelectById(long id)
+        public virtual async Task<JsonResult> SelectById(long id)
         {
             var instance = await _crudBaseService.GetById(id);
-            return ApiResult.Success(instance);
+            return ApiResult.Success(instance, "操作成功");
+        }
+
+        [HttpPost]
+        public virtual async Task<JsonResult> Create(T entity)
+        {
+            var instance = await _crudBaseService.Create(entity);
+            return ApiResult.Success(instance, "操作成功");
         }
 
         [HttpPut]
-        public async Task<JsonResult> Update(T entity)
+        public virtual async Task<JsonResult> Update(T entity)
         {
             await _crudBaseService.Update(entity);
-            return ApiResult.Success(new { },"更新成功");
+            return ApiResult.Success(new { }, "操作成功");
         }
 
         [HttpDelete]
-        public async Task<JsonResult> Delete(string ids)
+        public virtual async Task<JsonResult> Delete(string ids)
         {
             await _crudBaseService.Delete(ids);
-            return ApiResult.Success(new { }, "删除成功");
+            return ApiResult.Success(new { }, "操作成功");
         }
 
         [HttpGet("paginate")]

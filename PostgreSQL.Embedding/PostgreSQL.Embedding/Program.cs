@@ -1,15 +1,17 @@
-using DocumentFormat.OpenXml.Office2016.Drawing.ChartDrawing;
 using LLama;
 using LLama.Common;
 using LLamaSharp.KernelMemory;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Azure;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.KernelMemory;
 using Microsoft.KernelMemory.Postgres;
 using Microsoft.OpenApi.Models;
 using PostgreSQL.Embedding.Common;
+using PostgreSQL.Embedding.Common.Converters;
+using PostgreSQL.Embedding.Common.Middlewares;
 using PostgreSQL.Embedding.Common.Settings;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.Handlers;
@@ -46,7 +48,10 @@ builder.Services.AddAuthorization(options =>
    );
 });
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<GlobalExceptionFilter>();
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -103,6 +108,7 @@ builder.Services.AddScoped<ISqlSugarClient, SqlSugarClient>(sp =>
     return sqlSugarClient;
 });
 builder.Services.AddScoped(typeof(SimpleClient<>));
+builder.Services.AddScoped(typeof(CrudBaseService<>));
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 builder.Services.AddScoped<IChatHistoryService, ChatHistoryService>();
 builder.Services.AddLLama().AddHuggingFace();
@@ -156,6 +162,17 @@ builder.Services.AddSingleton<MemoryServerless>(serviceProvider =>
 });
 builder.Services.AddSingleton<KnowledgeImportingQueueService>();
 builder.Services.AddHostedService<KnowledgeImportingQueueService>();
+builder.Services.AddSingleton<EnumValuesConverter>();
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(builder =>
+    {
+        builder.WithOrigins("http://localhost:2800")
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials();
+    });
+});
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -164,6 +181,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseCors();
 
 app.UseAuthentication();
 

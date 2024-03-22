@@ -5,6 +5,9 @@ namespace PostgreSQL.Embedding.DataAccess.Entities
     [SugarTable("llm_app")]
     public class LlmApp : BaseEntity
     {
+        [SugarColumn(ColumnName = "name")]
+        public string Name { get; set; }
+
         [SugarColumn(ColumnName = "avatar")]
         public string Avatar { get; set; }
 
@@ -25,5 +28,8 @@ namespace PostgreSQL.Embedding.DataAccess.Entities
 
         [SugarColumn(ColumnName = "temperature")]
         public decimal Temperature { get; set; }
+
+        [SugarColumn(IsIgnore = true)]
+        public List<long> KnowledgeBaseIds { get; set; }
     }
 }

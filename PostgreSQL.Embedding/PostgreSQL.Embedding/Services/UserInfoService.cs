@@ -50,7 +50,7 @@ namespace PostgreSQL.Embedding.Services
             var token = GenerateJwtToken(userInfo);
             return new LoginResult
             {
-                AccessToken = token,
+                Token = token,
                 UserInfo = new UserInfo()
                 {
                     Id = userInfo.Id.ToString(),
