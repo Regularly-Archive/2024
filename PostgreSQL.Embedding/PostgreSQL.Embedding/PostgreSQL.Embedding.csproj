@@ -15,6 +15,7 @@
     <PackageReference Include="LLamaSharp.semantic-kernel" Version="0.10.0" />
     <PackageReference Include="Mapster" Version="7.4.0" />
     <PackageReference Include="Masuit.Tools.Core" Version="2.6.9.4" />
+    <PackageReference Include="Microsoft.AspNet.Cors" Version="5.3.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.3" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.2">
       <PrivateAssets>all</PrivateAssets>

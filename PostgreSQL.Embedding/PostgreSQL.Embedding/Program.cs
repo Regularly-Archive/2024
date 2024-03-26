@@ -22,6 +22,8 @@ using PostgreSQL.Embedding.Services;
 using PostgreSQL.Embedding.Services.Training;
 using SqlSugar;
 using System.Text;
+using System.Text.Encodings.Web;
+using System.Text.Unicode;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -50,7 +52,13 @@ builder.Services.AddAuthorization(options =>
 
 builder.Services.AddControllers(options =>
 {
+
     options.Filters.Add<GlobalExceptionFilter>();
+})
+.AddJsonOptions(cfg =>
+{
+    cfg.JsonSerializerOptions.Converters.Add(new BigIntJsonConverter());
+    cfg.JsonSerializerOptions.Encoder = JavaScriptEncoder.Create(UnicodeRanges.All);
 });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>

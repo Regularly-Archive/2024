@@ -1,10 +1,14 @@
 ﻿using PostgreSQL.Embedding.Common.Models.WebApi;
 using PostgreSQL.Embedding.DataAccess.Entities;
+using SqlSugar;
 
 namespace PostgreSQL.Embedding.DataAccess
 {
     public class CrudBaseService<T> where T : BaseEntity, new()
     {
+        public ISqlSugarClient SqlSugarClient => _repository.SqlSugarClient;
+        public IRepository<T> Repository => _repository;
+
         private readonly IRepository<T> _repository;
         public CrudBaseService(IRepository<T> repository)
         {

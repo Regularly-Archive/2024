@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.Common.Models.WebApi;
+using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 
@@ -8,28 +9,17 @@ namespace PostgreSQL.Embedding.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class KnowledgeBaseController : ControllerBase
+    public class KnowledgeBaseController : CrudBaseController<KnowledgeBase>
     {
         private readonly IWebHostEnvironment _webHostEnvironment;
         private readonly IKnowledgeBaseService _knowledgeBaseService;
-        public KnowledgeBaseController(IWebHostEnvironment hostingEnvironment, IKnowledgeBaseService knowledgeBaseService)
+        public KnowledgeBaseController(
+            IWebHostEnvironment hostingEnvironment,
+            IKnowledgeBaseService knowledgeBaseService,
+            CrudBaseService<KnowledgeBase> crudBaseService) : base(crudBaseService)
         {
             _webHostEnvironment = hostingEnvironment;
             _knowledgeBaseService = knowledgeBaseService;
-        }
-
-        [HttpPost]
-        public async Task<JsonResult> CreateKnowledgeBase(KnowledgeBase knowledgeBase)
-        {
-            var kb = await _knowledgeBaseService.CreateKnowledgeBase(knowledgeBase);
-            return ApiResult.Success(kb);
-        }
-
-        [HttpPut]
-        public async Task<IActionResult> UpdateKnowledgeBase(KnowledgeBase knowledgeBase)
-        {
-            await _knowledgeBaseService.UpdateKnowledgeBase(knowledgeBase);
-            return Ok();
         }
 
         [HttpPost("{knowledgeBaseId}/search")]
@@ -74,7 +64,7 @@ namespace PostgreSQL.Embedding.Controllers
             if (uploadedFiles.Any())
             {
                 await _knowledgeBaseService.ImportKnowledgeFromFiles(embeddingTaskId, knowledgeBaseId, uploadedFiles);
-                
+
             }
 
             return ApiResult.Success(new ImportingTaskResult()
@@ -121,6 +111,13 @@ namespace PostgreSQL.Embedding.Controllers
         public async Task DeleteKnowledges(long knowledgeBaseId, string fileName)
         {
             await _knowledgeBaseService.DeleteKnowledgesByFileName(knowledgeBaseId, fileName);
+        }
+
+        [HttpGet("list")]
+        public async Task<JsonResult> GetKnowledgeBaseDropdownList()
+        {
+            var list = await _knowledgeBaseService.GetKnowledgeBaseDropdownList();
+            return ApiResult.Success(list);
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.LlmServices.Abstration;
@@ -8,6 +9,7 @@ namespace PostgreSQL.Embedding.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [AllowAnonymous]
     public class LLMController : ControllerBase
     {
         private readonly ILlmServiceFactory _llmServiceFactory;

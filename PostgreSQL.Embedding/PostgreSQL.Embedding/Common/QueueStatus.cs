@@ -1,9 +1,11 @@
-﻿namespace PostgreSQL.Embedding.Common
+﻿using System.ComponentModel;
+
+namespace PostgreSQL.Embedding.Common
 {
     public enum QueueStatus
     {
-       Uploaded = 0,
-       Processing = 1,
-       Complete = 2,
+        [Description("已上传")] Uploaded = 0,
+        [Description("处理中")] Processing = 1,
+        [Description("已完成")] Complete = 2,
     }
 }
