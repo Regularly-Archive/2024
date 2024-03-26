@@ -105,7 +105,9 @@ namespace PostgreSQL.Embedding.LlmServices
             var tasks = records.Select(async record =>
             {
                 var knowledgeBase = await GetKnowledgeBaseById(record.KnowledgeBaseId);
-                var memoryServerless = await _memoryService.CreateByKnowledgeBase(knowledgeBase);
+                using var serviceProviderScope = _serviceProvider.CreateScope();
+                var memoryService = serviceProviderScope.ServiceProvider.GetService<IMemoryService>();
+                var memoryServerless = await memoryService.CreateByKnowledgeBase(knowledgeBase);
                 AddDefaultHandlers(memoryServerless);
 
                 var embeddingTaskFolder = Path.Combine(webHostEnvironment.ContentRootPath, "Upload", record.TaskId);
@@ -307,6 +309,11 @@ namespace PostgreSQL.Embedding.LlmServices
         {
             await _importRecordRepository.UpdateAsync(documentImportRecord);
         }
+
+        public Task<List<KnowledgeBase>> GetKnowledgeBaseDropdownList()
+        {
+            return _knowledgeBaseRepository.GetAllAsync();
+        }
     }
 
     internal class UpdateQueueStatusHandler : IPipelineStepHandler
@@ -334,7 +341,7 @@ namespace PostgreSQL.Embedding.LlmServices
             {
                 record.QueueStatus = (int)QueueStatus.Complete;
                 record.ProcessEndTime = DateTime.Now;
-                var totalSeconds = Math.Round((record.ProcessEndTime - record.ProcessStartTime).TotalSeconds, 2);
+                var totalSeconds = Math.Round((record.ProcessEndTime.Value - record.ProcessStartTime.Value).TotalSeconds, 2);
                 record.ProcessDuartionTime = totalSeconds;
                 await _importRecordRepository?.UpdateAsync(record);
                 _logger.LogInformation($"Importing document '{fileName}' finished in {totalSeconds} seconds.");

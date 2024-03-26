@@ -46,7 +46,7 @@ namespace PostgreSQL.Embedding.Controllers
         }
 
         [HttpGet("paginate")]
-        public async Task<JsonResult> GetByPage(int pageSize, int pageIndex)
+        public virtual async Task<JsonResult> GetByPage(int pageSize, int pageIndex)
         {
             var result = await _crudBaseService.GetPageList(pageSize, pageIndex);
             return ApiResult.Success(result, "");

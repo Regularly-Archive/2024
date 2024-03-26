@@ -1,4 +1,7 @@
-﻿using PostgreSQL.Embedding.LlmServices.Abstration;
+﻿using PostgreSQL.Embedding.Common;
+using PostgreSQL.Embedding.DataAccess;
+using PostgreSQL.Embedding.DataAccess.Entities;
+using PostgreSQL.Embedding.LlmServices.Abstration;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
@@ -30,6 +33,14 @@ namespace PostgreSQL.Embedding.LlmServices
             }
             catch (OperationCanceledException)
             {
+                using var scope = _serviceProvider.CreateScope();
+                var _documentImportRecordRepository = scope.ServiceProvider.GetService<IRepository<DocumentImportRecord>>();
+                var records = await _documentImportRecordRepository.FindAsync(x => x.QueueStatus == (int)QueueStatus.Processing);
+                foreach(var record in records)
+                {
+                    record.QueueStatus = (int)QueueStatus.Uploaded;
+                    await _documentImportRecordRepository.UpdateAsync(record);
+                }
                 _logger.LogError($"KnowledgeQueueService exited.");
             }
         }

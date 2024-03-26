@@ -6,6 +6,7 @@ using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
+using PostgreSQL.Embedding.Utils;
 using SqlSugar;
 
 namespace PostgreSQL.Embedding.LlmServices
@@ -14,10 +15,11 @@ namespace PostgreSQL.Embedding.LlmServices
     {
         private readonly IConfiguration _configuration;
         private readonly IServiceProvider _serviceProvider;
-        
+
         private readonly IRepository<LlmModel> _llmModelRepository;
         private readonly IRepository<LlmAppKnowledge> _llmAppKnowledgeRepository;
         private readonly IRepository<KnowledgeBase> _knowledgeBaseRepository;
+        private readonly IRepository<TablePrefixMapping> _tablePrefixMappingRepository;
 
         public MemoryService(IConfiguration configuration, IServiceProvider serviceProvider)
         {
@@ -26,6 +28,7 @@ namespace PostgreSQL.Embedding.LlmServices
             _llmModelRepository = serviceProvider.GetService<IRepository<LlmModel>>();
             _llmAppKnowledgeRepository = serviceProvider.GetService<IRepository<LlmAppKnowledge>>();
             _knowledgeBaseRepository = serviceProvider.GetService<IRepository<KnowledgeBase>>();
+            _tablePrefixMappingRepository = serviceProvider.GetService<IRepository<TablePrefixMapping>>();
         }
 
         public async Task<MemoryServerless> CreateByApp(LlmApp app)
@@ -33,16 +36,18 @@ namespace PostgreSQL.Embedding.LlmServices
             var generationModel = await _llmModelRepository.SingleOrDefaultAsync(x => x.ModelType == (int)ModelType.TextGeneration && x.ModelName == app.TextModel);
 
             var embeddingModelId = await GetEmbeddingModelByKnowledges(app);
-            var embeddingModel = await _llmModelRepository.SingleOrDefaultAsync(x => x.ModelType == (int)ModelType.TextEmbedding && x.ModelName == embeddingModelId); 
+            var embeddingModel = await _llmModelRepository.SingleOrDefaultAsync(x => x.ModelType == (int)ModelType.TextEmbedding && x.ModelName == embeddingModelId);
 
             var options = _serviceProvider.GetRequiredService<IOptions<LlmConfig>>();
             var embeddingHttpClient = new HttpClient(new OpenAIEmbeddingHandler(embeddingModel, options));
             var generationHttpClient = new HttpClient();
 
+            var tableNamePrefix = await GenerateTableNamePrefix(embeddingModel);
+
             var postgresConfig = new PostgresConfig()
             {
                 ConnectionString = _configuration["ConnectionStrings:Default"]!,
-                TableNamePrefix = GenerateTableNamePrefix(embeddingModel),
+                TableNamePrefix = tableNamePrefix,
             };
 
             // Todo
@@ -59,7 +64,7 @@ namespace PostgreSQL.Embedding.LlmServices
                 .WithCustomTextPartitioningOptions(new TextPartitioningOptions()
                 {
                     MaxTokensPerParagraph = DefaultTextPartitioningOptions.MaxTokensPerParagraph,
-                    MaxTokensPerLine =DefaultTextPartitioningOptions.MaxTokensPerLine,
+                    MaxTokensPerLine = DefaultTextPartitioningOptions.MaxTokensPerLine,
                     OverlappingTokens = DefaultTextPartitioningOptions.OverlappingTokens
                 });
 
@@ -75,10 +80,12 @@ namespace PostgreSQL.Embedding.LlmServices
             var embeddingHttpClient = new HttpClient(new OpenAIEmbeddingHandler(embeddingModel, options));
             var generationHttpClient = new HttpClient();
 
+            var tableNamePrefix = await GenerateTableNamePrefix(embeddingModel);
+
             var postgresConfig = new PostgresConfig()
             {
                 ConnectionString = _configuration["ConnectionStrings:Default"]!,
-                TableNamePrefix = GenerateTableNamePrefix(embeddingModel),
+                TableNamePrefix = tableNamePrefix,
             };
 
             // Todo
@@ -110,14 +117,25 @@ namespace PostgreSQL.Embedding.LlmServices
             return memoryBuilder.Build<MemoryServerless>();
         }
 
-        private string GenerateTableNamePrefix(LlmModel embeddingModel)
+        private async Task<string> GenerateTableNamePrefix(LlmModel embeddingModel)
         {
-            var hashCode = embeddingModel.ModelName.GetHashCode();
-            
-            if (hashCode > 0) return $"sk-{hashCode}-";
-            if (hashCode < 0) return $"sk{hashCode}-";
+            var tablePrefixMapping = await _tablePrefixMappingRepository.SingleOrDefaultAsync(x => x.FullName == embeddingModel.ModelName);
+            if (tablePrefixMapping != null)
+                return $"sk_{tablePrefixMapping.ShortName}_";
 
-            return "sk-";
+            var shortCode = string.Empty;
+            while (string.IsNullOrEmpty(shortCode))
+            {
+                shortCode = ShortUrlGenerator.GenerateShortCode(embeddingModel.ModelName);
+            }
+
+            await _tablePrefixMappingRepository.AddAsync(new TablePrefixMapping()
+            {
+                FullName = embeddingModel.ModelName,
+                ShortName = shortCode,
+            });
+
+            return $"sk_{shortCode}_";
         }
 
         private async Task<string> GetEmbeddingModelByKnowledges(LlmApp app)

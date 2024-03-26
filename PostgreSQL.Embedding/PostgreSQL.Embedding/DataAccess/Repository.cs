@@ -9,6 +9,7 @@ namespace PostgreSQL.Embedding.DataAccess
 {
     public interface IRepository<TEntity> where TEntity : BaseEntity, new()
     {
+        ISqlSugarClient SqlSugarClient { get; }
         Task<TEntity> AddAsync(TEntity entity);
         Task UpdateAsync(TEntity entity);
         Task DeleteAsync(long id);
@@ -24,14 +25,19 @@ namespace PostgreSQL.Embedding.DataAccess
 
     public class Repository<T> : SimpleClient<T>, IRepository<T> where T : BaseEntity, new()
     {
+        public ISqlSugarClient SqlSugarClient => _sqlSugarClient;
+
+        private readonly ISqlSugarClient _sqlSugarClient;
         private readonly IHttpContextAccessor _httpContextAccessor;
         public Repository(ISqlSugarClient db, IHttpContextAccessor httpContextAccessor) : base(db)
         {
             _httpContextAccessor = httpContextAccessor;
+            _sqlSugarClient = db;
         }
         public Task<T> AddAsync(T entity)
         {
             EnrichBaseProperties(entity, true);
+
             return base.InsertReturnEntityAsync(entity);
         }
 
@@ -75,8 +81,8 @@ namespace PostgreSQL.Embedding.DataAccess
 
         Task<int> IRepository<T>.CountAsync(Expression<Func<T, bool>> predicate)
         {
-           if (predicate == null) predicate = x => true;
-           return base.CountAsync(predicate);
+            if (predicate == null) predicate = x => true;
+            return base.CountAsync(predicate);
         }
 
         public async Task<bool> ExistsAsync(Expression<Func<T, bool>> predicate)
@@ -100,12 +106,12 @@ namespace PostgreSQL.Embedding.DataAccess
                 entity.CreatedBy = _httpContextAccessor.HttpContext?.User?.Identity?.Name ?? Constants.Admin;
                 entity.UpdatedAt = entity.CreatedAt;
                 entity.UpdatedBy = entity.CreatedBy;
-            } 
+            }
             else
             {
                 entity.UpdatedAt = DateTime.Now;
                 entity.UpdatedBy = _httpContextAccessor.HttpContext?.User?.Identity?.Name ?? Constants.Admin;
             }
         }
-    }   
+    }
 }
