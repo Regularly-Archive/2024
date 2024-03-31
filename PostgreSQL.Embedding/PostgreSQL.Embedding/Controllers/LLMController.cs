@@ -1,8 +1,6 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Models;
-using PostgreSQL.Embedding.LlmServices;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using System.Net;
 

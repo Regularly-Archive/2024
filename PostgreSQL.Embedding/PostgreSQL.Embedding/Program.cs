@@ -1,30 +1,87 @@
+using DocumentFormat.OpenXml.Office2016.Drawing.ChartDrawing;
+using LLama;
+using LLama.Common;
+using LLamaSharp.KernelMemory;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.KernelMemory;
 using Microsoft.KernelMemory.Postgres;
+using Microsoft.OpenApi.Models;
 using PostgreSQL.Embedding.Common;
+using PostgreSQL.Embedding.Common.Settings;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.Handlers;
-using LLamaSharp.SemanticKernel.TextEmbedding;
-using LLamaSharp.KernelMemory;
-using LLama.Common;
-using LLama;
-using PostgreSQL.Embedding.Services.Training;
-using PostgreSQL.Embedding.LLmServices.Extensions;
-using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.LlmServices;
-using DocumentFormat.OpenXml.Office2016.Drawing.ChartDrawing;
-using Microsoft.VisualBasic.FileIO;
+using PostgreSQL.Embedding.LlmServices.Abstration;
+using PostgreSQL.Embedding.LLmServices.Extensions;
+using PostgreSQL.Embedding.Services;
+using PostgreSQL.Embedding.Services.Training;
+using SqlSugar;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer(options =>
+            {
+                options.SaveToken = true;
+                options.RequireHttpsMetadata = false;
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtSetting:Secret"])),
+                    ValidateIssuer = false,
+                    ValidateAudience = false
+                };
+            });
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("Bearer", new AuthorizationPolicyBuilder()
+        .AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme)
+        .RequireAuthenticatedUser()
+        .Build()
+   );
+});
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Description = "JWT Authorization header using the Bearer scheme.",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.ApiKey,
+        Scheme = "Bearer",
+        BearerFormat = "JWT"
+    });
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+          new OpenApiSecurityScheme
+          {
+            Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+          },
+          new string[] {}
+        }
+    });
+});
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<IConversationService, ConversationService>();
+builder.Services.AddScoped<IUserInfoService, UserInfoService>();
 builder.Services.AddScoped<IEmbeddingService, SKEmbeddingService>();
+builder.Services.AddScoped<IKernelService, KernalService>();
+builder.Services.AddScoped<IMemoryService, PostgreSQL.Embedding.LlmServices.MemoryService>();
 builder.Services.AddDbContext<VectorsDbContext>(opt =>
 {
     opt.UseNpgsql(builder.Configuration["ConnectionStrings:Default"], x => x.UseVector());
 });
+
 builder.Services.AddSingleton<LLamaEmbedder>(sp =>
 {
     var modelPath = Path.Combine(builder.Environment.ContentRootPath, builder.Configuration["LLamaConfig:ModelPath"]!);
@@ -33,8 +90,24 @@ builder.Services.AddSingleton<LLamaEmbedder>(sp =>
     var embedder = new LLamaEmbedder(weights, @params);
     return embedder;
 });
-builder.Services.AddLLama();
+builder.Services.AddScoped<ISqlSugarClient, SqlSugarClient>(sp =>
+{
+    var sqlSugarClient = new SqlSugarClient(new ConnectionConfig()
+    {
+        DbType = DbType.PostgreSQL,
+        InitKeyType = InitKeyType.Attribute,
+        IsAutoCloseConnection = true,
+        ConnectionString = builder.Configuration["ConnectionStrings:Default"]
+    });
+
+    return sqlSugarClient;
+});
+builder.Services.AddScoped(typeof(SimpleClient<>));
+builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+builder.Services.AddScoped<IChatHistoryService, ChatHistoryService>();
+builder.Services.AddLLama().AddHuggingFace();
 builder.Services.Configure<LlmConfig>(builder.Configuration.GetSection(nameof(LlmConfig)));
+builder.Services.Configure<JwtSetting>(builder.Configuration.GetSection(nameof(JwtSetting)));
 builder.Services.AddSingleton<ILlmServiceFactory, LlmServiceFactory>();
 builder.Services.AddScoped<IKnowledgeBaseService, KnowledgeBaseService>();
 builder.Services.AddScoped<PgVectorService>();
@@ -81,7 +154,8 @@ builder.Services.AddSingleton<MemoryServerless>(serviceProvider =>
 
     return memoryBuilder.Build<MemoryServerless>();
 });
-
+builder.Services.AddSingleton<KnowledgeImportingQueueService>();
+builder.Services.AddHostedService<KnowledgeImportingQueueService>();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -91,8 +165,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseAuthentication();
+
 app.UseAuthorization();
 
-app.MapControllers();
+app.MapControllers().RequireAuthorization();
 
 app.Run();

@@ -1,6 +1,7 @@
-﻿using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
+using PostgreSQL.Embedding.Common.Models;
+using PostgreSQL.Embedding.Common.Models.WebApi;
+using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 
 namespace PostgreSQL.Embedding.Controllers
@@ -17,8 +18,36 @@ namespace PostgreSQL.Embedding.Controllers
             _knowledgeBaseService = knowledgeBaseService;
         }
 
+        [HttpPost]
+        public async Task<JsonResult> CreateKnowledgeBase(KnowledgeBase knowledgeBase)
+        {
+            var kb = await _knowledgeBaseService.CreateKnowledgeBase(knowledgeBase);
+            return ApiResult.Success(kb);
+        }
+
+        [HttpPut]
+        public async Task<IActionResult> UpdateKnowledgeBase(KnowledgeBase knowledgeBase)
+        {
+            await _knowledgeBaseService.UpdateKnowledgeBase(knowledgeBase);
+            return Ok();
+        }
+
+        [HttpPost("{knowledgeBaseId}/search")]
+        public async Task<JsonResult> KnowledgeSearch(long knowledgeBaseId, [FromQuery] string question, [FromQuery] double minRelevance, [FromQuery] int limit)
+        {
+            var searchResults = await _knowledgeBaseService.SearchAsync(knowledgeBaseId, question, minRelevance, limit);
+            return ApiResult.Success(searchResults);
+        }
+
+        [HttpPost("{knowledgeBaseId}/ask")]
+        public async Task<JsonResult> KnowledgeBaseAsk(long knowledgeBaseId, [FromQuery] string question, [FromQuery] double minRelevance)
+        {
+            var askResults = await _knowledgeBaseService.AskAsync(knowledgeBaseId, question, minRelevance);
+            return ApiResult.Success(askResults);
+        }
+
         [HttpPost("{knowledgeBaseId}/embedding/files")]
-        public async Task CreateEmbeddingFromFile(long knowledgeBaseId, List<IFormFile> files)
+        public async Task<JsonResult> CreateEmbeddingFromFile(long knowledgeBaseId, List<IFormFile> files)
         {
             var embeddingTaskId = Guid.NewGuid().ToString("N");
             var embedingTaskFolder = Path.Combine(_webHostEnvironment.ContentRootPath, "Upload", embeddingTaskId);
@@ -44,17 +73,54 @@ namespace PostgreSQL.Embedding.Controllers
 
             if (uploadedFiles.Any())
             {
-                _knowledgeBaseService.ImportKnowledgeFromFiles(embeddingTaskId, knowledgeBaseId, uploadedFiles);
+                await _knowledgeBaseService.ImportKnowledgeFromFiles(embeddingTaskId, knowledgeBaseId, uploadedFiles);
+                
             }
 
-            
+            return ApiResult.Success(new ImportingTaskResult()
+            {
+                KnowledgeBaseId = knowledgeBaseId.ToString(),
+                ImportingTaskId = embeddingTaskId
+            });
         }
 
         [HttpPost("{knowledgeBaseId}/embedding/url")]
-        public async Task CreateEmbeddingFromUrl(long knowledgeBaseId, [FromQuery] string url)
+        public JsonResult CreateEmbeddingFromUrl(long knowledgeBaseId, [FromQuery] string url)
         {
             var embeddingTaskId = Guid.NewGuid().ToString("N");
             _knowledgeBaseService.ImportKnowledgeFromUrl(embeddingTaskId, knowledgeBaseId, url);
+
+            return ApiResult.Success(new ImportingTaskResult()
+            {
+                KnowledgeBaseId = knowledgeBaseId.ToString(),
+                ImportingTaskId = embeddingTaskId
+            });
+        }
+
+        [HttpGet("{knowledgeBaseId}/details")]
+        public async Task<JsonResult> GetKnowledgeBaseDetails(long knowledgeBaseId)
+        {
+            var details = await _knowledgeBaseService.GetKnowledgeBaseDetails(knowledgeBaseId);
+            return new JsonResult(details);
+        }
+
+        [HttpGet("{knowledgeBaseId}/details/{fileName}")]
+        public async Task<JsonResult> GetKnowledgeBaseDetailsWithFileName(long knowledgeBaseId, string fileName = null)
+        {
+            var details = await _knowledgeBaseService.GetKnowledgeBaseDetails(knowledgeBaseId, fileName);
+            return new JsonResult(details);
+        }
+
+        [HttpDelete("{knowledgeBaseId}/details")]
+        public async Task DeleteKnowledges(long knowledgeBaseId)
+        {
+            await _knowledgeBaseService.DeleteKnowledgesById(knowledgeBaseId);
+        }
+
+        [HttpDelete("{knowledgeBaseId}/details/{fileName}")]
+        public async Task DeleteKnowledges(long knowledgeBaseId, string fileName)
+        {
+            await _knowledgeBaseService.DeleteKnowledgesByFileName(knowledgeBaseId, fileName);
         }
     }
 }
