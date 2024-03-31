@@ -1,7 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Hosting;
-using static Microsoft.KernelMemory.DocumentUploadRequest;
+﻿using Microsoft.AspNetCore.Mvc;
 using PostgreSQL.Embedding.Services.Training;
 
 namespace PostgreSQL.Embedding.Controllers
