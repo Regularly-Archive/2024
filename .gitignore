@@ -27,3 +27,9 @@ PostgreSQL.Embedding/PostgreSQL.Embedding/bin/
 hf-api/__pycache__/
 hf-api/Qwen/
 PostgreSQL.Embedding/PostgreSQL.Embedding/Assets/Models/
+SK.Training/SK.BasicChat/bin/
+SK.Training/SK.BasicChat/obj/
+SK.Training/SK.BasicChat/.vs/
+SK.Training/.vs/
+SK.Training/SK.Plugins/bin/
+SK.Training/SK.Plugins/obj/
