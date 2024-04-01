@@ -1,4 +1,5 @@
 ﻿using PostgreSQL.Embedding.Common;
+using System.Web;
 
 namespace PostgreSQL.Embedding.LLmServices.Extensions
 {
@@ -15,6 +16,18 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
             }
 
             return conversationId;
+        }
+
+        public static string GetConversationName(this HttpContext context)
+        {
+            var conversationName = context.Request.Headers[Constants.HttpRequestHeader_ConversationName].FirstOrDefault();
+            if (string.IsNullOrEmpty(conversationName))
+            {
+                return string.Empty;
+            }
+
+            
+            return HttpUtility.UrlDecode(conversationName);
         }
     }
 }

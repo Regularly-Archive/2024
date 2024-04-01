@@ -22,14 +22,14 @@ namespace PostgreSQL.Embedding.Controllers
             _knowledgeBaseService = knowledgeBaseService;
         }
 
-        [HttpPost("{knowledgeBaseId}/search")]
+        [HttpGet("{knowledgeBaseId}/search")]
         public async Task<JsonResult> KnowledgeSearch(long knowledgeBaseId, [FromQuery] string question, [FromQuery] double minRelevance, [FromQuery] int limit)
         {
             var searchResults = await _knowledgeBaseService.SearchAsync(knowledgeBaseId, question, minRelevance, limit);
             return ApiResult.Success(searchResults);
         }
 
-        [HttpPost("{knowledgeBaseId}/ask")]
+        [HttpGet("{knowledgeBaseId}/ask")]
         public async Task<JsonResult> KnowledgeBaseAsk(long knowledgeBaseId, [FromQuery] string question, [FromQuery] double minRelevance)
         {
             var askResults = await _knowledgeBaseService.AskAsync(knowledgeBaseId, question, minRelevance);
@@ -87,30 +87,30 @@ namespace PostgreSQL.Embedding.Controllers
             });
         }
 
-        [HttpGet("{knowledgeBaseId}/details")]
-        public async Task<JsonResult> GetKnowledgeBaseDetails(long knowledgeBaseId)
+        [HttpGet("{knowledgeBaseId}/chunks")]
+        public async Task<JsonResult> GetKnowledgeBaseChunks(long knowledgeBaseId)
         {
-            var details = await _knowledgeBaseService.GetKnowledgeBaseDetails(knowledgeBaseId);
+            var details = await _knowledgeBaseService.GetKnowledgeBaseChunks(knowledgeBaseId);
             return new JsonResult(details);
         }
 
-        [HttpGet("{knowledgeBaseId}/details/{fileName}")]
-        public async Task<JsonResult> GetKnowledgeBaseDetailsWithFileName(long knowledgeBaseId, string fileName = null)
+        [HttpGet("{knowledgeBaseId}/chunks/{fileName}")]
+        public async Task<JsonResult> GetKnowledgeBaseChunksWithFileName(long knowledgeBaseId, string fileName = null)
         {
-            var details = await _knowledgeBaseService.GetKnowledgeBaseDetails(knowledgeBaseId, fileName);
+            var details = await _knowledgeBaseService.GetKnowledgeBaseChunks(knowledgeBaseId, fileName);
             return new JsonResult(details);
         }
 
-        [HttpDelete("{knowledgeBaseId}/details")]
-        public async Task DeleteKnowledges(long knowledgeBaseId)
+        [HttpDelete("{knowledgeBaseId}/chunks")]
+        public async Task DeleteKnowledgeBaseChunks(long knowledgeBaseId)
         {
-            await _knowledgeBaseService.DeleteKnowledgesById(knowledgeBaseId);
+            await _knowledgeBaseService.DeleteKnowledgeBaseChunksById(knowledgeBaseId);
         }
 
-        [HttpDelete("{knowledgeBaseId}/details/{fileName}")]
-        public async Task DeleteKnowledges(long knowledgeBaseId, string fileName)
+        [HttpDelete("{knowledgeBaseId}/chunks/{fileName}")]
+        public async Task DeleteKnowledgeBaseChunks(long knowledgeBaseId, string fileName)
         {
-            await _knowledgeBaseService.DeleteKnowledgesByFileName(knowledgeBaseId, fileName);
+            await _knowledgeBaseService.DeleteKnowledgeBaseChunksByFileName(knowledgeBaseId, fileName);
         }
 
         [HttpGet("list")]
@@ -118,6 +118,12 @@ namespace PostgreSQL.Embedding.Controllers
         {
             var list = await _knowledgeBaseService.GetKnowledgeBaseDropdownList();
             return ApiResult.Success(list);
+        }
+
+        public override async Task<JsonResult> Create(KnowledgeBase entity)
+        {
+            var instance = await _knowledgeBaseService.CreateKnowledgeBase(entity);
+            return ApiResult.Success(instance);
         }
     }
 }

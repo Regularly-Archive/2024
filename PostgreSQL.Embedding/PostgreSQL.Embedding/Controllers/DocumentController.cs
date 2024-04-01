@@ -22,12 +22,22 @@ namespace PostgreSQL.Embedding.Controllers
             _knowledgeBaseService = knowledgeBaseService;
         }
 
+        public override async Task<JsonResult> SelectById(long id)
+        {
+            var db = _crudBaseService.SqlSugarClient;
+
+            var importRecord = await _crudBaseService.GetById(id);
+            var knowledgeBase = await db.Queryable<KnowledgeBase>().Where(x => x.Id == importRecord.KnowledgeBaseId).FirstAsync();
+            importRecord.KnowledgeBaseName = knowledgeBase != null ? knowledgeBase.Name : string.Empty;
+            return ApiResult.Success(importRecord);
+        }
+
         public override async Task<JsonResult> GetByPage(int pageSize, int pageIndex)
         {
             var db = _crudBaseService.SqlSugarClient;
             var list = await db.Queryable<DocumentImportRecord>()
-              .LeftJoin<KnowledgeBase>((r,k) => r.KnowledgeBaseId == k.Id)
-              .Select((r,k) => new DocumentImportRecord()
+              .LeftJoin<KnowledgeBase>((r, k) => r.KnowledgeBaseId == k.Id)
+              .Select((r, k) => new DocumentImportRecord()
               {
                   Id = r.Id,
                   TaskId = r.TaskId,
@@ -65,9 +75,9 @@ namespace PostgreSQL.Embedding.Controllers
 
             var deleteTasks = importRecords.Select(async importRecord =>
             {
-                await _knowledgeBaseService.DeleteKnowledgesByFileName(importRecord.KnowledgeBaseId, importRecord.FileName);
+                await _knowledgeBaseService.DeleteKnowledgeBaseChunksByFileName(importRecord.KnowledgeBaseId, importRecord.FileName);
             });
-            
+
             await Task.WhenAll(deleteTasks);
             return ApiResult.Success(new { });
         }

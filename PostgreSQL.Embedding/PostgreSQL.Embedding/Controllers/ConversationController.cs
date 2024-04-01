@@ -5,6 +5,10 @@ using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.LlmServices;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using System.Net;
+using Microsoft.AspNetCore.Authorization;
+using PostgreSQL.Embedding.Common.Models.WebApi;
+using static LLama.Common.ChatHistory;
+using PostgreSQL.Embedding.DataAccess.Entities;
 
 namespace PostgreSQL.Embedding.Controllers
 {
@@ -13,16 +17,45 @@ namespace PostgreSQL.Embedding.Controllers
     public class ConversationController : ControllerBase
     {
         private readonly IConversationService _conversationService;
-        public ConversationController(IConversationService conversationService)
+        private readonly IChatHistoryService _chatHistoryService;
+        public ConversationController(IConversationService conversationService, IChatHistoryService chatHistoryService)
         {
             _conversationService = conversationService;
+            _chatHistoryService = chatHistoryService;
         }
 
-        [HttpPost]
-        [Route("{appId}")]
+        [HttpPost("{appId}")]
         public async Task Chat(OpenAIModel model, string appId)
         {
             await _conversationService.Invoke(model, appId, HttpContext);
+        }
+
+        [HttpGet("{appId}/histories/{conversationId}")]
+        public async Task<JsonResult> GetConversationMessages(long appId, string conversationId)
+        {
+            var messsages = await _chatHistoryService.GetConversationMessages(appId, conversationId);
+            return ApiResult.Success(messsages);
+        }
+
+        [HttpGet("{appId}/histories")]
+        public async Task<JsonResult> GetConversations(long appId)
+        {
+            var conversations = await _chatHistoryService.GetAppConversations(appId);
+            return ApiResult.Success(conversations);
+        }
+
+        [HttpDelete("{appId}/histories/{conversationId}")]
+        public async Task<JsonResult> DeleteConversation(long appId, string conversationId)
+        {
+            await _chatHistoryService.DeleteConversation(appId, conversationId);
+            return ApiResult.Success<object>(null);
+        }
+
+        [HttpPut("{appId}/histories/{conversationId}")]
+        public async Task<JsonResult> UpdateConversation(AppConversation conversation)
+        {
+            await _chatHistoryService.UpdateConversation(conversation);
+            return ApiResult.Success<object>(null);
         }
     }
 }

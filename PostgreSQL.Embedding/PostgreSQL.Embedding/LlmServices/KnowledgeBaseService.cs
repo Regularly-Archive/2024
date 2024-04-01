@@ -8,6 +8,7 @@ using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using SqlSugar;
+using System.Text;
 using Constants = PostgreSQL.Embedding.Common.Constants;
 
 namespace PostgreSQL.Embedding.LlmServices
@@ -22,8 +23,8 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly ILogger<KnowledgeBaseService> _logger;
 
         public KnowledgeBaseService(
-            IServiceProvider serviceProvider, 
-            IConfiguration configuration, 
+            IServiceProvider serviceProvider,
+            IConfiguration configuration,
             IMemoryService memoryService,
             IRepository<DocumentImportRecord> importRecordRepository,
             IRepository<KnowledgeBase> knowledgeBaseRepository,
@@ -40,6 +41,15 @@ namespace PostgreSQL.Embedding.LlmServices
 
         public Task<KnowledgeBase> CreateKnowledgeBase(KnowledgeBase knowledgeBase)
         {
+            if (!knowledgeBase.MaxTokensPerParagraph.HasValue)
+                knowledgeBase.MaxTokensPerParagraph = DefaultTextPartitioningOptions.MaxTokensPerParagraph;
+
+            if (!knowledgeBase.MaxTokensPerLine.HasValue)
+                knowledgeBase.MaxTokensPerLine = DefaultTextPartitioningOptions.MaxTokensPerLine;
+
+            if (!knowledgeBase.OverlappingTokens.HasValue)
+                knowledgeBase.OverlappingTokens = DefaultTextPartitioningOptions.OverlappingTokens;
+
             return _knowledgeBaseRepository.AddAsync(knowledgeBase);
         }
 
@@ -49,7 +59,7 @@ namespace PostgreSQL.Embedding.LlmServices
         }
 
         // Todo
-        public async Task<List<KMPartition>> GetKnowledgeBaseDetails(long knowledgeBaseId, string fileName = null)
+        public async Task<List<KMPartition>> GetKnowledgeBaseChunks(long knowledgeBaseId, string fileName = null)
         {
             // 查询知识库
             var knowledgeBase = await GetKnowledgeBaseById(knowledgeBaseId);
@@ -98,11 +108,11 @@ namespace PostgreSQL.Embedding.LlmServices
         public async Task HandleImportingQueueAsync()
         {
             var webHostEnvironment = _serviceProvider.GetRequiredService<IWebHostEnvironment>();
-            
+
             var records = await _importRecordRepository.FindAsync(x => x.QueueStatus == (int)QueueStatus.Uploaded);
             _logger.LogInformation($"There are {records.Count} files to be processed.");
 
-            var tasks = records.Select(async record =>
+            var tasks = records.OrderBy(x => x.CreatedAt).Select(async record =>
             {
                 var knowledgeBase = await GetKnowledgeBaseById(record.KnowledgeBaseId);
                 using var serviceProviderScope = _serviceProvider.CreateScope();
@@ -163,7 +173,7 @@ namespace PostgreSQL.Embedding.LlmServices
             await memoryServerless.ImportWebPageAsync(url, tags: tags, steps: new List<string> { UpdateQueueStatusHandler.GetCurrentStepName() });
         }
 
-        public async Task DeleteKnowledgesById(long knowledgeBaseId)
+        public async Task DeleteKnowledgeBaseChunksById(long knowledgeBaseId)
         {
             // 查询知识库
             var knowledgeBase = await GetKnowledgeBaseById(knowledgeBaseId);
@@ -178,7 +188,7 @@ namespace PostgreSQL.Embedding.LlmServices
             }
         }
 
-        public async Task DeleteKnowledgesByFileName(long knowledgeBaseId, string fileName)
+        public async Task DeleteKnowledgeBaseChunksByFileName(long knowledgeBaseId, string fileName)
         {
             // 查询知识库
             var knowledgeBase = await GetKnowledgeBaseById(knowledgeBaseId);
@@ -219,7 +229,7 @@ namespace PostgreSQL.Embedding.LlmServices
 
         public async Task<KMAskResult> AskAsync(long knowledgeBaseId, string question, double minRelevance = 0)
         {
-            var askResult = new KMAskResult() { Question = question };
+            var askResult = new KMAskResult() { Question = question, RelevantSources = new List<KMCitation>() };
 
             // 查询知识库
             var knowledgeBase = await _knowledgeBaseRepository.GetAsync(knowledgeBaseId);
@@ -230,7 +240,7 @@ namespace PostgreSQL.Embedding.LlmServices
             var memoryFilter = new MemoryFilter()
                 .ByTag(KernelMemoryTags.KnowledgeBaseId, knowledgeBaseId.ToString());
 
-            var memoryAnswer = await memoryServerless.AskAsync(question, filter: memoryFilter, minRelevance: 0);
+            var memoryAnswer = await memoryServerless.AskAsync(question, filter: memoryFilter, minRelevance: minRelevance);
             askResult.Answer = memoryAnswer.Result;
 
             if (memoryAnswer.RelevantSources.Any())
@@ -242,6 +252,7 @@ namespace PostgreSQL.Embedding.LlmServices
                 })
                 .ToList();
             }
+
             return askResult;
         }
 

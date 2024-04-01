@@ -5,20 +5,17 @@ namespace PostgreSQL.Embedding.DataAccess.Entities
     [SugarTable("llm_knowledgebase")]
     public class KnowledgeBase : BaseEntity
     {
-        [SugarColumn(ColumnName = "avatar")]
+        [SugarColumn(ColumnName = "avatar", IsNullable = true)]
         public string Avatar { get; set; }
 
         [SugarColumn(ColumnName = "name")]
         public string Name { get; set; }
 
-        [SugarColumn(ColumnName = "intro")]
+        [SugarColumn(ColumnName = "intro", IsNullable = true)]
         public string Intro { get; set; }
 
         [SugarColumn(ColumnName = "embedding_model")]
         public string EmbeddingModel { get; set; }
-
-        [SugarColumn(ColumnName = "service_provider")]
-        public int ServiceProvider { get; set; }
 
         [SugarColumn(ColumnName = "max_tokens_per_paragraph")]
         public int? MaxTokensPerParagraph { get; set; }

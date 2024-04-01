@@ -28,6 +28,11 @@ namespace PostgreSQL.Embedding.LlmServices
                 request.RequestUri = new Uri(_llmModel.BaseUrl);
             }
 
+            if (!string.IsNullOrEmpty(_llmModel.ApiKey))
+            {
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _llmModel.ApiKey);
+            }
+
             request.Headers.Add(Constants.HttpRequestHeader_Provider, llmServiceProvider.ToString());
             return base.SendAsync(request, cancellationToken);
         }

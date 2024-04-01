@@ -8,9 +8,11 @@ namespace PostgreSQL.Embedding.LlmServices
     public class ChatHistoryService : IChatHistoryService
     {
         private IRepository<ChatMessage> _chatMessageRepository;
-        public ChatHistoryService(IRepository<ChatMessage> chatMessageRepository)
+        private readonly IRepository<AppConversation> _appConversationRepository;
+        public ChatHistoryService(IRepository<ChatMessage> chatMessageRepository, IRepository<AppConversation> appConversationRepository)
         {
             _chatMessageRepository = chatMessageRepository;
+            _appConversationRepository = appConversationRepository;
         }
 
         public Task AddSystemMessage(long appId, string conversationId, string content)
@@ -35,14 +37,38 @@ namespace PostgreSQL.Embedding.LlmServices
             });
         }
 
-        public Task<List<ChatHistory>> GetChatHistories(long appId)
+        public Task<List<AppConversation>> GetAppConversations(long appId)
         {
-            throw new NotImplementedException();
+            return _appConversationRepository.FindAsync(x => x.AppId == appId);
         }
 
-        public Task<List<ChatMessage>> GetHistoricalMessages(long appId, string conversationId)
+        public Task<List<ChatMessage>> GetConversationMessages(long appId, string conversationId)
         {
             return _chatMessageRepository.FindAsync(x => x.AppId == appId && x.ConversationId == conversationId);
+        }
+
+        public async Task AddConversation(long appId, string conversationId, string conversationName)
+        {
+            var conversation = await _appConversationRepository.SingleOrDefaultAsync(x => x.AppId == appId && x.ConversationId == conversationId);
+            if (conversation != null) return;
+
+            await _appConversationRepository.AddAsync(new AppConversation()
+            {
+                AppId = appId,
+                ConversationId = conversationId,
+                Summary = conversationName,
+            });
+        }
+
+        public async Task DeleteConversation(long appId, string conversationId)
+        {
+            await _appConversationRepository.DeleteAsync(x => x.AppId == appId && x.ConversationId == conversationId);
+            await _chatMessageRepository.DeleteAsync(x => x.AppId == appId && x.ConversationId == conversationId);
+        }
+
+        public Task UpdateConversation(AppConversation conversation)
+        {
+            return _appConversationRepository.UpdateAsync(conversation);
         }
     }
 }

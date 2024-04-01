@@ -8,23 +8,24 @@ namespace PostgreSQL.Embedding.DataAccess.Entities
         [SugarColumn(ColumnName = "name")]
         public string Name { get; set; }
 
-        [SugarColumn(ColumnName = "avatar")]
+        [SugarColumn(ColumnName = "avatar", IsNullable = true)]
         public string Avatar { get; set; }
 
-        [SugarColumn(ColumnName = "intro")]
+        [SugarColumn(ColumnName = "intro", IsNullable = true)]
         public string Intro { get; set; }
+
 
         [SugarColumn(ColumnName = "app_type")]
         public int AppType { get; set; }
 
-        [SugarColumn(ColumnName = "prompt")]
+        [SugarColumn(ColumnName = "prompt", IsNullable = true)]
         public string Prompt { get; set; }
+
+        [SugarColumn(ColumnName = "welcome", IsNullable = true)]
+        public string Welcome { get; set; }
 
         [SugarColumn(ColumnName = "text_model")]
         public string TextModel { get; set; }
-
-        [SugarColumn(ColumnName = "service_provider")]
-        public int ServiceProvider { get; set; }
 
         [SugarColumn(ColumnName = "temperature")]
         public decimal Temperature { get; set; }

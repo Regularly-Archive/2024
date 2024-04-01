@@ -1,2 +1,1 @@
-﻿<message role=""user"">{{$input}}</message>
-<message role=""system"">{{$system}}</message>
+﻿{{$system}} {{$input}}

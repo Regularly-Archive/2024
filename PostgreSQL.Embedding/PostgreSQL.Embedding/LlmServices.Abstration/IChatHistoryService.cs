@@ -7,7 +7,10 @@ namespace PostgreSQL.Embedding.LlmServices.Abstration
     {
         Task AddUserMessage(long appId, string conversationId, string content);
         Task AddSystemMessage(long appId, string conversationId, string content);
-        Task<List<ChatHistory>> GetChatHistories(long appId);
-        Task<List<ChatMessage>> GetHistoricalMessages(long appId, string conversationId);
+        Task AddConversation(long appId, string conversationId, string conversationName);
+        Task<List<AppConversation>> GetAppConversations(long appId);
+        Task<List<ChatMessage>> GetConversationMessages(long appId, string conversationId);
+        Task DeleteConversation(long appId, string conversationId);
+        Task UpdateConversation(AppConversation conversation);
     }
 }
