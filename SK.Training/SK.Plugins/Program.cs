@@ -6,6 +6,9 @@ using Microsoft.SemanticKernel.Planning;
 using System.ComponentModel;
 using Microsoft.SemanticKernel.Planning.Handlebars;
 using System.Net.Http.Headers;
+using Microsoft.SemanticKernel.Plugins.Web.Bing;
+using System.Security.Cryptography;
+using Microsoft.SemanticKernel.Plugins.Web.Google;
 
 namespace SK.Plugins;
 
@@ -89,7 +92,7 @@ public class Program
         var kernel = Kernel.CreateBuilder()
             .AddOpenAIChatCompletion(
                 modelId: "moonshot-v1-8k",
-                apiKey: "sk-IbKsN4zpWyJCrXUl8YXjDAVewlTuYOifkYgBLhzujhoSuHTd",
+                apiKey: "",
                 httpClient: httpClient
             )
             .Build();
@@ -100,6 +103,13 @@ public class Program
         #pragma warning restore SKEXP0050
         kernel.Plugins.AddFromType<MathPlugin>("math");
         kernel.Plugins.AddFromType<WeatherPlugin>("weather");
+
+        // 可以使用 Bing 或者 Google 的插件，使用效果一般，需要绑定信用卡
+        #pragma warning disable SKEXP0050
+        //var googleConnector = new GoogleConnector("", "");
+        //var searchEnginePlugin = new WebSearchEnginePlugin(googleConnector);
+        //kernel.Plugins.AddFromObject(searchEnginePlugin);
+        #pragma warning restore SKEXP0050
 
         // 手动调用插件
         var result = await kernel.InvokeAsync<string>("time", "Today");
@@ -115,7 +125,7 @@ public class Program
         // 从提示词模板构建一个翻译插件
         var translateFunction = kernel.CreateFunctionFromPrompt(
             @"""
-            You’re a AI bot and you are good at English. I need you help for the following input:
+            You’re a AI bot and you are good at English. I need your help for the following input:
 
             {{ $input }}
 

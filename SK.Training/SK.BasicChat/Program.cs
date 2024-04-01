@@ -32,7 +32,7 @@ public class Program
         var kernel = Kernel.CreateBuilder()
             .AddOpenAIChatCompletion(
                 modelId: "moonshot-v1-8k",
-                apiKey: "sk-IbKsN4zpWyJCrXUl8YXjDAVewlTuYOifkYgBLhzujhoSuHTd",
+                apiKey: "",
                 httpClient: httpClient
             )
             .Build();
@@ -43,8 +43,9 @@ public class Program
         while ((input = Console.ReadLine()) != null)
         {
             Console.WriteLine($"User -> {input}");
-            var arguments = new KernelArguments() { ["input"] = input };
+
             Console.Write("AI -> ");
+            var arguments = new KernelArguments() { ["input"] = input };
             await foreach (var message in kernel.InvokeStreamingAsync<string>(chatFunction, arguments: arguments))
             {
                 Console.Write(message);
