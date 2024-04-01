@@ -25,3 +25,5 @@ PostgreSQL.Embedding/PostgreSQL.Embedding/obj/
 PostgreSQL.Embedding/PostgreSQL.Embedding/Upload/
 PostgreSQL.Embedding/PostgreSQL.Embedding/bin/
 hf-api/__pycache__/
+hf-api/Qwen/
+PostgreSQL.Embedding/PostgreSQL.Embedding/Assets/Models/
