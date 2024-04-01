@@ -6,6 +6,7 @@ using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using System.Text;
 using PostgreSQL.Embedding.LLmServices.Extensions;
+using Masuit.Tools;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
@@ -14,9 +15,10 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly Kernel _kernel;
         private readonly LlmApp _app;
         private readonly string _promptTemplate;
-        private readonly string _defaultPrompt = "You are a helpful AI bot.";
+        private readonly string _defaultPrompt = "You are a helpful AI bot. You must answer the question in Chinese.";
         private readonly IChatHistoryService _chatHistoryService;
         private string _conversationId;
+        private readonly Random _random = new Random();
         public GenericConversationService(Kernel kernel, LlmApp app, IChatHistoryService chatHistoryService)
         {
             _kernel = kernel;
@@ -28,7 +30,10 @@ namespace PostgreSQL.Embedding.LlmServices
         public async Task InvokeAsync(OpenAIModel model, HttpContext httpContext, string input)
         {
             _conversationId = httpContext.GetOrCreateConversationId();
+            var conversationName = httpContext.GetConversationName();
             await _chatHistoryService.AddUserMessage(_app.Id, _conversationId, input);
+            await _chatHistoryService.AddConversation(_app.Id, _conversationId, conversationName);
+
             if (model.stream)
             {
                 var stramingResult = new OpenAIStreamResult();
@@ -67,21 +72,22 @@ namespace PostgreSQL.Embedding.LlmServices
 
             var temperature = _app.Temperature / 100;
             var settings = new OpenAIPromptExecutionSettings() { Temperature = (double)temperature };
-            var func = _kernel.CreateFunctionFromPrompt(_app.Prompt, settings);
+            var func = _kernel.CreateFunctionFromPrompt(_promptTemplate, settings);
             var chatResult = _kernel.InvokeStreamingAsync<StreamingChatMessageContent>(
                 function: func,
                 arguments: new KernelArguments() { ["input"] = input, ["system"] = _app.Prompt }
             );
 
             var answerBuilder = new StringBuilder();
+            var random = new Random();
             await foreach (var content in chatResult)
             {
                 if (!string.IsNullOrEmpty(content.Content)) answerBuilder.Append(content.Content);
                 result.choices[0].delta.content = content.Content ?? string.Empty;
-                string message = $"data: {JsonConvert.SerializeObject(result)}\n\n";
+                string message = $"data: {JsonConvert.SerializeObject(result)}\n";
                 await HttpContext.Response.WriteAsync(message, Encoding.UTF8);
                 await HttpContext.Response.Body.FlushAsync();
-                await Task.Delay(TimeSpan.FromMilliseconds(50));
+                await Task.Delay(TimeSpan.FromMilliseconds(random.Next(50,500)));
             }
 
             await _chatHistoryService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());

@@ -8,5 +8,6 @@ namespace PostgreSQL.Embedding.Common
         public const string Admin = "admin";
         public const string HttpRequestHeader_Provider = "X-LLM-SERVICE-PROVIDER";
         public const string HttpRequestHeader_ConversationId = "x-wikit-conversation-id";
+        public const string HttpRequestHeader_ConversationName = "x-wikit-conversation-name";
     }
 }

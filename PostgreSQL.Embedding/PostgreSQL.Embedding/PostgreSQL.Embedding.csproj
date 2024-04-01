@@ -40,6 +40,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="Assets\Models\LLama2-7B-Chat\llama-2-7b-chat.Q4_0.gguf">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="Assets\Models\Qwen-1_8B-Chat\ggml-model-q5_k_m.gguf">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

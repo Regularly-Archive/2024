@@ -40,7 +40,7 @@ namespace PostgreSQL.Embedding.LlmServices
 
             var options = _serviceProvider.GetRequiredService<IOptions<LlmConfig>>();
             var embeddingHttpClient = new HttpClient(new OpenAIEmbeddingHandler(embeddingModel, options));
-            var generationHttpClient = new HttpClient();
+            var generationHttpClient = new HttpClient(new OpenAIChatHandler(generationModel, options));
 
             var tableNamePrefix = await GenerateTableNamePrefix(embeddingModel);
 
@@ -66,6 +66,10 @@ namespace PostgreSQL.Embedding.LlmServices
                     MaxTokensPerParagraph = DefaultTextPartitioningOptions.MaxTokensPerParagraph,
                     MaxTokensPerLine = DefaultTextPartitioningOptions.MaxTokensPerLine,
                     OverlappingTokens = DefaultTextPartitioningOptions.OverlappingTokens
+                })
+                .WithSearchClientConfig(new SearchClientConfig()
+                {
+                    EmptyAnswer = "抱歉，我无法回答你的问题！"
                 });
 
             return memoryBuilder.Build<MemoryServerless>();
@@ -112,6 +116,10 @@ namespace PostgreSQL.Embedding.LlmServices
                     OverlappingTokens = (knowledgeBase.OverlappingTokens.HasValue ?
                     knowledgeBase.OverlappingTokens.Value :
                     DefaultTextPartitioningOptions.OverlappingTokens),
+                })
+                .WithSearchClientConfig(new SearchClientConfig()
+                {
+                    EmptyAnswer = "抱歉，我无法回答你的问题！"
                 });
 
             return memoryBuilder.Build<MemoryServerless>();
@@ -121,7 +129,7 @@ namespace PostgreSQL.Embedding.LlmServices
         {
             var tablePrefixMapping = await _tablePrefixMappingRepository.SingleOrDefaultAsync(x => x.FullName == embeddingModel.ModelName);
             if (tablePrefixMapping != null)
-                return $"sk_{tablePrefixMapping.ShortName}_";
+                return $"sk-{tablePrefixMapping.ShortName.ToLower()}-";
 
             var shortCode = string.Empty;
             while (string.IsNullOrEmpty(shortCode))
@@ -135,7 +143,7 @@ namespace PostgreSQL.Embedding.LlmServices
                 ShortName = shortCode,
             });
 
-            return $"sk_{shortCode}_";
+            return $"sk-{shortCode.ToLower()}-";
         }
 
         private async Task<string> GetEmbeddingModelByKnowledges(LlmApp app)

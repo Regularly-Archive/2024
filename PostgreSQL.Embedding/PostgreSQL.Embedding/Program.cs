@@ -4,7 +4,6 @@ using LLamaSharp.KernelMemory;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Azure;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.KernelMemory;
 using Microsoft.KernelMemory.Postgres;
@@ -175,7 +174,7 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(builder =>
     {
-        builder.WithOrigins("http://localhost:2800")
+        builder.WithOrigins("http://localhost:2800", "http://192.168.1.196:2800")
                 .AllowAnyHeader()
                 .AllowAnyMethod()
                 .AllowCredentials();

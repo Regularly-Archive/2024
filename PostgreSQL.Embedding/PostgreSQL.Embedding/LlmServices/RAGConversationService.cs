@@ -1,4 +1,5 @@
-﻿using Microsoft.KernelMemory;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.KernelMemory;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Newtonsoft.Json;
@@ -7,7 +8,9 @@ using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
+using PostgreSQL.Embedding.LLmServices.Extensions;
 using SqlSugar;
+using System.Net.Http;
 using System.Text;
 
 namespace PostgreSQL.Embedding.LlmServices
@@ -22,6 +25,7 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly MemoryServerless _memoryServerless;
         private readonly IChatHistoryService _chatHistoryService;
         private readonly string _promptTemplate;
+        private string _conversationId;
 
         public RAGConversationService(Kernel kernel, LlmApp app, IServiceProvider serviceProvider, MemoryServerless memoryServerless, IChatHistoryService chatHistoryService)
         {
@@ -37,6 +41,11 @@ namespace PostgreSQL.Embedding.LlmServices
 
         public async Task InvokeAsync(OpenAIModel model, HttpContext HttpContext, string input)
         {
+            _conversationId = HttpContext.GetOrCreateConversationId();
+            var conversationName = HttpContext.GetConversationName();
+            await _chatHistoryService.AddUserMessage(_app.Id, _conversationId, input);
+            await _chatHistoryService.AddConversation(_app.Id, _conversationId, conversationName);
+
             if (model.stream)
             {
                 var stramingResult = new OpenAIStreamResult();
@@ -78,8 +87,12 @@ namespace PostgreSQL.Embedding.LlmServices
                 arguments: new KernelArguments() { ["context"] = context, ["name"] = "ChatGPT", ["question"] = input }
             );
 
-            var answers = chatResult.GetValue<string>();
-            if (!string.IsNullOrEmpty(answers)) return answers;
+            var answer = chatResult.GetValue<string>();
+            if (!string.IsNullOrEmpty(answer))
+            {
+                await _chatHistoryService.AddSystemMessage(_app.Id, _conversationId, answer);
+                return answer;
+            }
 
             return string.Empty;
         }
@@ -99,21 +112,24 @@ namespace PostgreSQL.Embedding.LlmServices
 
             var temperature = _app.Temperature / 100;
             OpenAIPromptExecutionSettings settings = new() { Temperature = (double)temperature };
-            var func = _kernel.CreateFunctionFromPrompt(_app.Prompt, settings);
+            var func = _kernel.CreateFunctionFromPrompt(_promptTemplate, settings);
             var chatResult = _kernel.InvokeStreamingAsync<StreamingChatMessageContent>(
                 function: func,
                 arguments: new KernelArguments() { ["context"] = context, ["name"] = "ChatGPT", ["question"] = input }
             );
 
+            var answerBuilder = new StringBuilder();
             await foreach (var content in chatResult)
             {
+                if (!string.IsNullOrEmpty(content.Content)) answerBuilder.Append(content.Content);
                 result.choices[0].delta.content = content.Content ?? string.Empty;
-                string message = $"data: {JsonConvert.SerializeObject(result)}\n\n";
+                string message = $"data: {JsonConvert.SerializeObject(result)}\n";
                 await HttpContext.Response.WriteAsync(message, Encoding.UTF8);
                 await HttpContext.Response.Body.FlushAsync();
                 await Task.Delay(TimeSpan.FromMilliseconds(50));
             }
 
+            await _chatHistoryService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());
             await HttpContext.Response.WriteAsync("data: [DONE]");
             await HttpContext.Response.Body.FlushAsync();
             await HttpContext.Response.CompleteAsync();
