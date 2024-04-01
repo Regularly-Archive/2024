@@ -1,14 +1,15 @@
 from fastapi import FastAPI
-from models import EmbeddingsRequest, EmbeddingsObjectResponse, EmbeddingsResponse, Usage
+from models import CompletionRequest, ChatCompletionRequest, EmbeddingsRequest, EmbeddingsObjectResponse, EmbeddingsResponse, Usage, CompletionResponse, CompletionResponseChoice, ChatCompletionResponse, ChatCompletionResponseChoice
 from fastapi import FastAPI, HTTPException
 from sentence_transformers import SentenceTransformer
 import os
+from completions import chatCompletions, textCompletions
 
 app = FastAPI()
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com/"
 
 @app.post("/v1/embeddings")
-async def embedding(item: EmbeddingsRequest) -> EmbeddingsResponse:
+async def text_embeddings(item: EmbeddingsRequest) -> EmbeddingsResponse:
     model: SentenceTransformer = SentenceTransformer(item.model)
     if isinstance(item.input, str):
         vectors = model.encode(item.input)
@@ -43,8 +44,25 @@ async def embedding(item: EmbeddingsRequest) -> EmbeddingsResponse:
         status_code=400, detail="input needs to be an array of strings or a string"
     )
 
+@app.post("/v1/chat/completions")
+async def chat_completions(item: ChatCompletionRequest):
+    text = chatCompletions(item)
+    return ChatCompletionResponse(
+        model=item.model,
+        choices=[ChatCompletionResponseChoice(text=text, index=0, Usage=None)],
+    )
+
+@app.post("/v1/completions")
+async def completions(item: CompletionRequest): 
+    text = textCompletions(item)
+    return CompletionResponse(
+        model=item.model,
+        choices=[CompletionResponseChoice(text=text, index=0)],
+    )
+    
+
 
 if __name__ == '__main__':
     import os,uvicorn
     os.environ["HF_ENDPOINT"] = "https://hf-mirror.com/"
-    uvicorn.run(app='api:app', host="127.0.0.1", port=8001, reload=True)
+    uvicorn.run(app='api:app', host="127.0.0.1", port=8003, reload=True)

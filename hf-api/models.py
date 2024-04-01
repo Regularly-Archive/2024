@@ -84,7 +84,7 @@ class CompletionResponseChoice(BaseModel):
 
 
 class CompletionResponse(BaseModel):
-    id: str = Field(default_factory=lambda: f"hf-{generate(size=10)}")
+    id: str = Field()
     object: str = "text.completion"
     created: int = Field(default_factory=lambda: int(time.time()))
     model: Optional[str] = "custom"
