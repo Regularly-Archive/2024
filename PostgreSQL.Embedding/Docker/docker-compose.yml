@@ -1,0 +1,16 @@
+version: '3.7'
+
+services:
+  postgres:
+    build: .
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: postgresql
+      POSTGRES_USER: postgresql
+      POSTGRES_DB: wiki
+
+volumes:
+  postgres_data: 
