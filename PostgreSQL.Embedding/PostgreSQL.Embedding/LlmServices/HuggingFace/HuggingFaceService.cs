@@ -27,7 +27,10 @@ namespace PostgreSQL.Embedding.LlmServices.HuggingFace
         {
             var result = new OpenAIEmbeddingResult();
             result.data[0].embedding = await _huggingFaceEmbeddingService.Embedding(model.input[0]);
-            HttpContext.Response.ContentType = "application/json";
+            if (!HttpContext.Response.HasStarted)
+            {
+                HttpContext.Response.ContentType = "application/json";
+            }
             await HttpContext.Response.WriteAsync(JsonConvert.SerializeObject(result));
             await HttpContext.Response.CompleteAsync();
         }

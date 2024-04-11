@@ -10,9 +10,9 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
         public static IServiceCollection AddLLama(this IServiceCollection services)
         {
             return services
-                .AddSingleton<LLamaChatService>()
-                .AddSingleton<LLamaEmbeddingService>()
-                .AddSingleton<LLamaService>();
+                .AddScoped<LLamaChatService>()
+                .AddScoped<LLamaEmbeddingService>()
+                .AddScoped<LLamaService>();
         }
 
         public static IServiceCollection AddHuggingFace(this IServiceCollection services)

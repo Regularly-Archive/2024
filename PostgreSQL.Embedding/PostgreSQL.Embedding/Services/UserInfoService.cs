@@ -55,7 +55,8 @@ namespace PostgreSQL.Embedding.Services
                 {
                     Id = userInfo.Id.ToString(),
                     UserName = userInfo.UserName,
-                    Role = new List<string> { "SA" }
+                    Role = new List<string> { "SA" },
+                    Avatar = userInfo.Avatar,
                 }
             };
         }
