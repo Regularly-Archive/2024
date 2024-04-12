@@ -1,10 +1,12 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Azure.Search.Documents.Models;
+using Microsoft.AspNetCore.Http;
 using Microsoft.KernelMemory;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Models;
+using PostgreSQL.Embedding.Common.Models.KernelMemory;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
@@ -22,21 +24,35 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly IServiceProvider _serviceProvider;
         private readonly IConfiguration _configuration;
         private readonly IRepository<LlmAppKnowledge> _llmAppKnowledgeRepository;
-        private readonly MemoryServerless _memoryServerless;
+        private readonly IRepository<KnowledgeBase> _knowledgeBaseRepository;
+        private readonly IMemoryService _memoryService;
         private readonly IChatHistoryService _chatHistoryService;
+        private readonly PromptTemplateService _promptTemplateService;
+        private readonly ILogger<RAGConversationService> _logger;
         private readonly string _promptTemplate;
+        private readonly float _minRelevance = 0;
+        private readonly int _limit = 5;
         private string _conversationId;
 
-        public RAGConversationService(Kernel kernel, LlmApp app, IServiceProvider serviceProvider, MemoryServerless memoryServerless, IChatHistoryService chatHistoryService)
+        public RAGConversationService(
+            Kernel kernel,
+            LlmApp app,
+            IServiceProvider serviceProvider,
+            IMemoryService memoryService,
+            IChatHistoryService chatHistoryService
+        )
         {
             _kernel = kernel;
             _app = app;
             _serviceProvider = serviceProvider;
             _configuration = serviceProvider.GetRequiredService<IConfiguration>();
             _llmAppKnowledgeRepository = _serviceProvider.GetService<IRepository<LlmAppKnowledge>>();
-            _memoryServerless = memoryServerless;
-            _promptTemplate = LoadPromptTemplate("RAGPrompt.txt");
+            _knowledgeBaseRepository = _serviceProvider.GetService<IRepository<KnowledgeBase>>();
+            _memoryService = memoryService;
+            _promptTemplateService = _serviceProvider.GetService<PromptTemplateService>();
+            _promptTemplate = _promptTemplateService.LoadPromptTemplate("RAGPrompt.txt");
             _chatHistoryService = chatHistoryService;
+            _logger = _serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<RAGConversationService>();
         }
 
         public async Task InvokeAsync(OpenAIModel model, HttpContext HttpContext, string input)
@@ -52,7 +68,10 @@ namespace PostgreSQL.Embedding.LlmServices
                 stramingResult.created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                 stramingResult.choices = new List<StreamChoicesModel>() { new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant" } } };
                 await InvokeWithKnowledgeStreaming(HttpContext, stramingResult, input);
-                HttpContext.Response.ContentType = "application/json";
+                if (!HttpContext.Response.HasStarted)
+                {
+                    HttpContext.Response.ContentType = "application/json";
+                }
                 await HttpContext.Response.WriteAsync(JsonConvert.SerializeObject(stramingResult));
                 await HttpContext.Response.CompleteAsync();
             }
@@ -62,7 +81,10 @@ namespace PostgreSQL.Embedding.LlmServices
                 result.created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                 result.choices = new List<ChoicesModel>() { new ChoicesModel() { message = new OpenAIMessage() { role = "assistant" } } };
                 result.choices[0].message.content = await InvokeWithKnowledge(input);
-                HttpContext.Response.ContentType = "application/json";
+                if (!HttpContext.Response.HasStarted)
+                {
+                    HttpContext.Response.ContentType = "application/json";
+                }
                 await HttpContext.Response.WriteAsync(JsonConvert.SerializeObject(result));
                 await HttpContext.Response.CompleteAsync();
             }
@@ -76,7 +98,7 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <returns></returns>
         private async Task<string> InvokeWithKnowledge(string input)
         {
-            var context = BuildKnowledgeContext(input);
+            var context = await BuildKnowledgeContext(input);
 
             var temperature = _app.Temperature / 100;
             var settings = new OpenAIPromptExecutionSettings() { Temperature = (double)temperature };
@@ -106,9 +128,12 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <returns></returns>
         private async Task InvokeWithKnowledgeStreaming(HttpContext HttpContext, OpenAIStreamResult result, string input)
         {
-            HttpContext.Response.Headers.ContentType = new Microsoft.Extensions.Primitives.StringValues("text/event-stream");
+            if (!HttpContext.Response.HasStarted)
+            {
+                HttpContext.Response.Headers.ContentType = new Microsoft.Extensions.Primitives.StringValues("text/event-stream");
+            }
 
-            var context = BuildKnowledgeContext(input);
+            var context = await BuildKnowledgeContext(input);
 
             var temperature = _app.Temperature / 100;
             OpenAIPromptExecutionSettings settings = new() { Temperature = (double)temperature };
@@ -135,21 +160,6 @@ namespace PostgreSQL.Embedding.LlmServices
             await HttpContext.Response.CompleteAsync();
         }
 
-        /// <summary>
-        /// 加载提示词模板
-        /// </summary>
-        /// <param name="fileName"></param>
-        /// <returns></returns>
-        /// <exception cref="ArgumentException"></exception>
-        private string LoadPromptTemplate(string fileName)
-        {
-            var promptDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Common/Prompts");
-            var promptTemplate = Path.Combine(promptDirectory, fileName);
-            if (!File.Exists(promptTemplate))
-                throw new ArgumentException($"The prompt template file '{promptTemplate}' can not be found.");
-
-            return File.ReadAllText(promptTemplate);
-        }
 
         /// <summary>
         /// 构建知识库上下文
@@ -158,34 +168,69 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <returns></returns>
         private async Task<string> BuildKnowledgeContext(string input)
         {
-            var filters = new List<MemoryFilter>();
+            var searchResults = new List<KMCitation>();
             var llmKappKnowledges = await _llmAppKnowledgeRepository.FindAsync(x => x.AppId == _app.Id);
             if (llmKappKnowledges.Any())
             {
-                foreach (var knowledgeBase in llmKappKnowledges)
+                foreach (var appKnowledge in llmKappKnowledges)
                 {
-                    filters.Add(new MemoryFilter().ByTag(KernelMemoryTags.KnowledgeBaseId, knowledgeBase.KnowledgeBaseId.ToString()));
+                    var knowledgeBase = await _knowledgeBaseRepository.GetAsync(appKnowledge.KnowledgeBaseId);
+                    if (knowledgeBase == null) continue;
+
+                    var searchResult = await RetrieveAsync(knowledgeBase, _memoryService, input);
+                    if (searchResult.Any()) searchResults.AddRange(searchResult);
                 }
             }
 
             // 构建上下文
-            var contextBuilder = new StringBuilder();
-            var searchResult = await _memoryServerless.SearchAsync(input, filters: filters, minRelevance: 0, limit: 5);
-
-            if (searchResult.Results.Any())
+            var partitions = searchResults.SelectMany(x => x.Partitions).ToList();
+            var chunks = partitions.Select(x => new
             {
-                foreach (var citation in searchResult.Results)
-                {
-                    foreach (var part in citation.Partitions)
-                    {
-                        contextBuilder.AppendLine($"fileName:{citation.SourceName}; Relevance:{(part.Relevance * 100).ToString("F2")}%; Content: {part.Text}");
-                    }
-                }
+                FileName = x.FileName,
+                Relevance = x.Relevance,
+                Text = x.Text
+            })
+            .ToList();
 
-                return contextBuilder.ToString();
+            var maxRelevance = chunks.Max(x => x.Relevance);
+            var minRelevance = chunks.Min(x => x.Relevance);
+            _logger.LogInformation($"共检索到 {chunks.Count} 个文档块，相似度区间[{minRelevance},{maxRelevance}]");
+
+            var jsonFormatContext = JsonConvert.SerializeObject(chunks);
+            return jsonFormatContext;
+        }
+
+        private async Task<List<KMCitation>> RetrieveAsync(KnowledgeBase knowledgeBase, IMemoryService memoryService, string question)
+        {
+            if (knowledgeBase.RetrievalType == (int)RetrievalType.Vectors)
+            {
+                // 向量检索
+                var knowledgeBaseService = _memoryService.AsKnowledgeBaseService(_serviceProvider);
+                var searchResult = await knowledgeBaseService.SearchAsync(knowledgeBase.Id, question, _minRelevance, _limit);
+                return searchResult.RelevantSources;
+
             }
+            else if (knowledgeBase.RetrievalType == (int)RetrievalType.FullText)
+            {
+                // 全文检索
+                var fullTextService = _memoryService.AsFullTextSearchService(_serviceProvider);
+                var searchResult = await fullTextService.SearchAsync(knowledgeBase.Id, question, _minRelevance, _limit);
+                return searchResult.RelevantSources;
+            }
+            else
+            {
+                // 混合检索
+                var searchResults = new List<KMCitation>();
+                var knowledgeBaseService = _memoryService.AsKnowledgeBaseService(_serviceProvider);
+                var vectorSearchResult = await knowledgeBaseService.SearchAsync(knowledgeBase.Id, question, _minRelevance, _limit);
+                if (vectorSearchResult.RelevantSources.Any()) searchResults.AddRange(vectorSearchResult.RelevantSources);
 
-            return string.Empty;
+                var fullTextService = _memoryService.AsFullTextSearchService(_serviceProvider);
+                var fullTextSearchResult = await fullTextService.SearchAsync(knowledgeBase.Id, question, _minRelevance, _limit);
+                if (fullTextSearchResult.RelevantSources.Any()) searchResults = fullTextSearchResult.RelevantSources;
+
+                return searchResults;
+            }
         }
     }
 }

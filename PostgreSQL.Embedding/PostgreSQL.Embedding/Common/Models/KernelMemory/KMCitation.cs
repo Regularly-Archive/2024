@@ -7,6 +7,6 @@ namespace PostgreSQL.Embedding.Common.Models.KernelMemory
         [JsonProperty("sourceName")]
         public string SourceName { get; set; }
         [JsonProperty("partitions")]
-        public List<KMPartition> Partitions { get; set;}
+        public List<KMPartition> Partitions { get; set;} = new List<KMPartition>();
     }
 }

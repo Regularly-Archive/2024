@@ -35,7 +35,7 @@ namespace PostgreSQL.Embedding.Controllers
         public override async Task<JsonResult> GetByPage(int pageSize, int pageIndex)
         {
             var db = _crudBaseService.SqlSugarClient;
-            var list = await db.Queryable<DocumentImportRecord>()
+            var list = (await db.Queryable<DocumentImportRecord>()
               .LeftJoin<KnowledgeBase>((r, k) => r.KnowledgeBaseId == k.Id)
               .Select((r, k) => new DocumentImportRecord()
               {
@@ -52,10 +52,14 @@ namespace PostgreSQL.Embedding.Controllers
                   ProcessStartTime = r.ProcessStartTime,
                   ProcessEndTime = r.ProcessEndTime,
                   ProcessDuartionTime = r.ProcessDuartionTime,
+                  DocumentType = r.DocumentType,
+                  Content = r.Content,
               })
               .Skip((pageIndex - 1) * pageSize)
               .Take(pageSize)
-            .ToListAsync();
+              .ToListAsync())
+              .OrderByDescending(x => x.CreatedAt)
+              .ToList();
 
             var total = await _crudBaseService.Repository.CountAsync();
             var result = new PageResult<DocumentImportRecord> { TotalCount = total, Rows = list };

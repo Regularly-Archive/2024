@@ -29,7 +29,14 @@ async def chat_completions(request: ChatCompletionRequest):
 @app.post("/v1/completions")
 async def completions(request: CompletionRequest): 
     text = get_text_completion(request)
-    return CompletionResponse(model=request.model, choices=[CompletionResponseChoice(text=text, index=0)])
+    return CompletionResponse(
+        id='',
+        object='text_completion',
+        created=0,
+        model=request.model, 
+        choices=[CompletionResponseChoice(text=text, index=0, finish_reason='length', logprobs=None)],
+        usage=Usage()
+    )
     
 if __name__ == '__main__':
     uvicorn.run(app='api:app', host="127.0.0.1", port=8003, reload=True)

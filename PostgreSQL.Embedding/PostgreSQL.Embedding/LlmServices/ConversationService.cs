@@ -32,7 +32,6 @@ namespace PostgreSQL.Embedding.LlmServices
 
         public async Task Invoke(OpenAIModel model, string sk, HttpContext HttpContext)
         {
-            // Todo: 从 sk 中解析应用信息
             var appId = long.Parse(sk);
 
             var app = await _llmAppRepository.GetAsync(appId);
@@ -42,12 +41,11 @@ namespace PostgreSQL.Embedding.LlmServices
             switch (app.AppType)
             {
                 case (int)LlmAppType.Chat:
-                    var genericChatService = new GenericConversationService(kernel, app, _chatHistoryService);
+                    var genericChatService = new GenericConversationService(kernel, app, _serviceProvider, _chatHistoryService);
                     await genericChatService.InvokeAsync(model, HttpContext, input);
                     break;
                 case (int)LlmAppType.Knowledge:
-                    var memoryServerless = await _memoryService.CreateByApp(app);
-                    var ragChatService = new RAGConversationService(kernel, app, _serviceProvider, memoryServerless, _chatHistoryService);
+                    var ragChatService = new RAGConversationService(kernel, app, _serviceProvider, _memoryService, _chatHistoryService);
                     await ragChatService.InvokeAsync(model, HttpContext, input);
                     break;
             }
@@ -66,7 +64,7 @@ namespace PostgreSQL.Embedding.LlmServices
             if (model.messages.Count() > 10)
             {
                 //历史会话大于10条，进行总结
-                var msg = await HistorySummarize(kernel, questions, history.ToString());
+                var msg = await SummarizeContent(kernel, history.ToString());
                 return msg;
             }
             else
@@ -76,12 +74,16 @@ namespace PostgreSQL.Embedding.LlmServices
             }
         }
 
-        public async Task<string> HistorySummarize(Kernel kernel, string questions, string history)
+        public async Task<string> SummarizeContent(Kernel kernel, string content)
         {
-            KernelFunction sunFun = kernel.Plugins.GetFunction("ConversationSummaryPlugin", "SummarizeConversation");
-            var summary = await kernel.InvokeAsync(sunFun, new() { ["input"] = $"内容是：{history.ToString()} {Environment.NewLine} 请注意用中文总结" });
-            var msg = $"history：{history.ToString()}{Environment.NewLine} user：{questions}"; ;
-            return msg;
+            var summaryFunction = kernel.Plugins.GetFunction("ConversationSummaryPlugin", "SummarizeConversation");
+            if (summaryFunction == null)
+                return string.Empty;
+
+            var input = $"请使用中文对下面的内容进行归纳和总结: {content}";
+            var summary = await kernel.InvokeAsync(summaryFunction, new() { ["input"] = input });
+
+            return summary.GetValue<string>();
         }
     }
 }
