@@ -1,9 +1,8 @@
 from sentence_transformers import SentenceTransformer
 from models import EmbeddingsRequest, EmbeddingsObjectResponse
 from typing import List
+from utils import Embedding_Model_Cache_Folder as model_cache_folder
 import os
-
-model_cache_folder = './models/embedding/'
 
 def get_embeddings(request: EmbeddingsRequest) -> List[EmbeddingsObjectResponse]: 
     cache_folder = os.path.join(model_cache_folder, request.model)

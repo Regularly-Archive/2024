@@ -11,6 +11,7 @@ using PostgreSQL.Embedding.LlmServices.Abstration;
 using System.Collections.Immutable;
 using System.Text;
 using static Microsoft.KernelMemory.Citation;
+using Newtonsoft.Json;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
@@ -23,22 +24,25 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly IRepository<LlmModel> _llmModelRepository;
         private readonly IKernelService _kernelService;
         private readonly JiebaSegmenter _jiebaSegmenter;
+        private readonly PromptTemplateService _promptTemplateService;
 
         public FullTextSearchService(
             IConfiguration configuration,
             IRepository<TablePrefixMapping> tablePrefixMappingRepository,
             IRepository<KnowledgeBase> knowledgeBaseRepository,
             IRepository<LlmModel> llmModelRepository,
-            IKernelService kernelService
+            IKernelService kernelService,
+            PromptTemplateService promptTemplateService
             )
         {
-            _fullTextSearchLanguage = "english";
+            _fullTextSearchLanguage = "chinese";
             _postgrelConnectionString = configuration["ConnectionStrings:Default"]!;
             _tablePrefixMappingRepository = tablePrefixMappingRepository;
             _knowledgeBaseRepository = knowledgeBaseRepository;
             _llmModelRepository = llmModelRepository;
             _kernelService = kernelService;
             _jiebaSegmenter = new JiebaSegmenter();
+            _promptTemplateService = promptTemplateService;
         }
 
         public async Task<KMAskResult> AskAsync(long knowledgeBaseId, string question, double? minRelevance = 0.75)
@@ -58,11 +62,10 @@ namespace PostgreSQL.Embedding.LlmServices
                 return result;
             }
 
-
             result.RelevantSources = searchResult.RelevantSources;
             var context = BuildKnowledgeContext(searchResult);
 
-            var promptTemplate = LoadPromptTemplate("RAGPrompt.txt");
+            var promptTemplate = _promptTemplateService.LoadPromptTemplate("RAGPrompt.txt");
 
             var settings = new OpenAIPromptExecutionSettings () { Temperature = 0.75 };
             var func = kernel.CreateFunctionFromPrompt(promptTemplate, settings);
@@ -78,46 +81,49 @@ namespace PostgreSQL.Embedding.LlmServices
         public async Task<KMSearchResult> SearchAsync(long knowledgeBaseId, string question, double? minRelevance, int? limit)
         {
             // 通过分词获得关键字
-            var keywords = string.Join(" | ", _jiebaSegmenter.CutForSearch(question));
+            var segments = _jiebaSegmenter.CutForSearch(question).Where(x => !string.IsNullOrWhiteSpace(x)).ToList();
+            var keywords = string.Join(" | ", segments);
+            var sqlLike = string.Join(" OR ", segments.Select(x => $"t.content LIKE '%{x}%'"));
 
             // 组装 Kernel Memory 表名
             var knowledgeBase = await _knowledgeBaseRepository.GetAsync(knowledgeBaseId);
             var tablePrefixMapping = await _tablePrefixMappingRepository.SingleOrDefaultAsync(x => x.FullName == knowledgeBase.EmbeddingModel);
             var tableName = $"sk-{tablePrefixMapping.ShortName.ToLower()}-default";
 
+            if (!minRelevance.HasValue) minRelevance = 0.5;
+            if (!limit.HasValue) limit = 5;
+
             var fullTextSearchSql = $"""
-                SELECT
-                  t.*,
-                  ts_rank(
-                    to_tsvector('{_fullTextSearchLanguage}', t.content),
-                    to_tsquery('{_fullTextSearchLanguage}', '{keywords}')
-                  ) AS relevance
-                FROM
-                  "{tableName}" t
-                WHERE
-                  t.content @@ to_tsquery('{_fullTextSearchLanguage}', '{keywords}') AND t.tags @> ARRAY['{KernelMemoryTags.KnowledgeBaseId}:{knowledgeBaseId}']
-                ORDER BY
-                  relevance DESC;
+                SELECT * FROM
+                (
+                    SELECT
+                      t.*,
+                      ts_rank_cd(
+                        to_tsvector('{_fullTextSearchLanguage}', t.content),
+                        to_tsquery('{_fullTextSearchLanguage}', '{keywords}')
+                      ) AS relevance
+                    FROM
+                      "{tableName}" t
+                    WHERE
+                      (t.content @@ to_tsquery('{_fullTextSearchLanguage}', '{keywords}') OR {sqlLike}) AND t.tags @> ARRAY['{KernelMemoryTags.KnowledgeBaseId}:{knowledgeBaseId}']
+                    ORDER BY
+                      relevance DESC
+                ) AS t WHERE t.relevance > {minRelevance.Value} ORDER BY t.relevance DESC LIMIT {limit.Value}
             """;
 
             using var connection = new NpgsqlConnection(_postgrelConnectionString);
             using var command = new NpgsqlCommand(fullTextSearchSql, connection);
 
             await connection.OpenAsync();
+            await CreateFullTextSearchIndex(connection, tableName);
             using var reader = command.ExecuteReader();
 
             var partitions = new List<KMPartition>();
             while (reader.Read())
             {
                 var partition = ParseAsKMPartition(reader);
-                if (minRelevance.HasValue && partition.Relevance < minRelevance.Value)
-                    continue;
-
                 partitions.Add(partition);
             }
-
-            if (limit.HasValue)
-                partitions = partitions.Take(limit.Value).ToList();
 
             var citations = partitions.GroupBy(x => x.FileName).Select(x => new KMCitation()
             {
@@ -125,6 +131,7 @@ namespace PostgreSQL.Embedding.LlmServices
                 Partitions = x.ToList()
             })
             .ToList();
+
             return new KMSearchResult() { Question = question, RelevantSources = citations };
         }
 
@@ -160,26 +167,24 @@ namespace PostgreSQL.Embedding.LlmServices
 
         private string BuildKnowledgeContext(KMSearchResult searchResult)
         {
-            var contextBuilder = new StringBuilder();
-            foreach (var citation in searchResult.RelevantSources)
+            var partitions = searchResult.RelevantSources.SelectMany(x => x.Partitions).ToList();
+            var chunks = partitions.Select(x => new
             {
-                foreach (var part in citation.Partitions)
-                {
-                    contextBuilder.AppendLine($"fileName:{citation.SourceName}; Relevance:{(part.Relevance * 100).ToString("F2")}%; Content: {part.Text}");
-                }
-            }
+                FileName = x.FileName,
+                Relevance = x.Relevance,
+                Text = x.Text
+            })
+            .ToList();
 
-            return contextBuilder.ToString();
+            var jsonFormatContext = JsonConvert.SerializeObject(chunks);
+            return jsonFormatContext;
         }
 
-        private string LoadPromptTemplate(string fileName)
+        private async Task CreateFullTextSearchIndex(NpgsqlConnection connection, string tableName)
         {
-            var promptDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Common/Prompts");
-            var promptTemplate = Path.Combine(promptDirectory, fileName);
-            if (!File.Exists(promptTemplate))
-                throw new ArgumentException($"The prompt template file '{promptTemplate}' can not be found.");
-
-            return File.ReadAllText(promptTemplate);
+            var createIndexSql = $"""CREATE INDEX IF NOT EXISTS idx_chinese_full_text_search ON "{tableName}" USING gin(to_tsvector('chinese', 'content'))""";
+            using var command = new NpgsqlCommand(createIndexSql, connection);
+            await command.ExecuteNonQueryAsync();
         }
     }
 }

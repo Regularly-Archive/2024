@@ -7,6 +7,7 @@ using PostgreSQL.Embedding.LlmServices.Abstration;
 using System.Text;
 using PostgreSQL.Embedding.LLmServices.Extensions;
 using Masuit.Tools;
+using Microsoft.AspNetCore.Http;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
@@ -17,13 +18,17 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly string _promptTemplate;
         private readonly string _defaultPrompt = "You are a helpful AI bot. You must answer the question in Chinese.";
         private readonly IChatHistoryService _chatHistoryService;
+        private readonly IServiceProvider _serviceProvider;
+        private readonly PromptTemplateService _promptTemplateService;
         private string _conversationId;
         private readonly Random _random = new Random();
-        public GenericConversationService(Kernel kernel, LlmApp app, IChatHistoryService chatHistoryService)
+        public GenericConversationService(Kernel kernel, LlmApp app, IServiceProvider serviceProvider, IChatHistoryService chatHistoryService)
         {
             _kernel = kernel;
             _app = app;
-            _promptTemplate = LoadPromptTemplate("Default.txt");
+            _serviceProvider = serviceProvider;
+            _promptTemplateService = _serviceProvider.GetService<PromptTemplateService>();
+            _promptTemplate = _promptTemplateService.LoadPromptTemplate("Default.txt");
             _chatHistoryService = chatHistoryService;
         }
 
@@ -40,9 +45,12 @@ namespace PostgreSQL.Embedding.LlmServices
                 stramingResult.created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                 stramingResult.choices = new List<StreamChoicesModel>() { new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant" } } };
                 await InvokeStramingChat(httpContext, stramingResult, input);
-                httpContext.Response.ContentType = "application/json";
-                await httpContext.Response.WriteAsync(JsonConvert.SerializeObject(stramingResult));
-                await httpContext.Response.CompleteAsync();
+                if (!httpContext.Response.HasStarted)
+                {
+                    httpContext.Response.ContentType = "application/json";
+                    await httpContext.Response.WriteAsync(JsonConvert.SerializeObject(stramingResult));
+                    await httpContext.Response.CompleteAsync();
+                }
             }
             else
             {
@@ -50,9 +58,12 @@ namespace PostgreSQL.Embedding.LlmServices
                 result.created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                 result.choices = new List<ChoicesModel>() { new ChoicesModel() { message = new OpenAIMessage() { role = "assistant" } } };
                 result.choices[0].message.content = await InvokeChat(input);
-                httpContext.Response.ContentType = "application/json";
-                await httpContext.Response.WriteAsync(JsonConvert.SerializeObject(result));
-                await httpContext.Response.CompleteAsync();
+                if (!httpContext.Response.HasStarted)
+                {
+                    httpContext.Response.ContentType = "application/json";
+                    await httpContext.Response.WriteAsync(JsonConvert.SerializeObject(result));
+                    await httpContext.Response.CompleteAsync();
+                }
             }
         }
 
@@ -65,7 +76,11 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <returns></returns>
         private async Task InvokeStramingChat(HttpContext HttpContext, OpenAIStreamResult result, string input)
         {
-            HttpContext.Response.Headers.ContentType = new Microsoft.Extensions.Primitives.StringValues("text/event-stream");
+            if (!HttpContext.Response.HasStarted)
+            {
+                HttpContext.Response.Headers.ContentType = new Microsoft.Extensions.Primitives.StringValues("text/event-stream");
+            }
+
 
             if (string.IsNullOrEmpty(_app.Prompt))
                 _app.Prompt = _defaultPrompt;
@@ -87,7 +102,7 @@ namespace PostgreSQL.Embedding.LlmServices
                 string message = $"data: {JsonConvert.SerializeObject(result)}\n";
                 await HttpContext.Response.WriteAsync(message, Encoding.UTF8);
                 await HttpContext.Response.Body.FlushAsync();
-                await Task.Delay(TimeSpan.FromMilliseconds(random.Next(50,500)));
+                await Task.Delay(TimeSpan.FromMilliseconds(random.Next(10, 200)));
             }
 
             await _chatHistoryService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());
@@ -120,22 +135,6 @@ namespace PostgreSQL.Embedding.LlmServices
                 return answer;
             }
             return string.Empty;
-        }
-
-        /// <summary>
-        /// 加载提示词模板
-        /// </summary>
-        /// <param name="fileName"></param>
-        /// <returns></returns>
-        /// <exception cref="ArgumentException"></exception>
-        private string LoadPromptTemplate(string fileName)
-        {
-            var promptDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Common/Prompts");
-            var promptTemplate = Path.Combine(promptDirectory, fileName);
-            if (!File.Exists(promptTemplate))
-                throw new ArgumentException($"The prompt template file '{promptTemplate}' can not be found.");
-
-            return File.ReadAllText(promptTemplate);
         }
     }
 }

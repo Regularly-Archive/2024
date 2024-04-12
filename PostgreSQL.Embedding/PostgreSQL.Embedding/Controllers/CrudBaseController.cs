@@ -11,7 +11,7 @@ namespace PostgreSQL.Embedding.Controllers
     [ApiController]
     public class CrudBaseController<T>: ControllerBase where T : BaseEntity, new()
     {
-        private readonly CrudBaseService<T> _crudBaseService;
+        protected readonly CrudBaseService<T> _crudBaseService;
         public CrudBaseController(CrudBaseService<T> crudBaseService)
         {
             _crudBaseService = crudBaseService;
@@ -49,7 +49,14 @@ namespace PostgreSQL.Embedding.Controllers
         public virtual async Task<JsonResult> GetByPage(int pageSize, int pageIndex)
         {
             var result = await _crudBaseService.GetPageList(pageSize, pageIndex);
-            return ApiResult.Success(result, "");
+            return ApiResult.Success(result, "操作成功");
+        }
+
+        [HttpGet("list")]
+        public virtual async Task<JsonResult> FindList()
+        {
+            var results = await _crudBaseService.Repository.GetAllAsync();
+            return ApiResult.Success(results, "操作成功");
         }
     }
 }
