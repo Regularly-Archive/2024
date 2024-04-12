@@ -1,6 +1,7 @@
 ﻿using LLama.Common;
 using LLama;
 using PostgreSQL.Embedding.LlmServices.Abstration;
+using PostgreSQL.Embedding.Common.Models;
 
 namespace PostgreSQL.Embedding.LlmServices.LLama
 {
@@ -20,9 +21,9 @@ namespace PostgreSQL.Embedding.LlmServices.LLama
         }
 
 
-        public async Task<List<float>> Embedding(string text)
+        public async Task<List<float>> Embedding(OpenAIEmbeddingModel embeddingModel)
         {
-            float[] embeddings = await _embedder.GetEmbeddings(text);
+            float[] embeddings = await _embedder.GetEmbeddings(embeddingModel.input[0]);
             return embeddings.ToList();
         }
 

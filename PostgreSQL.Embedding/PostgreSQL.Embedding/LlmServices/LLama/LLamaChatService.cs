@@ -15,7 +15,7 @@ namespace PostgreSQL.Embedding.LlmServices.LLama
         private readonly LLamaContext _context;
         private readonly ILogger<LLamaChatService> _logger;
         private bool _continue = false;
-        private const string SystemPrompt = "You are a helpful AI bot.";
+        private readonly InferenceParams _inferenceParams;
 
         public LLamaChatService(IWebHostEnvironment environment, IConfiguration configuration, ILogger<LLamaChatService> logger)
         {
@@ -33,7 +33,19 @@ namespace PostgreSQL.Embedding.LlmServices.LLama
             _context = new LLamaContext(weights, @params);
 
             _session = new ChatSession(new InteractiveExecutor(_context));
-            _session.History.AddMessage(AuthorRole.System, SystemPrompt);
+            _session.WithOutputTransform(
+                new LLamaTransforms.KeywordTextOutputStreamTransform(
+                    new string[] { "User:", "System:" },
+                    redundancyLength: 9
+                )
+            );
+            _session.History.AddMessage(AuthorRole.System, "Assistant is a large language model.");
+
+            _inferenceParams = new InferenceParams()
+            {
+                RepeatPenalty = 1.0f,
+                AntiPrompts = new string[] { "User:" },
+            };
         }
 
         public void Dispose()
@@ -43,21 +55,12 @@ namespace PostgreSQL.Embedding.LlmServices.LLama
 
         public async Task<string> ChatAsync(string input)
         {
+            if (!_continue) _continue = true;
 
-            if (!_continue)
-            {
-                _logger.LogInformation("Prompt: {text}", SystemPrompt);
-                _continue = true;
-            }
             _logger.LogInformation("Input: {text}", input);
+
             HandleChatHistories();
-            var outputs = _session.ChatAsync(
-                new ChatHistory.Message(AuthorRole.User, input),
-                new InferenceParams()
-                {
-                    RepeatPenalty = 1.0f,
-                    AntiPrompts = new string[] { "User:" },
-                });
+            var outputs = _session.ChatAsync(new ChatHistory.Message(AuthorRole.User, input), _inferenceParams);
 
             var result = "";
             await foreach (var output in outputs)
@@ -66,26 +69,16 @@ namespace PostgreSQL.Embedding.LlmServices.LLama
                 result += output;
             }
 
-            return result.Trim();
+            return result;
         }
 
         public async IAsyncEnumerable<string> ChatStreamAsync(string input)
         {
-            if (!_continue)
-            {
-                _logger.LogInformation(SystemPrompt);
-                _continue = true;
-            }
-
             _logger.LogInformation(input);
+            if (!_continue) _continue = true;
+
             HandleChatHistories();
-            var outputs = _session.ChatAsync(
-                new ChatHistory.Message(AuthorRole.User, input!)
-                , new InferenceParams()
-                {
-                    RepeatPenalty = 1.0f,
-                    AntiPrompts = new string[] { "User:" },
-                });
+            var outputs = _session.ChatAsync(new ChatHistory.Message(AuthorRole.User, input!), _inferenceParams);
 
             await foreach (var output in outputs)
             {
@@ -96,9 +89,7 @@ namespace PostgreSQL.Embedding.LlmServices.LLama
 
         private void HandleChatHistories()
         {
-
-            _session.History.Messages.Clear();
-            _session.History.AddMessage(AuthorRole.System, SystemPrompt);
+            _session.History.Messages.RemoveAll(x => x.AuthorRole != AuthorRole.System);
         }
     }
 }

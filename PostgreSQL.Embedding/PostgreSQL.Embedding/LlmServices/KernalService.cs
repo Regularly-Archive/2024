@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.Plugins.Core;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
@@ -19,18 +20,25 @@ namespace PostgreSQL.Embedding.LlmServices
 
         public async Task<Kernel> GetKernel(LlmApp app)
         {
-            var options = _serviceProvider.GetRequiredService<IOptions<LlmConfig>>();
-
             var llmModel = await _llmModelRepository.SingleOrDefaultAsync(
                 x => x.ModelType == (int)ModelType.TextGeneration && x.ModelName == app.TextModel
             );
 
+            return (await GetKernel(llmModel));
+        }
+
+        public Task<Kernel> GetKernel(LlmModel llmModel)
+        {
+            var options = _serviceProvider.GetRequiredService<IOptions<LlmConfig>>();
+
             var httpClient = new HttpClient(new OpenAIChatHandler(llmModel, options));
             var kernel = Kernel.CreateBuilder()
-                .AddOpenAIChatCompletion(modelId: app.TextModel, apiKey: llmModel.ApiKey ?? string.Empty, httpClient: httpClient)
+                .AddOpenAIChatCompletion(modelId: llmModel.ModelName, apiKey: llmModel.ApiKey ?? "sk-1234567890", httpClient: httpClient)
                 .Build();
 
-            return kernel;
+            kernel.Plugins.AddFromType<ConversationSummaryPlugin>();
+            kernel.Plugins.AddFromType<TimePlugin>();
+            return Task.FromResult(kernel);
         }
     }
 }

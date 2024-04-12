@@ -1,10 +1,9 @@
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from models import CompletionRequest, ChatCompletionRequest
-import torch
-import os
+from utils import Text_Generation_Model_Cache_Folder as model_cache_folder
+import os, torch
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model_cache_folder = './models/text-generation/'
 
 def get_chat_completion(request: ChatCompletionRequest) -> str:
     cache_dir = os.path.join(model_cache_folder, request.model)
@@ -21,7 +20,7 @@ def get_chat_completion(request: ChatCompletionRequest) -> str:
 
 def get_text_completion(request: CompletionRequest) -> str:
     cache_dir = os.path.join(model_cache_folder, request.model)
-    model = AutoModelForCausalLM.from_pretrained(request.model, torch_dtype="auto", device_map="auto", cache_dir=cache_dir)
+    model = AutoModelForCausalLM.from_pretrained(request.model, torch_dtype="auto", device_map="auto", cache_dir=cache_dir, trust_remote_code=True)
     tokenizer = AutoTokenizer.from_pretrained(request.model)
     messages = []
     if isinstance(request.prompt, str):

@@ -28,5 +28,11 @@ namespace PostgreSQL.Embedding.DataAccess.Entities
 
         [SugarColumn(IsIgnore = true)]
         public string KnowledgeBaseName { get; set; }
+
+        [SugarColumn(ColumnName = "document_type")]
+        public int DocumentType { get; set; }
+
+        [SugarColumn(ColumnName = "content", IsNullable = true, ColumnDataType = "text")]
+        public string Content { get; set; }
     }
 }

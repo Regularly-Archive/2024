@@ -39,7 +39,7 @@ namespace PostgreSQL.Embedding.LlmServices
             var embeddingModel = await _llmModelRepository.SingleOrDefaultAsync(x => x.ModelType == (int)ModelType.TextEmbedding && x.ModelName == embeddingModelId);
 
             var options = _serviceProvider.GetRequiredService<IOptions<LlmConfig>>();
-            var embeddingHttpClient = new HttpClient(new OpenAIEmbeddingHandler(embeddingModel, options));
+            var embeddingHttpClient = new HttpClient(new EmbeddingRouterHandler(embeddingModel, options));
             var generationHttpClient = new HttpClient(new OpenAIChatHandler(generationModel, options));
 
             var tableNamePrefix = await GenerateTableNamePrefix(embeddingModel);
@@ -81,7 +81,7 @@ namespace PostgreSQL.Embedding.LlmServices
             var generationModel = await _llmModelRepository.SingleOrDefaultAsync(x => x.ModelType == (int)ModelType.TextGeneration && x.ModelName == "gpt-3.5-turbo");
 
             var options = _serviceProvider.GetRequiredService<IOptions<LlmConfig>>();
-            var embeddingHttpClient = new HttpClient(new OpenAIEmbeddingHandler(embeddingModel, options));
+            var embeddingHttpClient = new HttpClient(new EmbeddingRouterHandler(embeddingModel, options));
             var generationHttpClient = new HttpClient();
 
             var tableNamePrefix = await GenerateTableNamePrefix(embeddingModel);
@@ -96,6 +96,8 @@ namespace PostgreSQL.Embedding.LlmServices
             // 需要解除对 OpenAIConfig 的依赖
             var openAIConfig = new OpenAIConfig();
             _configuration.BindSection(nameof(OpenAIConfig), openAIConfig);
+            openAIConfig.EmbeddingModel = embeddingModel.ModelName;
+            openAIConfig.TextModel = generationModel.ModelName;
 
             var memoryBuilder = new KernelMemoryBuilder();
 

@@ -66,9 +66,13 @@ namespace PostgreSQL.Embedding.LlmServices
             await _chatMessageRepository.DeleteAsync(x => x.AppId == appId && x.ConversationId == conversationId);
         }
 
-        public Task UpdateConversation(AppConversation conversation)
+        public async Task UpdateConversation(long appId, string conversationId, string summary)
         {
-            return _appConversationRepository.UpdateAsync(conversation);
+            var conversation = await _appConversationRepository.SingleOrDefaultAsync(x => x.AppId == appId && x.ConversationId == conversationId);
+            if (conversation == null) return;
+
+            conversation.Summary = summary;
+            await _appConversationRepository.UpdateAsync(conversation);
         }
     }
 }

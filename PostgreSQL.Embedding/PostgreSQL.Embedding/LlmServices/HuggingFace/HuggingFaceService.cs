@@ -26,7 +26,8 @@ namespace PostgreSQL.Embedding.LlmServices.HuggingFace
         public async Task Embedding(OpenAIEmbeddingModel model, HttpContext HttpContext)
         {
             var result = new OpenAIEmbeddingResult();
-            result.data[0].embedding = await _huggingFaceEmbeddingService.Embedding(model.input[0]);
+            result.model = model.model;
+            result.data[0].embedding = await _huggingFaceEmbeddingService.Embedding(model);
             if (!HttpContext.Response.HasStarted)
             {
                 HttpContext.Response.ContentType = "application/json";

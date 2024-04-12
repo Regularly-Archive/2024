@@ -30,7 +30,7 @@ namespace PostgreSQL.Embedding.DataAccess
         public async Task<PageResult<T>> GetPageList(int pageSize, int pageIndex)
         {
             var total = await _repository.CountAsync();
-            var list = await _repository.PaginateAsync(null, pageIndex, pageSize);
+            var list = (await _repository.PaginateAsync(null, pageIndex, pageSize)).OrderByDescending(x => x.CreatedAt).ToList();
             return new PageResult<T> { TotalCount = total, Rows = list };
         }
     }

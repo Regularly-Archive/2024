@@ -18,7 +18,6 @@ using PostgreSQL.Embedding.LlmServices;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.LLmServices.Extensions;
 using PostgreSQL.Embedding.Services;
-using PostgreSQL.Embedding.Services.Training;
 using SqlSugar;
 using System.Text;
 using System.Text.Encodings.Web;
@@ -86,13 +85,8 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<IConversationService, ConversationService>();
 builder.Services.AddScoped<IUserInfoService, UserInfoService>();
-builder.Services.AddScoped<IEmbeddingService, SKEmbeddingService>();
 builder.Services.AddScoped<IKernelService, KernalService>();
 builder.Services.AddScoped<IMemoryService, PostgreSQL.Embedding.LlmServices.MemoryService>();
-builder.Services.AddDbContext<VectorsDbContext>(opt =>
-{
-    opt.UseNpgsql(builder.Configuration["ConnectionStrings:Default"], x => x.UseVector());
-});
 
 builder.Services.AddSingleton<LLamaEmbedder>(sp =>
 {
@@ -123,7 +117,7 @@ builder.Services.Configure<LlmConfig>(builder.Configuration.GetSection(nameof(Ll
 builder.Services.Configure<JwtSetting>(builder.Configuration.GetSection(nameof(JwtSetting)));
 builder.Services.AddSingleton<ILlmServiceFactory, LlmServiceFactory>();
 builder.Services.AddScoped<IKnowledgeBaseService, KnowledgeBaseService>();
-builder.Services.AddScoped<PgVectorService>();
+builder.Services.AddScoped<PromptTemplateService>();
 builder.Services.AddSingleton<MemoryServerless>(serviceProvider =>
 {
     var httpClient = new HttpClient(new OpenAIProxyHandler(builder.Configuration));
@@ -170,6 +164,7 @@ builder.Services.AddSingleton<MemoryServerless>(serviceProvider =>
 builder.Services.AddSingleton<KnowledgeImportingQueueService>();
 builder.Services.AddHostedService<KnowledgeImportingQueueService>();
 builder.Services.AddSingleton<EnumValuesConverter>();
+builder.Services.AddScoped<IFullTextSearchService, FullTextSearchService>();
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(builder =>

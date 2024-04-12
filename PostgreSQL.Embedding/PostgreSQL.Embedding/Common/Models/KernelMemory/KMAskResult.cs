@@ -11,6 +11,6 @@ namespace PostgreSQL.Embedding.Common.Models.KernelMemory
         public string Answer { get; set; }
 
         [JsonProperty("relevantSources")]
-        public List<KMCitation> RelevantSources { get; set; }
+        public List<KMCitation> RelevantSources { get; set; } = new List<KMCitation>();
     }
 }

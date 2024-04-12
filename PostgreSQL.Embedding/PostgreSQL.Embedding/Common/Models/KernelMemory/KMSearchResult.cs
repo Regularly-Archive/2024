@@ -8,6 +8,6 @@ namespace PostgreSQL.Embedding.Common.Models.KernelMemory
         public string Question { get; set; }
 
         [JsonProperty("relevantSources")]
-        public List<KMCitation> RelevantSources { get; set;}
+        public List<KMCitation> RelevantSources { get; set; } = new List<KMCitation>();
     }
 }

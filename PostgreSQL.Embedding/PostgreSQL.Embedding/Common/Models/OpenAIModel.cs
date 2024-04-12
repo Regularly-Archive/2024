@@ -15,6 +15,7 @@
 
     public class OpenAIEmbeddingModel
     {
+        public string model { get; set; }
         public List<string> input { get; set; }
     }
 }

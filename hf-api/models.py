@@ -84,9 +84,9 @@ class CompletionResponseChoice(BaseModel):
 
 
 class CompletionResponse(BaseModel):
-    id: str = Field()
+    id: str
     object: str = "text.completion"
-    created: int = Field(default_factory=lambda: int(time.time()))
+    created: int
     model: Optional[str] = "custom"
     choices: List[CompletionResponseChoice]
     usage: Usage

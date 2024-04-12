@@ -1,6 +1,9 @@
 ﻿using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.DataAccess.Entities;
+using System.Text;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
@@ -14,8 +17,22 @@ namespace PostgreSQL.Embedding.LlmServices
             _llmConfigOptions = llmConfigOptions;
         }
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            var payload = await request.Content.ReadAsStringAsync();
+            var dynamic = JObject.Parse(payload);
+            var userMessage = dynamic["messages"].LastOrDefault();
+            if (userMessage != null)
+            {
+                var content = userMessage["content"];
+                if (content.Type == JTokenType.Array) 
+                {
+                    userMessage["content"] = content.FirstOrDefault().Value<string>("text");
+                    request.Content = new StringContent(JsonConvert.SerializeObject(dynamic), Encoding.UTF8, "application/json");
+                }
+            }
+
+
             var llmServiceProvider = (LlmServiceProvider)_llmModel.ServiceProvider;
             if (llmServiceProvider != LlmServiceProvider.OpenAI)
             {
@@ -34,7 +51,7 @@ namespace PostgreSQL.Embedding.LlmServices
             }
 
             request.Headers.Add(Constants.HttpRequestHeader_Provider, llmServiceProvider.ToString());
-            return base.SendAsync(request, cancellationToken);
+            return (await base.SendAsync(request, cancellationToken));
         }
     }
 }
