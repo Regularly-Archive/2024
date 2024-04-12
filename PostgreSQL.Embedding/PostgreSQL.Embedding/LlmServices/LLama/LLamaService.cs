@@ -19,8 +19,7 @@ namespace PostgreSQL.Embedding.LlmServices.LLama
 
         public async Task ChatStream(OpenAIModel model, HttpContext HttpContext)
         {
-            HttpContext.Response.Headers.Add("Content-Type", "text/event-stream");
-            OpenAIStreamResult result = new OpenAIStreamResult();
+            var result = new OpenAIStreamResult();
             result.created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             result.choices = new List<StreamChoicesModel>() { new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant" } } };
             string questions = model.messages.LastOrDefault().content;
@@ -40,11 +39,10 @@ namespace PostgreSQL.Embedding.LlmServices.LLama
         public async Task Chat(OpenAIModel model, HttpContext HttpContext)
         {
             string questions = model.messages.LastOrDefault().content;
-            OpenAIResult result = new OpenAIResult();
+            var result = new OpenAIResult();
             result.created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             result.choices = new List<ChoicesModel>() { new ChoicesModel() { message = new OpenAIMessage() { role = "assistant" } } };
-            result.choices[0].message.content = await _lLamaChatService.ChatAsync(questions); ;
-            HttpContext.Response.ContentType = "application/json";
+            result.choices[0].message.content = await _lLamaChatService.ChatAsync(questions);
             await HttpContext.Response.WriteAsync(JsonConvert.SerializeObject(result));
             await HttpContext.Response.CompleteAsync();
         }
@@ -52,8 +50,11 @@ namespace PostgreSQL.Embedding.LlmServices.LLama
         public async Task Embedding(OpenAIEmbeddingModel model, HttpContext HttpContext)
         {
             var result = new OpenAIEmbeddingResult();
-            result.data[0].embedding = await _lLamaEmbeddingService.Embedding(model.input[0]);
-            HttpContext.Response.ContentType = "application/json";
+            result.data[0].embedding = await _lLamaEmbeddingService.Embedding(model);
+            if (!HttpContext.Response.HasStarted)
+            {
+                HttpContext.Response.ContentType = "application/json";
+            }
             await HttpContext.Response.WriteAsync(JsonConvert.SerializeObject(result));
             await HttpContext.Response.CompleteAsync();
         }

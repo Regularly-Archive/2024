@@ -7,7 +7,7 @@ namespace PostgreSQL.Embedding.LlmServices
 {
     public class KnowledgeImportingQueueService : BackgroundService
     {
-        private readonly TimeSpan _interval = TimeSpan.FromMinutes(3);
+        private readonly TimeSpan _interval = TimeSpan.FromMinutes(1);
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<KnowledgeImportingQueueService> _logger;
         public KnowledgeImportingQueueService(IServiceProvider serviceProvider)
@@ -31,12 +31,12 @@ namespace PostgreSQL.Embedding.LlmServices
                     await _knowledgeBaseService.HandleImportingQueueAsync();
                 }
             }
-            catch (OperationCanceledException)
+            catch(Exception ex)
             {
                 using var scope = _serviceProvider.CreateScope();
                 var _documentImportRecordRepository = scope.ServiceProvider.GetService<IRepository<DocumentImportRecord>>();
                 var records = await _documentImportRecordRepository.FindAsync(x => x.QueueStatus == (int)QueueStatus.Processing);
-                foreach(var record in records)
+                foreach (var record in records)
                 {
                     record.QueueStatus = (int)QueueStatus.Uploaded;
                     await _documentImportRecordRepository.UpdateAsync(record);

@@ -25,5 +25,8 @@ namespace PostgreSQL.Embedding.DataAccess.Entities
 
         [SugarColumn(ColumnName = "overlapping_tokens")]
         public int? OverlappingTokens { get; set; }
+
+        [SugarColumn(ColumnName = "retrieval_type", DefaultValue = "0")]
+        public int? RetrievalType { get; set; }
     }
 }

@@ -11,6 +11,6 @@ namespace PostgreSQL.Embedding.LlmServices.Abstration
         Task<List<AppConversation>> GetAppConversations(long appId);
         Task<List<ChatMessage>> GetConversationMessages(long appId, string conversationId);
         Task DeleteConversation(long appId, string conversationId);
-        Task UpdateConversation(AppConversation conversation);
+        Task UpdateConversation(long appId, string conversationId, string summary);
     }
 }

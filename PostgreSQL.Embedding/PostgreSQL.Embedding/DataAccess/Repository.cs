@@ -11,6 +11,7 @@ namespace PostgreSQL.Embedding.DataAccess
     {
         ISqlSugarClient SqlSugarClient { get; }
         Task<TEntity> AddAsync(TEntity entity);
+        Task AddAsync(params TEntity[] entities);
         Task UpdateAsync(TEntity entity);
         Task DeleteAsync(long id);
         Task DeleteAsync(Expression<Func<TEntity, bool>> predicate);
@@ -34,11 +35,21 @@ namespace PostgreSQL.Embedding.DataAccess
             _httpContextAccessor = httpContextAccessor;
             _sqlSugarClient = db;
         }
+
         public Task<T> AddAsync(T entity)
         {
             EnrichBaseProperties(entity, true);
 
             return base.InsertReturnEntityAsync(entity);
+        }
+
+        public async Task AddAsync(params T[] entities)
+        {
+            foreach (var entity in entities)
+            {
+                EnrichBaseProperties(entity, true);
+                await base.InsertReturnEntityAsync(entity);
+            }
         }
 
         Task IRepository<T>.UpdateAsync(T entity)
