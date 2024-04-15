@@ -22,7 +22,7 @@ class ChatCompletionRequest(BaseModel):
     stop: Optional[List[str]] = None
     stream: bool = False
     frequency_penalty: Optional[float] = 1.0
-    user: Optional[str] = None
+    user: Optional[str] = Field(default='')
 
 
 class ChatCompletionResponseChoice(BaseModel):
@@ -108,9 +108,9 @@ class CompletionStreamResponse(BaseModel):
 
 
 class EmbeddingsRequest(BaseModel):
-    model: Optional[str] = Field(default="GanymedeNil/text2vec-large-chinese")
+    model: Optional[str] = Field(default="google-bert/bert-base-chinese")
     input: Union[str, List[Any]] = Field(default=["人生若只如初见，何事秋风悲画扇"])
-    user: Optional[str] = None
+    user: Optional[str] = Field(default='')
 
 
 class EmbeddingsObjectResponse(BaseModel):
