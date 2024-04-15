@@ -37,3 +37,4 @@ SK.Training/SK.RAG/bin/
 SK.Training/SK.RAG/obj/
 hf-api/models/
 hf-api/src/models/
+KnowledgeBase/input/
