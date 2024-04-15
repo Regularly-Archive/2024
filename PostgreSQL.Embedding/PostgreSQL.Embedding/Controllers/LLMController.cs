@@ -1,8 +1,11 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.LlmServices.Abstration;
+using PostgreSQL.Embedding.LlmServices.LLama;
+using PostgreSQL.Embedding.LLmServices.Extensions;
 using System.Net;
 
 namespace PostgreSQL.Embedding.Controllers
@@ -38,11 +41,13 @@ namespace PostgreSQL.Embedding.Controllers
             var llmService = _llmServiceFactory.Create(llmServiceProvider);
             if (model.stream)
             {
-                await llmService.ChatStream(model, HttpContext);
+                var chatCompletion = llmService.ChatStreamAsync(model);
+                await HttpContext.WriteStreamingChatCompletion(chatCompletion);
             }
             else
             {
-                await llmService.Chat(model, HttpContext);
+                var chatCompletion = await llmService.ChatAsync(model);
+                await HttpContext.WriteChatCompletion(chatCompletion);
             }
         }
 
@@ -53,7 +58,7 @@ namespace PostgreSQL.Embedding.Controllers
         /// <returns></returns>
         [HttpPost]
         [Route("{provider}/embeddings")]
-        public async Task embedding(OpenAIEmbeddingModel model, string provider)
+        public async Task Embedding(OpenAIEmbeddingModel model, string provider)
         {
             if (!Enum.TryParse<LlmServiceProvider>(provider, out LlmServiceProvider llmServiceProvider))
             {
@@ -63,7 +68,29 @@ namespace PostgreSQL.Embedding.Controllers
             }
 
             var llmService = _llmServiceFactory.Create(llmServiceProvider);
-            await llmService.Embedding(model, HttpContext);
+            var embedding = await llmService.Embedding(model);
+            await HttpContext.WriteEmbedding(embedding);
+        }
+
+        /// <summary>
+        /// 与 OpenAI 兼容的生成接口
+        /// </summary>
+        /// <param name="model"></param>
+        /// <returns></returns>
+        [HttpPost]
+        [Route("{provider}/completions")]
+        public async Task Completion(OpenAICompletionModel model, string provider)
+        {
+            if (!Enum.TryParse<LlmServiceProvider>(provider, out LlmServiceProvider llmServiceProvider))
+            {
+                HttpContext.Response.StatusCode = (int)HttpStatusCode.BadRequest;
+                await HttpContext.Response.WriteAsync("The parameter \"provider\" must be one of \"OpenAI\", \"LLama\" ,\"HuggingFace\"");
+                return;
+            }
+
+            var llmService = _llmServiceFactory.Create(llmServiceProvider);
+            var completion = await llmService.CompletionAsync(model);
+            await HttpContext.WriteCompletion(completion);
         }
     }
 }

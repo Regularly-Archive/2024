@@ -1,12 +1,13 @@
 ﻿using LLama.Common;
 using Microsoft.AspNetCore.Http;
+using PostgreSQL.Embedding.Common.Models;
 
 namespace PostgreSQL.Embedding.LlmServices.Abstration
 {
     public interface ILlmChatService
     {
-        Task<string> ChatAsync(string input);
+        Task<string> ChatAsync(OpenAIModel request);
 
-        IAsyncEnumerable<string> ChatStreamAsync(string input);
+        IAsyncEnumerable<string> ChatStreamAsync(OpenAIModel request);
     }
 }

@@ -9,17 +9,12 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
     {
         public static IServiceCollection AddLLama(this IServiceCollection services)
         {
-            return services
-                .AddScoped<LLamaChatService>()
-                .AddScoped<LLamaEmbeddingService>()
-                .AddScoped<LLamaService>();
+            return services.AddScoped<LLamaService>();
         }
 
         public static IServiceCollection AddHuggingFace(this IServiceCollection services)
         {
-            services
-                .AddSingleton<HuggingFaceEmbeddingService>()
-                .AddSingleton<HuggingFaceService>();
+            services.AddSingleton<HuggingFaceService>();
 
             return services;
         }

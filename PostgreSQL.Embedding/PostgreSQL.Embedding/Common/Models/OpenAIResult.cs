@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using JetBrains.Annotations;
+using Newtonsoft.Json;
 
 namespace PostgreSQL.Embedding.Common.Models
 {
@@ -8,7 +9,7 @@ namespace PostgreSQL.Embedding.Common.Models
         [JsonProperty("object")]
         public string obj { get; set; } = "chat.completion";
         public List<ChoicesModel> choices { get; set; }
-        public long created { get; set; }
+        public long created { get; set; } = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
     }
 
 
@@ -20,15 +21,19 @@ namespace PostgreSQL.Embedding.Common.Models
         public OpenAIMessage message { get; set; }
     }
 
-    public class OpenAIEmbeddingResult
+    public class OpenAICompatibleEmbeddingResult
     {
         [JsonProperty("object")]
-        public string obj { get; set; } = "list";
-        public string model { get; set; } = "ada";
+        public string Object { get; set; } = "list";
 
-        public UsageModel usage { get; set; } = new UsageModel();
+        [JsonProperty("model")]
+        public string Model { get; set; }
 
-        public List<DataModel> data { get; set; } = new List<DataModel>() { new DataModel() };
+        [JsonProperty("usage")]
+        public UsageModel Usage { get; set; } = new UsageModel();
+
+        [JsonProperty("data")]
+        public List<OpenAICompatibleEmbeddingDataModel> Data { get; set; }
     }
 
     public class UsageModel
@@ -38,28 +43,59 @@ namespace PostgreSQL.Embedding.Common.Models
         public long total_tokens { get; set; } = 0;
     }
 
-    public class DataModel
+    public class OpenAICompatibleEmbeddingDataModel
     {
         [JsonProperty("object")]
-        public string obj { get; set; } = "embedding";
-        public int index { get; set; } = 0;
+        public string Object { get; set; } = "embedding";
 
-        public List<float> embedding { get; set; }
+        [JsonProperty("index")]
+        public int Index { get; set; } = 0;
+
+        [JsonProperty("embedding")]
+        public List<float> Embedding { get; set; }
     }
 
 
     public class OpenAIStreamResult
     {
         public string id { get; set; } = Guid.NewGuid().ToString();
+
         [JsonProperty("object")]
         public string obj { get; set; } = "chat.completion";
+
         public List<StreamChoicesModel> choices { get; set; }
-        public long created { get; set; }
+
+        public long created { get; set; } = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
     }
+
     public class StreamChoicesModel
     {
         public int index { get; set; } = 0;
 
         public OpenAIMessage delta { get; set; }
+    }
+
+    public class OpenAICompatibleCompletionResult
+    {
+        [JsonProperty("id")]
+        public string Id { get; set; } = Guid.NewGuid().ToString();
+
+        [JsonProperty("object")]
+        public string Object { get; set; } = "text.completion";
+
+        [JsonProperty("choices")]
+        public List<OpenAICompatibleCompletionChoiceModel> Choices { get; set; }
+
+        [JsonProperty("created")]
+        public long Created { get; set; } = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+    }
+
+    public class OpenAICompatibleCompletionChoiceModel
+    {
+        [JsonProperty("index")]
+        public int Index { get; set; }
+
+        [JsonProperty("text")]
+        public string Text { get; set; }
     }
 }
