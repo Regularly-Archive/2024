@@ -1,12 +1,13 @@
 from fastapi import FastAPI
-from models import CompletionRequest, ChatCompletionRequest, EmbeddingsRequest, EmbeddingsObjectResponse, EmbeddingsResponse, Usage, CompletionResponse, CompletionResponseChoice, ChatCompletionResponse, ChatCompletionResponseChoice
+from models import CompletionRequest, ChatCompletionRequest, EmbeddingsRequest, EmbeddingsObjectResponse, EmbeddingsResponse, Usage, CompletionResponse, CompletionResponseChoice, ChatCompletionResponse, ChatCompletionResponseChoice, ChatMessage
 from fastapi import FastAPI, HTTPException
 from completion import get_chat_completion, get_text_completion
 from embeddings import get_embeddings
 import os, uvicorn
+from uvicorn.config import LOGGING_CONFIG
 
-app = FastAPI()
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+app = FastAPI(title='A OpenAI Compatible API for HuggingFace')
 
 @app.post("/v1/embeddings")
 async def text_embeddings(request: EmbeddingsRequest) -> EmbeddingsResponse:
@@ -24,19 +25,22 @@ async def text_embeddings(request: EmbeddingsRequest) -> EmbeddingsResponse:
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatCompletionRequest):
     text = get_chat_completion(request)
-    return ChatCompletionResponse(model=request.model,choices=[ChatCompletionResponseChoice(text=text, index=0, Usage=None)])
+    message = ChatMessage(role='assistant', content=text)
+    return ChatCompletionResponse(
+        model=request.model, 
+        choices=[ChatCompletionResponseChoice(message=message, index=0, finish_reason='length')],
+        usage=Usage()
+    )
 
 @app.post("/v1/completions")
 async def completions(request: CompletionRequest): 
     text = get_text_completion(request)
     return CompletionResponse(
-        id='',
-        object='text_completion',
-        created=0,
         model=request.model, 
         choices=[CompletionResponseChoice(text=text, index=0, finish_reason='length', logprobs=None)],
         usage=Usage()
     )
     
 if __name__ == '__main__':
+    LOGGING_CONFIG["formatters"]["access"]["fmt"] = ("%(asctime)s " + LOGGING_CONFIG["formatters"]["access"]["fmt"])
     uvicorn.run(app='api:app', host="127.0.0.1", port=8003, reload=True)
