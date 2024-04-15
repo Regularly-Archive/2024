@@ -7,11 +7,11 @@ def timer(logger):
     def wrapper(func):
         def decorate(*args,**kwargs):
             time_start = time()
-            logger.debug(f'The method {func.__name__} execution starts...')
+            logger.debug(f'The execution of method {func.__name__} starts...')
             result = func(*args, **kwargs)
             time_finish = time()
             time_spend = time_finish - time_start
-            logger.debug(f'The method {func.__name__} execution finished in  {round(time_spend, 3)} seconds.')
+            logger.debug(f'The execution of method {func.__name__} finished in  {round(time_spend, 3)} seconds.')
             return result
         return decorate
     return wrapper

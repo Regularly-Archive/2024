@@ -9,6 +9,8 @@ RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     apt-get -y --no-install-recommends install python3 python3-pip git && \
     rm -rf /var/lib/apt/lists/*
 
+WORKDIR /etc/hf-api/
+
 COPY requirements.txt requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip3 install --upgrade pip && \

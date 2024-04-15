@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  hf_api:
+    image: hf-api
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: hf-api
+    restart: always
+    ports:
+      - "8003:8080"
+    volumes:
+      - /models:/etc/hf-api/models
