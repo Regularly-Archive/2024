@@ -1,6 +1,5 @@
 FROM nvidia/cuda:12.2.2-runtime-ubuntu22.04
 
-
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PORT=8080
 
@@ -15,8 +14,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip3 install --upgrade pip && \
     pip3 install -r requirements.txt
 
-COPY api.py .
-COPY models.py .
+COPY . .
 COPY entrypoint.sh /usr/local/bin/
 CMD [ "entrypoint.sh" ]
 
