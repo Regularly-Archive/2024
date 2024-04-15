@@ -1,4 +1,4 @@
-import time
+import time, uuid
 from typing import Any, Dict, List, Literal, Optional, Union
 from pydantic import BaseModel, Field
 
@@ -13,7 +13,7 @@ class Usage(BaseModel):
 
 class ChatCompletionRequest(BaseModel):
     messages: List[ChatMessage]
-    model: Optional[str] = None
+    model: Optional[str] = Field(default='Qwen/Qwen1.5-1.8B-Chat')
     temperature: float = 0.9
     top_p: float = 0.6
     top_k: Optional[int] = 10
@@ -32,10 +32,10 @@ class ChatCompletionResponseChoice(BaseModel):
 
 
 class ChatCompletionResponse(BaseModel):
-    id: str = Field()
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     object: str = "chat.completion"
     created: int = Field(default_factory=lambda: int(time.time()))
-    model: Optional[str] = "custom"
+    model: Optional[str] = Field(default='Qwen/Qwen1.5-1.8B-Chat')
     choices: List[ChatCompletionResponseChoice]
     usage: Usage
 
@@ -52,7 +52,7 @@ class ChatCompletionResponseStreamChoice(BaseModel):
 
 
 class ChatCompletionStreamResponse(BaseModel):
-    id: str
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     object: str = "chat.completion.chunk"
     created: int = Field(default_factory=lambda: int(time.time()))
     model: Optional[str] = None
@@ -60,18 +60,18 @@ class ChatCompletionStreamResponse(BaseModel):
 
 
 class CompletionRequest(BaseModel):
-    model: Optional[str] = None
-    prompt: Union[str, List[Any]]
-    suffix: Optional[str] = None
+    model: str = Field(default='Qwen/Qwen1.5-1.8B-Chat')
+    prompt: Union[str, List[Any]] = Field(default='你好')
+    suffix: Optional[str] = Field(default='')
     temperature: float = 0.9
     top_p: float = 0.6
     top_k: Optional[int] = 10
     n: int = 1
     max_tokens: int = 1024
-    stop: Optional[List[str]] = None
+    stop: Optional[List[str]] = []
     stream: bool = False
     frequency_penalty: Optional[float] = 1.0
-    user: Optional[str] = None
+    user: Optional[str] = Field(default='')
     logprobs: bool = False
     echo: bool = False
 
@@ -84,9 +84,9 @@ class CompletionResponseChoice(BaseModel):
 
 
 class CompletionResponse(BaseModel):
-    id: str
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     object: str = "text.completion"
-    created: int
+    created: int = Field(default_factory=lambda: int(time.time()))
     model: Optional[str] = "custom"
     choices: List[CompletionResponseChoice]
     usage: Usage
