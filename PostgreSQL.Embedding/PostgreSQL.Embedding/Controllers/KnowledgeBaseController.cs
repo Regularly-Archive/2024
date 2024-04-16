@@ -6,6 +6,7 @@ using PostgreSQL.Embedding.Common.Models.WebApi;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
+using PostgreSQL.Embedding.Services;
 
 namespace PostgreSQL.Embedding.Controllers
 {
@@ -17,20 +18,24 @@ namespace PostgreSQL.Embedding.Controllers
         private readonly IWebHostEnvironment _webHostEnvironment;
         private readonly IKnowledgeBaseService _knowledgeBaseService;
         private readonly IFullTextSearchService _fullTextSearchService;
+        private readonly IFileStorageService _fileStorageService;
         public KnowledgeBaseController(
             IWebHostEnvironment hostingEnvironment,
             IKnowledgeBaseService knowledgeBaseService,
             IFullTextSearchService fullTextSearchService,
+            IFileStorageService fileStorageService,
             CrudBaseService<KnowledgeBase> crudBaseService) : base(crudBaseService)
         {
             _webHostEnvironment = hostingEnvironment;
             _knowledgeBaseService = knowledgeBaseService;
             _fullTextSearchService = fullTextSearchService;
+            _fileStorageService = fileStorageService;
         }
 
         [HttpGet("{knowledgeBaseId}/search")]
         public async Task<JsonResult> KnowledgeSearch(long knowledgeBaseId, [FromQuery] string question, [FromQuery] double? minRelevance, [FromQuery] int? limit)
         {
+            // Todo: 这里需要重构
             var knowledgeBase = await _crudBaseService.GetById(knowledgeBaseId);
             if (knowledgeBase.RetrievalType == (int)RetrievalType.Vectors)
             {
@@ -47,6 +52,7 @@ namespace PostgreSQL.Embedding.Controllers
         [HttpGet("{knowledgeBaseId}/ask")]
         public async Task<JsonResult> KnowledgeBaseAsk(long knowledgeBaseId, [FromQuery] string question, [FromQuery] double minRelevance)
         {
+            // Todo: 这里需要重构
             var knowledgeBase = await _crudBaseService.GetById(knowledgeBaseId);
             if (knowledgeBase.RetrievalType == (int)RetrievalType.Vectors)
             {
@@ -63,33 +69,19 @@ namespace PostgreSQL.Embedding.Controllers
         [HttpPost("{knowledgeBaseId}/embedding/files")]
         public async Task<JsonResult> CreateEmbeddingFromFile(long knowledgeBaseId, List<IFormFile> files)
         {
-            var embeddingTaskId = Guid.NewGuid().ToString("N");
-            var embedingTaskFolder = Path.Combine(_webHostEnvironment.ContentRootPath, "Upload", embeddingTaskId);
-            if (!Directory.Exists(embedingTaskFolder))
-                Directory.CreateDirectory(embedingTaskFolder);
-
             var uploadedFiles = new List<string>();
+            var embeddingTaskId = Guid.NewGuid().ToString("N");
 
-            if (files != null && files.Any())
+            if (files == null || !files.Any()) return ApiResult.Failure();
+
+            foreach (var file in files)
             {
-                foreach (var file in files)
-                {
-                    if (file.Length <= 0) continue;
-
-                    var filePath = Path.Combine(embedingTaskFolder, file.FileName);
-                    using (var fileStream = new FileStream(filePath, FileMode.Create))
-                    {
-                        file.CopyTo(fileStream);
-                        uploadedFiles.Add(filePath);
-                    }
-                }
+                if (file.Length <= 0) continue;
+                var result = await _fileStorageService.PutFileAsync(embeddingTaskId, file);
+                uploadedFiles.Add(result.FileId);
             }
 
-            if (uploadedFiles.Any())
-            {
-                await _knowledgeBaseService.ImportKnowledgeFromFiles(embeddingTaskId, knowledgeBaseId, uploadedFiles);
-
-            }
+            if (uploadedFiles.Any()) await _knowledgeBaseService.ImportKnowledgeFromFiles(embeddingTaskId, knowledgeBaseId, uploadedFiles);
 
             return ApiResult.Success(new ImportingTaskResult()
             {
