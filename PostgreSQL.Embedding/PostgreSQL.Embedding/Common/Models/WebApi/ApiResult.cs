@@ -20,5 +20,11 @@ namespace PostgreSQL.Embedding.Common.Models.WebApi
             var result = new ApiResult { code = (int)HttpStatusCode.InternalServerError, data = null, message = ex.Message };
             return new JsonResult(result);
         }
+
+        public static JsonResult Failure(string message = "操作失败")
+        {
+            var result = new ApiResult { code = (int)HttpStatusCode.InternalServerError, data = null, message = message };
+            return new JsonResult(result);
+        }
     }
 }

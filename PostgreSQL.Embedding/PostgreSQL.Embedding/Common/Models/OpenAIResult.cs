@@ -3,17 +3,23 @@ using Newtonsoft.Json;
 
 namespace PostgreSQL.Embedding.Common.Models
 {
-    public class OpenAIResult
+    public class OpenAICompatibleResult
     {
+        [JsonProperty("id")]
         public string id { get; set; } = Guid.NewGuid().ToString();
+
         [JsonProperty("object")]
-        public string obj { get; set; } = "chat.completion";
-        public List<ChoicesModel> choices { get; set; }
-        public long created { get; set; } = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        public string Object { get; set; } = "chat.completion";
+
+        [JsonProperty("choices")]
+        public List<OpenAICompatibleChoicesModel> Choices { get; set; }
+
+        [JsonProperty("created")]
+        public long Created { get; set; } = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
     }
 
 
-    public class ChoicesModel
+    public class OpenAICompatibleChoicesModel
     {
         public string finish_reason { get; set; } = "stop";
         public int index { get; set; } = 0;
