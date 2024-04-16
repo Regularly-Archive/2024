@@ -88,6 +88,7 @@ builder.Services.AddScoped<IUserInfoService, UserInfoService>();
 builder.Services.AddScoped<IKernelService, KernalService>();
 builder.Services.AddScoped<IMemoryService, PostgreSQL.Embedding.LlmServices.MemoryService>();
 
+// Todo: 需要实现按指定模型加载
 builder.Services.AddSingleton<LLamaEmbedder>(sp =>
 {
     var modelPath = Path.Combine(builder.Environment.ContentRootPath, builder.Configuration["LLamaConfig:ModelPath"]!);
@@ -118,53 +119,12 @@ builder.Services.Configure<JwtSetting>(builder.Configuration.GetSection(nameof(J
 builder.Services.AddSingleton<ILlmServiceFactory, LlmServiceFactory>();
 builder.Services.AddScoped<IKnowledgeBaseService, KnowledgeBaseService>();
 builder.Services.AddScoped<PromptTemplateService>();
-builder.Services.AddSingleton<MemoryServerless>(serviceProvider =>
-{
-    var httpClient = new HttpClient(new OpenAIProxyHandler(builder.Configuration));
 
-    var postgresConfig = new PostgresConfig()
-    {
-        ConnectionString = builder.Configuration["ConnectionStrings:Default"]!,
-        TableNamePrefix = "sk_"
-    };
-
-
-    var memoryBuilder = new KernelMemoryBuilder();
-    memoryBuilder.WithPostgresMemoryDb(postgresConfig);
-
-    var llmConfig = new LlmConfig();
-    builder.Configuration.Bind(nameof(LlmConfig), llmConfig);
-
-    if (llmConfig.Provider == LlmServiceProvider.OpenAI)
-    {
-        var openAIConfig = new OpenAIConfig();
-        builder.Configuration.BindSection(nameof(OpenAIConfig), openAIConfig);
-
-        memoryBuilder
-            .WithOpenAITextGeneration(openAIConfig)
-            .WithOpenAITextEmbeddingGeneration(openAIConfig);
-    }
-    else
-    {
-        var modelPath = Path.Combine(
-            builder.Environment.ContentRootPath,
-            builder.Configuration["LLamaConfig:ModelPath"]!
-        );
-
-        var llamaConfig = new LLamaSharpConfig(modelPath) { ContextSize = builder.Configuration.GetValue<uint>("LlamaConfig:ContextSize") };
-        var embedder = serviceProvider.GetRequiredService<LLamaEmbedder>();
-        memoryBuilder
-            .WithCustomTextGenerator(new LlamaSharpTextGenerator(llamaConfig))
-            .WithCustomEmbeddingGenerator(new LLamaSharpTextEmbeddingGenerator(embedder));
-    }
-
-
-    return memoryBuilder.Build<MemoryServerless>();
-});
 builder.Services.AddSingleton<KnowledgeImportingQueueService>();
 builder.Services.AddHostedService<KnowledgeImportingQueueService>();
 builder.Services.AddSingleton<EnumValuesConverter>();
 builder.Services.AddScoped<IFullTextSearchService, FullTextSearchService>();
+builder.Services.AddScoped<IFileStorageService, PhysicalFileStorageService>();
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(builder =>

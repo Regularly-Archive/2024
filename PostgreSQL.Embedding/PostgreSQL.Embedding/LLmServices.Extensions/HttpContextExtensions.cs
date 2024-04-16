@@ -49,10 +49,10 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
 
         public static async Task WriteChatCompletion(this Microsoft.AspNetCore.Http.HttpContext context, string text)
         {
-            var result = new OpenAIResult();
-            result.choices = new List<ChoicesModel>()
+            var result = new OpenAICompatibleResult();
+            result.Choices = new List<OpenAICompatibleChoicesModel>()
             {
-                new ChoicesModel() { index = 0, message = new OpenAIMessage() { role = "assistant", content = text } },
+                new OpenAICompatibleChoicesModel() { index = 0, message = new OpenAIMessage() { role = "assistant", content = text } },
             };
 
             if (!context.Response.HasStarted) context.Response.ContentType = "application/json";

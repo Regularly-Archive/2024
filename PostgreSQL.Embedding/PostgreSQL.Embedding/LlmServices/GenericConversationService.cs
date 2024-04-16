@@ -54,10 +54,9 @@ namespace PostgreSQL.Embedding.LlmServices
             }
             else
             {
-                var result = new OpenAIResult();
-                result.created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-                result.choices = new List<ChoicesModel>() { new ChoicesModel() { message = new OpenAIMessage() { role = "assistant" } } };
-                result.choices[0].message.content = await InvokeChat(input);
+                var result = new OpenAICompatibleResult();
+                result.Choices = new List<OpenAICompatibleChoicesModel>() { new OpenAICompatibleChoicesModel() { message = new OpenAIMessage() { role = "assistant" } } };
+                result.Choices[0].message.content = await InvokeChat(input);
                 if (!httpContext.Response.HasStarted)
                 {
                     httpContext.Response.ContentType = "application/json";

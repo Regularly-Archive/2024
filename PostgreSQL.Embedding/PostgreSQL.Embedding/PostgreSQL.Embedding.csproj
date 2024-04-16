@@ -28,6 +28,7 @@
     <PackageReference Include="Microsoft.SemanticKernel.Plugins.Core" Version="1.4.0-alpha" />
     <PackageReference Include="Microsoft.SemanticKernel.Plugins.Memory" Version="1.0.0-rc4" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.19.5" />
+    <PackageReference Include="Minio" Version="6.0.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Pgvector.EntityFrameworkCore" Version="0.2.0" />
     <PackageReference Include="SqlSugarCore" Version="5.1.4.145" />
