@@ -27,9 +27,9 @@ namespace PostgreSQL.Embedding.LlmServices.HuggingFace
                 httpResponse.EnsureSuccessStatusCode();
 
                 var returnContent = await httpResponse.Content.ReadAsStringAsync();
-                var completionResult = JsonConvert.DeserializeObject<OpenAIResult>(returnContent);
+                var completionResult = JsonConvert.DeserializeObject<OpenAICompatibleResult>(returnContent);
 
-                return completionResult.choices[0].message.content;
+                return completionResult.Choices[0].message.content;
             }
         }
 
@@ -42,9 +42,9 @@ namespace PostgreSQL.Embedding.LlmServices.HuggingFace
                 httpResponse.EnsureSuccessStatusCode();
 
                 var returnContent = await httpResponse.Content.ReadAsStringAsync();
-                var completionResult = JsonConvert.DeserializeObject<OpenAIResult>(returnContent);
+                var completionResult = JsonConvert.DeserializeObject<OpenAICompatibleResult>(returnContent);
 
-                foreach (var item in completionResult.choices[0].message.content)
+                foreach (var item in completionResult.Choices[0].message.content)
                 {
                     yield return item.ToString();
                 }
