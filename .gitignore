@@ -38,3 +38,6 @@ SK.Training/SK.RAG/obj/
 hf-api/models/
 hf-api/src/models/
 KnowledgeBase/input/
+JsonSchemaValidator/.vs/
+JsonSchemaValidator/bin/
+JsonSchemaValidator/obj/

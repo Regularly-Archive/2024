@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "brand": {
+      "type": "string",
+      "enum": [ "ARC" ]
+    },
+    "consent_code": {
+      "type": "string",
+      "minLength": 1
+    },
+    "consent_tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "consent_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "consent_uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  },
+  "required": [ "brand", "consent_code", "consent_type", "consent_uuid" ]
+}
+2
