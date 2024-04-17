@@ -11,14 +11,12 @@ namespace PostgreSQL.Embedding.Controllers
 {
     public class DocumentController : CrudBaseController<DocumentImportRecord>
     {
-        private CrudBaseService<DocumentImportRecord> _crudBaseService;
         private IKnowledgeBaseService _knowledgeBaseService;
         public DocumentController(
             CrudBaseService<DocumentImportRecord> crudBaseService,
             IKnowledgeBaseService knowledgeBaseService
             ) : base(crudBaseService)
         {
-            _crudBaseService = crudBaseService;
             _knowledgeBaseService = knowledgeBaseService;
         }
 

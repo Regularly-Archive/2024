@@ -2,13 +2,13 @@
 
 namespace PostgreSQL.Embedding.DataAccess.Entities
 {
-    [SugarTable("physical_file_storage")]
-    public class PhysicalFileStorage : BaseEntity
+    [SugarTable("file_storage")]
+    public class FileStorage : BaseEntity
     {
         [SugarColumn(ColumnName = "file_id")]
         public string FileId { get; set; }
 
-        [SugarColumn(ColumnName = "file_path")]
+        [SugarColumn(ColumnName = "file_path", IsNullable = true)]
         public string FilePath { get; set; }
 
         [SugarColumn(ColumnName = "file_name")]
