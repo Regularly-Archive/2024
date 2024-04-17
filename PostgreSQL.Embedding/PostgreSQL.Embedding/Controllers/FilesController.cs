@@ -23,8 +23,8 @@ namespace PostgreSQL.Embedding.Controllers
             var result = await _fileStorageService.PutFileAsync(bucketName, file);
             return ApiResult.Success(new
             {
-                Src = $"/files/{bucketName}/{result.FileId}",
-                FileName = result.FileName
+                Url = $"/files/{bucketName}/{result.FileId}",
+                FileName = result.FileName,
             });
         }
 
@@ -32,7 +32,7 @@ namespace PostgreSQL.Embedding.Controllers
         public async Task<IActionResult> Download(string bucketName, string fileId)
         {
             var fileStorage = await _fileStorageService.GetFileAsync(bucketName, fileId);
-            return File(fileStorage.Content, fileStorage.ContentType);
+            return File(fileStorage.Content, fileStorage.ContentType, fileStorage.FileName, true);
         }
 
         [HttpDelete("{bucketName}/{fileId}")]
