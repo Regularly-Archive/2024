@@ -5,18 +5,16 @@ using PostgreSQL.Embedding.Common.Models.File;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using System.Net;
-using System.Text.Encodings.Web;
-using static Microsoft.KernelMemory.DocumentUploadRequest;
 
 namespace PostgreSQL.Embedding.Services
 {
-    public class PhysicalFileStorageService : IFileStorageService
+    public class PhysicalFileStorageService : BaseFileStorageService, IFileStorageService
     {
         private readonly string _rootPath;
         private readonly IFileProvider _fileProvider;
-        private readonly IRepository<PhysicalFileStorage> _fileStorageRepository;
+        private readonly IRepository<FileStorage> _fileStorageRepository;
 
-        public PhysicalFileStorageService(IWebHostEnvironment webHostEnvironment, IRepository<PhysicalFileStorage> fileStorageRepository)
+        public PhysicalFileStorageService(IWebHostEnvironment webHostEnvironment, IRepository<FileStorage> fileStorageRepository)
         {
             _rootPath = Path.Combine(webHostEnvironment.ContentRootPath, Constants.DefaultUploadFolder);
             _fileProvider = new PhysicalFileProvider(_rootPath);
@@ -63,6 +61,24 @@ namespace PostgreSQL.Embedding.Services
             };
         }
 
+        public async Task GetFileAsync(string bucketName, string fileId, string fileName)
+        {
+            var fileStorage = await _fileStorageRepository.SingleOrDefaultAsync(x => x.FileId == fileId);
+            if (fileStorage == null)
+                throw new Exception($"The file '{fileId}' is not exist.");
+
+            bucketName = WebUtility.UrlDecode(bucketName);
+            bucketName = bucketName.Replace('/', Path.DirectorySeparatorChar);
+
+            var relativePath = Path.Combine(bucketName, fileStorage.FilePath);
+            var fileInfo = _fileProvider.GetFileInfo(relativePath);
+            if (!fileInfo.Exists)
+                throw new ArgumentException($"The file '{fileStorage.FileName}' is not exist.");
+
+            using var fileStream = new FileStream(fileName, FileMode.Create, FileAccess.Write);
+            fileInfo.CreateReadStream().CopyTo(fileStream);
+        }
+
         public async Task<PutFileStorageResult> PutFileAsync(string bucketName, IFormFile file)
         {
             bucketName = WebUtility.UrlDecode(bucketName);
@@ -72,7 +88,7 @@ namespace PostgreSQL.Embedding.Services
             var fileExt = Path.GetExtension(file.FileName);
             var relativePath = Path.Combine($"{fileId}{fileExt}");
             relativePath = relativePath.Replace(Path.DirectorySeparatorChar, '/');
-            await _fileStorageRepository.AddAsync(new PhysicalFileStorage()
+            await _fileStorageRepository.AddAsync(new FileStorage()
             {
                 FileId = fileId,
                 FilePath = relativePath,
@@ -93,32 +109,32 @@ namespace PostgreSQL.Embedding.Services
             };
         }
 
-        private string GetContentType(string fileName)
+        public async Task<PutFileStorageResult> PutFileAsync(string bucketName, string fileName)
         {
-            if (fileName.Contains(".jpg"))
+            bucketName = WebUtility.UrlDecode(bucketName);
+            bucketName = bucketName.Replace('/', Path.DirectorySeparatorChar);
+
+            var fileId = Guid.NewGuid().ToString("N");
+            var fileExt = Path.GetExtension(fileName);
+            var relativePath = Path.Combine($"{fileId}{fileExt}");
+            relativePath = relativePath.Replace(Path.DirectorySeparatorChar, '/');
+            await _fileStorageRepository.AddAsync(new FileStorage()
             {
-                return "image/jpg";
-            }
-            else if (fileName.Contains(".jpeg"))
+                FileId = fileId,
+                FilePath = relativePath,
+                FileName = Path.GetFileName(fileName),
+            });
+
+            var fullPath = Path.Combine(_rootPath, bucketName, relativePath);
+            var fullPathDir = Path.GetDirectoryName(fullPath);
+            if (!Directory.Exists(fullPathDir)) Directory.CreateDirectory(fullPathDir);
+
+            File.Copy(fileName, fullPath);
+            return new PutFileStorageResult()
             {
-                return "image/jpeg";
-            }
-            else if (fileName.Contains(".png"))
-            {
-                return "image/png";
-            }
-            else if (fileName.Contains(".gif"))
-            {
-                return "image/gif";
-            }
-            else if (fileName.Contains(".pdf"))
-            {
-                return "application/pdf";
-            }
-            else
-            {
-                return "application/octet-stream";
-            }
+                FileId = fileId,
+                FileName = Path.GetFileName(fileName)
+            };
         }
     }
 }

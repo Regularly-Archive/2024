@@ -132,11 +132,11 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <param name="knowledgeBaseId">知识库ID</param>
         /// <param name="files">文件列表</param>
         /// <returns></returns>
-        public async Task ImportKnowledgeFromFiles(string taskId, long knowledgeBaseId, IEnumerable<string> files)
+        public async Task ImportKnowledgeFromFiles(string taskId, long knowledgeBaseId, IEnumerable<string> filePaths)
         {
-            foreach (var file in files)
+            foreach (var filePath in filePaths)
             {
-                var fileName = Path.GetFileName(file);
+                var fileName = Path.GetFileName(filePath);
 
                 // 如果文件重复则直接忽略
                 // Todo：考虑增加针对文件的 SHA 校验
@@ -151,7 +151,7 @@ namespace PostgreSQL.Embedding.LlmServices
                     QueueStatus = (int)QueueStatus.Uploaded,
                     KnowledgeBaseId = knowledgeBaseId,
                     DocumentType = (int)DocumentType.File,
-                    Content = file
+                    Content = filePath
                 });
             }
         }
@@ -419,18 +419,6 @@ namespace PostgreSQL.Embedding.LlmServices
             return (await memoryServerless.IsDocumentReadyAsync(fileName));
         }
 
-        public async Task<List<KnowledgeBaseFile>> GetKnowledgeBaseFiles(long knowledgeBaseId)
-        {
-            var records = await _importRecordRepository.FindAsync(x => x.KnowledgeBaseId == knowledgeBaseId);
-            return records.Select(x => new KnowledgeBaseFile()
-            {
-                FileName = x.FileName,
-                KnowledgeBaseId = x.KnowledgeBaseId,
-                QueueStatus = x.QueueStatus,
-            })
-            .ToList();
-        }
-
         private async Task<KnowledgeBase> GetKnowledgeBaseById(long knowledgeBaseId, bool renew = false)
         {
             KnowledgeBase knowledgeBase = null;
@@ -448,6 +436,18 @@ namespace PostgreSQL.Embedding.LlmServices
             if (knowledgeBase == null) throw new InvalidOperationException("The knowledgebase must exists.");
 
             return knowledgeBase;
+        }
+
+        /// <summary>
+        /// 重新导入知识
+        /// </summary>
+        /// <param name="knowledgeBaseId">知识库ID</param>
+        /// <param name="fileName">文件名称</param>
+        /// <returns></returns>
+        /// <exception cref="NotImplementedException"></exception>
+        public Task ReImportKnowledges(long knowledgeBaseId, string fileName = null)
+        {
+            throw new NotImplementedException();
         }
 
         private void AddDefaultHandlers(MemoryServerless memoryServerless)

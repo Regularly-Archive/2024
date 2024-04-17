@@ -77,8 +77,11 @@ namespace PostgreSQL.Embedding.Controllers
             foreach (var file in files)
             {
                 if (file.Length <= 0) continue;
-                var result = await _fileStorageService.PutFileAsync(embeddingTaskId, file);
-                uploadedFiles.Add(result.FileId);
+
+                var filePath = Path.Combine(_webHostEnvironment.ContentRootPath, embeddingTaskId, file.FileName);
+                using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write);
+                await file.CopyToAsync(fileStream);
+                uploadedFiles.Add(filePath);
             }
 
             if (uploadedFiles.Any()) await _knowledgeBaseService.ImportKnowledgeFromFiles(embeddingTaskId, knowledgeBaseId, uploadedFiles);
