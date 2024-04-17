@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.KernelMemory;
 using Microsoft.KernelMemory.Postgres;
 using Microsoft.OpenApi.Models;
+using Minio;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Converters;
 using PostgreSQL.Embedding.Common.Middlewares;
@@ -119,12 +120,19 @@ builder.Services.Configure<JwtSetting>(builder.Configuration.GetSection(nameof(J
 builder.Services.AddSingleton<ILlmServiceFactory, LlmServiceFactory>();
 builder.Services.AddScoped<IKnowledgeBaseService, KnowledgeBaseService>();
 builder.Services.AddScoped<PromptTemplateService>();
-
+builder.Services.AddMinio(minioClient =>
+{
+    var minioConfig = builder.Configuration.GetSection("MinioConfig");
+    minioClient
+        .WithEndpoint(new Uri(minioConfig["Url"]))
+        .WithCredentials(minioConfig["AccessKey"], minioConfig["SecretKey"])
+        .WithSSL(false);
+});
 builder.Services.AddSingleton<KnowledgeImportingQueueService>();
 builder.Services.AddHostedService<KnowledgeImportingQueueService>();
 builder.Services.AddSingleton<EnumValuesConverter>();
 builder.Services.AddScoped<IFullTextSearchService, FullTextSearchService>();
-builder.Services.AddScoped<IFileStorageService, PhysicalFileStorageService>();
+builder.Services.AddScoped<IFileStorageService, MinioFileStorageService>();
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(builder =>

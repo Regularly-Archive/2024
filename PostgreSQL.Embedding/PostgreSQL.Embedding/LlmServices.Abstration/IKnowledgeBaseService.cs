@@ -20,5 +20,6 @@ namespace PostgreSQL.Embedding.LlmServices.Abstration
         Task<KMAskResult> AskAsync(long knowledgeBaseId, string question, double minRelevance = 0.75);
         Task<bool> IsDocumentReady(long knowledgeBaseId, string fileName);
         Task HandleImportingQueueAsync(int batchLimit = 5);
+        Task ReImportKnowledges(long knowledgeBaseId, string fileName = null);
     }
 }
