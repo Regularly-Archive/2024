@@ -10,5 +10,6 @@ namespace PostgreSQL.Embedding.Common
         public const string HttpRequestHeader_ConversationId = "x-wikit-conversation-id";
         public const string HttpRequestHeader_ConversationName = "x-wikit-conversation-name";
         public const string DefaultUploadFolder = "Upload";
+        public const string DefaultEmptyAnswer = "抱歉，我无法回答你的问题！";
     }
 }

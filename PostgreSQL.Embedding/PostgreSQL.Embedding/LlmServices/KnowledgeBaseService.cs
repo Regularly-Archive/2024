@@ -14,6 +14,7 @@ using PostgreSQL.Embedding.Common.Models.WebApi;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
+using PostgreSQL.Embedding.Utils;
 using SqlSugar;
 using System.Text;
 using Constants = PostgreSQL.Embedding.Common.Constants;
@@ -190,141 +191,15 @@ namespace PostgreSQL.Embedding.LlmServices
         {
             // 查询知识库
             var knowledgeBase = await GetKnowledgeBaseById(knowledgeBaseId);
+            var webPageTitle = await WebPageTitleFetcher.GetWebPageTitleAsync(url);
             await _importRecordRepository.AddAsync(new DocumentImportRecord()
             {
                 TaskId = taskId,
-                FileName = Guid.NewGuid().ToString("N"),
+                FileName = webPageTitle ?? Guid.NewGuid().ToString("N"),
                 QueueStatus = (int)QueueStatus.Uploaded,
                 KnowledgeBaseId = knowledgeBaseId,
                 DocumentType = (int)DocumentType.Url,
                 Content = url,
-            });
-        }
-
-        /// <summary>
-        /// 异步处理队列任务
-        /// </summary>
-        /// <returns></returns>
-        public async Task HandleImportingQueueAsync(int batchLimit = 5)
-        {
-            var webHostEnvironment = _serviceProvider.GetRequiredService<IWebHostEnvironment>();
-
-            var records = await _importRecordRepository.FindAsync(x => x.QueueStatus == (int)QueueStatus.Uploaded);
-            _logger.LogInformation($"There are {records.Count} files to be processed.");
-
-            var tasks = records.OrderBy(x => x.CreatedAt).Take(batchLimit).Select(async record =>
-            {
-                var knowledgeBase = await GetKnowledgeBaseById(record.KnowledgeBaseId, true);
-                if (knowledgeBase != null)
-                {
-                    if (record.DocumentType == (int)DocumentType.Text)
-                    {
-                        await HandleTextImportAsync(record, knowledgeBase);
-                    }
-                    else if (record.DocumentType == (int)DocumentType.Url)
-                    {
-                        await HandleUrlImportAsync(record, knowledgeBase);
-                    }
-                    else if (record.DocumentType == (int)DocumentType.File)
-                    {
-                        await HandleFileImportAsync(record, knowledgeBase);
-                    }
-                }
-            });
-
-            await Task.WhenAll(tasks);
-        }
-
-        private async Task HandleFileImportAsync(DocumentImportRecord record, KnowledgeBase knowledgeBase)
-        {
-            using var serviceProviderScope = _serviceProvider.CreateScope();
-            var memoryService = serviceProviderScope.ServiceProvider.GetService<IMemoryService>();
-            var memoryServerless = await memoryService.CreateByKnowledgeBase(knowledgeBase);
-            var importRecordRepository = serviceProviderScope.ServiceProvider.GetService<IRepository<DocumentImportRecord>>();
-            AddDefaultHandlers(memoryServerless);
-
-            var tags = new TagCollection
-            {
-                { KernelMemoryTags.TaskId, record.TaskId },
-                { KernelMemoryTags.FileName, record.FileName },
-                { KernelMemoryTags.KnowledgeBaseId, record.KnowledgeBaseId.ToString() },
-            };
-            var document = new Document(tags: tags, filePaths: new List<string> { record.Content });
-
-            // 更新文件导入记录
-            record.QueueStatus = (int)QueueStatus.Processing;
-            record.ProcessStartTime = DateTime.Now;
-            await importRecordRepository.UpdateAsync(record);
-
-            // 导入文档
-            await memoryServerless.ImportDocumentAsync(document, steps: new List<string>()
-            {
-                "extract_text",
-                "split_text_in_partitions",
-                "generate_embeddings",
-                "save_memory_records",
-                UpdateQueueStatusHandler.GetCurrentStepName()
-            });
-        }
-
-        private async Task HandleTextImportAsync(DocumentImportRecord record, KnowledgeBase knowledgeBase)
-        {
-            using var serviceProviderScope = _serviceProvider.CreateScope();
-            var memoryService = serviceProviderScope.ServiceProvider.GetService<IMemoryService>();
-            var memoryServerless = await memoryService.CreateByKnowledgeBase(knowledgeBase);
-            var importRecordRepository = serviceProviderScope.ServiceProvider.GetService<IRepository<DocumentImportRecord>>();
-            AddDefaultHandlers(memoryServerless);
-
-            var tags = new TagCollection
-            {
-                { KernelMemoryTags.TaskId, record.TaskId },
-                { KernelMemoryTags.FileName, record.FileName},
-                { KernelMemoryTags.KnowledgeBaseId, record.KnowledgeBaseId.ToString() },
-            };
-
-            // 更新文件导入记录
-            record.QueueStatus = (int)QueueStatus.Processing;
-            record.ProcessStartTime = DateTime.Now;
-            await importRecordRepository.UpdateAsync(record);
-
-            await memoryServerless.ImportTextAsync(record.Content, tags: tags, steps: new List<string>()
-            {
-                "extract_text",
-                "split_text_in_partitions",
-                "generate_embeddings",
-                "save_memory_records",
-                UpdateQueueStatusHandler.GetCurrentStepName()
-            });
-        }
-
-        private async Task HandleUrlImportAsync(DocumentImportRecord record, KnowledgeBase knowledgeBase)
-        {
-            using var serviceProviderScope = _serviceProvider.CreateScope();
-            var memoryService = serviceProviderScope.ServiceProvider.GetService<IMemoryService>();
-            var memoryServerless = await memoryService.CreateByKnowledgeBase(knowledgeBase);
-            var importRecordRepository = serviceProviderScope.ServiceProvider.GetService<IRepository<DocumentImportRecord>>();
-            AddDefaultHandlers(memoryServerless);
-
-            var tags = new TagCollection
-            {
-                { KernelMemoryTags.TaskId, record.TaskId },
-                { KernelMemoryTags.FileName, record.FileName},
-                { KernelMemoryTags.KnowledgeBaseId, record.KnowledgeBaseId.ToString() },
-                { KernelMemoryTags.Url, record.Content },
-            };
-
-            // 更新文件导入记录
-            record.QueueStatus = (int)QueueStatus.Processing;
-            record.ProcessStartTime = DateTime.Now;
-            await importRecordRepository.UpdateAsync(record);
-
-            await memoryServerless.ImportWebPageAsync(record.Content, tags: tags, steps: new List<string>()
-            {
-                "extract_text",
-                "split_text_in_partitions",
-                "generate_embeddings",
-                "save_memory_records",
-                UpdateQueueStatusHandler.GetCurrentStepName()
             });
         }
 
@@ -419,22 +294,9 @@ namespace PostgreSQL.Embedding.LlmServices
             return (await memoryServerless.IsDocumentReadyAsync(fileName));
         }
 
-        private async Task<KnowledgeBase> GetKnowledgeBaseById(long knowledgeBaseId, bool renew = false)
+        private async Task<KnowledgeBase> GetKnowledgeBaseById(long knowledgeBaseId)
         {
-            KnowledgeBase knowledgeBase = null;
-            if (!renew)
-            {
-                knowledgeBase = await _knowledgeBaseRepository.GetAsync(knowledgeBaseId);
-            }
-            else
-            {
-                var serviceProviderScope = _serviceProvider.CreateScope();
-                var knowledgeBaseRespository = serviceProviderScope.ServiceProvider.GetService<IRepository<KnowledgeBase>>();
-                knowledgeBase = await knowledgeBaseRespository.GetAsync(knowledgeBaseId);
-            }
-
-            if (knowledgeBase == null) throw new InvalidOperationException("The knowledgebase must exists.");
-
+            var knowledgeBase = await _knowledgeBaseRepository.GetAsync(knowledgeBaseId);
             return knowledgeBase;
         }
 
@@ -448,18 +310,6 @@ namespace PostgreSQL.Embedding.LlmServices
         public Task ReImportKnowledges(long knowledgeBaseId, string fileName = null)
         {
             throw new NotImplementedException();
-        }
-
-        private void AddDefaultHandlers(MemoryServerless memoryServerless)
-        {
-            var loggerFactory = _serviceProvider.GetRequiredService<ILoggerFactory>();
-            var logger = loggerFactory.CreateLogger<UpdateQueueStatusHandler>();
-
-            memoryServerless.Orchestrator.AddHandler<TextExtractionHandler>("extract_text");
-            memoryServerless.Orchestrator.AddHandler<TextPartitioningHandler>("split_text_in_partitions");
-            memoryServerless.Orchestrator.AddHandler<GenerateEmbeddingsHandler>("generate_embeddings");
-            memoryServerless.Orchestrator.AddHandler<SaveRecordsHandler>("save_memory_records");
-            memoryServerless.Orchestrator.AddHandler(new UpdateQueueStatusHandler(_importRecordRepository, logger));
         }
 
         private KMPartition ParseAsKMPartition(NpgsqlDataReader reader)
@@ -489,41 +339,6 @@ namespace PostgreSQL.Embedding.LlmServices
                 return tag.Split(new Char[] { ':' })[1];
 
             return string.Empty;
-        }
-    }
-
-    internal class UpdateQueueStatusHandler : IPipelineStepHandler
-    {
-        public string StepName => "update_quque_status";
-        public static string GetCurrentStepName() => "update_quque_status";
-
-        private readonly IRepository<DocumentImportRecord> _importRecordRepository;
-        private readonly ILogger<UpdateQueueStatusHandler> _logger;
-        public UpdateQueueStatusHandler(IRepository<DocumentImportRecord> importRecordRepository, ILogger<UpdateQueueStatusHandler> logger)
-        {
-            _importRecordRepository = importRecordRepository;
-            _logger = logger;
-        }
-
-        public async Task<(bool success, DataPipeline updatedPipeline)> InvokeAsync(DataPipeline pipeline, CancellationToken cancellationToken = default)
-        {
-            var taskId = pipeline.Tags[KernelMemoryTags.TaskId].FirstOrDefault();
-            var fileName = pipeline.Tags[KernelMemoryTags.FileName].FirstOrDefault();
-            var knowledgeBaseId = long.Parse(pipeline.Tags[KernelMemoryTags.KnowledgeBaseId].FirstOrDefault());
-
-
-            var record = await _importRecordRepository.SingleOrDefaultAsync(x => x.KnowledgeBaseId == knowledgeBaseId && x.TaskId == taskId && x.FileName == fileName);
-            if (record != null)
-            {
-                record.QueueStatus = (int)QueueStatus.Complete;
-                record.ProcessEndTime = DateTime.Now;
-                var totalSeconds = Math.Round((record.ProcessEndTime.Value - record.ProcessStartTime.Value).TotalSeconds, 2);
-                record.ProcessDuartionTime = totalSeconds;
-                await _importRecordRepository?.UpdateAsync(record);
-                _logger.LogInformation($"Importing document '{fileName}' finished in {totalSeconds} seconds.");
-            }
-
-            return (true, pipeline);
         }
     }
 }

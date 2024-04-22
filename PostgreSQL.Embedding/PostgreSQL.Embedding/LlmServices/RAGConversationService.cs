@@ -1,4 +1,5 @@
 ﻿using Azure.Search.Documents.Models;
+using DocumentFormat.OpenXml.InkML;
 using Microsoft.AspNetCore.Http;
 using Microsoft.KernelMemory;
 using Microsoft.SemanticKernel;
@@ -7,6 +8,7 @@ using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.Common.Models.KernelMemory;
+using PostgreSQL.Embedding.Common.Models.RAG;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
@@ -30,6 +32,7 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly PromptTemplateService _promptTemplateService;
         private readonly ILogger<RAGConversationService> _logger;
         private readonly string _promptTemplate;
+        private readonly string _rewritePromptTemplate;
         private readonly float _minRelevance = 0;
         private readonly int _limit = 5;
         private string _conversationId;
@@ -51,6 +54,7 @@ namespace PostgreSQL.Embedding.LlmServices
             _memoryService = memoryService;
             _promptTemplateService = _serviceProvider.GetService<PromptTemplateService>();
             _promptTemplate = _promptTemplateService.LoadPromptTemplate("RAGPrompt.txt");
+            _rewritePromptTemplate = _promptTemplateService.LoadPromptTemplate("RewritePrompt.txt");
             _chatHistoryService = chatHistoryService;
             _logger = _serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<RAGConversationService>();
         }
@@ -106,7 +110,7 @@ namespace PostgreSQL.Embedding.LlmServices
             var func = _kernel.CreateFunctionFromPrompt(_promptTemplate, settings);
             var chatResult = await _kernel.InvokeAsync(
                 function: func,
-                arguments: new KernelArguments() { ["context"] = context, ["name"] = "ChatGPT", ["question"] = input }
+                arguments: new KernelArguments() { ["context"] = context, ["name"] = "ChatGPT", ["empty_answer"] = Common.Constants.DefaultEmptyAnswer, ["question"] = input }
             );
 
             var answer = chatResult.GetValue<string>();
@@ -166,19 +170,26 @@ namespace PostgreSQL.Embedding.LlmServices
         /// </summary>
         /// <param name="input"></param>
         /// <returns></returns>
-        private async Task<string> BuildKnowledgeContext(string input)
+        private async Task<string> BuildKnowledgeContext(string question)
         {
             var searchResults = new List<KMCitation>();
             var llmKappKnowledges = await _llmAppKnowledgeRepository.FindAsync(x => x.AppId == _app.Id);
             if (llmKappKnowledges.Any())
             {
+                var inputs = new List<string> { question };
+                var similarQuestions = await RewriteAsync(question);
+                _logger.LogInformation($"完成用户输入重写，共生成{similarQuestions.Count}个相似问题.");
+                if (similarQuestions.Any()) { inputs.AddRange(similarQuestions); }
                 foreach (var appKnowledge in llmKappKnowledges)
                 {
                     var knowledgeBase = await _knowledgeBaseRepository.GetAsync(appKnowledge.KnowledgeBaseId);
                     if (knowledgeBase == null) continue;
 
-                    var searchResult = await RetrieveAsync(knowledgeBase, _memoryService, input);
-                    if (searchResult.Any()) searchResults.AddRange(searchResult);
+                    foreach (var input in inputs)
+                    {
+                        var retrieveResult = await RetrieveAsync(knowledgeBase, _memoryService, input);
+                        if (retrieveResult != null && retrieveResult.Any()) searchResults.AddRange(retrieveResult);
+                    }
                 }
             }
 
@@ -190,6 +201,8 @@ namespace PostgreSQL.Embedding.LlmServices
                 Relevance = x.Relevance,
                 Text = x.Text
             })
+            .OrderByDescending(x => x.Relevance)
+            .Take(10)
             .ToList();
 
             var maxRelevance = chunks.Max(x => x.Relevance);
@@ -202,10 +215,11 @@ namespace PostgreSQL.Embedding.LlmServices
 
         private async Task<List<KMCitation>> RetrieveAsync(KnowledgeBase knowledgeBase, IMemoryService memoryService, string question)
         {
+            using var serviceScope = _serviceProvider.CreateScope();
             if (knowledgeBase.RetrievalType == (int)RetrievalType.Vectors)
             {
                 // 向量检索
-                var knowledgeBaseService = _memoryService.AsKnowledgeBaseService(_serviceProvider);
+                var knowledgeBaseService = _memoryService.AsKnowledgeBaseService(serviceScope.ServiceProvider);
                 var searchResult = await knowledgeBaseService.SearchAsync(knowledgeBase.Id, question, _minRelevance, _limit);
                 return searchResult.RelevantSources;
 
@@ -213,7 +227,7 @@ namespace PostgreSQL.Embedding.LlmServices
             else if (knowledgeBase.RetrievalType == (int)RetrievalType.FullText)
             {
                 // 全文检索
-                var fullTextService = _memoryService.AsFullTextSearchService(_serviceProvider);
+                var fullTextService = _memoryService.AsFullTextSearchService(serviceScope.ServiceProvider);
                 var searchResult = await fullTextService.SearchAsync(knowledgeBase.Id, question, _minRelevance, _limit);
                 return searchResult.RelevantSources;
             }
@@ -221,15 +235,42 @@ namespace PostgreSQL.Embedding.LlmServices
             {
                 // 混合检索
                 var searchResults = new List<KMCitation>();
-                var knowledgeBaseService = _memoryService.AsKnowledgeBaseService(_serviceProvider);
+                var knowledgeBaseService = _memoryService.AsKnowledgeBaseService(serviceScope.ServiceProvider);
                 var vectorSearchResult = await knowledgeBaseService.SearchAsync(knowledgeBase.Id, question, _minRelevance, _limit);
                 if (vectorSearchResult.RelevantSources.Any()) searchResults.AddRange(vectorSearchResult.RelevantSources);
 
-                var fullTextService = _memoryService.AsFullTextSearchService(_serviceProvider);
+                var fullTextService = _memoryService.AsFullTextSearchService(serviceScope.ServiceProvider);
                 var fullTextSearchResult = await fullTextService.SearchAsync(knowledgeBase.Id, question, _minRelevance, _limit);
                 if (fullTextSearchResult.RelevantSources.Any()) searchResults = fullTextSearchResult.RelevantSources;
 
                 return searchResults;
+            }
+        }
+
+        private async Task<List<string>> RewriteAsync(string question)
+        {
+            var similarQuestions = new List<string>();
+            try
+            {
+                var settings = new OpenAIPromptExecutionSettings() { Temperature = 0f };
+
+                var func = _kernel.CreateFunctionFromPrompt(_rewritePromptTemplate, settings);
+                var invokeResult = await _kernel.InvokeAsync(
+                function: func,
+                    arguments: new KernelArguments() { ["question"] = question }
+                );
+
+                var payload = invokeResult.GetValue<string>();
+                if (string.IsNullOrEmpty(payload)) return similarQuestions;
+
+                payload = payload.Replace("```json", "").Replace("```", "");
+                var llmRewriteResult = JsonConvert.DeserializeObject<LlmRewriteResult>(payload);
+                return llmRewriteResult.Output;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "The rewrite flow has been stoped due to unexpected reason: {0}", ex.Message);
+                return similarQuestions;
             }
         }
     }
