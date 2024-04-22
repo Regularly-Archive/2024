@@ -78,7 +78,9 @@ namespace PostgreSQL.Embedding.Controllers
             {
                 if (file.Length <= 0) continue;
 
-                var filePath = Path.Combine(_webHostEnvironment.ContentRootPath, embeddingTaskId, file.FileName);
+                var filePath = Path.Combine(_webHostEnvironment.ContentRootPath, "Upload", embeddingTaskId, file.FileName);
+                var filePathDir = Path.GetDirectoryName(filePath);
+                if (!Directory.Exists(filePathDir)) Directory.CreateDirectory(filePathDir);
                 using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write);
                 await file.CopyToAsync(fileStream);
                 uploadedFiles.Add(filePath);

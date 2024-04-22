@@ -119,6 +119,7 @@ builder.Services.Configure<LlmConfig>(builder.Configuration.GetSection(nameof(Ll
 builder.Services.Configure<JwtSetting>(builder.Configuration.GetSection(nameof(JwtSetting)));
 builder.Services.AddSingleton<ILlmServiceFactory, LlmServiceFactory>();
 builder.Services.AddScoped<IKnowledgeBaseService, KnowledgeBaseService>();
+builder.Services.AddScoped<IKnowledgeBaseTaskQueueService, KnowledgeBaseTaskQueueService>();
 builder.Services.AddScoped<PromptTemplateService>();
 builder.Services.AddMinio(minioClient =>
 {
@@ -128,8 +129,8 @@ builder.Services.AddMinio(minioClient =>
         .WithCredentials(minioConfig["AccessKey"], minioConfig["SecretKey"])
         .WithSSL(false);
 });
-builder.Services.AddSingleton<KnowledgeImportingQueueService>();
-builder.Services.AddHostedService<KnowledgeImportingQueueService>();
+builder.Services.AddSingleton<KnowledgeBaseBackgroundService>();
+builder.Services.AddHostedService<KnowledgeBaseBackgroundService>();
 builder.Services.AddSingleton<EnumValuesConverter>();
 builder.Services.AddScoped<IFullTextSearchService, FullTextSearchService>();
 builder.Services.AddScoped<IFileStorageService, MinioFileStorageService>();
