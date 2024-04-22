@@ -69,7 +69,7 @@ namespace PostgreSQL.Embedding.LlmServices
                 })
                 .WithSearchClientConfig(new SearchClientConfig()
                 {
-                    EmptyAnswer = "抱歉，我无法回答你的问题！"
+                    EmptyAnswer = Common.Constants.DefaultEmptyAnswer
                 });
 
             return memoryBuilder.Build<MemoryServerless>();
@@ -121,7 +121,7 @@ namespace PostgreSQL.Embedding.LlmServices
                 })
                 .WithSearchClientConfig(new SearchClientConfig()
                 {
-                    EmptyAnswer = "抱歉，我无法回答你的问题！"
+                    EmptyAnswer = Common.Constants.DefaultEmptyAnswer
                 });
 
             return memoryBuilder.Build<MemoryServerless>();

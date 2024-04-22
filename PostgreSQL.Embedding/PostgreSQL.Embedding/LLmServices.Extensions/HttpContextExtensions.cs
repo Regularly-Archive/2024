@@ -28,7 +28,10 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
         public static async Task WriteEmbedding(this Microsoft.AspNetCore.Http.HttpContext context, List<float> embedding)
         {
             var result = new OpenAICompatibleEmbeddingResult();
-            result.Data.Add(new OpenAICompatibleEmbeddingDataModel() { Index = 0, Embedding = embedding });
+            result.Data = new List<OpenAICompatibleEmbeddingDataModel>()
+            {
+                new OpenAICompatibleEmbeddingDataModel() { Index = 0, Embedding = embedding }
+            };
             if (!context.Response.HasStarted) context.Response.ContentType = "application/json";
             await context.Response.WriteAsync(JsonConvert.SerializeObject(result));
             await context.Response.CompleteAsync();

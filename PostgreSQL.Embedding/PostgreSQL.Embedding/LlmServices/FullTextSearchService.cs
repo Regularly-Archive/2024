@@ -71,7 +71,7 @@ namespace PostgreSQL.Embedding.LlmServices
             var func = kernel.CreateFunctionFromPrompt(promptTemplate, settings);
             var chatResult = await kernel.InvokeAsync<string>(
                 function: func,
-                arguments: new KernelArguments() { ["context"] = context, ["name"] = "ChatGPT", ["question"] = question }
+                arguments: new KernelArguments() { ["context"] = context, ["name"] = "ChatGPT", ["empty_answer"] = Common.Constants.DefaultEmptyAnswer, ["question"] = question }
             );
 
             result.Answer = chatResult;
