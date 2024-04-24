@@ -4,6 +4,7 @@ using LLamaSharp.KernelMemory;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Azure;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.KernelMemory;
 using Microsoft.KernelMemory.Postgres;
@@ -15,6 +16,7 @@ using PostgreSQL.Embedding.Common.Middlewares;
 using PostgreSQL.Embedding.Common.Settings;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.Handlers;
+using PostgreSQL.Embedding.Hubs;
 using PostgreSQL.Embedding.LlmServices;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.LLmServices.Extensions;
@@ -37,6 +39,20 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtSetting:Secret"])),
                     ValidateIssuer = false,
                     ValidateAudience = false
+                };
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        var accessToken = context.Request.Query["access_token"];
+                        var path = context.HttpContext.Request.Path;
+                        if (!string.IsNullOrEmpty(accessToken) &&
+                            (path.StartsWithSegments("/hubs/notificationHub")))
+                        {
+                            context.Token = accessToken;
+                        }
+                        return Task.CompletedTask;
+                    }
                 };
             });
 
@@ -82,6 +98,8 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 });
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<INotificationService, NotificationService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<IConversationService, ConversationService>();
@@ -134,6 +152,7 @@ builder.Services.AddHostedService<KnowledgeBaseBackgroundService>();
 builder.Services.AddSingleton<EnumValuesConverter>();
 builder.Services.AddScoped<IFullTextSearchService, FullTextSearchService>();
 builder.Services.AddScoped<IFileStorageService, MinioFileStorageService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(builder =>
@@ -159,6 +178,7 @@ app.UseAuthentication();
 
 app.UseAuthorization();
 
+app.MapHub<NotificationHub>("/hubs/notificationHub");
 app.MapControllers().RequireAuthorization();
 
 app.Run();

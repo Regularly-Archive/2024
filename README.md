@@ -9,3 +9,4 @@ Non-formal Project of 2024
 * PostgreSQL.Embedding - 基于 Semantic Kernel 的 AI 应用
 * SK.Training - Semantic Kernel 培训示例代码
 * hf-api - 一个尝试使用 Transformer 来构建 OpenAI Style API 的 FastAPI 项目
+* JsonSchemaValidator - 一个使用 JSON Schema 来校验 JSON 数据的示例

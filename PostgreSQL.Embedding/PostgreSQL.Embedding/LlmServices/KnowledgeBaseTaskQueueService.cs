@@ -5,6 +5,8 @@ using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
+using PostgreSQL.Embedding.Services;
+using PostgreSQL.Embedding.Common.Models.Notification;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
@@ -13,7 +15,11 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly IServiceProvider _serviceProvider;
         private readonly IRepository<DocumentImportRecord> _importRecordRepository;
         private readonly ILogger<KnowledgeBaseTaskQueueService> _logger;
-        public KnowledgeBaseTaskQueueService(IServiceProvider serviceProvider, IRepository<DocumentImportRecord> importRecordRepository, ILogger<KnowledgeBaseTaskQueueService> logger)
+        public KnowledgeBaseTaskQueueService(
+            IServiceProvider serviceProvider, 
+            IRepository<DocumentImportRecord> importRecordRepository, 
+            ILogger<KnowledgeBaseTaskQueueService> logger
+            )
         {
             _serviceProvider = serviceProvider;
             _importRecordRepository = importRecordRepository;
@@ -166,10 +172,14 @@ namespace PostgreSQL.Embedding.LlmServices
             public static string GetCurrentStepName() => "update_quque_status";
 
             private readonly IRepository<DocumentImportRecord> _importRecordRepository;
+            private readonly INotificationService _notificationService;
+            private readonly IUserInfoService _userInfoService;
             private readonly ILogger<UpdateQueueStatusHandler> _logger;
             public UpdateQueueStatusHandler(IServiceProvider serviceProvider, ILogger<UpdateQueueStatusHandler> logger)
             {
                 _importRecordRepository = serviceProvider.GetService<IRepository<DocumentImportRecord>>();
+                _userInfoService = serviceProvider.GetService<IUserInfoService>();
+                _notificationService = serviceProvider.GetRequiredService<INotificationService>();
                 _logger = logger;
             }
 
@@ -189,6 +199,12 @@ namespace PostgreSQL.Embedding.LlmServices
                     record.ProcessDuartionTime = totalSeconds;
                     await _importRecordRepository?.UpdateAsync(record);
                     _logger.LogInformation($"Importing document '{fileName}' finished in {totalSeconds} seconds.");
+
+                    var currentUser = _userInfoService.GetCurrentUser();
+                    await _notificationService.SendTo("admin", new DocumentReadyEvent()
+                    {
+                        Content = $"文档 '{record.FileName}' 解析完成！"
+                    });
                 }
 
                 return (true, pipeline);
