@@ -178,7 +178,7 @@ namespace PostgreSQL.Embedding.LlmServices
             {
                 var inputs = new List<string> { question };
                 var similarQuestions = await RewriteAsync(question);
-                _logger.LogInformation($"完成用户输入重写，共生成{similarQuestions.Count}个相似问题.");
+                _logger.LogInformation($"完成用户输入重写，共生成{similarQuestions.Count}个相似问题：{JsonConvert.SerializeObject(similarQuestions)}.");
                 if (similarQuestions.Any()) { inputs.AddRange(similarQuestions); }
                 foreach (var appKnowledge in llmKappKnowledges)
                 {
