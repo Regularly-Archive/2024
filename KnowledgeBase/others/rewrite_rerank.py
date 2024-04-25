@@ -2,8 +2,7 @@ from langchain_community.vectorstores import Chroma
 from langchain_openai import ChatOpenAI
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.prompts.prompt import PromptTemplate
-from langchain.memory import ConversationBufferMemory
-from langchain.chains import ConversationalRetrievalChain, LLMChain
+from langchain.chains import LLMChain
 from rich.console import Console
 from rich.prompt import Prompt
 from langchain.text_splitter import RecursiveCharacterTextSplitter
