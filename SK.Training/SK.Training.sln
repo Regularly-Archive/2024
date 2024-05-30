@@ -7,7 +7,12 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SK.BasicChat", "SK.BasicCha
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SK.Plugins", "SK.Plugins\SK.Plugins.csproj", "{4C7AC1FE-111A-4EC4-9522-28B6EC3F4F5A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SK.RAG", "SK.RAG\SK.RAG.csproj", "{6DEE8FF7-354F-40E2-A8D9-D7DB12D3FF82}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SK.RAG", "SK.RAG\SK.RAG.csproj", "{6DEE8FF7-354F-40E2-A8D9-D7DB12D3FF82}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{C5036E27-E9A2-4A2C-997B-A573A2755C01}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
