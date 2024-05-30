@@ -30,7 +30,7 @@ namespace SK.RAG
             var openaiConfig = new OpenAIConfig()
             {
                 APIKey = "",
-                EmbeddingModel = "GanymedeNil/text2vec-large-chinese",
+                EmbeddingModel = "BAAI/bge-base-zh-v1.5",
                 TextModel = "gpt-3.5-turbo"
             };
 
@@ -100,7 +100,7 @@ namespace SK.RAG
                 {
                     foreach (var part in citation.Partitions)
                     {
-                        contextBuilder.AppendLine($"fileName:{citation.SourceName}; Relevance:{(part.Relevance * 100).ToString("F2")}%; Content: {part.Text}");
+                        contextBuilder.AppendLine($"fileName:{citation.SourceName}; Relevance:{(part.Relevance * 100).ToString("F2")}%; Content: {part.Text}\r\n");
                     }
                 }
 
@@ -114,10 +114,14 @@ namespace SK.RAG
         {
             var memoryServerless = GetMemoryServerless();
 
+            var openaiProxyHandler = new OpenAIProxyHandler("https://api.moonshot.cn/v1/chat/completions");
+            var httpClient = new HttpClient(openaiProxyHandler);
+
             var kernel = Kernel.CreateBuilder()
                 .AddOpenAIChatCompletion(
-                    modelId: "gpt-3.5-turbo",
-                    apiKey: ""
+                    modelId: "moonshot-v1-8k",
+                    apiKey: "",
+                    httpClient: httpClient
                 )
                 .Build();
 
@@ -164,8 +168,9 @@ namespace SK.RAG
                 }
                 Console.Write("\r\n");
 
-
-                Console.Write($"引用文档：\r\n{context}\r\n");
+                Console.ForegroundColor = ConsoleColor.Blue;
+                Console.Write($"引用文档：\r\n {context}\r\n");
+                Console.ResetColor();
             }
         }
     }

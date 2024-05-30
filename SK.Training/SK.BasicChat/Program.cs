@@ -29,6 +29,7 @@ public class Program
         var openaiProxyHandler = new OpenAIProxyHandler("https://api.moonshot.cn/v1/chat/completions");
         var httpClient = new HttpClient(openaiProxyHandler);
 
+
         var kernel = Kernel.CreateBuilder()
             .AddOpenAIChatCompletion(
                 modelId: "moonshot-v1-8k",
