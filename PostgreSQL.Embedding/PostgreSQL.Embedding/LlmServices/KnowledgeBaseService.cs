@@ -1,14 +1,7 @@
-﻿using DocumentFormat.OpenXml.Spreadsheet;
-using Irony.Parsing;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
-using Microsoft.KernelMemory;
-using Microsoft.KernelMemory.Handlers;
-using Microsoft.KernelMemory.Pipeline;
+﻿using Microsoft.KernelMemory;
+using Newtonsoft.Json;
 using Npgsql;
 using PostgreSQL.Embedding.Common;
-using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.Common.Models.KernelMemory;
 using PostgreSQL.Embedding.Common.Models.WebApi;
 using PostgreSQL.Embedding.DataAccess;
@@ -16,8 +9,7 @@ using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.Utils;
 using SqlSugar;
-using System.Text;
-using Constants = PostgreSQL.Embedding.Common.Constants;
+using System.ServiceModel.Syndication;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
@@ -94,6 +86,14 @@ namespace PostgreSQL.Embedding.LlmServices
             return pageResult;
         }
 
+        /// <summary>
+        /// 获取文档分块信息总数
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <param name="tableName"></param>
+        /// <param name="knowledgeBaseId"></param>
+        /// <param name="fileName"></param>
+        /// <returns></returns>
         private long GetKnowledgeBaseChunksCount(NpgsqlConnection connection, string tableName, long knowledgeBaseId, string fileName = null)
         {
             var sqlText = $"""SELECT COUNT(*) FROM "{tableName}" t WHERE t.tags @> ARRAY['{KernelMemoryTags.KnowledgeBaseId}:{knowledgeBaseId}']""";
@@ -105,6 +105,16 @@ namespace PostgreSQL.Embedding.LlmServices
             return count;
         }
 
+        /// <summary>
+        /// 文档分块信息分页查询
+        /// </summary>
+        /// <param name="connection"></param>
+        /// <param name="tableName"></param>
+        /// <param name="pageIndex"></param>
+        /// <param name="pageSize"></param>
+        /// <param name="knowledgeBaseId"></param>
+        /// <param name="fileName"></param>
+        /// <returns></returns>
         private List<KMPartition> GetKnowledgeBaseChunksPageList(NpgsqlConnection connection, string tableName, int pageIndex, int pageSize, long knowledgeBaseId, string fileName = null)
         {
             // 拼接 SQL 语句，按标签进行过滤
@@ -187,20 +197,43 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <param name="knowledgeBaseId">知识库ID</param>
         /// <param name="url">网址</param>
         /// <returns></returns>
-        public async Task ImportKnowledgeFromUrl(string taskId, long knowledgeBaseId, string url)
+        public async Task ImportKnowledgeFromUrl(string taskId, long knowledgeBaseId, string url, int urlType, string contentSelector)
         {
             // 查询知识库
             var knowledgeBase = await GetKnowledgeBaseById(knowledgeBaseId);
-            var webPageTitle = await WebPageTitleFetcher.GetWebPageTitleAsync(url);
-            await _importRecordRepository.AddAsync(new DocumentImportRecord()
+            if (urlType == (int)UrlType.Generic)
             {
-                TaskId = taskId,
-                FileName = webPageTitle ?? Guid.NewGuid().ToString("N"),
-                QueueStatus = (int)QueueStatus.Uploaded,
-                KnowledgeBaseId = knowledgeBaseId,
-                DocumentType = (int)DocumentType.Url,
-                Content = url,
-            });
+                var extractionResult = await WebPageExtractor.ExtractWebPageAsync(url, contentSelector);
+                await _importRecordRepository.AddAsync(new DocumentImportRecord()
+                {
+                    TaskId = taskId,
+                    FileName = extractionResult.Title ?? Guid.NewGuid().ToString("N"),
+                    QueueStatus = (int)QueueStatus.Uploaded,
+                    KnowledgeBaseId = knowledgeBaseId,
+                    DocumentType = (int)DocumentType.Url,
+                    Content = JsonConvert.SerializeObject(extractionResult),
+                });
+            }
+            else if (urlType == (int)UrlType.RSS)
+            {
+                var extractionResults = await RSSExtractor.ExtractAsync(url);
+                foreach (var extractionResult in extractionResults)
+                {
+                    await _importRecordRepository.AddAsync(new DocumentImportRecord()
+                    {
+                        TaskId = taskId,
+                        FileName = extractionResult.Title,
+                        QueueStatus = (int)QueueStatus.Uploaded,
+                        KnowledgeBaseId = knowledgeBaseId,
+                        DocumentType = (int)DocumentType.Url,
+                        Content = JsonConvert.SerializeObject(extractionResult)
+                    });
+                }
+            }
+            else if (urlType == (int)UrlType.Sitemap)
+            {
+
+            }
         }
 
         public async Task DeleteKnowledgeBaseChunksById(long knowledgeBaseId)

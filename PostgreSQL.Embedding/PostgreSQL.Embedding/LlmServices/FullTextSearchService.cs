@@ -12,6 +12,7 @@ using System.Collections.Immutable;
 using System.Text;
 using static Microsoft.KernelMemory.Citation;
 using Newtonsoft.Json;
+using static Azure.Core.HttpHeader;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
@@ -66,13 +67,14 @@ namespace PostgreSQL.Embedding.LlmServices
             var context = BuildKnowledgeContext(searchResult);
 
             var promptTemplate = _promptTemplateService.LoadPromptTemplate("RAGPrompt.txt");
+            promptTemplate.AddVariable("name", "ChatGPT");
+            promptTemplate.AddVariable("context", context);
+            promptTemplate.AddVariable("question", question);
+            promptTemplate.AddVariable("empty_answer", Common.Constants.DefaultEmptyAnswer);
 
-            var settings = new OpenAIPromptExecutionSettings () { Temperature = 0.75 };
-            var func = kernel.CreateFunctionFromPrompt(promptTemplate, settings);
-            var chatResult = await kernel.InvokeAsync<string>(
-                function: func,
-                arguments: new KernelArguments() { ["context"] = context, ["name"] = "ChatGPT", ["empty_answer"] = Common.Constants.DefaultEmptyAnswer, ["question"] = question }
-            );
+
+            var executionSettings = new OpenAIPromptExecutionSettings () { Temperature = 0.75 };
+            var chatResult = await promptTemplate.InvokeAsync<string>(kernel, executionSettings);
 
             result.Answer = chatResult;
             return result;

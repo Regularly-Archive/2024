@@ -30,6 +30,12 @@ namespace PostgreSQL.Embedding.DataAccess.Entities
         [SugarColumn(ColumnName = "temperature")]
         public decimal Temperature { get; set; }
 
+        [SugarColumn(ColumnName = "enable_rewrite", IsNullable = false, DefaultValue = "FALSE")]
+        public bool EnableRewrite { get; set; }
+
+        [SugarColumn(ColumnName = "enable_rerank", IsNullable = false, DefaultValue = "FALSE")]
+        public bool EnableRerank { get; set; }
+
         [SugarColumn(IsIgnore = true)]
         public List<long> KnowledgeBaseIds { get; set; }
     }

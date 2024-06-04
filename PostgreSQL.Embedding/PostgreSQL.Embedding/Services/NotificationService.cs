@@ -19,17 +19,25 @@ namespace PostgreSQL.Embedding.Services
             {
                 ContractResolver = new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver()
             };
-            var payload = JsonConvert.SerializeObject(@event, Formatting.Indented, serializerSettings);
+
+            var message = new { Type = typeof(TEvent).Name, Data = @event };
+
+            var payload = JsonConvert.SerializeObject(message, Formatting.Indented, serializerSettings);
+
             await _hubContext.Clients.All.SendAsync("Broadcast", payload);
         }
 
         public async Task SendTo<TEvent>(string userId, TEvent @event) where TEvent : EventBase
         {
-            var serializerSettings = new JsonSerializerSettings 
-            { 
-                ContractResolver = new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver() 
+            var serializerSettings = new JsonSerializerSettings
+            {
+                ContractResolver = new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver()
             };
-            var payload = JsonConvert.SerializeObject(@event, Formatting.Indented, serializerSettings);
+
+            var message = new { Type = typeof(TEvent).Name, Data = @event };
+
+            var payload = JsonConvert.SerializeObject(message, Formatting.Indented, serializerSettings);
+
             await _hubContext.Clients.Group(userId).SendAsync("Notification", payload);
         }
     }

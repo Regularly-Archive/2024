@@ -2,9 +2,12 @@
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Plugins.Core;
 using PostgreSQL.Embedding.Common;
+using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
+using PostgreSQL.Embedding.Utils;
+using System.Reflection;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
@@ -38,6 +41,9 @@ namespace PostgreSQL.Embedding.LlmServices
 
             kernel.Plugins.AddFromType<ConversationSummaryPlugin>();
             kernel.Plugins.AddFromType<TimePlugin>();
+
+            kernel = kernel.ImportLlmPlugins(_serviceProvider);
+
             return Task.FromResult(kernel);
         }
     }
