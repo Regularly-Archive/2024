@@ -5,12 +5,14 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Azure;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.KernelMemory;
 using Microsoft.KernelMemory.Postgres;
 using Microsoft.OpenApi.Models;
 using Minio;
 using PostgreSQL.Embedding.Common;
+using PostgreSQL.Embedding.Common.Confirguration;
 using PostgreSQL.Embedding.Common.Converters;
 using PostgreSQL.Embedding.Common.Middlewares;
 using PostgreSQL.Embedding.Common.Settings;
@@ -25,6 +27,7 @@ using SqlSugar;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Unicode;
+using PostgreSQL.Embedding.Utils;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -106,6 +109,9 @@ builder.Services.AddScoped<IConversationService, ConversationService>();
 builder.Services.AddScoped<IUserInfoService, UserInfoService>();
 builder.Services.AddScoped<IKernelService, KernalService>();
 builder.Services.AddScoped<IMemoryService, PostgreSQL.Embedding.LlmServices.MemoryService>();
+builder.Services.AddScoped<IImportingTaskHandler, FileImportingTaskHandler>();
+builder.Services.AddScoped<IImportingTaskHandler, TextImportingTaskHandler>();
+builder.Services.AddScoped<IImportingTaskHandler, UrlImportingTaskHandler>();
 
 // Todo: 需要实现按指定模型加载
 builder.Services.AddSingleton<LLamaEmbedder>(sp =>
@@ -135,6 +141,7 @@ builder.Services.AddScoped<IChatHistoryService, ChatHistoryService>();
 builder.Services.AddLLama().AddHuggingFace();
 builder.Services.Configure<LlmConfig>(builder.Configuration.GetSection(nameof(LlmConfig)));
 builder.Services.Configure<JwtSetting>(builder.Configuration.GetSection(nameof(JwtSetting)));
+builder.Services.Configure<PythonConfig>(builder.Configuration.GetSection(nameof(PythonConfig)));
 builder.Services.AddSingleton<ILlmServiceFactory, LlmServiceFactory>();
 builder.Services.AddScoped<IKnowledgeBaseService, KnowledgeBaseService>();
 builder.Services.AddScoped<IKnowledgeBaseTaskQueueService, KnowledgeBaseTaskQueueService>();
@@ -153,6 +160,7 @@ builder.Services.AddSingleton<EnumValuesConverter>();
 builder.Services.AddScoped<IFullTextSearchService, FullTextSearchService>();
 builder.Services.AddScoped<IFileStorageService, MinioFileStorageService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddSingleton<IRerankService, BgeRerankService>();
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(builder =>
@@ -163,6 +171,7 @@ builder.Services.AddCors(options =>
                 .AllowCredentials();
     });
 });
+builder.Services.RegisterLlmPlugins();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -173,6 +182,11 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors();
+app.UseStaticFiles(new StaticFileOptions()
+{
+    FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.ContentRootPath)),
+    RequestPath = "/statics"
+});
 
 app.UseAuthentication();
 
