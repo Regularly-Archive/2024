@@ -11,7 +11,7 @@ namespace PostgreSQL.Embedding.LlmServices.Abstration
         Task<KnowledgeBase> CreateKnowledgeBase(KnowledgeBase knowledgeBase);
         Task UpdateKnowledgeBase(KnowledgeBase knowledgeBase);
         Task ImportKnowledgeFromFiles(string taskId, long knowledgeBaseId, IEnumerable<string> files);
-        Task ImportKnowledgeFromUrl(string taskId, long knowledgeBaseId, string url);
+        Task ImportKnowledgeFromUrl(string taskId, long knowledgeBaseId, string url, int urltype, string contentSelector);
         Task ImportKnowledgeFromText(string taskId, long knowledgeBaseId, string text);
         Task DeleteKnowledgeBaseChunksById(long knowledgeBaseId);
         Task DeleteKnowledgeBaseChunksByFileName(long knowledgeBaseId, string fileName);

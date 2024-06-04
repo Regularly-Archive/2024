@@ -15,26 +15,30 @@ namespace PostgreSQL.Embedding.LlmServices
             _appConversationRepository = appConversationRepository;
         }
 
-        public Task AddSystemMessage(long appId, string conversationId, string content)
+        public async Task<long> AddSystemMessage(long appId, string conversationId, string content)
         {
-            return _chatMessageRepository.AddAsync(new ChatMessage()
+            var message = await _chatMessageRepository.AddAsync(new ChatMessage()
             {
                 AppId = appId,
                 ConversationId = conversationId,
                 Content = content,
                 IsUserMessage = false
             });
+
+            return message.Id;
         }
 
-        public Task AddUserMessage(long appId, string conversationId, string content)
+        public async Task<long> AddUserMessage(long appId, string conversationId, string content)
         {
-            return _chatMessageRepository.AddAsync(new ChatMessage()
+            var message = await _chatMessageRepository.AddAsync(new ChatMessage()
             {
                 AppId = appId,
                 ConversationId = conversationId,
                 Content = content,
                 IsUserMessage = true
             });
+
+            return message.Id;
         }
 
         public Task<List<AppConversation>> GetAppConversations(long appId)
@@ -73,6 +77,11 @@ namespace PostgreSQL.Embedding.LlmServices
 
             conversation.Summary = summary;
             await _appConversationRepository.UpdateAsync(conversation);
+        }
+
+        public Task DeleteConversationMessage(long messageId)
+        {
+            return _chatMessageRepository.DeleteAsync(messageId);
         }
     }
 }

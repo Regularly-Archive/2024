@@ -37,6 +37,9 @@ namespace PostgreSQL.Embedding.Controllers
             _sqlSugarClient.CodeFirst.InitTables(typeof(TablePrefixMapping));
             _sqlSugarClient.CodeFirst.InitTables(typeof(AppConversation));
             _sqlSugarClient.CodeFirst.InitTables(typeof(FileStorage));
+            _sqlSugarClient.CodeFirst.InitTables(typeof(SystemMessage));
+            _sqlSugarClient.CodeFirst.InitTables(typeof(LlmPlugin));
+            _sqlSugarClient.CodeFirst.InitTables(typeof(LlmAppPlugin));
             _sqlSugarClient.Ado.ExecuteCommandAsync($"CREATE EXTENSION IF NOT EXISTS vector;");
             return Ok();
         }

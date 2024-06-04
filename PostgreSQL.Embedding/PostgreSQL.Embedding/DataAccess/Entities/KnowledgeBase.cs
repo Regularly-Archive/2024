@@ -28,5 +28,11 @@ namespace PostgreSQL.Embedding.DataAccess.Entities
 
         [SugarColumn(ColumnName = "retrieval_type", DefaultValue = "0")]
         public int? RetrievalType { get; set; }
+
+        [SugarColumn(ColumnName = "retrieval_limit", IsNullable = true)]
+        public int? RetrievalLimit { get; set; }
+
+        [SugarColumn(ColumnName = "retrieval_relevance", IsNullable = true)]
+        public decimal? RetrievalRelevance { get; set; }
     }
 }

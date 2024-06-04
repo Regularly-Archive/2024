@@ -55,8 +55,8 @@ namespace PostgreSQL.Embedding.Controllers
               })
               .Skip((pageIndex - 1) * pageSize)
               .Take(pageSize)
+              .OrderByDescending(r => r.CreatedAt)
               .ToListAsync())
-              .OrderByDescending(x => x.CreatedAt)
               .ToList();
 
             var total = await _crudBaseService.Repository.CountAsync();
