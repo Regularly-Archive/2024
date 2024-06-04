@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Microsoft.SemanticKernel;
+using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.LlmServices.LLama;
@@ -63,7 +64,7 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
             await context.Response.CompleteAsync();
         }
 
-        public static async Task WriteStreamingChatCompletion(this Microsoft.AspNetCore.Http.HttpContext context, IAsyncEnumerable<string> text)
+        public static async Task WriteStreamingChatCompletion(this Microsoft.AspNetCore.Http.HttpContext context, IAsyncEnumerable<string> texts)
         {
             var result = new OpenAIStreamResult();
             result.choices = new List<StreamChoicesModel>() 
@@ -71,9 +72,29 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
                 new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant" } } 
             };
 
-            await foreach (var r in text)
+            await foreach (var text in texts)
             {
-                result.choices[0].delta.content = r == null ? string.Empty : Convert.ToString(r);
+                result.choices[0].delta.content = text == null ? string.Empty : Convert.ToString(text);
+                string message = $"data: {JsonConvert.SerializeObject(result)}\n\n";
+                await context.Response.WriteAsync(message, Encoding.UTF8);
+                await context.Response.Body.FlushAsync();
+            }
+            await context.Response.WriteAsync("data: [DONE]");
+            await context.Response.Body.FlushAsync();
+            await context.Response.CompleteAsync();
+        }
+
+        public static async Task WriteStreamingChatCompletion(this Microsoft.AspNetCore.Http.HttpContext context, IAsyncEnumerable<StreamingChatMessageContent> texts)
+        {
+            var result = new OpenAIStreamResult();
+            result.choices = new List<StreamChoicesModel>()
+            {
+                new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant" } }
+            };
+
+            await foreach (var text in texts)
+            {
+                result.choices[0].delta.content = text.Content ?? string.Empty;
                 string message = $"data: {JsonConvert.SerializeObject(result)}\n\n";
                 await context.Response.WriteAsync(message, Encoding.UTF8);
                 await context.Response.Body.FlushAsync();

@@ -35,5 +35,10 @@ namespace PostgreSQL.Embedding.Common.Models.KernelMemory
 
             return val.FirstOrDefault();
         }
+
+        public void SetRelevance(float relevance)
+        {
+            Relevance = relevance;
+        }
     }
 }
