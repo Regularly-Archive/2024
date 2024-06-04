@@ -13,14 +13,14 @@ namespace PostgreSQL.Embedding.Hubs
 
         public override async Task OnConnectedAsync()
         {
-            _logger.LogInformation($"The user ({Context.User.Identity.Name}) connected with connectionId: {Context.ConnectionId}.");
+            _logger.LogInformation($"The user '{Context.User.Identity.Name}' connected with connectionId '{Context.ConnectionId}'.");
             await Groups.AddToGroupAsync(Context.ConnectionId, Context.User.Identity.Name);
             await base.OnConnectedAsync();
         }
 
         public override async Task OnDisconnectedAsync(Exception exception)
         {
-            _logger.LogInformation($"The user ({Context.User.Identity.Name}) disconnected with connectionId: {Context.ConnectionId}.");
+            _logger.LogInformation($"The user '{Context.User.Identity.Name}' disconnected with connectionId '{Context.ConnectionId}'.");
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, Context.User.Identity.Name);
             await base.OnDisconnectedAsync(exception);
         }

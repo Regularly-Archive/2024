@@ -1,4 +1,5 @@
-﻿using Masuit.Tools.Security;
+﻿using Mapster;
+using Masuit.Tools.Security;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using PostgreSQL.Embedding.Common.Models.User;
@@ -19,7 +20,11 @@ namespace PostgreSQL.Embedding.Services
 
         Task RegisterAsync(Common.Models.User.RegisterRequest request);
 
+        Task<SystemUser> GetUserByIdAsync(long userId);
 
+        Task ChangePassword(ChangePasswordRequest request);
+
+        Task UpdateProfile(UpdateProfileRequest request);
     }
 
     public class UserInfoService : IUserInfoService
@@ -28,7 +33,11 @@ namespace PostgreSQL.Embedding.Services
         private readonly IRepository<SystemUser> _systemUserRepository;
         private readonly IOptions<JwtSetting> _jwtSettingOptions;
         private const string Default_AES_Key = "V2lraXRBZG1pbg==";
-        public UserInfoService(IHttpContextAccessor httpContextAccessor, IRepository<SystemUser> systemUserRepository, IOptions<JwtSetting> jwtSettingOptions)
+        public UserInfoService(
+            IHttpContextAccessor httpContextAccessor,
+            IRepository<SystemUser> systemUserRepository,
+            IOptions<JwtSetting> jwtSettingOptions
+        )
         {
             _httpContextAccessor = httpContextAccessor;
             _systemUserRepository = systemUserRepository;
@@ -51,12 +60,14 @@ namespace PostgreSQL.Embedding.Services
             return new LoginResult
             {
                 Token = token,
-                UserInfo = new UserInfo()
+                UserInfo = new Common.Models.User.UserInfo()
                 {
                     Id = userInfo.Id.ToString(),
                     UserName = userInfo.UserName,
-                    Role = new List<string> { "SA" },
+                    NickName = userInfo.NickName,
                     Avatar = userInfo.Avatar,
+                    Gender = userInfo.Gender,
+                    Role = new List<string> { "SA" },
                 }
             };
         }
@@ -73,6 +84,40 @@ namespace PostgreSQL.Embedding.Services
                 Password = encrypted,
             };
             await _systemUserRepository.AddAsync(newUser);
+        }
+
+        public async Task<SystemUser> GetUserByIdAsync(long userId)
+        {
+            var systemUser = await _systemUserRepository.GetAsync(userId);
+            if (systemUser == null) throw new ArgumentException("指定用户不存在");
+
+            return systemUser;
+        }
+
+        public async Task UpdateProfile(UpdateProfileRequest request)
+        {
+            var systemUser = await _systemUserRepository.GetAsync(request.Id);
+            if (systemUser == null) throw new ArgumentException("指定用户不存在"); ;
+
+            request.Adapt(systemUser);
+            await _systemUserRepository.UpdateAsync(systemUser);
+        }
+
+        public async Task ChangePassword(ChangePasswordRequest request)
+        {
+            var currentUserName = GetCurrentUser().Identity.Name;
+            if (currentUserName != request.UserName)
+                throw new ArgumentException("不允许修改他人密码");
+
+            var currentUser = await _systemUserRepository.SingleOrDefaultAsync(x => x.UserName == request.UserName);
+            if (currentUser == null) throw new ArgumentException("指定用户不存在");
+
+            if (request.OldPassword == request.NewPassword)
+                throw new ArgumentException("新/旧密码不能相同");
+
+            var encryptedPassword = request.NewPassword.AESEncrypt(Default_AES_Key);
+            currentUser.Password = encryptedPassword;
+            await _systemUserRepository.UpdateAsync(currentUser);
         }
 
         private string GenerateJwtToken(SystemUser systemUser)
