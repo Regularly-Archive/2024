@@ -2,6 +2,8 @@
 {
     public class UrlEmbeddingPayload
     {
-        public string Url {  get; set; }
+        public string Url { get; set; }
+        public int UrlType { get; set; }
+        public string Selector { get; set; }
     }
 }
