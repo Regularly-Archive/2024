@@ -1,11 +1,9 @@
 ﻿
 using Minio;
 using Minio.DataModel.Args;
-using Minio.DataModel.Tags;
 using PostgreSQL.Embedding.Common.Models.File;
-using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.DataAccess;
-using static Microsoft.KernelMemory.DataFormats.WebPages.WebScraper;
+using PostgreSQL.Embedding.DataAccess.Entities;
 
 namespace PostgreSQL.Embedding.Services
 {

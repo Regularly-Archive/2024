@@ -31,11 +31,10 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly IChatHistoryService _chatHistoryService;
         private readonly PromptTemplateService _promptTemplateService;
         private readonly ILogger<RAGConversationService> _logger;
-        private readonly string _promptTemplate;
-        private readonly string _rewritePromptTemplate;
-        private readonly float _minRelevance = 0;
-        private readonly int _limit = 5;
+        private readonly CallablePromptTemplate _promptTemplate;
+        private readonly CallablePromptTemplate _rewritePromptTemplate;
         private string _conversationId;
+        private readonly IRerankService _rerankService;
 
         public RAGConversationService(
             Kernel kernel,
@@ -57,6 +56,7 @@ namespace PostgreSQL.Embedding.LlmServices
             _rewritePromptTemplate = _promptTemplateService.LoadPromptTemplate("RewritePrompt.txt");
             _chatHistoryService = chatHistoryService;
             _logger = _serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<RAGConversationService>();
+            _rerankService = _serviceProvider.GetRequiredService<IRerankService>();
         }
 
         public async Task InvokeAsync(OpenAIModel model, HttpContext HttpContext, string input)
@@ -68,31 +68,12 @@ namespace PostgreSQL.Embedding.LlmServices
 
             if (model.stream)
             {
-                var stramingResult = new OpenAIStreamResult();
-                stramingResult.created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-                stramingResult.choices = new List<StreamChoicesModel>() { new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant" } } };
-                await InvokeWithKnowledgeStreaming(HttpContext, stramingResult, input);
-                if (!HttpContext.Response.HasStarted)
-                {
-                    HttpContext.Response.ContentType = "application/json";
-                }
-                await HttpContext.Response.WriteAsync(JsonConvert.SerializeObject(stramingResult));
-                await HttpContext.Response.CompleteAsync();
+                await InvokeWithKnowledgeStreaming(HttpContext, input);
             }
             else
             {
-                var result = new OpenAICompatibleResult();
-                result.Created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-                result.Choices = new List<OpenAICompatibleChoicesModel>() { new OpenAICompatibleChoicesModel() { message = new OpenAIMessage() { role = "assistant" } } };
-                result.Choices[0].message.content = await InvokeWithKnowledge(input);
-                if (!HttpContext.Response.HasStarted)
-                {
-                    HttpContext.Response.ContentType = "application/json";
-                }
-                await HttpContext.Response.WriteAsync(JsonConvert.SerializeObject(result));
-                await HttpContext.Response.CompleteAsync();
+                await InvokeWithKnowledge(HttpContext, input);
             }
-
         }
 
         /// <summary>
@@ -100,27 +81,25 @@ namespace PostgreSQL.Embedding.LlmServices
         /// </summary>
         /// <param name="input"></param>
         /// <returns></returns>
-        private async Task<string> InvokeWithKnowledge(string input)
+        private async Task InvokeWithKnowledge(HttpContext HttpContext, string input)
         {
             var context = await BuildKnowledgeContext(input);
 
             var temperature = _app.Temperature / 100;
-            var settings = new OpenAIPromptExecutionSettings() { Temperature = (double)temperature };
+            var executionSettings = new OpenAIPromptExecutionSettings() { Temperature = (double)temperature };
 
-            var func = _kernel.CreateFunctionFromPrompt(_promptTemplate, settings);
-            var chatResult = await _kernel.InvokeAsync(
-                function: func,
-                arguments: new KernelArguments() { ["context"] = context, ["name"] = "ChatGPT", ["empty_answer"] = Common.Constants.DefaultEmptyAnswer, ["question"] = input }
-            );
+            _promptTemplate.AddVariable("name", "ChatGPT");
+            _promptTemplate.AddVariable("context", context);
+            _promptTemplate.AddVariable("question", input);
+            _promptTemplate.AddVariable("empty_answer", Common.Constants.DefaultEmptyAnswer);
+            var chatResult = await _promptTemplate.InvokeAsync(_kernel, executionSettings);
 
             var answer = chatResult.GetValue<string>();
             if (!string.IsNullOrEmpty(answer))
             {
                 await _chatHistoryService.AddSystemMessage(_app.Id, _conversationId, answer);
-                return answer;
+                await HttpContext.WriteChatCompletion(input);
             }
-
-            return string.Empty;
         }
 
         /// <summary>
@@ -130,7 +109,7 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <param name="result"></param>
         /// <param name="input"></param>
         /// <returns></returns>
-        private async Task InvokeWithKnowledgeStreaming(HttpContext HttpContext, OpenAIStreamResult result, string input)
+        private async Task InvokeWithKnowledgeStreaming(HttpContext HttpContext, string input)
         {
             if (!HttpContext.Response.HasStarted)
             {
@@ -140,28 +119,23 @@ namespace PostgreSQL.Embedding.LlmServices
             var context = await BuildKnowledgeContext(input);
 
             var temperature = _app.Temperature / 100;
-            OpenAIPromptExecutionSettings settings = new() { Temperature = (double)temperature };
-            var func = _kernel.CreateFunctionFromPrompt(_promptTemplate, settings);
-            var chatResult = _kernel.InvokeStreamingAsync<StreamingChatMessageContent>(
-                function: func,
-                arguments: new KernelArguments() { ["context"] = context, ["name"] = "ChatGPT", ["question"] = input }
-            );
+            var executionSettings = new OpenAIPromptExecutionSettings() { Temperature = (double)temperature };
+
+            _promptTemplate.AddVariable("name", "ChatGPT");
+            _promptTemplate.AddVariable("context", context);
+            _promptTemplate.AddVariable("question", input);
+            _promptTemplate.AddVariable("empty_answer", Common.Constants.DefaultEmptyAnswer);
+            var chatResult = _promptTemplate.InvokeStreamingAsync(_kernel, executionSettings);
 
             var answerBuilder = new StringBuilder();
             await foreach (var content in chatResult)
             {
                 if (!string.IsNullOrEmpty(content.Content)) answerBuilder.Append(content.Content);
-                result.choices[0].delta.content = content.Content ?? string.Empty;
-                string message = $"data: {JsonConvert.SerializeObject(result)}\n";
-                await HttpContext.Response.WriteAsync(message, Encoding.UTF8);
-                await HttpContext.Response.Body.FlushAsync();
-                await Task.Delay(TimeSpan.FromMilliseconds(50));
             }
 
             await _chatHistoryService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());
-            await HttpContext.Response.WriteAsync("data: [DONE]");
-            await HttpContext.Response.Body.FlushAsync();
-            await HttpContext.Response.CompleteAsync();
+
+            await HttpContext.WriteStreamingChatCompletion(chatResult);
         }
 
 
@@ -177,9 +151,15 @@ namespace PostgreSQL.Embedding.LlmServices
             if (llmKappKnowledges.Any())
             {
                 var inputs = new List<string> { question };
-                var similarQuestions = await RewriteAsync(question);
-                _logger.LogInformation($"完成用户输入重写，共生成{similarQuestions.Count}个相似问题：{JsonConvert.SerializeObject(similarQuestions)}.");
-                if (similarQuestions.Any()) { inputs.AddRange(similarQuestions); }
+
+                // 查询重写
+                if (_app.EnableRewrite)
+                {
+                    var similarQuestions = await RewriteAsync(question);
+                    _logger.LogInformation($"查询重写，共生成{similarQuestions.Count}个相似问题：{JsonConvert.SerializeObject(similarQuestions)}.");
+                    if (similarQuestions.Any()) { inputs.AddRange(similarQuestions); }
+                }
+
                 foreach (var appKnowledge in llmKappKnowledges)
                 {
                     var knowledgeBase = await _knowledgeBaseRepository.GetAsync(appKnowledge.KnowledgeBaseId);
@@ -187,14 +167,22 @@ namespace PostgreSQL.Embedding.LlmServices
 
                     foreach (var input in inputs)
                     {
-                        var retrieveResult = await RetrieveAsync(knowledgeBase, _memoryService, input);
+                        var retrieveResult = await RetrieveAsync(knowledgeBase, input);
                         if (retrieveResult != null && retrieveResult.Any()) searchResults.AddRange(retrieveResult);
                     }
                 }
             }
 
-            // 构建上下文
+
             var partitions = searchResults.SelectMany(x => x.Partitions).ToList();
+
+            // 结果重排
+            if (_app.EnableRerank)
+            {
+                partitions = Rerank(question, partitions);
+            }
+
+            // 构建上下文
             var chunks = partitions.Select(x => new
             {
                 FileName = x.FileName,
@@ -205,22 +193,35 @@ namespace PostgreSQL.Embedding.LlmServices
             .Take(10)
             .ToList();
 
-            var maxRelevance = chunks.Max(x => x.Relevance);
-            var minRelevance = chunks.Min(x => x.Relevance);
-            _logger.LogInformation($"共检索到 {chunks.Count} 个文档块，相似度区间[{minRelevance},{maxRelevance}]");
+            if (chunks.Any())
+            {
+                var maxRelevance = chunks.Max(x => x.Relevance);
+                var minRelevance = chunks.Min(x => x.Relevance);
+                _logger.LogInformation($"共检索到 {chunks.Count} 个文档块，相似度区间[{minRelevance},{maxRelevance}]");
+            }
+            else
+            {
+                _logger.LogInformation($"未检索到符合条件的文档块");
+            }
 
             var jsonFormatContext = JsonConvert.SerializeObject(chunks);
             return jsonFormatContext;
         }
 
-        private async Task<List<KMCitation>> RetrieveAsync(KnowledgeBase knowledgeBase, IMemoryService memoryService, string question)
+        private async Task<List<KMCitation>> RetrieveAsync(KnowledgeBase knowledgeBase, string question)
         {
+            var limit = knowledgeBase.RetrievalLimit.HasValue ? 
+                knowledgeBase.RetrievalLimit.Value : PostgreSQL.Embedding.Common.Constants.DefaultRetrievalLimit;
+
+            var minRelevance = knowledgeBase.RetrievalRelevance.HasValue 
+                ? knowledgeBase.RetrievalRelevance.Value / 100 : PostgreSQL.Embedding.Common.Constants.DefaultRetrievalRelevance;
+
             using var serviceScope = _serviceProvider.CreateScope();
             if (knowledgeBase.RetrievalType == (int)RetrievalType.Vectors)
             {
                 // 向量检索
                 var knowledgeBaseService = _memoryService.AsKnowledgeBaseService(serviceScope.ServiceProvider);
-                var searchResult = await knowledgeBaseService.SearchAsync(knowledgeBase.Id, question, _minRelevance, _limit);
+                var searchResult = await knowledgeBaseService.SearchAsync(knowledgeBase.Id, question, (double)minRelevance, limit);
                 return searchResult.RelevantSources;
 
             }
@@ -228,7 +229,7 @@ namespace PostgreSQL.Embedding.LlmServices
             {
                 // 全文检索
                 var fullTextService = _memoryService.AsFullTextSearchService(serviceScope.ServiceProvider);
-                var searchResult = await fullTextService.SearchAsync(knowledgeBase.Id, question, _minRelevance, _limit);
+                var searchResult = await fullTextService.SearchAsync(knowledgeBase.Id, question, (double)minRelevance, limit);
                 return searchResult.RelevantSources;
             }
             else
@@ -236,11 +237,11 @@ namespace PostgreSQL.Embedding.LlmServices
                 // 混合检索
                 var searchResults = new List<KMCitation>();
                 var knowledgeBaseService = _memoryService.AsKnowledgeBaseService(serviceScope.ServiceProvider);
-                var vectorSearchResult = await knowledgeBaseService.SearchAsync(knowledgeBase.Id, question, _minRelevance, _limit);
+                var vectorSearchResult = await knowledgeBaseService.SearchAsync(knowledgeBase.Id, question, (double)minRelevance, limit);
                 if (vectorSearchResult.RelevantSources.Any()) searchResults.AddRange(vectorSearchResult.RelevantSources);
 
                 var fullTextService = _memoryService.AsFullTextSearchService(serviceScope.ServiceProvider);
-                var fullTextSearchResult = await fullTextService.SearchAsync(knowledgeBase.Id, question, _minRelevance, _limit);
+                var fullTextSearchResult = await fullTextService.SearchAsync(knowledgeBase.Id, question, (double)minRelevance, limit);
                 if (fullTextSearchResult.RelevantSources.Any()) searchResults = fullTextSearchResult.RelevantSources;
 
                 return searchResults;
@@ -252,13 +253,10 @@ namespace PostgreSQL.Embedding.LlmServices
             var similarQuestions = new List<string>();
             try
             {
-                var settings = new OpenAIPromptExecutionSettings() { Temperature = 0f };
+                var executionSettings = new OpenAIPromptExecutionSettings() { Temperature = 0f };
 
-                var func = _kernel.CreateFunctionFromPrompt(_rewritePromptTemplate, settings);
-                var invokeResult = await _kernel.InvokeAsync(
-                function: func,
-                    arguments: new KernelArguments() { ["question"] = question }
-                );
+                _rewritePromptTemplate.AddVariable("question", question);
+                var invokeResult = await _rewritePromptTemplate.InvokeAsync(_kernel, executionSettings);
 
                 var payload = invokeResult.GetValue<string>();
                 if (string.IsNullOrEmpty(payload)) return similarQuestions;
@@ -271,6 +269,28 @@ namespace PostgreSQL.Embedding.LlmServices
             {
                 _logger.LogError(ex, "The rewrite flow has been stoped due to unexpected reason: {0}", ex.Message);
                 return similarQuestions;
+            }
+        }
+
+        private List<KMPartition> Rerank(string question, List<KMPartition> partitions)
+        {
+            if (!partitions.Any()) return partitions;
+
+            try
+            {
+                var rerankResult = _rerankService.Sort(question, partitions, x => x.Text).ToList();
+                foreach (var item in rerankResult)
+                {
+                    var score = item.Score;
+                    item.Document.SetRelevance((float)score);
+                }
+
+                return rerankResult.Select(x => x.Document).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "The rerank flow has been stoped due to unexpected reason: {0}", ex.Message);
+                return partitions;
             }
         }
     }

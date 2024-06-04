@@ -99,7 +99,7 @@ namespace PostgreSQL.Embedding.Controllers
         public JsonResult CreateEmbeddingFromUrl(long knowledgeBaseId, [FromBody] UrlEmbeddingPayload payload)
         {
             var embeddingTaskId = Guid.NewGuid().ToString("N");
-            _knowledgeBaseService.ImportKnowledgeFromUrl(embeddingTaskId, knowledgeBaseId, payload.Url);
+            _knowledgeBaseService.ImportKnowledgeFromUrl(embeddingTaskId, knowledgeBaseId, payload.Url, payload.UrlType, payload.Selector);
 
             return ApiResult.Success(new ImportingTaskResult()
             {
