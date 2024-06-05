@@ -138,7 +138,7 @@ builder.Services.AddScoped(typeof(SimpleClient<>));
 builder.Services.AddScoped(typeof(CrudBaseService<>));
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 builder.Services.AddScoped<IChatHistoryService, ChatHistoryService>();
-builder.Services.AddLLama().AddHuggingFace();
+builder.Services.AddLLama().AddHuggingFace().AddOllama();
 builder.Services.Configure<LlmConfig>(builder.Configuration.GetSection(nameof(LlmConfig)));
 builder.Services.Configure<JwtSetting>(builder.Configuration.GetSection(nameof(JwtSetting)));
 builder.Services.Configure<PythonConfig>(builder.Configuration.GetSection(nameof(PythonConfig)));

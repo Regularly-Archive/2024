@@ -6,6 +6,7 @@ namespace PostgreSQL.Embedding.Common
     {
         [Description("OpenAI")] OpenAI = 0,
         [Description("LLama")] LLama = 1,
-        [Description("HuggingFace")] HuggingFace = 2
+        [Description("HuggingFace")] HuggingFace = 2,
+        [Description("Ollama")] Ollama = 3
     }
 }

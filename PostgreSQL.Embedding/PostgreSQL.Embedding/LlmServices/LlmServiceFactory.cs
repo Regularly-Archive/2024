@@ -2,6 +2,7 @@
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.LlmServices.HuggingFace;
 using PostgreSQL.Embedding.LlmServices.LLama;
+using PostgreSQL.Embedding.LlmServices.Ollama;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
@@ -23,6 +24,8 @@ namespace PostgreSQL.Embedding.LlmServices
                     return _serviceProvider.GetService<LLamaService>();
                 case LlmServiceProvider.HuggingFace:
                     return _serviceProvider.GetService<HuggingFaceService>();
+                case LlmServiceProvider.Ollama:
+                    return _serviceProvider.GetService<OllamaService>();
             }
 
             throw new Exception();
