@@ -49,3 +49,6 @@ Python.NET/obj/
 Python.NET/bin/
 Python.NET/.vs/
 KnowledgeBase/others/__pycache__/
+MongoRepository/MongoRepository/bin/
+AspNetWithK8S/AspNetWithK8S/obj/
+AspNetWithK8S/.vs/
