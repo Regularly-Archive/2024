@@ -17,8 +17,8 @@ namespace MongoRepository.Abstration
         Task DeleteAsync(string id, IClientSessionHandle session = null);
         Task DeleteAsync(FilterDefinition<T> filterDefinition, IClientSessionHandle session = null);
         Task DeleteAsync(Expression<Func<T, bool>> predicate, IClientSessionHandle session = null);
-        Task UpsetAsync(T entity, IClientSessionHandle session = null);
-        Task UpsetAsync(Expression<Func<T, bool>> selector, T entity, IClientSessionHandle session = null);
+        Task UpsertAsync(T entity, IClientSessionHandle session = null);
+        Task UpsertAsync(Expression<Func<T, bool>> selector, T entity, IClientSessionHandle session = null);
         Task<List<T>> GetAllAsync();
         Task<T> GetAsync(string id);
         Task<List<T>> FindAsync(FilterDefinition<T> filterDefinition, SortDefinition<T> sortDefinition = null);

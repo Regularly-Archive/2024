@@ -50,7 +50,7 @@ class Program
 
         var unitOfWork = serviceProvider.GetService<IMongoDbUnitOfWork>();
         var session = await unitOfWork.BeginTransactionAsync();
-        await repository.UpsetAsync(x => x.OrderNo == order.OrderNo, order, session);
+        await repository.UpsertAsync(x => x.OrderNo == order.OrderNo, order, session);
         await unitOfWork.SaveChangesAsync(session);
 
         await host.RunAsync();
