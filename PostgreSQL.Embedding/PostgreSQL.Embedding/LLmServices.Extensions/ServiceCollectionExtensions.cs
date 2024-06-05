@@ -2,6 +2,7 @@
 using PostgreSQL.Embedding.Common.Confirguration;
 using PostgreSQL.Embedding.LlmServices.HuggingFace;
 using PostgreSQL.Embedding.LlmServices.LLama;
+using PostgreSQL.Embedding.LlmServices.Ollama;
 
 namespace PostgreSQL.Embedding.LLmServices.Extensions
 {
@@ -14,9 +15,12 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
 
         public static IServiceCollection AddHuggingFace(this IServiceCollection services)
         {
-            services.AddSingleton<HuggingFaceService>();
+            return services.AddSingleton<HuggingFaceService>();
+        }
 
-            return services;
+        public static IServiceCollection AddOllama(this IServiceCollection services) 
+        {
+            return services.AddSingleton<OllamaService>();
         }
     }
 }

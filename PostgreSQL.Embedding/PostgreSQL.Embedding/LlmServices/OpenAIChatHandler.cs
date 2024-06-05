@@ -4,6 +4,7 @@ using Newtonsoft.Json.Linq;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using System.Text;
+using static LLama.Common.ChatHistory;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
@@ -19,19 +20,7 @@ namespace PostgreSQL.Embedding.LlmServices
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            var payload = await request.Content.ReadAsStringAsync();
-            var dynamic = JObject.Parse(payload);
-            var userMessage = dynamic["messages"].LastOrDefault();
-            if (userMessage != null)
-            {
-                var content = userMessage["content"];
-                if (content.Type == JTokenType.Array) 
-                {
-                    userMessage["content"] = content.FirstOrDefault().Value<string>("text");
-                    request.Content = new StringContent(JsonConvert.SerializeObject(dynamic), Encoding.UTF8, "application/json");
-                }
-            }
-
+            request = await ProcessRequestMessages(request);
 
             var llmServiceProvider = (LlmServiceProvider)_llmModel.ServiceProvider;
             if (llmServiceProvider != LlmServiceProvider.OpenAI)
@@ -52,6 +41,41 @@ namespace PostgreSQL.Embedding.LlmServices
 
             request.Headers.Add(Constants.HttpRequestHeader_Provider, llmServiceProvider.ToString());
             return (await base.SendAsync(request, cancellationToken));
+        }
+
+        private async Task<HttpRequestMessage> ProcessRequestMessages(HttpRequestMessage request)
+        {
+            var requestBody = await request.Content.ReadAsStringAsync();
+            var dynamicObject = JObject.Parse(requestBody);
+            var messages = dynamicObject["messages"].Value<JArray>();
+            if (messages != null && messages.Children().Count() > 0)
+            {
+                var messageList = new List<object>();
+                foreach(var message in messages.Children<JToken>())
+                {
+                    var messageRole = message["role"].Value<string>();
+                    var messageContent = message["content"];
+                    if (messageContent.Children<JToken>().Count() == 0)
+                    {
+                        messageList.Add(new { role = messageRole, content = messageContent });
+                    }
+                    else
+                    {
+                        var innerContent = messageContent.First();
+                        messageList.Add(new { role = messageRole, content = innerContent["text"].Value<string>() });
+                    }
+                }
+
+                var payload = new { 
+                    model = dynamicObject["model"].Value<string>(), 
+                    messages = messageList,
+                    stream = true
+                };
+                request.Content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
+            }
+
+            
+            return request;
         }
     }
 }
