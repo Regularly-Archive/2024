@@ -146,7 +146,7 @@ namespace MongoRepository.Core
             return await _dbSet.Find(predicate).FirstOrDefaultAsync();
         }
 
-        public async Task UpsetAsync(T entity, IClientSessionHandle session = null)
+        public async Task UpsertAsync(T entity, IClientSessionHandle session = null)
         {
             var exists = await ExistsAsync(x => x.Id == entity.Id);
             if (exists)
@@ -162,7 +162,7 @@ namespace MongoRepository.Core
             }
         }
 
-        public async Task UpsetAsync(Expression<Func<T, bool>> selector, T entity, IClientSessionHandle session = null)
+        public async Task UpsertAsync(Expression<Func<T, bool>> selector, T entity, IClientSessionHandle session = null)
         {
             var exists = await ExistsAsync(selector);
             if (exists)
