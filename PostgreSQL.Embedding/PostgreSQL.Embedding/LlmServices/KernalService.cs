@@ -36,7 +36,7 @@ namespace PostgreSQL.Embedding.LlmServices
 
             var httpClient = new HttpClient(new OpenAIChatHandler(llmModel, options));
             var kernel = Kernel.CreateBuilder()
-                .AddOpenAIChatCompletion(modelId: llmModel.ModelName, apiKey: llmModel.ApiKey ?? "sk-1234567890", httpClient: httpClient)
+                .AddOpenAIChatCompletion(modelId: llmModel.ModelName, apiKey: llmModel.ApiKey ?? Guid.NewGuid().ToString(), httpClient: httpClient)
                 .Build();
 
             kernel.Plugins.AddFromType<ConversationSummaryPlugin>();
