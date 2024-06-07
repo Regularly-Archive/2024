@@ -7,10 +7,13 @@ namespace PostgreSQL.Embedding.Utils
 {
     public static class AsyncEnumerableExtensions
     {
-        public static IAsyncEnumerable<StreamingChatMessageContent> AsStreamming(this string content)
+        public static async IAsyncEnumerable<StreamingChatMessageContent> AsStreamming(this string content)
         {
             var streamingChatContents = content.ToArray().Select(x => new StreamingChatMessageContent(AuthorRole.Assistant, x.ToString())).ToList();
-            return new AsyncEnumerable<StreamingChatMessageContent>(streamingChatContents);
+            foreach(var chatContent in streamingChatContents)
+            {
+                yield return chatContent;
+            }
         }
 
         public static FunctionResult AsFunctionResult(this string content)
