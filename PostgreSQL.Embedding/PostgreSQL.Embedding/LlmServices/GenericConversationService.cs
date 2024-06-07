@@ -68,7 +68,7 @@ namespace PostgreSQL.Embedding.LlmServices
                 HttpContext.Response.Headers.ContentType = new Microsoft.Extensions.Primitives.StringValues("text/event-stream");
             }
 
-            var usePlugin = true;
+            var usePlugin = false;
             var chatResult = usePlugin
                 ? await InvokeStreamingByPlannerAsync(_kernel, input)
                 : await InvokeStreamingByKernelAsync(_kernel, input);
@@ -79,9 +79,9 @@ namespace PostgreSQL.Embedding.LlmServices
                 if (!string.IsNullOrEmpty(content.Content)) answerBuilder.Append(content.Content);
             }
 
-            await _chatHistoryService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());
-
             await HttpContext.WriteStreamingChatCompletion(chatResult);
+
+            await _chatHistoryService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());
         }
 
         /// <summary>
@@ -91,7 +91,7 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <returns></returns>
         private async Task InvokeChat(HttpContext HttpContext, string input)
         {
-            var usePlugin = true;
+            var usePlugin = false;
 
             var chatResult = usePlugin
                 ? await InvokeByPlannerAsync(_kernel, input)

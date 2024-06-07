@@ -94,6 +94,7 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
 
             await foreach (var text in texts)
             {
+                result.created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                 result.choices[0].delta.content = text.Content ?? string.Empty;
                 string message = $"data: {JsonConvert.SerializeObject(result)}\n\n";
                 await context.Response.WriteAsync(message, Encoding.UTF8);
