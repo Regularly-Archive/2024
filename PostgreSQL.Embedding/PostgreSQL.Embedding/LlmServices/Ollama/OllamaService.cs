@@ -2,6 +2,8 @@
 using Newtonsoft.Json.Linq;
 using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.LlmServices.Abstration;
+using System.Diagnostics;
+using System.IO;
 using System.Text;
 
 namespace PostgreSQL.Embedding.LlmServices.Ollama
@@ -9,11 +11,15 @@ namespace PostgreSQL.Embedding.LlmServices.Ollama
     public class OllamaService : ILlmService
     {
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly ILogger<OllamaService> _logger;
+        private readonly Stopwatch _stopwatch;
         private readonly string _baseUrl;
-        public OllamaService(IConfiguration configuration, IHttpClientFactory httpClientFactory)
+        public OllamaService(IConfiguration configuration, IHttpClientFactory httpClientFactory, ILogger<OllamaService> logger)
         {
             _baseUrl = configuration["OllamaConfig:BaseUrl"];
             _httpClientFactory = httpClientFactory;
+            _logger = logger;
+            _stopwatch = Stopwatch.StartNew();
         }
 
         public async Task<string> ChatAsync(OpenAIModel request)
@@ -33,19 +39,37 @@ namespace PostgreSQL.Embedding.LlmServices.Ollama
 
         public async IAsyncEnumerable<string> ChatStreamAsync(OpenAIModel request)
         {
+            _stopwatch.Restart();
+            _logger.LogInformation($"Start invoke {nameof(OllamaService)}::ChatStreamAsync()...");
             using (var httpClient = _httpClientFactory.CreateClient())
             {
-                request.stream = false;
-                var httpContent = new StringContent(JsonConvert.SerializeObject(request), Encoding.UTF8, "application/json");
-                var httpResponse = await httpClient.PostAsync(new Uri($"{_baseUrl}/v1/chat/completions"), httpContent);
+                httpClient.Timeout = TimeSpan.FromMinutes(5);
+
+                var httpRequest = new HttpRequestMessage(HttpMethod.Post, new Uri($"{_baseUrl}/v1/chat/completions"));
+                httpRequest.Content = new StringContent(JsonConvert.SerializeObject(request), Encoding.UTF8, "application/json");
+
+                var httpResponse = await httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead);
                 httpResponse.EnsureSuccessStatusCode();
 
-                var returnContent = await httpResponse.Content.ReadAsStringAsync();
-                var completionResult = JsonConvert.DeserializeObject<OpenAICompatibleResult>(returnContent);
-
-                foreach (var item in completionResult.Choices[0].message.content)
+                using (var responseStream = await httpResponse.Content.ReadAsStreamAsync())
                 {
-                    yield return item.ToString();
+                    using (var reader = new StreamReader(responseStream))
+                    {
+                        string line;
+                        while ((line = await reader.ReadLineAsync()) != null)
+                        {
+                            if (string.IsNullOrEmpty(line)) continue;
+
+                            if (!line.StartsWith("data: ")) continue;
+
+                            var data = line.Substring("data: ".Length);
+                            if (data.IndexOf("DONE") == -1)
+                                yield return JObject.Parse(data)["choices"][0]["delta"]["content"].Value<string>();
+                        }
+
+                        _logger.LogInformation($"End invoke {nameof(OllamaService)}::ChatStreamAsync() in {_stopwatch.Elapsed.TotalSeconds} seconds.");
+                        _stopwatch.Stop();
+                    }
                 }
             }
         }
