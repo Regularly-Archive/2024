@@ -25,7 +25,7 @@ namespace PostgreSQL.Embedding.Controllers
         }
 
         [HttpPost("{appId}")]
-        public async Task Chat(OpenAIModel model, string appId)
+        public async Task Chat(OpenAIModel model, long appId)
         {
             await _conversationService.Invoke(model, appId, HttpContext);
         }

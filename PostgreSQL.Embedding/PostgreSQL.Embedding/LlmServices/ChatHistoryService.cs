@@ -46,9 +46,11 @@ namespace PostgreSQL.Embedding.LlmServices
             return _appConversationRepository.FindAsync(x => x.AppId == appId);
         }
 
-        public Task<List<ChatMessage>> GetConversationMessages(long appId, string conversationId)
+        public async Task<List<ChatMessage>> GetConversationMessages(long appId, string conversationId)
         {
-            return _chatMessageRepository.FindAsync(x => x.AppId == appId && x.ConversationId == conversationId);
+            var messages = await _chatMessageRepository.FindAsync(x => x.AppId == appId && x.ConversationId == conversationId);
+            messages = messages.OrderBy(x => x.CreatedAt).ToList();
+            return messages;
         }
 
         public async Task AddConversation(long appId, string conversationId, string conversationName)
