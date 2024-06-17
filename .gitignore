@@ -52,3 +52,10 @@ KnowledgeBase/others/__pycache__/
 MongoRepository/MongoRepository/bin/
 AspNetWithK8S/AspNetWithK8S/obj/
 AspNetWithK8S/.vs/
+SSE.Streaming/server/WebApplication/WebApplication/obj/
+SSE.Streaming/server/WebApplication/WebApplication/bin/
+SSE.Streaming/server/WebApplication/.vs/
+SSE.Streaming/AsyncEnumerable/obj/
+SSE.Streaming/AsyncEnumerable/bin/
+SSE.Streaming/AsyncEnumerable/.vs/
+SSE.Streaming/server/.vs/
