@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+
+<body>
+    <button id='btnEventSource'>EventSource API</button>
+    <button id='btnFetch'>Fetch API</button>
+    <button id='btnWS'>WebSocket</button>
+    <button id="btnStop">Stop Generate</button>
+    <hr />
+    <div id='result' />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js" integrity="sha512-7rhBJh1om/W5Ztx7WiYOR9h2wlSaTmPyQMoHFtbT/FVNIA12y6S6I8HY9mrBS1uJ3dSU/R3qaSAXsGYuRjMDxg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script>
+        // Server-Sent Events
+        const invokeByEventSource = function () {
+            const eventSource = new EventSource('https://localhost:7261/api/chat/streaming');
+            const messageList = document.querySelector('#result');
+            messageList.innerText = ''
+
+            eventSource.onmessage = (e) => {
+                if (e.data != '[DONE]') {
+                    messageList.innerText += JSON.parse(e.data).text
+                }
+            };
+
+            eventSource.onerror = (e) => {
+                eventSource.close()
+            }
+        }
+        
+        // fetch API
+        const invokeByFetch = async function () {
+            const messageList = document.querySelector('#result');
+            messageList.innerText = ''
+
+            const response = await fetchWithTimeout('https://localhost:7261/api/chat/streaming', {
+                timeout: 10 * 1000 * 1000,
+                method: 'POST',
+            });
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let resultData = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                    break;
+                }
+                resultData += decoder.decode(value);
+                while (resultData.indexOf('\n') != -1) {
+                    const messageIndex = resultData.indexOf('\n');
+                    const message = resultData.slice(0, messageIndex);
+                    resultData = resultData.slice(messageIndex + 1);
+                    if (message.startsWith('data: ')) {
+                        if (message.includes('[DONE]')) {
+                            break
+                        }
+                        const messageData = message.substring(5)
+                        messageList.innerText += JSON.parse(messageData).text
+                    }
+                }
+            }
+        }
+        
+        // WebSocket
+        const invokeByWS = async function() {
+            const messageList = document.querySelector('#result');
+            messageList.innerText = ''
+
+            const connection = new signalR.HubConnectionBuilder()
+                .withUrl("https://localhost:7261/hubs/chat")
+                .configureLogging(signalR.LogLevel.Information)
+                .build();
+
+            window.connection = connection;
+            window.stoped = false;
+
+            await connection.start();
+            
+            const requestId = new Date().getTime().toString()
+            window.requestId = requestId
+            connection.send("Generate", requestId, '')
+                .catch(error => console.error(error));
+
+            connection.on("ReceiveChunks", (data, requestId) => {
+                if (requestId === window.requestId && !window.stoped) {
+                    messageList.innerText += JSON.parse(data).text
+                }
+            });
+        }
+
+        async function fetchWithTimeout(resource, options = {}) {
+            const { timeout } = options;
+
+            const controller = new AbortController();
+            window.controller = controller;
+            const id = setTimeout(() => controller.abort(), timeout);
+            const response = await fetch(resource, {
+                ...options,
+                signal: controller.signal
+            });
+            return response;
+        }
+
+        const btnEventSource = document.querySelector('#btnEventSource');
+        const btnFetch = document.querySelector('#btnFetch');
+        const btnWS = document.querySelector('#btnWS')
+        const btnStop = document.querySelector('#btnStop');
+        btnEventSource.addEventListener('click', invokeByEventSource);
+        btnFetch.addEventListener('click', invokeByFetch)
+        btnWS.addEventListener('click', invokeByWS)
+        btnStop.addEventListener('click', async () => {
+            if (window.controller && !window.controller.signal.aborted) {
+                window.controller.abort()
+            }
+            if (window.connection && !window.stoped) {
+                await window.connection.send("Cancel", window.requestId)
+                window.stoped = true
+            }
+        })
+
+    </script>
+</body>
