@@ -1,4 +1,7 @@
-﻿using Microsoft.Extensions.Options;
+﻿using Azure.AI.OpenAI;
+using Azure;
+using Microsoft.Extensions.Azure;
+using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Plugins.Core;
 using PostgreSQL.Embedding.Common;
@@ -8,6 +11,7 @@ using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.Utils;
 using System.Reflection;
+using Azure.Core.Pipeline;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
@@ -35,7 +39,8 @@ namespace PostgreSQL.Embedding.LlmServices
             var options = _serviceProvider.GetRequiredService<IOptions<LlmConfig>>();
 
             var httpClient = new HttpClient(new OpenAIChatHandler(llmModel, options));
-            httpClient.Timeout = TimeSpan.FromMinutes(5);
+            httpClient.Timeout = Timeout.InfiniteTimeSpan;
+
             var kernel = Kernel.CreateBuilder()
                 .AddOpenAIChatCompletion(modelId: llmModel.ModelName, apiKey: llmModel.ApiKey ?? Guid.NewGuid().ToString(), httpClient: httpClient)
                 .Build();
@@ -46,6 +51,18 @@ namespace PostgreSQL.Embedding.LlmServices
             kernel = kernel.ImportLlmPlugins(_serviceProvider);
 
             return Task.FromResult(kernel);
+        }
+
+        private OpenAIClient GetOpenAIClient(HttpClient httpClient, LlmModel llmModel)
+        {
+            var clientOptions = new OpenAIClientOptions();
+
+            clientOptions.Transport = new HttpClientTransport(httpClient);
+
+            clientOptions.Retry.MaxRetries = 1;
+            clientOptions.Retry.NetworkTimeout = TimeSpan.FromMinutes(10);
+
+            return new OpenAIClient(new Uri("https://api.openai.com/v1"), new AzureKeyCredential(llmModel.ApiKey ?? Guid.NewGuid().ToString()), clientOptions);
         }
     }
 }
