@@ -43,7 +43,7 @@ namespace PostgreSQL.Embedding.LlmServices.Ollama
             _logger.LogInformation($"Start invoke {nameof(OllamaService)}::ChatStreamAsync()...");
             using (var httpClient = _httpClientFactory.CreateClient())
             {
-                httpClient.Timeout = TimeSpan.FromMinutes(5);
+                httpClient.Timeout = Timeout.InfiniteTimeSpan;
 
                 var httpRequest = new HttpRequestMessage(HttpMethod.Post, new Uri($"{_baseUrl}/v1/chat/completions"));
                 httpRequest.Content = new StringContent(JsonConvert.SerializeObject(request), Encoding.UTF8, "application/json");

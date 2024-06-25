@@ -3,7 +3,7 @@ using PostgreSQL.Embedding.DataAccess.Entities;
 
 namespace PostgreSQL.Embedding.LlmServices.Abstration
 {
-    public interface IChatHistoryService
+    public interface IChatHistoriesService
     {
         Task<long> AddUserMessage(long appId, string conversationId, string content);
         Task<long> AddSystemMessage(long appId, string conversationId, string content);
