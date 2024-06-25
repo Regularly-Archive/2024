@@ -17,7 +17,7 @@ namespace PostgreSQL.Embedding.Utils
             if (externalAssemblies != null && assembies.Any())
                 assembies = assembies.Concat(externalAssemblies);
 
-            var pluginTypes = assembies.SelectMany(x => x.GetTypes())
+            var pluginTypes = assembies.SelectMany(x => x.DefinedTypes)
                  .Where(x => x.GetCustomAttribute<KernelPluginAttribute>() != null).ToList();
 
             foreach (var pluginType in pluginTypes)
@@ -35,7 +35,7 @@ namespace PostgreSQL.Embedding.Utils
             if (externalAssemblies != null && assembies.Any())
                 assembies = assembies.Concat(externalAssemblies);
 
-            var pluginTypes = assembies.SelectMany(x => x.GetTypes())
+            var pluginTypes = assembies.SelectMany(x => x.DefinedTypes)
                 .Where(x => x.GetCustomAttribute<KernelPluginAttribute>() != null).ToList();
 
             foreach (var pluginType in pluginTypes)
