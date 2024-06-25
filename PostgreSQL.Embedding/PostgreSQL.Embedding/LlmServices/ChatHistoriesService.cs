@@ -1,15 +1,17 @@
 ﻿using LLama.Common;
+using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
+using System.Text;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
-    public class ChatHistoryService : IChatHistoryService
+    public class ChatHistoriesService : IChatHistoriesService
     {
         private IRepository<ChatMessage> _chatMessageRepository;
         private readonly IRepository<AppConversation> _appConversationRepository;
-        public ChatHistoryService(IRepository<ChatMessage> chatMessageRepository, IRepository<AppConversation> appConversationRepository)
+        public ChatHistoriesService(IRepository<ChatMessage> chatMessageRepository, IRepository<AppConversation> appConversationRepository)
         {
             _chatMessageRepository = chatMessageRepository;
             _appConversationRepository = appConversationRepository;
@@ -85,5 +87,7 @@ namespace PostgreSQL.Embedding.LlmServices
         {
             return _chatMessageRepository.DeleteAsync(messageId);
         }
+
+
     }
 }

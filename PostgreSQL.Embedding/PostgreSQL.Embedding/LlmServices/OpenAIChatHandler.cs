@@ -69,7 +69,7 @@ namespace PostgreSQL.Embedding.LlmServices
                 var payload = new { 
                     model = dynamicObject["model"].Value<string>(), 
                     messages = messageList,
-                    stream = true
+                    stream = dynamicObject.ContainsKey("stream")
                 };
                 request.Content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
             }
