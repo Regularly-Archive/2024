@@ -19,7 +19,7 @@ using System.Text;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
-    public class RAGConversationService
+    public class RAGConversationService : BaseConversationService
     {
         private readonly Kernel _kernel;
         private readonly LlmApp _app;
@@ -28,7 +28,7 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly IRepository<LlmAppKnowledge> _llmAppKnowledgeRepository;
         private readonly IRepository<KnowledgeBase> _knowledgeBaseRepository;
         private readonly IMemoryService _memoryService;
-        private readonly IChatHistoryService _chatHistoryService;
+        private readonly IChatHistoriesService _chatHistoriesService;
         private readonly PromptTemplateService _promptTemplateService;
         private readonly ILogger<RAGConversationService> _logger;
         private readonly CallablePromptTemplate _promptTemplate;
@@ -41,8 +41,9 @@ namespace PostgreSQL.Embedding.LlmServices
             LlmApp app,
             IServiceProvider serviceProvider,
             IMemoryService memoryService,
-            IChatHistoryService chatHistoryService
+            IChatHistoriesService chatHistoriesService
         )
+            : base(kernel, chatHistoriesService)
         {
             _kernel = kernel;
             _app = app;
@@ -54,7 +55,7 @@ namespace PostgreSQL.Embedding.LlmServices
             _promptTemplateService = _serviceProvider.GetService<PromptTemplateService>();
             _promptTemplate = _promptTemplateService.LoadPromptTemplate("RAGPrompt.txt");
             _rewritePromptTemplate = _promptTemplateService.LoadPromptTemplate("RewritePrompt.txt");
-            _chatHistoryService = chatHistoryService;
+            _chatHistoriesService = chatHistoriesService;
             _logger = _serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<RAGConversationService>();
             _rerankService = _serviceProvider.GetRequiredService<IRerankService>();
         }
@@ -63,17 +64,14 @@ namespace PostgreSQL.Embedding.LlmServices
         {
             _conversationId = HttpContext.GetOrCreateConversationId();
             var conversationName = HttpContext.GetConversationName();
-            await _chatHistoryService.AddUserMessage(_app.Id, _conversationId, input);
-            await _chatHistoryService.AddConversation(_app.Id, _conversationId, conversationName);
+            await _chatHistoriesService.AddUserMessage(_app.Id, _conversationId, input);
+            await _chatHistoriesService.AddConversation(_app.Id, _conversationId, conversationName);
 
-            if (model.stream)
-            {
-                await InvokeWithKnowledgeStreaming(HttpContext, input);
-            }
-            else
-            {
-                await InvokeWithKnowledge(HttpContext, input);
-            }
+            var conversationTask = model.stream
+                ? InvokeWithKnowledgeStreaming(HttpContext, input)
+                : InvokeWithKnowledge(HttpContext, input);
+
+            await conversationTask;
         }
 
         /// <summary>
@@ -88,16 +86,19 @@ namespace PostgreSQL.Embedding.LlmServices
             var temperature = _app.Temperature / 100;
             var executionSettings = new OpenAIPromptExecutionSettings() { Temperature = (double)temperature };
 
+            var histories = await GetHistoricalMessages(_app.Id, _conversationId, _app.MaxMessageRounds);
+
             _promptTemplate.AddVariable("name", "ChatGPT");
             _promptTemplate.AddVariable("context", context);
             _promptTemplate.AddVariable("question", input);
             _promptTemplate.AddVariable("empty_answer", Common.Constants.DefaultEmptyAnswer);
+            _promptTemplate.AddVariable("histories", histories);
             var chatResult = await _promptTemplate.InvokeAsync(_kernel, executionSettings);
 
             var answer = chatResult.GetValue<string>();
             if (!string.IsNullOrEmpty(answer))
             {
-                await _chatHistoryService.AddSystemMessage(_app.Id, _conversationId, answer);
+                await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answer);
                 await HttpContext.WriteChatCompletion(input);
             }
         }
@@ -121,10 +122,13 @@ namespace PostgreSQL.Embedding.LlmServices
             var temperature = _app.Temperature / 100;
             var executionSettings = new OpenAIPromptExecutionSettings() { Temperature = (double)temperature };
 
+            var histories = await GetHistoricalMessages(_app.Id, _conversationId, _app.MaxMessageRounds);
+
             _promptTemplate.AddVariable("name", "ChatGPT");
             _promptTemplate.AddVariable("context", context);
             _promptTemplate.AddVariable("question", input);
             _promptTemplate.AddVariable("empty_answer", Common.Constants.DefaultEmptyAnswer);
+            _promptTemplate.AddVariable("histories", histories);
             var chatResult = _promptTemplate.InvokeStreamingAsync(_kernel, executionSettings);
 
             var answerBuilder = new StringBuilder();
@@ -133,7 +137,7 @@ namespace PostgreSQL.Embedding.LlmServices
                 if (!string.IsNullOrEmpty(content.Content)) answerBuilder.Append(content.Content);
             }
 
-            await _chatHistoryService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());
+            await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());
 
             await HttpContext.WriteStreamingChatCompletion(chatResult);
         }
@@ -210,10 +214,10 @@ namespace PostgreSQL.Embedding.LlmServices
 
         private async Task<List<KMCitation>> RetrieveAsync(KnowledgeBase knowledgeBase, string question)
         {
-            var limit = knowledgeBase.RetrievalLimit.HasValue ? 
+            var limit = knowledgeBase.RetrievalLimit.HasValue ?
                 knowledgeBase.RetrievalLimit.Value : PostgreSQL.Embedding.Common.Constants.DefaultRetrievalLimit;
 
-            var minRelevance = knowledgeBase.RetrievalRelevance.HasValue 
+            var minRelevance = knowledgeBase.RetrievalRelevance.HasValue
                 ? knowledgeBase.RetrievalRelevance.Value / 100 : PostgreSQL.Embedding.Common.Constants.DefaultRetrievalRelevance;
 
             using var serviceScope = _serviceProvider.CreateScope();
