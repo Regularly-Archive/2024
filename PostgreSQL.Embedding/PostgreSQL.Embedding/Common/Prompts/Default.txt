@@ -1,3 +1,9 @@
-﻿System: {{$system}}
-User: {{$input}}
+﻿# System
+{{$system}}
 
+
+# Histories
+{{$histories}}
+
+# User
+{{$input}}

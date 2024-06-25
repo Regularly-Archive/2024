@@ -1,57 +1,53 @@
-﻿using Microsoft.SemanticKernel;
+﻿using AngleSharp.Css;
+using DocumentFormat.OpenXml.Wordprocessing;
+using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
+using Microsoft.SemanticKernel.Planning.Handlebars;
+using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.LLmServices.Extensions;
-using System.Text;
-using Microsoft.SemanticKernel.Planning.Handlebars;
-using DocumentFormat.OpenXml.Wordprocessing;
-using Microsoft.SemanticKernel.ChatCompletion;
 using PostgreSQL.Embedding.Utils;
-using Microsoft.EntityFrameworkCore.Storage;
-using Irony.Parsing;
-using PostgreSQL.Embedding.Common;
-using System.Reflection.Metadata.Ecma335;
+using System.Text;
+
 
 namespace PostgreSQL.Embedding.LlmServices
 {
-    public class GenericConversationService
+    public class GenericConversationService : BaseConversationService
     {
         private readonly Kernel _kernel;
         private readonly LlmApp _app;
         private readonly CallablePromptTemplate _promptTemplate;
         private readonly string _defaultPrompt = "You are a helpful AI bot. You must answer the question in Chinese.";
-        private readonly IChatHistoryService _chatHistoryService;
+        private readonly IChatHistoriesService _chatHistoriesService;
         private readonly IServiceProvider _serviceProvider;
         private readonly PromptTemplateService _promptTemplateService;
         private string _conversationId;
         private readonly Random _random = new Random();
-        public GenericConversationService(Kernel kernel, LlmApp app, IServiceProvider serviceProvider, IChatHistoryService chatHistoryService)
+        public GenericConversationService(Kernel kernel, LlmApp app, IServiceProvider serviceProvider, IChatHistoriesService chatHistoriesService)
+            :base(kernel, chatHistoriesService)
         {
             _kernel = kernel;
             _app = app;
             _serviceProvider = serviceProvider;
             _promptTemplateService = _serviceProvider.GetService<PromptTemplateService>();
             _promptTemplate = _promptTemplateService.LoadPromptTemplate("Default.txt");
-            _chatHistoryService = chatHistoryService;
+            _chatHistoriesService = chatHistoriesService;
         }
 
         public async Task InvokeAsync(OpenAIModel model, HttpContext httpContext, string input)
         {
             _conversationId = httpContext.GetOrCreateConversationId();
             var conversationName = httpContext.GetConversationName();
-            await _chatHistoryService.AddUserMessage(_app.Id, _conversationId, input);
-            await _chatHistoryService.AddConversation(_app.Id, _conversationId, conversationName);
+            await _chatHistoriesService.AddUserMessage(_app.Id, _conversationId, input);
+            await _chatHistoriesService.AddConversation(_app.Id, _conversationId, conversationName);
 
-            if (model.stream)
-            {
-                await InvokeStreamingChat(httpContext, input);
-            }
-            else
-            {
-                await InvokeChat(httpContext, input);
-            }
+            var conversationTask = model.stream
+                ? InvokeStreamingChat(httpContext, input)
+                : InvokeChat(httpContext, input);
+
+            await conversationTask;
         }
 
         /// <summary>
@@ -80,8 +76,7 @@ namespace PostgreSQL.Embedding.LlmServices
             }
 
             await HttpContext.WriteStreamingChatCompletion(chatResult);
-
-            await _chatHistoryService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());
+            await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());
         }
 
         /// <summary>
@@ -100,7 +95,7 @@ namespace PostgreSQL.Embedding.LlmServices
             var answer = chatResult.GetValue<string>();
             if (!string.IsNullOrEmpty(answer))
             {
-                await _chatHistoryService.AddSystemMessage(_app.Id, _conversationId, answer);
+                await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answer);
                 await HttpContext.WriteChatCompletion(input);
             }
         }
@@ -149,7 +144,7 @@ namespace PostgreSQL.Embedding.LlmServices
             }
         }
 
-        private Task<FunctionResult> InvokeByKernelAsync(Kernel kernel, string input)
+        private async Task<FunctionResult> InvokeByKernelAsync(Kernel kernel, string input)
         {
             if (string.IsNullOrEmpty(_app.Prompt))
                 _app.Prompt = _defaultPrompt;
@@ -157,12 +152,15 @@ namespace PostgreSQL.Embedding.LlmServices
             var temperature = _app.Temperature / 100;
             var executionSettings = new OpenAIPromptExecutionSettings() { Temperature = (double)temperature };
 
+            var histories = await GetHistoricalMessages(_app.Id, _conversationId, _app.MaxMessageRounds);
+
             _promptTemplate.AddVariable("input", input);
             _promptTemplate.AddVariable("system", _app.Prompt);
-            return _promptTemplate.InvokeAsync(kernel, executionSettings);
+            _promptTemplate.AddVariable("histories", histories);
+            return await _promptTemplate.InvokeAsync(kernel, executionSettings);
         }
 
-        private Task<IAsyncEnumerable<StreamingChatMessageContent>> InvokeStreamingByKernelAsync(Kernel kernel, string input)
+        private async Task<IAsyncEnumerable<StreamingChatMessageContent>> InvokeStreamingByKernelAsync(Kernel kernel, string input)
         {
             if (string.IsNullOrEmpty(_app.Prompt))
                 _app.Prompt = _defaultPrompt;
@@ -170,9 +168,13 @@ namespace PostgreSQL.Embedding.LlmServices
             var temperature = _app.Temperature / 100;
             var executionSettings = new OpenAIPromptExecutionSettings() { Temperature = (double)temperature };
 
+            var histories = await GetHistoricalMessages(_app.Id, _conversationId, _app.MaxMessageRounds);
+
+
             _promptTemplate.AddVariable("input", input);
             _promptTemplate.AddVariable("system", _app.Prompt);
-            return Task.FromResult(_promptTemplate.InvokeStreamingAsync(kernel, executionSettings));
+            _promptTemplate.AddVariable("histories", histories);
+            return _promptTemplate.InvokeStreamingAsync(kernel, executionSettings);
         }
     }
 }
