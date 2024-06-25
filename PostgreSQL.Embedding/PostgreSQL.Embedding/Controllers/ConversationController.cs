@@ -17,8 +17,8 @@ namespace PostgreSQL.Embedding.Controllers
     public class ConversationController : ControllerBase
     {
         private readonly IConversationService _conversationService;
-        private readonly IChatHistoryService _chatHistoryService;
-        public ConversationController(IConversationService conversationService, IChatHistoryService chatHistoryService)
+        private readonly IChatHistoriesService _chatHistoryService;
+        public ConversationController(IConversationService conversationService, IChatHistoriesService chatHistoryService)
         {
             _conversationService = conversationService;
             _chatHistoryService = chatHistoryService;

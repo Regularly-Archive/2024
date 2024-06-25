@@ -117,7 +117,7 @@ builder.Services.AddScoped<IImportingTaskHandler, UrlImportingTaskHandler>();
 builder.Services.AddSingleton<LLamaEmbedder>(sp =>
 {
     var modelPath = Path.Combine(builder.Environment.ContentRootPath, builder.Configuration["LLamaConfig:ModelPath"]!);
-    var @params = new ModelParams(modelPath) { EmbeddingMode = true, ContextSize = builder.Configuration.GetValue<uint>("LLamaConfig:ContextSize") };
+    var @params = new ModelParams(modelPath) { ContextSize = builder.Configuration.GetValue<uint>("LLamaConfig:ContextSize") };
     using var weights = LLamaWeights.LoadFromFile(@params);
     var embedder = new LLamaEmbedder(weights, @params);
     return embedder;
@@ -137,7 +137,7 @@ builder.Services.AddScoped<ISqlSugarClient, SqlSugarClient>(sp =>
 builder.Services.AddScoped(typeof(SimpleClient<>));
 builder.Services.AddScoped(typeof(CrudBaseService<>));
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
-builder.Services.AddScoped<IChatHistoryService, ChatHistoryService>();
+builder.Services.AddScoped<IChatHistoriesService, ChatHistoriesService>();
 builder.Services.AddLLama().AddHuggingFace().AddOllama();
 builder.Services.Configure<LlmConfig>(builder.Configuration.GetSection(nameof(LlmConfig)));
 builder.Services.Configure<JwtSetting>(builder.Configuration.GetSection(nameof(JwtSetting)));
