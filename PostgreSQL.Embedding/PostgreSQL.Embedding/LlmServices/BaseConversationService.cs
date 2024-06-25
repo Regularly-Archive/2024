@@ -35,9 +35,10 @@ namespace PostgreSQL.Embedding.LlmServices
                 if (summaryFunction == null) return string.Empty;
 
                 var summaryInput = $"请使用中文对下面的内容进行归纳和总结: {chatHistories}";
-                var summarized = await _kernel.InvokeAsync(summaryFunction, new() { ["input"] = summaryInput });
+                var functionResult = await _kernel.InvokeAsync(summaryFunction, new() { ["input"] = summaryInput });
 
-                return $"<message role=\"system\">历史聊天摘要：{summarized.GetValue<string>()}</message>";
+                var summarized = functionResult.GetValue<string>().Replace("END SUMMARY", "").Trim();
+                return $"<message role=\"system\">历史聊天摘要：{summarized}</message>";
             }
             else
             {
