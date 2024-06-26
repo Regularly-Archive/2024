@@ -8,6 +8,7 @@ using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.LLmServices.Extensions;
+using PostgreSQL.Embedding.Planners;
 using PostgreSQL.Embedding.Utils;
 using System.Text;
 
@@ -32,7 +33,7 @@ namespace PostgreSQL.Embedding.LlmServices
             _app = app;
             _serviceProvider = serviceProvider;
             _promptTemplateService = _serviceProvider.GetService<PromptTemplateService>();
-            _promptTemplate = _promptTemplateService.LoadPromptTemplate("Default.txt");
+            _promptTemplate = _promptTemplateService.LoadTemplate("Default.txt");
             _chatHistoriesService = chatHistoriesService;
         }
 
@@ -64,9 +65,11 @@ namespace PostgreSQL.Embedding.LlmServices
                 HttpContext.Response.Headers.ContentType = new Microsoft.Extensions.Primitives.StringValues("text/event-stream");
             }
 
-            var usePlugin = false;
+
+
+            var usePlugin = true;
             var chatResult = usePlugin
-                ? await InvokeStreamingByPlannerAsync(_kernel, input)
+                ? await InvokeStreamingByStepwisePlannerAsync(_kernel, input)
                 : await InvokeStreamingByKernelAsync(_kernel, input);
 
             var answerBuilder = new StringBuilder();
@@ -110,7 +113,7 @@ namespace PostgreSQL.Embedding.LlmServices
 #pragma warning disable SKEXP0060
                 var plan = await planner.CreatePlanAsync(kernel, input);
                 var executionResult = await plan.InvokeAsync(kernel);
-                var promptTemplate = _promptTemplateService.LoadPromptTemplate("AgentPrompt.txt");
+                var promptTemplate = _promptTemplateService.LoadTemplate("AgentPrompt.txt");
                 promptTemplate.AddVariable("input", input);
                 promptTemplate.AddVariable("context", executionResult);
                 return await promptTemplate.InvokeAsync(kernel);
@@ -132,7 +135,7 @@ namespace PostgreSQL.Embedding.LlmServices
 #pragma warning disable SKEXP0060
                 var plan = await planner.CreatePlanAsync(kernel, input);
                 var executionResult = await plan.InvokeAsync(kernel);
-                var promptTemplate = _promptTemplateService.LoadPromptTemplate("AgentPrompt.txt");
+                var promptTemplate = _promptTemplateService.LoadTemplate("AgentPrompt.txt");
                 promptTemplate.AddVariable("input", input);
                 promptTemplate.AddVariable("context", executionResult);
                 return promptTemplate.InvokeStreamingAsync(kernel);
@@ -142,6 +145,22 @@ namespace PostgreSQL.Embedding.LlmServices
             {
                 return Constants.DefaultErrorAnswer.AsStreamming();
             }
+        }
+
+        private async Task<IAsyncEnumerable<StreamingChatMessageContent>> InvokeStreamingByStepwisePlannerAsync(Kernel kernel, string input)
+        {
+            try
+            {
+                var planner = new StepwisePlanner(_kernel, _promptTemplateService);
+                var plan = await planner.CreatePlanAsync(input);
+                var result = await plan.ExecuteAsync(_kernel);
+                return result.AsStreamming();
+            }
+            catch (Exception ex)
+            {
+                return Constants.DefaultErrorAnswer.AsStreamming();
+            }
+
         }
 
         private async Task<FunctionResult> InvokeByKernelAsync(Kernel kernel, string input)
