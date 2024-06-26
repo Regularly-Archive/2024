@@ -1,4 +1,4 @@
-﻿[AVAILABLE FUNCTIONS]
+[AVAILABLE FUNCTIONS]
 The function definitions below are in the following format:
 <functionName>: <description>
  - <parameterName>: <parameterDescription>
