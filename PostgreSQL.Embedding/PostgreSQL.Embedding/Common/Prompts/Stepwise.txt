@@ -1,4 +1,4 @@
-﻿[INSTRUCTION]
+[INSTRUCTION]
 Answer the following questions as accurately as possible using the provided functions.
 
 {{$functionDescriptions}}
