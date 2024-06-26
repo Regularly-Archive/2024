@@ -1,6 +1,4 @@
 ﻿using Microsoft.SemanticKernel;
-using PostgreSQL.Embedding.Common.Models;
-using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using System.Text;
 
