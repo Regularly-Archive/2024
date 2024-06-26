@@ -42,7 +42,6 @@
   <ItemGroup>
     <Folder Include="Assets\Models\Qwen1.5-1.8B-Chat\" />
     <Folder Include="LlmServices\OpenAI\" />
-    <Folder Include="Planners\" />
   </ItemGroup>
 
   <ItemGroup>
@@ -92,10 +91,16 @@
     <None Update="Common\Prompts\Default.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="Common\Prompts\FunctionManual.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="Common\Prompts\RAGPrompt.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Common\Prompts\RewritePrompt.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Common\Prompts\Stepwise.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Resources\cn_synonym.txt">

@@ -66,7 +66,7 @@ namespace PostgreSQL.Embedding.LlmServices
             result.RelevantSources = searchResult.RelevantSources;
             var context = BuildKnowledgeContext(searchResult);
 
-            var promptTemplate = _promptTemplateService.LoadPromptTemplate("RAGPrompt.txt");
+            var promptTemplate = _promptTemplateService.LoadTemplate("RAGPrompt.txt");
             promptTemplate.AddVariable("name", "ChatGPT");
             promptTemplate.AddVariable("context", context);
             promptTemplate.AddVariable("question", question);
