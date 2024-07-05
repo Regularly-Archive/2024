@@ -41,7 +41,10 @@ namespace PostgreSQL.Embedding.LlmServices
             var httpClient = new HttpClient(new OpenAIChatHandler(llmModel, options));
             httpClient.Timeout = Timeout.InfiniteTimeSpan;
 
-            var kernel = Kernel.CreateBuilder()
+            var kernelBuilder = Kernel.CreateBuilder();
+            kernelBuilder.Services.AddLogging(loggingBuilder => loggingBuilder.AddConsole().SetMinimumLevel(LogLevel.Information));
+
+            var kernel = kernelBuilder
                 .AddOpenAIChatCompletion(modelId: llmModel.ModelName, apiKey: llmModel.ApiKey ?? Guid.NewGuid().ToString(), httpClient: httpClient)
                 .Build();
 
