@@ -1,5 +1,7 @@
 ﻿using Microsoft.SemanticKernel;
+using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.LlmServices.Abstration;
+using System.ComponentModel;
 using System.Text;
 
 namespace PostgreSQL.Embedding.LlmServices
@@ -15,7 +17,11 @@ namespace PostgreSQL.Embedding.LlmServices
             _chatHistoriesService = chatHistoriesService;
         }
 
-        public async Task<string> GetHistoricalMessages(long appId, string conversationId, int maxMessageRounds)
+        public async Task<string> GetHistoricalMessages(
+            long appId, 
+            string conversationId, 
+            int maxMessageRounds = 15
+        )
         {
             var stringBuilder = new StringBuilder();
             var chatMessages = await _chatHistoriesService.GetConversationMessages(appId, conversationId);
