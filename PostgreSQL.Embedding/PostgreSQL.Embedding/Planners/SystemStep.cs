@@ -1,6 +1,9 @@
-﻿using System.Text.Json;
+﻿using PostgreSQL.Embedding.Common.Json;
+using System.Text.Encodings.Web;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using System.Text.Unicode;
 
 namespace PostgreSQL.Embedding.Planners
 {
@@ -83,7 +86,7 @@ namespace PostgreSQL.Embedding.Planners
                             if (systemStepResults is not null)
                             {
                                 result.Action = systemStepResults.Action;
-                                result.ActionVariables = systemStepResults.ActionVariables;
+                                result.ActionVariables = systemStepResults.ActionVariables ?? new Dictionary<string, object>();
                             }
                         }
                         catch (JsonException je)
@@ -96,5 +99,7 @@ namespace PostgreSQL.Embedding.Planners
 
             return result;
         }
+
+        public override string ToString() => JsonSerializerExtensions.Serialize(this);
     }
 }

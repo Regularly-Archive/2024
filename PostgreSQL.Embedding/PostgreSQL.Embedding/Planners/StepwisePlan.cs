@@ -3,6 +3,7 @@ using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Services;
 using Microsoft.SemanticKernel.TextGeneration;
+using PostgreSQL.Embedding.Common.Json;
 using PostgreSQL.Embedding.LLmServices.Extensions;
 using System.Globalization;
 using System.Text;
@@ -51,6 +52,7 @@ namespace PostgreSQL.Embedding.Planners
                 if (i > 0) await Task.Delay(_config.MinIterationTimeMs, cancellationToken).ConfigureAwait(false);
 
                 var nextStep = await GetNextStepAsync(stepsTaken, chatHistory, aiService, startingMessageCount, cancellationToken);
+                _logger.LogTrace($"Step {i + 1}: {nextStep.ToString()}");
 
                 var finalAnswer = TryGetFinalAnswer(nextStep, stepsTaken, i + 1);
 
@@ -99,12 +101,25 @@ namespace PostgreSQL.Embedding.Planners
             try
             {
                 var kernelFunction = kernel.GetKernelFunction(actionName);
+
                 var kernelArguments = new KernelArguments(actionVariables);
+                foreach (var parameter in kernelFunction.Metadata.Parameters)
+                {
+                    if (actionVariables.ContainsKey(parameter.Name) && actionVariables[parameter.Name] is JsonElement)
+                    {
+                        actionVariables[parameter.Name] = GetValue((JsonElement)actionVariables[parameter.Name], parameter.ParameterType);
+                    }
+                }
+
+                foreach (var varibale in _config.Variables)
+                {
+                    kernelArguments[varibale.Key] = varibale.Value;
+                }
 
                 var kernelResult = await kernel.InvokeAsync(kernelFunction, kernelArguments);
                 var result = kernelResult.GetValue<string>();
 
-                this._logger?.LogTrace("Invoked {FunctionName}. Result: {Result}", targetFunction.Name, result);
+                this._logger?.LogTrace($"Invoked {actionName}. Result: {result}");
                 return result;
             }
             catch (Exception e)
@@ -119,13 +134,13 @@ namespace PostgreSQL.Embedding.Planners
             if (!string.IsNullOrEmpty(step.Action))
             {
                 this._logger?.LogInformation("Action: {Action}({ActionVariables}).",
-                    step.Action, JsonSerializer.Serialize(step.ActionVariables));
+                    step.Action, JsonSerializerExtensions.Serialize(step.ActionVariables));
 
                 // add [thought and] action to chat history
                 var stringBuilder = new StringBuilder();
                 stringBuilder.Append(ActionTag);
                 var actionPayload = new { action = step.Action, action_variables = step.ActionVariables };
-                stringBuilder.Append(JsonSerializer.Serialize(actionPayload));
+                stringBuilder.Append(JsonSerializerExtensions.Serialize(actionPayload));
                 var actionMessage = stringBuilder.ToString();
 
                 var message = string.IsNullOrEmpty(step.Thought) ? actionMessage : $"{ThoughtTag} {step.Thought}\n{actionMessage}";
@@ -170,7 +185,7 @@ namespace PostgreSQL.Embedding.Planners
             }
             else
             {
-                this._logger?.LogInformation("Thought: {Thought}", step.Thought);
+                _logger?.LogInformation("Thought: {Thought}", step.Thought);
                 stepsTaken.Add(step);
                 lastStep = step;
             }
@@ -321,5 +336,50 @@ namespace PostgreSQL.Embedding.Planners
             throw new Exception("No available AIService for getting completions.");
         }
 
+        private object GetValue(JsonElement element, Type returnType)
+        {
+            // boolean
+            if (returnType == typeof(Boolean))
+            {
+                return Boolean.Parse(element.ToString());
+            }
+
+            // string 
+            if (returnType == typeof(string))
+            {
+                return element.ToString();
+            }
+
+            // object
+            if (returnType.BaseType != typeof(ValueType))
+            {
+                return JsonSerializer.Deserialize(element.ToString(), returnType);
+            }
+
+            // number
+            var numberTypes = new List<Type>()
+            {
+                typeof(Int16), typeof(Int32), typeof(Int128),
+                typeof(UInt16),typeof(UInt32), typeof(UInt128),
+                typeof(int), typeof(short), typeof(long), typeof(float),typeof(double),
+                typeof(decimal)
+            };
+
+            if (numberTypes.Contains(returnType))
+            {
+                return Convert.ChangeType(element.ToString(), returnType);
+            }
+
+            // null
+            if (element.ValueKind == JsonValueKind.Null) return null;
+
+            // array
+            if (element.ValueKind == JsonValueKind.Array)
+            {
+                return JsonSerializer.Deserialize(element.ToString(), returnType);
+            }
+
+            return null;
+        }
     }
 }

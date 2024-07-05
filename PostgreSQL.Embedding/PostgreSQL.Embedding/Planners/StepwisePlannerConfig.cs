@@ -11,5 +11,7 @@
         public List<string> ExcludedPlugins { get; set; } = new List<string>();
 
         public List<string> ExcludedFunctions { get; set; } = new List<string>();
+
+        public Dictionary<string, object> Variables { get; set; } = new Dictionary<string, object>();
     }
 }

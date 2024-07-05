@@ -26,6 +26,14 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
             return HttpUtility.UrlDecode(conversationName);
         }
 
+        public static bool GetConversationFlag(this Microsoft.AspNetCore.Http.HttpContext context)
+        {
+            var conversationFlag = context.Request.Headers[Constants.HttpRequestHeader_ConversationFlag].FirstOrDefault();
+            if (string.IsNullOrEmpty(conversationFlag)) return false;
+
+            return conversationFlag == "Y";
+        }
+
         public static async Task WriteEmbedding(this Microsoft.AspNetCore.Http.HttpContext context, List<float> embedding)
         {
             var result = new OpenAICompatibleEmbeddingResult();
@@ -45,7 +53,7 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
             {
                 new OpenAICompatibleCompletionChoiceModel() { Index = 0, Text = text }
             };
-            
+
             if (!context.Response.HasStarted) context.Response.ContentType = "application/json";
             await context.Response.WriteAsync(JsonConvert.SerializeObject(result));
             await context.Response.CompleteAsync();
@@ -67,9 +75,9 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
         public static async Task WriteStreamingChatCompletion(this Microsoft.AspNetCore.Http.HttpContext context, IAsyncEnumerable<string> texts)
         {
             var result = new OpenAIStreamResult();
-            result.choices = new List<StreamChoicesModel>() 
+            result.choices = new List<StreamChoicesModel>()
             {
-                new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant" } } 
+                new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant" } }
             };
 
             await foreach (var text in texts)
