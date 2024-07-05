@@ -87,7 +87,5 @@ namespace PostgreSQL.Embedding.LlmServices
         {
             return _chatMessageRepository.DeleteAsync(messageId);
         }
-
-
     }
 }
