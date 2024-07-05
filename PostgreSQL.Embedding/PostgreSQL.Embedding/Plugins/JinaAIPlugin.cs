@@ -1,6 +1,8 @@
 ﻿using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
 using System.ComponentModel;
+using System.Text;
+using System.Text.Json.Serialization;
 
 namespace PostgreSQL.Embedding.Plugins
 {
@@ -14,11 +16,23 @@ namespace PostgreSQL.Embedding.Plugins
         }
 
         [KernelFunction]
-        [Description("一个由 JinaAI 驱动的搜索接口，返回内容格式为 Markdown。")]
+        [Description("一个由 JinaAI 驱动的搜索接口，返回内容格式为 JSON。")]
         public async Task<string> SearchAsync([Description("查询关键词")] string query)
         {
             using var httpClient = _httpClientFactory.CreateClient();
-            return await httpClient.GetStringAsync($"https://s.jina.ai/{query}");
+            httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
+            var searchResult = await httpClient.GetFromJsonAsync<JinaAISearchResult>($"https://s.jina.ai/{query}");
+
+            var stringBuilder = new StringBuilder();
+            foreach (var entry in searchResult.Data)
+            {
+                stringBuilder.AppendLine($"Url: {entry.Url}");
+                stringBuilder.AppendLine($"Title: {entry.Title}");
+                stringBuilder.AppendLine($"Description: {entry.Description}");
+                stringBuilder.AppendLine();
+            }
+
+            return stringBuilder.ToString();
         }
 
         [KernelFunction]
@@ -29,6 +43,31 @@ namespace PostgreSQL.Embedding.Plugins
             return await httpClient.GetStringAsync($"https://r.jina.ai/{url}");
         }
 
+        internal class JinaAISearchResult
+        {
+            [JsonPropertyName("code")]
+            public int Code { get; set; }
 
+            [JsonPropertyName("status")]
+            public long Status { get; set; }
+
+            [JsonPropertyName("data")]
+            public List<JinaAISearchResultEntry> Data { get; set; }
+        }
+
+        internal class JinaAISearchResultEntry
+        {
+            [JsonPropertyName("title")]
+            public string Title { get; set; }
+
+            [JsonPropertyName("url")]
+            public string Url { get; set; }
+
+            [JsonPropertyName("content")]
+            public string Content { get; set; }
+
+            [JsonPropertyName("description")]
+            public string Description { get; set; }
+        }
     }
 }

@@ -10,6 +10,7 @@ using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.LLmServices.Extensions;
 using PostgreSQL.Embedding.Planners;
 using PostgreSQL.Embedding.Utils;
+using System.Globalization;
 using System.Text;
 
 
@@ -27,7 +28,7 @@ namespace PostgreSQL.Embedding.LlmServices
         private string _conversationId;
         private readonly Random _random = new Random();
         public GenericConversationService(Kernel kernel, LlmApp app, IServiceProvider serviceProvider, IChatHistoriesService chatHistoriesService)
-            :base(kernel, chatHistoriesService)
+            : base(kernel, chatHistoriesService)
         {
             _kernel = kernel;
             _app = app;
@@ -41,8 +42,17 @@ namespace PostgreSQL.Embedding.LlmServices
         {
             _conversationId = httpContext.GetOrCreateConversationId();
             var conversationName = httpContext.GetConversationName();
-            await _chatHistoriesService.AddUserMessage(_app.Id, _conversationId, input);
-            await _chatHistoriesService.AddConversation(_app.Id, _conversationId, conversationName);
+            var conversationFlag = httpContext.GetConversationFlag();
+            if (!conversationFlag)
+            {
+                await _chatHistoriesService.AddUserMessage(_app.Id, _conversationId, input);
+                await _chatHistoriesService.AddConversation(_app.Id, _conversationId, conversationName);
+            }
+            else
+            {
+                await RemoveLastChatMessage(_app.Id, _conversationId);
+            }
+
 
             var conversationTask = model.stream
                 ? InvokeStreamingChat(httpContext, input)
@@ -61,11 +71,7 @@ namespace PostgreSQL.Embedding.LlmServices
         private async Task InvokeStreamingChat(HttpContext HttpContext, string input)
         {
             if (!HttpContext.Response.HasStarted)
-            {
                 HttpContext.Response.Headers.ContentType = new Microsoft.Extensions.Primitives.StringValues("text/event-stream");
-            }
-
-
 
             var usePlugin = true;
             var chatResult = usePlugin
@@ -152,6 +158,9 @@ namespace PostgreSQL.Embedding.LlmServices
             try
             {
                 var planner = new StepwisePlanner(_kernel, _promptTemplateService);
+                planner.AddVariable("appId", _app.Id);
+                planner.AddVariable("conversationId", _conversationId);
+
                 var plan = await planner.CreatePlanAsync(input);
                 var result = await plan.ExecuteAsync(_kernel);
                 return result.AsStreamming();
@@ -194,6 +203,15 @@ namespace PostgreSQL.Embedding.LlmServices
             _promptTemplate.AddVariable("system", _app.Prompt);
             _promptTemplate.AddVariable("histories", histories);
             return _promptTemplate.InvokeStreamingAsync(kernel, executionSettings);
+        }
+
+        private async Task RemoveLastChatMessage(long appId, string conversationId)
+        {
+            var messageList = await _chatHistoriesService.GetConversationMessages(appId, conversationId);
+            messageList = messageList.OrderBy(x => x.CreatedAt).ToList();
+            var lastMessage = messageList.LastOrDefault();
+            if (!lastMessage.IsUserMessage)
+                await _chatHistoriesService.DeleteConversationMessage(lastMessage.Id);
         }
     }
 }
