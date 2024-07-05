@@ -3,8 +3,12 @@ Answer the following questions as accurately as possible using the provided func
 
 {{$functionDescriptions}}
 
+[GLOBAL VARIABLES]
+{{$variableDescriptions}}
+[END GLOBAL VARIABLES]
+
 [USAGE INSTRUCTIONS]
-To use the functions, specify a JSON blob representing an action. The JSON blob should contain an "action" key with the name of the function to use, and an "action_variables" key with a JSON object of string values to use when calling the function.
+To use the functions, variables and histories, specify a JSON blob representing an action. The JSON blob should contain an "action" key with the name of the function to use, and an "action_variables" key with a JSON object of string values to use when calling the function.
 Do not call functions directly; they must be invoked through an action.
 The keys in "action_variables" value should match the defined [PARAMETERS] of the named "action" in [AVAILABLE FUNCTIONS].
 The values in "action_variables" must be of type string and represent the actual values to be passed to the function. Do not attempt to pass a variable name or other reference to a function.

@@ -22,10 +22,12 @@ namespace PostgreSQL.Embedding.Planners
         public async Task<StepwisePlan> CreatePlanAsync(string goal)
         {
             var functionDescriptions = await CreateFunctionDescriptions(_kernel);
+            var variableDescriptions = CreateVariableDescriptions();
 
             var arguments = new KernelArguments()
             {
                 ["functionDescriptions"] = functionDescriptions,
+                ["variableDescriptions"] = variableDescriptions,
                 ["suffix"] = _config.Suffix
             };
             var systemMessage = await _promptTemplateService.RenderTemplateAsync("Stepwise.txt", _kernel, arguments);
@@ -35,6 +37,8 @@ namespace PostgreSQL.Embedding.Planners
             return new StepwisePlan(systemMessage, goal, _config, logger);
         }
 
+        public void AddVariable<T>(string key, T value)  => _config.Variables.Add(key, value);
+
         private Task<string> CreateFunctionDescriptions(Kernel kernel)
         {
             var availableFunctions = kernel.GetAvailableFunctions(x => !_config.ExcludedPlugins.Contains(x.PluginName) && !_config.ExcludedPlugins.Contains(x.Name));
@@ -42,6 +46,17 @@ namespace PostgreSQL.Embedding.Planners
 
             var arguments = new KernelArguments() { ["functionDescriptions"] = functionDescriptions };
             return _promptTemplateService.RenderTemplateAsync("FunctionManual.txt", kernel, arguments);
+        }
+
+        private string CreateVariableDescriptions()
+        {
+            var stringBuilder = new StringBuilder();
+            foreach(var variable in  _config.Variables)
+            {
+                stringBuilder.AppendLine($"{variable.Key}: {variable.Value.ToString()}");
+            }
+
+            return stringBuilder.ToString(); ;
         }
 
         private string CreateFunctionDescription(KernelFunctionMetadata functionMetadata)
