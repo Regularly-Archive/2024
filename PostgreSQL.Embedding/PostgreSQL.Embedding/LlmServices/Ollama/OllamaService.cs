@@ -26,6 +26,8 @@ namespace PostgreSQL.Embedding.LlmServices.Ollama
         {
             using (var httpClient = _httpClientFactory.CreateClient())
             {
+                httpClient.Timeout = Timeout.InfiniteTimeSpan;
+
                 var httpContent = new StringContent(JsonConvert.SerializeObject(request), Encoding.UTF8, "application/json");
                 var httpResponse = await httpClient.PostAsync(new Uri($"{_baseUrl}/v1/chat/completions"), httpContent);
                 httpResponse.EnsureSuccessStatusCode();
