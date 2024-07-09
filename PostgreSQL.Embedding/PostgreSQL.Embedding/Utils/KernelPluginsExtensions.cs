@@ -22,6 +22,9 @@ namespace PostgreSQL.Embedding.Utils
 
             foreach (var pluginType in pluginTypes)
             {
+                var kernelPluginAttribute = pluginType.GetCustomAttribute<KernelPluginAttribute>();
+                if (!kernelPluginAttribute.Enabled) continue;
+
                 services.AddScoped(pluginType);
             }
 
@@ -47,6 +50,7 @@ namespace PostgreSQL.Embedding.Utils
                     if (string.IsNullOrEmpty(kernelPluginAttribute.PluginName))
                         kernelPluginAttribute.PluginName = pluginType.Name;
 
+                    if (!kernelPluginAttribute.Enabled) continue;
                     kernel.Plugins.AddFromObject(pluginInstance, kernelPluginAttribute.PluginName);
                 }
             }
@@ -68,7 +72,7 @@ namespace PostgreSQL.Embedding.Utils
                     persistedPlugin.PluginIntro = kernelPluginAttribute.Description;
                     persistedPlugin.PluginName = kernelPluginAttribute.PluginName ?? pluginType.Name;
                     await pluginRepository.UpdateAsync(persistedPlugin);
-                } 
+                }
                 else
                 {
                     var newPlugin = new LlmPlugin()
