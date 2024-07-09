@@ -1,0 +1,40 @@
+# deployment dc-api
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aspnet-api
+  namespace: test
+  labels:
+    app: aspnet-api
+    app-group: aspnet-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aspnet-api
+  template:
+    metadata:
+      labels:
+        app: aspnet-api
+        app-group: aspnet-api
+    spec:
+      containers:
+      - name: aspnet-api
+        image: qinyuanpei/aspnet-api
+        # volumeMounts:
+        #   - mountPath: "/run/settings"
+        #     name: aspnet-api-appsettings
+        #     readOnly: true
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+      # volumes:
+      #   - name: aspnet-api-appsettings
+      #     secret:
+      #       secretName: aspnet-api-appsettings
+      imagePullSecrets:
+      - name: docker-hub-cred
+
