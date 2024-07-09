@@ -59,3 +59,12 @@ SSE.Streaming/AsyncEnumerable/obj/
 SSE.Streaming/AsyncEnumerable/bin/
 SSE.Streaming/AsyncEnumerable/.vs/
 SSE.Streaming/server/.vs/
+AspNetWithAspire/AspireApp/AspireApp.Web/bin/
+AspNetWithAspire/AspireApp/AspireApp.Web/obj/
+AspNetWithAspire/AspireApp/AspireApp.AppHost/obj/
+AspNetWithAspire/AspireApp/AspireApp.ServiceDefaults/obj/
+AspNetWithAspire/AspireApp/AspireApp.ApiService/obj/
+AspNetWithAspire/AspireApp/AspireApp.AppHost/bin/
+AspNetWithAspire/AspireApp/.vs/
+AspNetWithAspire/AspireApp/AspireApp.ServiceDefaults/bin/
+AspNetWithAspire/AspireApp/AspireApp.ApiService/bin/
