@@ -7,7 +7,7 @@ using ThirdParty.Json.LitJson;
 namespace PostgreSQL.Embedding.Plugins
 {
     [KernelPlugin(Description = "中央气象台天气预报接口")]
-    public class NMCWeather
+    public class NMCWeatherPlugin
     {
         private readonly Dictionary<string, string> _provincesMap = new Dictionary<string, string>()
         {
@@ -48,7 +48,7 @@ namespace PostgreSQL.Embedding.Plugins
         };
 
         private readonly IHttpClientFactory _httpClientFactory;
-        public NMCWeather(IHttpClientFactory httpClientFactory)
+        public NMCWeatherPlugin(IHttpClientFactory httpClientFactory)
         {
             _httpClientFactory = httpClientFactory;
         }
