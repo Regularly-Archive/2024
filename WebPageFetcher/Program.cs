@@ -1,11 +1,13 @@
 ﻿using AngleSharp;
 using AngleSharp.Dom;
 using HtmlAgilityPack;
+using System;
 using System.Net;
 using System.Net.Http;
 using System.ServiceModel.Syndication;
 using System.Text.RegularExpressions;
 using System.Xml;
+using WebPageFetcher;
 
 public class Program
 {
@@ -84,7 +86,6 @@ public class Program
                 var config = Configuration.Default.WithDefaultLoader();
                 var context = BrowsingContext.New(config);
                 var document = await context.OpenAsync(request => request.Content(html));
-                var htmlDocument = new HtmlDocument();
 
                 var eleTitle = document.QuerySelector("title");
                 Console.WriteLine("Title: " + eleTitle.TextContent);
@@ -99,6 +100,45 @@ public class Program
         }
     }
 
+    public static async Task<SearchResult> GetSearchResultAsync(string keyword)
+    {
+        using (var httpClient = new HttpClient())
+        {
+            var response = await httpClient.GetAsync($"https://www.bing.com/search?q={keyword}");
+            response.EnsureSuccessStatusCode();
+
+            var seachResult = new SearchResult();
+
+            var html = await response.Content.ReadAsStringAsync();
+
+            var config = Configuration.Default.WithDefaultLoader();
+            var context = BrowsingContext.New(config);
+            var document = await context.OpenAsync(request => request.Content(html));
+
+            var eleMain = document.QuerySelector("main");
+            if (eleMain == null)
+                return seachResult;
+
+            var eleResults = eleMain.QuerySelectorAll(".b_algo");
+            if (eleResults == null || !eleResults.Any())
+                return seachResult;
+
+            seachResult.Entries = eleResults.Select(x =>
+            {
+                var eleH2 = x.QuerySelector("h2");
+                return new Entry()
+                {
+                    Title = eleH2.TextContent,
+                    Url = eleH2.QuerySelector("a").Attributes["href"].Value,
+                    Description = x.QuerySelector(".b_caption").TextContent
+                };
+            })
+            .ToList();
+
+            return seachResult;
+        }
+    }
+
     public static async Task Main(string[] args)
     {
         ExtractFromRSS("https://www.ruanyifeng.com/blog/atom.xml");
@@ -108,6 +148,8 @@ public class Program
 
         await GetWebPageContentAsync("https://sspai.com/post/86171", ".article-detail");
         await GetWebPageContentAsync("https://blog.yuanpei.me/posts/the-boy-the-heron-the-self-reconciliation/", "article");
+
+        await GetSearchResultAsync("blog.yuanpei.me");
     }
 
     static string CleanHtml(string html)
