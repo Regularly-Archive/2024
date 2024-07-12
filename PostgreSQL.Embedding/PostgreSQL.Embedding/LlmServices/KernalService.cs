@@ -50,6 +50,7 @@ namespace PostgreSQL.Embedding.LlmServices
 
             kernel.Plugins.AddFromType<ConversationSummaryPlugin>();
             kernel.Plugins.AddFromType<TimePlugin>();
+            kernel.Plugins.AddFromType<MathPlugin>();
 
             kernel = kernel.ImportLlmPlugins(_serviceProvider);
 

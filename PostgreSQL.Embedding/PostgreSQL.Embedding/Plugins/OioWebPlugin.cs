@@ -1,6 +1,9 @@
 ﻿using Microsoft.SemanticKernel;
+using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Attributes;
+using PostgreSQL.Embedding.Common.Json;
 using System.ComponentModel;
+using System.Text.Json.Serialization;
 using static PostgreSQL.Embedding.Plugins.NMCWeatherPlugin;
 
 namespace PostgreSQL.Embedding.Plugins
@@ -18,10 +21,8 @@ namespace PostgreSQL.Embedding.Plugins
         [Description("历史上的今天都发生了哪些事情。")]
         public async Task<string> TodayInHistory()
         {
-            using (var httpClient = _httpClientFactory.CreateClient())
-            {
-                return await httpClient.GetStringAsync($"https://api.oioweb.cn/api/common/history");
-            }
+            using var httpClient = _httpClientFactory.CreateClient();
+            return await httpClient.GetStringAsync($"https://api.oioweb.cn/api/common/history");
         }
 
         [KernelFunction]
@@ -46,21 +47,22 @@ namespace PostgreSQL.Embedding.Plugins
 
                     return targetCurrency.v;
 
-                } else if (destination == "CNY")
+                }
+                else if (destination == "CNY")
                 {
                     var targetCurrency = currencyList.FirstOrDefault(x => x.c == source);
                     if (targetCurrency == null) return $"未查询到对应汇率：{source}";
 
                     return (1M / decimal.Parse(targetCurrency.v)).ToString("f3");
-                } 
+                }
                 else
                 {
-                    var middleCurrency = await GetExchangeRate(source, "CNY");
+                    var cnyCurrency = await GetExchangeRate(source, "CNY");
 
                     var targetCurrency = currencyList.FirstOrDefault(x => x.c == destination);
                     if (targetCurrency == null) return $"未查询到对应汇率：{destination}";
 
-                    return (decimal.Parse(middleCurrency) *  decimal.Parse(targetCurrency.v)).ToString("f3");
+                    return (decimal.Parse(cnyCurrency) * decimal.Parse(targetCurrency.v)).ToString("f3");
                 }
             }
         }
@@ -75,11 +77,59 @@ namespace PostgreSQL.Embedding.Plugins
             }
         }
 
+        [KernelFunction]
+        [Description("获取公共假期信息")]
+        public async Task<string> GetNextHolidayInfo()
+        {
+            using var httpClient = _httpClientFactory.CreateClient();
+            var holidayDayInfoResult = await httpClient.GetFromJsonAsync<HolidayInfoApiResult>($"https://api.oioweb.cn/api/common/getNextHolidayInfo");
+            if (holidayDayInfoResult.Result == null || !holidayDayInfoResult.Result.Any())
+                return "暂无可用的公共假期";
+
+            var holidays = holidayDayInfoResult.Result.Where(x => x.Start >= DateTime.Today).ToList();
+            if (!holidays.Any())
+                return "暂无可用的公共假期";
+
+            return JsonSerializerExtensions.Serialize(holidays);
+        }
+
+        internal class HolidayInfo
+        {
+            [JsonPropertyName("holiday")]
+            public DateTime Holiday { get; set; }
+
+            [JsonPropertyName("enName")]
+            public string EnName { get; set; }
+
+            [JsonPropertyName("name")]
+            public string Name { get; set; }
+
+            [JsonPropertyName("year")]
+            public int Year { get; set; }
+
+            [JsonPropertyName("start")]
+            public DateTime Start { get; set; }
+
+            [JsonPropertyName("end")]
+            public DateTime End { get; set; }
+
+            [JsonPropertyName("occupied")]
+            public List<string> Occupied { get; set; }
+        }
+
+        internal class HolidayInfoApiResult
+        {
+            [JsonPropertyName("code")]
+            public int Code { get; set; }
+
+            [JsonPropertyName("result")]
+            public List<HolidayInfo> Result { get; set; }
+        }
         internal class CurrencyModel
         {
             public string c { get; set; }
             public string v { get; set; }
-            public string d {  get; set; }
+            public string d { get; set; }
         }
 
         internal class ApiResult<T>

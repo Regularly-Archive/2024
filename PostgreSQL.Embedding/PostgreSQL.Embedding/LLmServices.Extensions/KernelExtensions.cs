@@ -28,5 +28,15 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
 
             return kernel.Plugins.GetFunction(pluginName, functionName);
         }
+
+        public static KernelArguments MergeArguments(this KernelArguments kernelArguments, Dictionary<string, object> dictionary)
+        {
+            foreach (var kv in dictionary)
+            {
+                kernelArguments[kv.Key] = kv.Value;
+            }
+
+            return kernelArguments;
+        }
     }
 }
