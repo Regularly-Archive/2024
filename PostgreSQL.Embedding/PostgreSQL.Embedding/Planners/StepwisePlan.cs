@@ -101,20 +101,10 @@ namespace PostgreSQL.Embedding.Planners
             try
             {
                 var kernelFunction = kernel.GetKernelFunction(actionName);
+                actionVariables = BindFunctionParameter(actionVariables, kernelFunction);
 
                 var kernelArguments = new KernelArguments(actionVariables);
-                foreach (var parameter in kernelFunction.Metadata.Parameters)
-                {
-                    if (actionVariables.ContainsKey(parameter.Name) && actionVariables[parameter.Name] is JsonElement)
-                    {
-                        actionVariables[parameter.Name] = GetValue((JsonElement)actionVariables[parameter.Name], parameter.ParameterType);
-                    }
-                }
-
-                foreach (var varibale in _config.Variables)
-                {
-                    kernelArguments[varibale.Key] = varibale.Value;
-                }
+                kernelArguments = kernelArguments.MergeArguments(_config.Variables);
 
                 var kernelResult = await kernel.InvokeAsync(kernelFunction, kernelArguments);
                 var result = kernelResult.GetValue<string>();
@@ -159,7 +149,7 @@ namespace PostgreSQL.Embedding.Planners
                     this._logger?.LogWarning(ex, "Error invoking action {Action}", step.Action);
                 }
 
-                this._logger?.LogInformation("Observation: {Observation}", step.Observation);
+                this._logger?.LogInformation("Observation: \r\n{Observation}", step.Observation);
                 chatHistory.AddUserMessage($"{ObservationTag} {step.Observation}");
 
                 return true;
@@ -380,6 +370,19 @@ namespace PostgreSQL.Embedding.Planners
             }
 
             return null;
+        }
+
+        private Dictionary<string,object> BindFunctionParameter(Dictionary<string, object> actionVariables, KernelFunction kernelFunction)
+        {
+            foreach (var parameter in kernelFunction.Metadata.Parameters)
+            {
+                if (actionVariables.ContainsKey(parameter.Name) && actionVariables[parameter.Name] is JsonElement)
+                {
+                    actionVariables[parameter.Name] = GetValue((JsonElement)actionVariables[parameter.Name], parameter.ParameterType);
+                }
+            }
+
+            return actionVariables;
         }
     }
 }
