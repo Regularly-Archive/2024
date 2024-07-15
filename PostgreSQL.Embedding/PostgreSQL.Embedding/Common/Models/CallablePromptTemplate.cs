@@ -10,6 +10,7 @@ namespace PostgreSQL.Embedding.Common.Models
     {
         public string Template { get; private set; }
         private Dictionary<string, object> _arguments = new Dictionary<string, object>();
+        private readonly KernelPromptTemplateFactory _templateFactory = new KernelPromptTemplateFactory();
 
         public CallablePromptTemplate(string template)
         {
@@ -41,6 +42,13 @@ namespace PostgreSQL.Embedding.Common.Models
         {
             var kernelFunction = kernel.CreateFunctionFromPrompt(Template, executionSettings);
             return kernel.InvokeStreamingAsync<T>(kernelFunction, new KernelArguments(_arguments));
+        }
+
+        public Task<string> RenderTemplateAsync(Kernel kernel, OpenAIPromptExecutionSettings executionSettings = null)
+        {
+            var promptTemplateConfig = new PromptTemplateConfig(Template);
+            var kernelPromptTemplate = _templateFactory.Create(promptTemplateConfig);
+            return kernelPromptTemplate.RenderAsync(kernel, new KernelArguments(_arguments));
         }
     }
 }
