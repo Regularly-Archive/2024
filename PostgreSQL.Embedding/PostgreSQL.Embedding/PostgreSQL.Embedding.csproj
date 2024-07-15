@@ -103,6 +103,9 @@
     <None Update="Common\Prompts\Stepwise.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="Common\Prompts\Text2SQL.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="Resources\cn_synonym.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

@@ -10,6 +10,15 @@ namespace PostgreSQL.Embedding.Plugins
     [KernelPlugin(Description = "微软必应搜索插件")]
     public class BingSearchPlugin
     {
+        private const string SELECTOR_TAG_MAIN = "main";
+        private const string SELECTOR_TAG_LINK = "a";
+        private const string SELECTOR_TAG_ITEM = ".b_algo";
+        private const string SELECTOR_TAG_ITEM_TITLE = "h2";
+        private const string SELECTOR_TAG_HREF = "href";
+        private const string SELECTOR_TAG_ITEM_DESC = ".b_caption";
+
+
+
         private readonly IHttpClientFactory _httpClientFactory;
         public BingSearchPlugin(IHttpClientFactory httpClientFactory)
         {
@@ -47,20 +56,20 @@ namespace PostgreSQL.Embedding.Plugins
             var context = BrowsingContext.New(config);
             var document = await context.OpenAsync(request => request.Content(html));
 
-            var eleMain = document.QuerySelector("main");
+            var eleMain = document.QuerySelector(SELECTOR_TAG_MAIN);
             if (eleMain == null) return seachResult;
 
-            var eleItems = eleMain.QuerySelectorAll(".b_algo");
+            var eleItems = eleMain.QuerySelectorAll(SELECTOR_TAG_ITEM);
             if (eleItems == null || !eleItems.Any()) return seachResult;
 
             seachResult.Entries = eleItems.Select(x =>
             {
-                var eleTitle = x.QuerySelector("h2");
+                var eleTitle = x.QuerySelector(SELECTOR_TAG_ITEM_TITLE);
                 return new Entry()
                 {
                     Title = eleTitle.TextContent,
-                    Url = eleTitle.QuerySelector("a").Attributes["href"].Value,
-                    Description = x.QuerySelector(".b_caption").TextContent
+                    Url = eleTitle.QuerySelector(SELECTOR_TAG_LINK).Attributes[SELECTOR_TAG_HREF].Value,
+                    Description = x.QuerySelector(SELECTOR_TAG_ITEM_DESC).TextContent
                 };
             })
             .ToList();
