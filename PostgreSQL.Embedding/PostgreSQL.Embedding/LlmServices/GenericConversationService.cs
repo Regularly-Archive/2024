@@ -42,6 +42,7 @@ namespace PostgreSQL.Embedding.LlmServices
         {
             _conversationId = httpContext.GetOrCreateConversationId();
             var conversationName = httpContext.GetConversationName();
+
             var conversationFlag = httpContext.GetConversationFlag();
             if (!conversationFlag)
             {
