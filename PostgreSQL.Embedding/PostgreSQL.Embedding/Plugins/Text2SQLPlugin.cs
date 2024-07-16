@@ -114,36 +114,36 @@ namespace PostgreSQL.Embedding.Plugins
             using var sqlClient = new SqlSugarClient(_connectionConfig);
             var rows = await sqlClient.Ado.SqlQueryAsync<dynamic>(sql);
 
-            var columns = ((IDictionary<string, object>)rows[0]).Keys.ToList();
+            var columnNames = ((IDictionary<string, object>)rows[0]).Keys.ToList();
 
             var stringBuilder = new StringBuilder();
-            stringBuilder.AppendLine(RenderMarkdownTableHeader(columns));
-            stringBuilder.AppendLine(RenderMarkdownTableBody(rows, columns));
+            stringBuilder.AppendLine(RenderMarkdownTableHeader(columnNames));
+            stringBuilder.AppendLine(RenderMarkdownTableBody(rows, columnNames));
             return stringBuilder.ToString();
         }
 
-        private string RenderMarkdownTableHeader(List<string> columns)
+        private string RenderMarkdownTableHeader(List<string> columnNames)
         {
             var stringBuilder = new StringBuilder();
-            stringBuilder.AppendLine(" | " + string.Join(" | ", columns) + " | ");
+            stringBuilder.AppendLine(" | " + string.Join(" | ", columnNames) + " | ");
 
-            var maxLength = columns.Max(x => x.Length);
-            var headerDividers = columns.Select(x => new string('-', maxLength * 2));
+            var maxLength = columnNames.Max(x => x.Length);
+            var headerDividers = columnNames.Select(x => new string('-', maxLength * 2));
             stringBuilder.AppendLine(" | " + string.Join(" | ", headerDividers) + " | ");
             return stringBuilder.ToString();
         }
 
-        private string RenderMarkdownTableBody(List<dynamic> rows, List<string> columns)
+        private string RenderMarkdownTableBody(List<dynamic> rows, List<string> columnNames)
         {
             var stringBuilder = new StringBuilder();
 
             foreach (var row in rows)
             {
                 var rowValues = new List<string>();
-                foreach (var column in columns)
+                foreach (var columnName in columnNames)
                 {
 
-                    var value = ((IDictionary<string, object>)row)[column]?.ToString() ?? "NULL";
+                    var value = ((IDictionary<string, object>)row)[columnName]?.ToString() ?? "NULL";
                     rowValues.Add(value);
                 }
                 stringBuilder.AppendLine(" | " + string.Join(" | ", rowValues) + " | ");
