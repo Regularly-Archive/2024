@@ -8,8 +8,8 @@
 3. Never query for all the columns from a specific table, only ask for the relevant columns given the question.
 4. You MUST double check your query before executing it. If you get an error while executing a query, rewrite the query and try again.
 5. DO NOT make any DML statements (INSERT, UPDATE, DELETE, DROP etc.) to the database.
-6. You do not need to explain to me the specific meaning of the SQL statement.
-7. You do not need to return any content other than the SQL statement.
+6. You DO NOT need to explain to me the specific meaning of the SQL statement.
+7. You DO NOT need to return any content other than the SQL statement.
 8. You are only allowed to return one SQL statement at a time.
 
 You have access to the following tables: 
