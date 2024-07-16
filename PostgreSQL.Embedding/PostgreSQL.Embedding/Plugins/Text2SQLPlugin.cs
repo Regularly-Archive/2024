@@ -142,7 +142,6 @@ namespace PostgreSQL.Embedding.Plugins
                 var rowValues = new List<string>();
                 foreach (var columnName in columnNames)
                 {
-
                     var value = ((IDictionary<string, object>)row)[columnName]?.ToString() ?? "NULL";
                     rowValues.Add(value);
                 }
