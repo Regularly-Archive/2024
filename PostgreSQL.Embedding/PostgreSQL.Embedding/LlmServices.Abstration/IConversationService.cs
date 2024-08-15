@@ -5,6 +5,6 @@ namespace PostgreSQL.Embedding.LlmServices.Abstration
 {
     public interface IConversationService
     {
-        Task Invoke(OpenAIModel model, long appId, HttpContext HttpContext);
+        Task Invoke(OpenAIModel model, long appId, HttpContext HttpContext, CancellationToken cancellationToken = default);
     }
 }

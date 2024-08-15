@@ -93,6 +93,19 @@ namespace PostgreSQL.Embedding.Plugins
             return JsonSerializerExtensions.Serialize(holidays);
         }
 
+        [KernelFunction]
+        [Description("获取必应壁纸，返回 Markdown 形式的图片")]
+        public async Task<string> GetBingWallPaper()
+        {
+            using var httpClient = _httpClientFactory.CreateClient();
+            var data = await httpClient.GetFromJsonAsync<WallPaperInfoApiResult>($"https://api.oioweb.cn/api/bing");
+
+            var random = new Random();
+            var image = data.Result[random.Next(data.Result.Count)];
+            return $"![{image.Title}]({image.Url})";
+        }
+
+        #region
         internal class HolidayInfo
         {
             [JsonPropertyName("holiday")]
@@ -125,6 +138,7 @@ namespace PostgreSQL.Embedding.Plugins
             [JsonPropertyName("result")]
             public List<HolidayInfo> Result { get; set; }
         }
+
         internal class CurrencyModel
         {
             public string c { get; set; }
@@ -143,5 +157,24 @@ namespace PostgreSQL.Embedding.Plugins
         {
             public T data { get; set; }
         }
+
+        internal class WallPaperInfo
+        {
+            [JsonPropertyName("url")]
+            public string Url { get; set; }
+
+            [JsonPropertyName("title")]
+            public string Title { get; set; }
+        }
+
+        internal class WallPaperInfoApiResult
+        {
+            [JsonPropertyName("code")]
+            public int Code { get; set; }
+
+            [JsonPropertyName("result")]
+            public List<WallPaperInfo> Result { get; set; }
+        }
+        #endregion
     }
 }
