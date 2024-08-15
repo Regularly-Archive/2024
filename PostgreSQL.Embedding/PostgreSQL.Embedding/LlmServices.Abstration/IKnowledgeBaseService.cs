@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc.RazorPages;
+﻿using HandlebarsDotNet;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.Common.Models.KernelMemory;
 using PostgreSQL.Embedding.Common.Models.WebApi;
@@ -20,5 +21,6 @@ namespace PostgreSQL.Embedding.LlmServices.Abstration
         Task<KMAskResult> AskAsync(long knowledgeBaseId, string question, double minRelevance = 0.75);
         Task<bool> IsDocumentReady(long knowledgeBaseId, string fileName);
         Task ReImportKnowledges(long knowledgeBaseId, string fileName = null);
+        Task<KMPartition> GetKnowledgeBaseChunk(long knowledgeBaseId, string fileId, string partId);
     }
 }

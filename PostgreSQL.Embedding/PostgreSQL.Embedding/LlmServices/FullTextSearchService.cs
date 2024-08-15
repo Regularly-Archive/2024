@@ -150,6 +150,8 @@ namespace PostgreSQL.Embedding.LlmServices
             tags.Add(KernelMemoryTags.TaskId, ParseFromTags(reader, KernelMemoryTags.TaskId));
             tags.Add(KernelMemoryTags.KnowledgeBaseId, ParseFromTags(reader, KernelMemoryTags.KnowledgeBaseId));
             tags.Add(KernelMemoryTags.FileName, ParseFromTags(reader, KernelMemoryTags.FileName));
+            tags.Add(KernelMemoryTags.FileId, ParseFromTags(reader, KernelMemoryTags.FileId));
+            tags.Add(KernelMemoryTags.PartId, ParseFromTags(reader, KernelMemoryTags.PartId));
 
             partion.Tags = tags;
             return new KMPartition(partion);

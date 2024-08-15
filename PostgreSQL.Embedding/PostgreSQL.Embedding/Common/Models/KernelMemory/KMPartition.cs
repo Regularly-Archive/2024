@@ -4,6 +4,8 @@ namespace PostgreSQL.Embedding.Common.Models.KernelMemory
 {
     public class KMPartition
     {
+        public string FileId { get; private set; }
+        public string PartId { get; private set; }
         public string Text { get; private set; }
         public float Relevance { get; private set; }
         public int PartitionNumber { get; private set; }
@@ -23,6 +25,8 @@ namespace PostgreSQL.Embedding.Common.Models.KernelMemory
             this.FileName = GetTagValue(partition, KernelMemoryTags.FileName);
             this.TaskId = GetTagValue(partition, KernelMemoryTags.TaskId);
             this.KnowledgeBaseId = GetTagValue(partition, KernelMemoryTags.KnowledgeBaseId);
+            this.FileId = GetTagValue(partition, KernelMemoryTags.FileId);
+            this.PartId = GetTagValue(partition, KernelMemoryTags.PartId);
         }
 
         private string GetTagValue(Citation.Partition partition, string key)
