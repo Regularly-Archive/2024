@@ -147,6 +147,13 @@ namespace PostgreSQL.Embedding.Controllers
             await _knowledgeBaseService.DeleteKnowledgeBaseChunksByFileName(knowledgeBaseId, fileName);
         }
 
+        [HttpGet("{knowledgeBaseId}/chunks/{fileId}/{partId}")]
+        public async Task<JsonResult> GetKnowledgeBaseChunk(long knowledgeBaseId, string fileId, string partId)
+        {
+            var chunk = await _knowledgeBaseService.GetKnowledgeBaseChunk(knowledgeBaseId, fileId,partId);
+            return ApiResult.Success(chunk);
+        }
+
         public override async Task<JsonResult> Create(KnowledgeBase entity)
         {
             var instance = await _knowledgeBaseService.CreateKnowledgeBase(entity);

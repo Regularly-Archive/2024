@@ -37,7 +37,7 @@ namespace PostgreSQL.Embedding.Plugins
         [Description("根据用户的输入生成和执行 SQL 并返回 Markdown 形式的表格数据")]
         public async Task<string> QueryAsync([Description("用户输入")] string input, Kernel kernel)
         {
-            var tableDescriptor = await GetTableTableDescriptorsAsync("Chinook");
+            var tableDescriptor = await GetTableDescriptorsAsync("Chinook");
             var databaseSchema = GeneratorDatabaseSchema(tableDescriptor);
 
             var promptTemplate = _promptTemplateService.LoadTemplate("Text2SQL.txt");
@@ -47,12 +47,12 @@ namespace PostgreSQL.Embedding.Plugins
             var functionResult = await promptTemplate.InvokeAsync(kernel);
             var generatedSQL = functionResult.GetValue<string>().Replace("```sql", "").Replace("```", "");
             _logger.LogInformation("Generated SQL: {0}", generatedSQL);
-            
+
             var queryResult = await ExecuteSQLAsync(generatedSQL);
             return queryResult;
         }
 
-        private async Task<IEnumerable<TableDescriptor>> GetTableTableDescriptorsAsync(string databaseName)
+        private async Task<IEnumerable<TableDescriptor>> GetTableDescriptorsAsync(string databaseName)
         {
             var sqlText =
                 @"SELECT t.TABLE_NAME,
@@ -98,7 +98,7 @@ namespace PostgreSQL.Embedding.Plugins
             foreach (var tableDescriptor in tableDescriptors)
             {
                 stringBuilder.AppendLine($"{tableDescriptor.Name}, {tableDescriptor.Description}");
-                foreach(var columnDescriptor in tableDescriptor.Columns)
+                foreach (var columnDescriptor in tableDescriptor.Columns)
                 {
                     stringBuilder.AppendLine($" - {columnDescriptor.Name}, {columnDescriptor.DataType}, {columnDescriptor.Description}");
                 }
