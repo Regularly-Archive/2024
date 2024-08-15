@@ -30,8 +30,10 @@ namespace PostgreSQL.Embedding.LlmServices
             _chatHistoryService = chatHistoryService;
         }
 
-        public async Task Invoke(OpenAIModel model, long appId, HttpContext HttpContext)
+        public async Task Invoke(OpenAIModel model, long appId, HttpContext HttpContext, CancellationToken cancellationToken = default)
         {
+            if (cancellationToken.IsCancellationRequested) return;
+
             var app = await _llmAppRepository.GetAsync(appId);
             var kernel = await _kernelService.GetKernel(app);
 

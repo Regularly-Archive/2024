@@ -112,5 +112,27 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
             await context.Response.Body.FlushAsync();
             await context.Response.CompleteAsync();
         }
+
+        public static async Task WriteStreamingChatCompletion(this Microsoft.AspNetCore.Http.HttpContext context, string data)
+        {
+            var texts = data.ToArray().Select(x => x.ToString()).ToAsyncEnumerable();
+
+            var result = new OpenAIStreamResult();
+            result.choices = new List<StreamChoicesModel>()
+            {
+                new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant" } }
+            };
+
+            await foreach (var text in texts)
+            {
+                result.choices[0].delta.content = text == null ? string.Empty : Convert.ToString(text);
+                string message = $"data: {JsonConvert.SerializeObject(result)}\n\n";
+                await context.Response.WriteAsync(message, Encoding.UTF8);
+                await context.Response.Body.FlushAsync();
+            }
+            await context.Response.WriteAsync("data: [DONE]");
+            await context.Response.Body.FlushAsync();
+            await context.Response.CompleteAsync();
+        }
     }
 }
