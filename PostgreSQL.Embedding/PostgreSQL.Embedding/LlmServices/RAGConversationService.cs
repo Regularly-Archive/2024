@@ -16,6 +16,7 @@ using PostgreSQL.Embedding.LLmServices.Extensions;
 using SqlSugar;
 using System.Net.Http;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
@@ -35,6 +36,7 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly CallablePromptTemplate _rewritePromptTemplate;
         private string _conversationId;
         private readonly IRerankService _rerankService;
+        private Regex _regexCitations = new Regex(@"\[\^(\d+)\]");
 
         public RAGConversationService(
             Kernel kernel,
@@ -81,7 +83,8 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <returns></returns>
         private async Task InvokeWithKnowledge(HttpContext HttpContext, string input)
         {
-            var context = await BuildKnowledgeContext(input);
+            var citations = await BuildKnowledgeCitations(input);
+            var jsonFormatContext = JsonConvert.SerializeObject(citations);
 
             var temperature = _app.Temperature / 100;
             var executionSettings = new OpenAIPromptExecutionSettings() { Temperature = (double)temperature };
@@ -89,7 +92,7 @@ namespace PostgreSQL.Embedding.LlmServices
             var histories = await GetHistoricalMessages(_app.Id, _conversationId, _app.MaxMessageRounds);
 
             _promptTemplate.AddVariable("name", "ChatGPT");
-            _promptTemplate.AddVariable("context", context);
+            _promptTemplate.AddVariable("context", jsonFormatContext);
             _promptTemplate.AddVariable("question", input);
             _promptTemplate.AddVariable("empty_answer", Common.Constants.DefaultEmptyAnswer);
             _promptTemplate.AddVariable("histories", histories);
@@ -98,8 +101,24 @@ namespace PostgreSQL.Embedding.LlmServices
             var answer = chatResult.GetValue<string>();
             if (!string.IsNullOrEmpty(answer))
             {
-                await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answer);
-                await HttpContext.WriteChatCompletion(input);
+                if (answer.IndexOf(Common.Constants.DefaultEmptyAnswer) != -1)
+                {
+                    answer = Common.Constants.DefaultEmptyAnswer;
+                    await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answer);
+                    await HttpContext.WriteChatCompletion(input);
+                } 
+                else
+                {
+                    var citationNumbers = _regexCitations.Matches(answer).Select(x => int.Parse(x.Groups[1].Value));
+                    var markdownFormatContext = string.Join("\r\n", citations.Where(x => citationNumbers.Contains(x.Index)).Select(x => $"[^{x.Index}]: {x.Url}"));
+
+                    var answerBuilder = new StringBuilder();
+                    answerBuilder.AppendLine(answer);
+                    answerBuilder.AppendLine(markdownFormatContext);
+
+                    await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());
+                    await HttpContext.WriteChatCompletion(answerBuilder.ToString());
+                }
             }
         }
 
@@ -117,7 +136,8 @@ namespace PostgreSQL.Embedding.LlmServices
                 HttpContext.Response.Headers.ContentType = new Microsoft.Extensions.Primitives.StringValues("text/event-stream");
             }
 
-            var context = await BuildKnowledgeContext(input);
+            var citations = await BuildKnowledgeCitations(input);
+            var jsonFormatContext = JsonConvert.SerializeObject(citations);
 
             var temperature = _app.Temperature / 100;
             var executionSettings = new OpenAIPromptExecutionSettings() { Temperature = (double)temperature };
@@ -125,21 +145,32 @@ namespace PostgreSQL.Embedding.LlmServices
             var histories = await GetHistoricalMessages(_app.Id, _conversationId, _app.MaxMessageRounds);
 
             _promptTemplate.AddVariable("name", "ChatGPT");
-            _promptTemplate.AddVariable("context", context);
+            _promptTemplate.AddVariable("context", jsonFormatContext);
             _promptTemplate.AddVariable("question", input);
             _promptTemplate.AddVariable("empty_answer", Common.Constants.DefaultEmptyAnswer);
             _promptTemplate.AddVariable("histories", histories);
-            var chatResult = _promptTemplate.InvokeStreamingAsync(_kernel, executionSettings);
+            var chatResult = await _promptTemplate.InvokeAsync(_kernel, executionSettings);
 
-            var answerBuilder = new StringBuilder();
-            await foreach (var content in chatResult)
+            var llmResponse = chatResult.GetValue<string>();
+            if (llmResponse != null && llmResponse.IndexOf(Common.Constants.DefaultEmptyAnswer) != -1)
             {
-                if (!string.IsNullOrEmpty(content.Content)) answerBuilder.Append(content.Content);
+                llmResponse = Common.Constants.DefaultEmptyAnswer;
+                await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, llmResponse);
+                await HttpContext.WriteStreamingChatCompletion(llmResponse);
+            } 
+            else
+            {
+                var citationNumbers = _regexCitations.Matches(llmResponse).Select(x => int.Parse(x.Groups[1].Value));
+                var markdownFormatContext = string.Join("\r\n", citations.Where(x => citationNumbers.Contains(x.Index)).Select(x => $"[^{x.Index}]: {x.Url}"));
+
+                var answerBuilder = new StringBuilder();
+                answerBuilder.AppendLine(llmResponse);
+                answerBuilder.AppendLine();
+                answerBuilder.AppendLine(markdownFormatContext);
+
+                await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());
+                await HttpContext.WriteStreamingChatCompletion(answerBuilder.ToString());
             }
-
-            await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());
-
-            await HttpContext.WriteStreamingChatCompletion(chatResult);
         }
 
 
@@ -148,7 +179,7 @@ namespace PostgreSQL.Embedding.LlmServices
         /// </summary>
         /// <param name="input"></param>
         /// <returns></returns>
-        private async Task<string> BuildKnowledgeContext(string question)
+        private async Task<List<LlmCitationModel>> BuildKnowledgeCitations(string question)
         {
             var searchResults = new List<KMCitation>();
             var llmKappKnowledges = await _llmAppKnowledgeRepository.FindAsync(x => x.AppId == _app.Id);
@@ -187,11 +218,13 @@ namespace PostgreSQL.Embedding.LlmServices
             }
 
             // 构建上下文
-            var chunks = partitions.Select(x => new
+            var chunks = partitions.Select((x,i) => new LlmCitationModel
             {
+                Index =  i + 1,
                 FileName = x.FileName,
                 Relevance = x.Relevance,
-                Text = x.Text
+                Text = $"[^{i+1}]: {x.Text}",
+                Url = $"/api/KnowledgeBase/{x.KnowledgeBaseId}/chunks/{x.FileId}/{x.PartId}"
             })
             .OrderByDescending(x => x.Relevance)
             .Take(10)
@@ -208,8 +241,7 @@ namespace PostgreSQL.Embedding.LlmServices
                 _logger.LogInformation($"未检索到符合条件的文档块");
             }
 
-            var jsonFormatContext = JsonConvert.SerializeObject(chunks);
-            return jsonFormatContext;
+            return chunks;
         }
 
         private async Task<List<KMCitation>> RetrieveAsync(KnowledgeBase knowledgeBase, string question)
