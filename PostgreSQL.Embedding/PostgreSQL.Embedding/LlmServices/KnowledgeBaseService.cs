@@ -345,6 +345,50 @@ namespace PostgreSQL.Embedding.LlmServices
             throw new NotImplementedException();
         }
 
+
+        /// <summary>
+        /// 获取指定的文本块信息
+        /// </summary>
+        /// <param name="knowledgeBaseId"></param>
+        /// <param name="fileId"></param>
+        /// <param name="partId"></param>
+        /// <returns></returns>
+        /// <exception cref="NotImplementedException"></exception>
+        public async Task<KMPartition> GetKnowledgeBaseChunk(long knowledgeBaseId, string fileId, string partId)
+        {
+            // 组装 Kernel Memory 表名
+            var knowledgeBase = await _knowledgeBaseRepository.GetAsync(knowledgeBaseId);
+            var tablePrefixMapping = await _tablePrefixMappingRepository.SingleOrDefaultAsync(x => x.FullName == knowledgeBase.EmbeddingModel);
+            var tableName = $"sk-{tablePrefixMapping.ShortName.ToLower()}-default";
+
+            using var connection = new NpgsqlConnection(_postgrelConnectionString);
+            await connection.OpenAsync();
+
+            var partitions = GetKnowledgeBaseChunkInternal(connection, tableName, knowledgeBaseId, fileId, partId);
+            return partitions.FirstOrDefault();
+        }
+
+        private List<KMPartition> GetKnowledgeBaseChunkInternal(NpgsqlConnection connection, string tableName, long knowledgeBaseId, string fileId, string partId)
+        {
+            // 拼接 SQL 语句，按标签进行过滤
+            var sqlText = $"""
+            SELECT t.* FROM "{tableName}" t WHERE t.tags @> ARRAY['{KernelMemoryTags.KnowledgeBaseId}:{knowledgeBaseId}']
+                AND t.tags @> ARRAY['{KernelMemoryTags.FileId}:{fileId}'] AND t.tags @> ARRAY['{KernelMemoryTags.PartId}:{partId}']
+            """;
+
+            using var queryCommand = new NpgsqlCommand(sqlText, connection);
+            using var reader = queryCommand.ExecuteReader();
+
+            var partitions = new List<KMPartition>();
+            while (reader.Read())
+            {
+                var partition = ParseAsKMPartition(reader);
+                partitions.Add(partition);
+            }
+
+            return partitions;
+        }
+
         private KMPartition ParseAsKMPartition(NpgsqlDataReader reader)
         {
             var partion = new Microsoft.KernelMemory.Citation.Partition();
@@ -357,7 +401,9 @@ namespace PostgreSQL.Embedding.LlmServices
                 { KernelMemoryTags.DocumentId, ParseFromTags(reader, KernelMemoryTags.DocumentId) },
                 { KernelMemoryTags.TaskId, ParseFromTags(reader, KernelMemoryTags.TaskId) },
                 { KernelMemoryTags.KnowledgeBaseId, ParseFromTags(reader, KernelMemoryTags.KnowledgeBaseId) },
-                { KernelMemoryTags.FileName, ParseFromTags(reader, KernelMemoryTags.FileName) }
+                { KernelMemoryTags.FileName, ParseFromTags(reader, KernelMemoryTags.FileName) },
+                { KernelMemoryTags.FileId, ParseFromTags(reader, KernelMemoryTags.FileId) },
+                { KernelMemoryTags.PartId, ParseFromTags(reader, KernelMemoryTags.PartId) }
             };
 
             partion.Tags = tags;
