@@ -22,16 +22,25 @@ namespace WebApp.Hubs
             var cts = new CancellationTokenSource();
             _cancellationTokens[requestId] = cts;
 
-
-            await foreach (var item in _textGenerator.Generate(prompt, cts.Token))
+            try
             {
-                await Clients.Caller.SendAsync("ReceiveChunks", JsonSerializer.Serialize(new { text = item }), requestId, cts.Token);
+                cts.Token.ThrowIfCancellationRequested();
+
+                await foreach (var item in _textGenerator.Generate(prompt, cts.Token))
+                {
+                    await Clients.Caller.SendAsync("ReceiveChunks", JsonSerializer.Serialize(new { text = item }), requestId, cts.Token);
+                }
             }
+            catch (OperationCanceledException ex)
+            {
+                _logger.LogInformation("The task is canceled.");
+            }
+
         }
 
         public async Task Cancel(string requestId)
         {
-          if (_cancellationTokens.TryGetValue(requestId, out var cts))
+            if (_cancellationTokens.TryGetValue(requestId, out var cts))
             {
                 await cts.CancelAsync();
                 await Clients.Caller.SendAsync("GenerationCancelled", requestId, cts.Token);
