@@ -27,7 +27,7 @@ namespace PostgreSQL.Embedding.Controllers
         [HttpPost("{appId}")]
         public async Task Chat(OpenAIModel model, long appId, CancellationToken cancellationToken = default)
         {
-            await _conversationService.Invoke(model, appId, HttpContext);
+            await _conversationService.InvokeAsync(model, appId, HttpContext, cancellationToken);
         }
 
         [HttpGet("{appId}/histories/{conversationId}")]

@@ -72,7 +72,7 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
             await context.Response.CompleteAsync();
         }
 
-        public static async Task WriteStreamingChatCompletion(this Microsoft.AspNetCore.Http.HttpContext context, IAsyncEnumerable<string> texts)
+        public static async Task WriteStreamingChatCompletion(this Microsoft.AspNetCore.Http.HttpContext context, IAsyncEnumerable<string> texts, CancellationToken cancellationToken = default)
         {
             var result = new OpenAIStreamResult();
             result.choices = new List<StreamChoicesModel>()
@@ -82,6 +82,8 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
 
             await foreach (var text in texts)
             {
+                if (cancellationToken.IsCancellationRequested) { return; }
+
                 result.choices[0].delta.content = text == null ? string.Empty : Convert.ToString(text);
                 string message = $"data: {JsonConvert.SerializeObject(result)}\n\n";
                 await context.Response.WriteAsync(message, Encoding.UTF8);
@@ -92,7 +94,7 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
             await context.Response.CompleteAsync();
         }
 
-        public static async Task WriteStreamingChatCompletion(this Microsoft.AspNetCore.Http.HttpContext context, IAsyncEnumerable<StreamingChatMessageContent> texts)
+        public static async Task WriteStreamingChatCompletion(this Microsoft.AspNetCore.Http.HttpContext context, IAsyncEnumerable<StreamingChatMessageContent> texts, CancellationToken cancellationToken = default)
         {
             var result = new OpenAIStreamResult();
             result.choices = new List<StreamChoicesModel>()
@@ -102,6 +104,8 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
 
             await foreach (var text in texts)
             {
+                if (cancellationToken.IsCancellationRequested) { return; }
+
                 result.created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                 result.choices[0].delta.content = text.Content ?? string.Empty;
                 string message = $"data: {JsonConvert.SerializeObject(result)}\n\n";
@@ -113,7 +117,7 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
             await context.Response.CompleteAsync();
         }
 
-        public static async Task WriteStreamingChatCompletion(this Microsoft.AspNetCore.Http.HttpContext context, string data)
+        public static async Task WriteStreamingChatCompletion(this Microsoft.AspNetCore.Http.HttpContext context, string data, CancellationToken cancellationToken = default)
         {
             var texts = data.ToArray().Select(x => x.ToString()).ToAsyncEnumerable();
 
@@ -125,6 +129,8 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
 
             await foreach (var text in texts)
             {
+                if (cancellationToken.IsCancellationRequested) { return; }
+
                 result.choices[0].delta.content = text == null ? string.Empty : Convert.ToString(text);
                 string message = $"data: {JsonConvert.SerializeObject(result)}\n\n";
                 await context.Response.WriteAsync(message, Encoding.UTF8);
