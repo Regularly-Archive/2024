@@ -1,9 +1,14 @@
 ﻿using AngleSharp;
-using HtmlAgilityPack;
 using Microsoft.SemanticKernel;
+using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Attributes;
+using PostgreSQL.Embedding.Common.Models.RAG;
+using PostgreSQL.Embedding.Common.Models.Search;
+using PostgreSQL.Embedding.LlmServices;
+using SqlSugar;
 using System.ComponentModel;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace PostgreSQL.Embedding.Plugins
 {
@@ -17,21 +22,25 @@ namespace PostgreSQL.Embedding.Plugins
         private const string SELECTOR_TAG_HREF = "href";
         private const string SELECTOR_TAG_ITEM_DESC = ".b_caption";
 
+        private Regex _regexCitations = new Regex(@"\[\^(\d+)\]");
+        private const string FINAL_ANSWER_TAG = "[FINAL_ANSWER]";
 
-
+        private readonly IServiceProvider _serviceProvider;
         private readonly IHttpClientFactory _httpClientFactory;
-        public BingSearchPlugin(IHttpClientFactory httpClientFactory)
+        
+        public BingSearchPlugin(IServiceProvider serviceProvider, IHttpClientFactory httpClientFactory)
         {
+            _serviceProvider = serviceProvider;
             _httpClientFactory = httpClientFactory;
         }
 
         [KernelFunction]
         [Description("使用关键词进行检索")]
-        public async Task<string> Search([Description("关键词")] string keyword)
+        public async Task<string> Search([Description("关键词")] string keyword, [Description("原始请求")] string query, Kernel kernel)
         {
             using var httpClient = _httpClientFactory.CreateClient();
             httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0");
-            httpClient.DefaultRequestHeaders.Referrer = new Uri("https://cn.bing.com/");
+            httpClient.DefaultRequestHeaders.Referrer = new Uri("https://bing.com/");
 
             var response = await httpClient.GetAsync($"https://bing.com/search?q={keyword}");
             response.EnsureSuccessStatusCode();
@@ -45,7 +54,9 @@ namespace PostgreSQL.Embedding.Plugins
                 return content;
             }
 
-            return searchResult.ToString();
+
+            var rag_answer = await RunRAGFlowAsync(query, searchResult.Entries, kernel);
+            return $"{FINAL_ANSWER_TAG}{rag_answer}";
         }
 
         private async Task<SearchResult> ExtractSearchResults(string query, string html)
@@ -76,33 +87,50 @@ namespace PostgreSQL.Embedding.Plugins
 
             return seachResult;
         }
-    }
 
-    internal class SearchResult
-    {
-        public List<Entry> Entries { get; set; } = new List<Entry>();
-        public string Query { get; set; }
-
-        public override string ToString()
+        private async Task<string> RunRAGFlowAsync(string query, List<Entry> entries, Kernel kernel)
         {
-            var stringBuilder = new StringBuilder();
+            var clonedKernel = kernel.Clone();
 
-            foreach (var entry in Entries)
+            var citations = entries.Select((x, i) => new LlmCitationModel
             {
-                stringBuilder.AppendLine($"Url: {entry.Url}");
-                stringBuilder.AppendLine($"Title: {entry.Title}");
-                stringBuilder.AppendLine($"Description: {entry.Description}");
-                stringBuilder.AppendLine();
+                Index = i + 1,
+                FileName = string.Empty,
+                Relevance = 1.0f,
+                Text = $"[^{i + 1}]: {x.Description}",
+                Url = x.Url
+            }).ToList();
+
+            var jsonFormatContext = JsonConvert.SerializeObject(citations);
+
+            using var serviceScope = _serviceProvider.CreateScope();
+            var promptTemplateService = serviceScope.ServiceProvider.GetRequiredService<PromptTemplateService>();
+            var promptTemplate = promptTemplateService.LoadTemplate("RAGPrompt.txt");
+            promptTemplate.AddVariable("name", "Bing");
+            promptTemplate.AddVariable("context", jsonFormatContext);
+            promptTemplate.AddVariable("question",query);
+            promptTemplate.AddVariable("empty_answer", Common.Constants.DefaultEmptyAnswer);
+            promptTemplate.AddVariable("histories", string.Empty);
+
+            var chatResult = await promptTemplate.InvokeAsync(kernel);
+
+            var llmResponse = chatResult.GetValue<string>();
+            if (llmResponse != null && llmResponse.IndexOf(Common.Constants.DefaultEmptyAnswer) != -1)
+            {
+                return Common.Constants.DefaultEmptyAnswer;
             }
+            else
+            {
+                var citationNumbers = _regexCitations.Matches(llmResponse).Select(x => int.Parse(x.Groups[1].Value));
+                var markdownFormatContext = string.Join("\r\n", citations.Where(x => citationNumbers.Contains(x.Index)).Select(x => $"[^{x.Index}]: {x.Url}"));
 
-            return stringBuilder.ToString();
+                var answerBuilder = new StringBuilder();
+                answerBuilder.AppendLine(llmResponse);
+                answerBuilder.AppendLine();
+                answerBuilder.AppendLine(markdownFormatContext);
+
+                return answerBuilder.ToString();
+            }
         }
-    }
-
-    public class Entry
-    {
-        public string Url { get; set; }
-        public string Title { get; set; }
-        public string Description { get; set; }
     }
 }

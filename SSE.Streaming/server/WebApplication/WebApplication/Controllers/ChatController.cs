@@ -45,7 +45,19 @@ namespace WebApp.Controllers
             {
                 _logger.LogInformation("Operation is canceled.");
             }
-            
+
+        }
+
+        [HttpGet("echo")]
+        public async Task<string> Echo(string text)
+        {
+            _logger.LogInformation("[{0}] IsCancellationRequested: {1}", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), HttpContext.RequestAborted.IsCancellationRequested);
+
+            await Task.Delay(1000 * 2);
+
+            _logger.LogInformation("[{0}] IsCancellationRequested: {1}", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), HttpContext.RequestAborted.IsCancellationRequested);
+
+            return text;
         }
     }
 }

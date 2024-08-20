@@ -8,6 +8,7 @@ using PostgreSQL.Embedding.LLmServices.Extensions;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace PostgreSQL.Embedding.Planners
 {
@@ -21,6 +22,7 @@ namespace PostgreSQL.Embedding.Planners
         private const string ObservationTag = "[OBSERVATION]";
         private const string ActionTag = "[ACTION]";
         private const string ThoughtTag = "[THOUGHT]";
+        private const string FinalAnswerTag = "[FINAL_ANSWER]";
         private const string TrimMessageFormat = "... I've removed the first {0} steps of my previous work to make room for the new stuff ...";
         private const string MainKey = "INPUT";
 
@@ -49,6 +51,8 @@ namespace PostgreSQL.Embedding.Planners
 
             for (var i = 0; i < _config.MaxIterations; i++)
             {
+                if (cancellationToken.IsCancellationRequested) break;
+
                 if (i > 0) await Task.Delay(_config.MinIterationTimeMs, cancellationToken).ConfigureAwait(false);
 
                 var nextStep = await GetNextStepAsync(stepsTaken, chatHistory, aiService, startingMessageCount, cancellationToken);
@@ -141,6 +145,9 @@ namespace PostgreSQL.Embedding.Planners
                 try
                 {
                     var result = await InvokeActionAsync(kernel, step.Action, step.ActionVariables, cancellationToken).ConfigureAwait(false);
+                    if (result.StartsWith(FinalAnswerTag))
+                        chatHistory.AddUserMessage($"{FinalAnswerTag} {result.Substring(FinalAnswerTag.Length)}");
+
                     step.Observation = string.IsNullOrEmpty(result) ? "Got no result from action" : result!;
                 }
                 catch (Exception ex)
@@ -372,7 +379,7 @@ namespace PostgreSQL.Embedding.Planners
             return null;
         }
 
-        private Dictionary<string,object> BindFunctionParameter(Dictionary<string, object> actionVariables, KernelFunction kernelFunction)
+        private Dictionary<string, object> BindFunctionParameter(Dictionary<string, object> actionVariables, KernelFunction kernelFunction)
         {
             foreach (var parameter in kernelFunction.Metadata.Parameters)
             {
