@@ -62,7 +62,7 @@ namespace PostgreSQL.Embedding.LlmServices
             _rerankService = _serviceProvider.GetRequiredService<IRerankService>();
         }
 
-        public async Task InvokeAsync(OpenAIModel model, HttpContext HttpContext, string input)
+        public async Task InvokeAsync(OpenAIModel model, HttpContext HttpContext, string input, CancellationToken cancellationToken = default)
         {
             _conversationId = HttpContext.GetOrCreateConversationId();
             var conversationName = HttpContext.GetConversationName();
@@ -70,7 +70,7 @@ namespace PostgreSQL.Embedding.LlmServices
             await _chatHistoriesService.AddConversation(_app.Id, _conversationId, conversationName);
 
             var conversationTask = model.stream
-                ? InvokeWithKnowledgeStreaming(HttpContext, input)
+                ? InvokeWithKnowledgeStreaming(HttpContext, input, cancellationToken)
                 : InvokeWithKnowledge(HttpContext, input);
 
             await conversationTask;
@@ -129,7 +129,7 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <param name="result"></param>
         /// <param name="input"></param>
         /// <returns></returns>
-        private async Task InvokeWithKnowledgeStreaming(HttpContext HttpContext, string input)
+        private async Task InvokeWithKnowledgeStreaming(HttpContext HttpContext, string input, CancellationToken cancellationToken = default)
         {
             if (!HttpContext.Response.HasStarted)
             {
@@ -169,7 +169,7 @@ namespace PostgreSQL.Embedding.LlmServices
                 answerBuilder.AppendLine(markdownFormatContext);
 
                 await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());
-                await HttpContext.WriteStreamingChatCompletion(answerBuilder.ToString());
+                await HttpContext.WriteStreamingChatCompletion(answerBuilder.ToString(), cancellationToken);
             }
         }
 
