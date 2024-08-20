@@ -8,7 +8,7 @@ using System.Text;
 
 namespace PostgreSQL.Embedding.Plugins
 {
-    [KernelPlugin(Description = "使用自然语言查询数据库的插件")]
+    [KernelPlugin(Description = "使用自然语言查询关系型数据库的插件")]
     public class Text2SQLPlugin
     {
         private IServiceProvider _serviceProvider;

@@ -20,35 +20,35 @@ namespace PostgreSQL.Embedding.Common.Models
         public void AddVariable(string key, object value) => _arguments[key] = value;
         public void AddEnvironmentVariable(string key) => _arguments[key] = Environment.GetEnvironmentVariable(key);
 
-        public Task<FunctionResult> InvokeAsync(Kernel kernel, OpenAIPromptExecutionSettings executionSettings = null)
+        public Task<FunctionResult> InvokeAsync(Kernel kernel, OpenAIPromptExecutionSettings executionSettings = null, CancellationToken cancellationToken = default)
         {
             var kernelFunction = kernel.CreateFunctionFromPrompt(Template, executionSettings);
-            return kernel.InvokeAsync(kernelFunction, new KernelArguments(_arguments));
+            return kernel.InvokeAsync(kernelFunction, new KernelArguments(_arguments), cancellationToken);
         }
 
-        public Task<T> InvokeAsync<T>(Kernel kernel, OpenAIPromptExecutionSettings executionSettings = null)
+        public Task<T> InvokeAsync<T>(Kernel kernel, OpenAIPromptExecutionSettings executionSettings = null, CancellationToken cancellationToken = default)
         {
             var kernelFunction = kernel.CreateFunctionFromPrompt(Template, executionSettings);
-            return kernel.InvokeAsync<T>(kernelFunction, new KernelArguments(_arguments));
+            return kernel.InvokeAsync<T>(kernelFunction, new KernelArguments(_arguments), cancellationToken);
         }
 
-        public IAsyncEnumerable<StreamingChatMessageContent> InvokeStreamingAsync(Kernel kernel, OpenAIPromptExecutionSettings executionSettings = null)
+        public IAsyncEnumerable<StreamingChatMessageContent> InvokeStreamingAsync(Kernel kernel, OpenAIPromptExecutionSettings executionSettings = null, CancellationToken cancellationToken = default)
         {
             var kernelFunction = kernel.CreateFunctionFromPrompt(Template, executionSettings);
-            return kernel.InvokeStreamingAsync<StreamingChatMessageContent>(kernelFunction, new KernelArguments(_arguments));
+            return kernel.InvokeStreamingAsync<StreamingChatMessageContent>(kernelFunction, new KernelArguments(_arguments), cancellationToken);
         }
 
-        public IAsyncEnumerable<T> InvokeStreamingAsync<T>(Kernel kernel, OpenAIPromptExecutionSettings executionSettings = null)
+        public IAsyncEnumerable<T> InvokeStreamingAsync<T>(Kernel kernel, OpenAIPromptExecutionSettings executionSettings = null, CancellationToken cancellationToken = default)
         {
             var kernelFunction = kernel.CreateFunctionFromPrompt(Template, executionSettings);
-            return kernel.InvokeStreamingAsync<T>(kernelFunction, new KernelArguments(_arguments));
+            return kernel.InvokeStreamingAsync<T>(kernelFunction, new KernelArguments(_arguments), cancellationToken);
         }
 
-        public Task<string> RenderTemplateAsync(Kernel kernel, OpenAIPromptExecutionSettings executionSettings = null)
+        public Task<string> RenderTemplateAsync(Kernel kernel, OpenAIPromptExecutionSettings executionSettings = null, CancellationToken cancellationToken = default)
         {
             var promptTemplateConfig = new PromptTemplateConfig(Template);
             var kernelPromptTemplate = _templateFactory.Create(promptTemplateConfig);
-            return kernelPromptTemplate.RenderAsync(kernel, new KernelArguments(_arguments));
+            return kernelPromptTemplate.RenderAsync(kernel, new KernelArguments(_arguments), cancellationToken);
         }
     }
 }

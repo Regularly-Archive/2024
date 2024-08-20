@@ -30,25 +30,31 @@ namespace PostgreSQL.Embedding.LlmServices
             _chatHistoryService = chatHistoryService;
         }
 
-        public async Task Invoke(OpenAIModel model, long appId, HttpContext HttpContext, CancellationToken cancellationToken = default)
+        public async Task InvokeAsync(OpenAIModel model, long appId, HttpContext HttpContext, CancellationToken cancellationToken = default)
         {
-            if (cancellationToken.IsCancellationRequested) return;
-
-            var app = await _llmAppRepository.GetAsync(appId);
-            var kernel = await _kernelService.GetKernel(app);
-
-            var input = model.messages[model.messages.Count - 1].content;
-            switch (app.AppType)
+            try
             {
-                case (int)LlmAppType.Chat:
-                    var genericConversationService = new GenericConversationService(kernel, app, _serviceProvider, _chatHistoryService);
-                    await genericConversationService.InvokeAsync(model, HttpContext, input);
-                    break;
-                case (int)LlmAppType.Knowledge:
-                    var ragConversationService = new RAGConversationService(kernel, app, _serviceProvider, _memoryService, _chatHistoryService);
-                    await ragConversationService.InvokeAsync(model, HttpContext, input);
-                    break;
+                var app = await _llmAppRepository.GetAsync(appId);
+                var kernel = await _kernelService.GetKernel(app);
+
+                var input = model.messages[model.messages.Count - 1].content;
+                switch (app.AppType)
+                {
+                    case (int)LlmAppType.Chat:
+                        var genericConversationService = new GenericConversationService(kernel, app, _serviceProvider, _chatHistoryService);
+                        await genericConversationService.InvokeAsync(model, HttpContext, input, cancellationToken);
+                        break;
+                    case (int)LlmAppType.Knowledge:
+                        var ragConversationService = new RAGConversationService(kernel, app, _serviceProvider, _memoryService, _chatHistoryService);
+                        await ragConversationService.InvokeAsync(model, HttpContext, input, cancellationToken);
+                        break;
+                }
             }
+            catch (OperationCanceledException)
+            {
+
+            }
+
         }
     }
 }

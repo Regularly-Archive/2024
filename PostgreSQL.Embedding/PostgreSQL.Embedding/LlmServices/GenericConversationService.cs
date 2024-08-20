@@ -38,7 +38,7 @@ namespace PostgreSQL.Embedding.LlmServices
             _chatHistoriesService = chatHistoriesService;
         }
 
-        public async Task InvokeAsync(OpenAIModel model, HttpContext httpContext, string input)
+        public async Task InvokeAsync(OpenAIModel model, HttpContext httpContext, string input, CancellationToken cancellationToken = default)
         {
             _conversationId = httpContext.GetOrCreateConversationId();
             var conversationName = httpContext.GetConversationName();
@@ -56,8 +56,8 @@ namespace PostgreSQL.Embedding.LlmServices
 
 
             var conversationTask = model.stream
-                ? InvokeStreamingChat(httpContext, input)
-                : InvokeChat(httpContext, input);
+                ? InvokeStreamingChat(httpContext, input, cancellationToken)
+                : InvokeChat(httpContext, input, cancellationToken);
 
             await conversationTask;
         }
@@ -69,15 +69,15 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <param name="result"></param>
         /// <param name="input"></param>
         /// <returns></returns>
-        private async Task InvokeStreamingChat(HttpContext HttpContext, string input)
+        private async Task InvokeStreamingChat(HttpContext HttpContext, string input, CancellationToken cancellationToken = default)
         {
             if (!HttpContext.Response.HasStarted)
                 HttpContext.Response.Headers.ContentType = new Microsoft.Extensions.Primitives.StringValues("text/event-stream");
 
             var usePlugin = true;
             var chatResult = usePlugin
-                ? await InvokeStreamingByStepwisePlannerAsync(_kernel, input)
-                : await InvokeStreamingByKernelAsync(_kernel, input);
+                ? await InvokeStreamingByStepwisePlannerAsync(_kernel, input, cancellationToken)
+                : await InvokeStreamingByKernelAsync(_kernel, input, cancellationToken);
 
             var answerBuilder = new StringBuilder();
             await foreach (var content in chatResult)
@@ -85,7 +85,7 @@ namespace PostgreSQL.Embedding.LlmServices
                 if (!string.IsNullOrEmpty(content.Content)) answerBuilder.Append(content.Content);
             }
 
-            await HttpContext.WriteStreamingChatCompletion(chatResult);
+            await HttpContext.WriteStreamingChatCompletion(chatResult, cancellationToken);
             await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());
         }
 
@@ -94,7 +94,7 @@ namespace PostgreSQL.Embedding.LlmServices
         /// </summary>
         /// <param name="input"></param>
         /// <returns></returns>
-        private async Task InvokeChat(HttpContext HttpContext, string input)
+        private async Task InvokeChat(HttpContext HttpContext, string input, CancellationToken cancellationToken = default)
         {
             var usePlugin = false;
 
@@ -110,7 +110,7 @@ namespace PostgreSQL.Embedding.LlmServices
             }
         }
 
-        private async Task<FunctionResult> InvokeByPlannerAsync(Kernel kernel, string input)
+        private async Task<FunctionResult> InvokeByPlannerAsync(Kernel kernel, string input, CancellationToken cancellationToken = default)
         {
 #pragma warning disable SKEXP0060
             var planner = new HandlebarsPlanner();
@@ -154,7 +154,7 @@ namespace PostgreSQL.Embedding.LlmServices
             }
         }
 
-        private async Task<IAsyncEnumerable<StreamingChatMessageContent>> InvokeStreamingByStepwisePlannerAsync(Kernel kernel, string input)
+        private async Task<IAsyncEnumerable<StreamingChatMessageContent>> InvokeStreamingByStepwisePlannerAsync(Kernel kernel, string input, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -163,7 +163,7 @@ namespace PostgreSQL.Embedding.LlmServices
                 planner.AddVariable("conversationId", _conversationId);
 
                 var plan = await planner.CreatePlanAsync(input);
-                var result = await plan.ExecuteAsync(_kernel);
+                var result = await plan.ExecuteAsync(_kernel,cancellationToken);
                 return result.AsStreamming();
             }
             catch (Exception ex)
@@ -173,7 +173,7 @@ namespace PostgreSQL.Embedding.LlmServices
 
         }
 
-        private async Task<FunctionResult> InvokeByKernelAsync(Kernel kernel, string input)
+        private async Task<FunctionResult> InvokeByKernelAsync(Kernel kernel, string input, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrEmpty(_app.Prompt))
                 _app.Prompt = _defaultPrompt;
@@ -186,10 +186,10 @@ namespace PostgreSQL.Embedding.LlmServices
             _promptTemplate.AddVariable("input", input);
             _promptTemplate.AddVariable("system", _app.Prompt);
             _promptTemplate.AddVariable("histories", histories);
-            return await _promptTemplate.InvokeAsync(kernel, executionSettings);
+            return await _promptTemplate.InvokeAsync(kernel, executionSettings, cancellationToken);
         }
 
-        private async Task<IAsyncEnumerable<StreamingChatMessageContent>> InvokeStreamingByKernelAsync(Kernel kernel, string input)
+        private async Task<IAsyncEnumerable<StreamingChatMessageContent>> InvokeStreamingByKernelAsync(Kernel kernel, string input, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrEmpty(_app.Prompt))
                 _app.Prompt = _defaultPrompt;
@@ -203,7 +203,7 @@ namespace PostgreSQL.Embedding.LlmServices
             _promptTemplate.AddVariable("input", input);
             _promptTemplate.AddVariable("system", _app.Prompt);
             _promptTemplate.AddVariable("histories", histories);
-            return _promptTemplate.InvokeStreamingAsync(kernel, executionSettings);
+            return _promptTemplate.InvokeStreamingAsync(kernel, executionSettings, cancellationToken);
         }
 
         private async Task RemoveLastChatMessage(long appId, string conversationId)
