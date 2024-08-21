@@ -1,5 +1,6 @@
 ﻿using AngleSharp;
 using Microsoft.SemanticKernel;
+using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Models.Search;
 using System.ComponentModel;
@@ -8,7 +9,7 @@ using System.Runtime.CompilerServices;
 namespace PostgreSQL.Embedding.Plugins
 {
     [KernelPlugin(Description = "Brave 搜索插件")]
-    public class BraveSearchPlugin
+    public class BraveSearchPlugin : ISearchEngineProvider
     {
         private const string SELECTOR_RESULTS = "#results";
         private const string SELECTOR_RESULTS_ITEM = ".snippet";
@@ -37,13 +38,7 @@ namespace PostgreSQL.Embedding.Plugins
 
             var html = await response.Content.ReadAsStringAsync();
             var searchResult = await ExtractSearchResults(keyword, html);
-            if (!searchResult.Entries.Any())
-            {
-                var content = await new JinaAIPlugin(_httpClientFactory).ExtractAsync($"https://search.brave.com/search?q={keyword}&offset=1&spellcheck=0");
-                return content;
-            }
-
-            return searchResult.ToString();
+            return JsonConvert.SerializeObject(searchResult);
         }
 
         private async Task<SearchResult> ExtractSearchResults(string query, string html)

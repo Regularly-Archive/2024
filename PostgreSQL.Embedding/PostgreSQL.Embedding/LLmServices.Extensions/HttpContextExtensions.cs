@@ -59,9 +59,9 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
             await context.Response.CompleteAsync();
         }
 
-        public static async Task WriteChatCompletion(this Microsoft.AspNetCore.Http.HttpContext context, string text)
+        public static async Task WriteChatCompletion(this Microsoft.AspNetCore.Http.HttpContext context, string text, long? mesageId = null)
         {
-            var result = new OpenAICompatibleResult();
+            var result = new OpenAICompatibleResult() { id = mesageId.HasValue ? mesageId.ToString() : Guid.NewGuid().ToString() };
             result.Choices = new List<OpenAICompatibleChoicesModel>()
             {
                 new OpenAICompatibleChoicesModel() { index = 0, message = new OpenAIMessage() { role = "assistant", content = text } },
@@ -72,9 +72,9 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
             await context.Response.CompleteAsync();
         }
 
-        public static async Task WriteStreamingChatCompletion(this Microsoft.AspNetCore.Http.HttpContext context, IAsyncEnumerable<string> texts, CancellationToken cancellationToken = default)
+        public static async Task WriteStreamingChatCompletion(this Microsoft.AspNetCore.Http.HttpContext context, IAsyncEnumerable<string> texts, long? mesageId = null, CancellationToken cancellationToken = default)
         {
-            var result = new OpenAIStreamResult();
+            var result = new OpenAIStreamResult() { id = mesageId.HasValue ? mesageId.ToString() : Guid.NewGuid().ToString() };
             result.choices = new List<StreamChoicesModel>()
             {
                 new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant" } }
@@ -94,9 +94,9 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
             await context.Response.CompleteAsync();
         }
 
-        public static async Task WriteStreamingChatCompletion(this Microsoft.AspNetCore.Http.HttpContext context, IAsyncEnumerable<StreamingChatMessageContent> texts, CancellationToken cancellationToken = default)
+        public static async Task WriteStreamingChatCompletion(this Microsoft.AspNetCore.Http.HttpContext context, IAsyncEnumerable<StreamingChatMessageContent> texts, long? mesageId = null, CancellationToken cancellationToken = default)
         {
-            var result = new OpenAIStreamResult();
+            var result = new OpenAIStreamResult() { id = mesageId.HasValue ? mesageId.ToString() : Guid.NewGuid().ToString() };
             result.choices = new List<StreamChoicesModel>()
             {
                 new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant" } }
@@ -117,11 +117,11 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
             await context.Response.CompleteAsync();
         }
 
-        public static async Task WriteStreamingChatCompletion(this Microsoft.AspNetCore.Http.HttpContext context, string data, CancellationToken cancellationToken = default)
+        public static async Task WriteStreamingChatCompletion(this Microsoft.AspNetCore.Http.HttpContext context, string data, long? mesageId = null, CancellationToken cancellationToken = default)
         {
             var texts = data.ToArray().Select(x => x.ToString()).ToAsyncEnumerable();
 
-            var result = new OpenAIStreamResult();
+            var result = new OpenAIStreamResult() { id = mesageId.HasValue ? mesageId.ToString() : Guid.NewGuid().ToString() };
             result.choices = new List<StreamChoicesModel>()
             {
                 new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant" } }
