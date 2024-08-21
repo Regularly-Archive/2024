@@ -43,7 +43,6 @@
   <ItemGroup>
     <Folder Include="Assets\Models\Qwen1.5-1.8B-Chat\" />
     <Folder Include="LlmServices\OpenAI\" />
-    <Folder Include="Plugins\SearchEngine\" />
   </ItemGroup>
 
   <ItemGroup>

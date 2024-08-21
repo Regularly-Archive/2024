@@ -26,6 +26,7 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly IServiceProvider _serviceProvider;
         private readonly PromptTemplateService _promptTemplateService;
         private string _conversationId;
+        private long _messageReferenceId;
         private readonly Random _random = new Random();
         public GenericConversationService(Kernel kernel, LlmApp app, IServiceProvider serviceProvider, IChatHistoriesService chatHistoriesService)
             : base(kernel, chatHistoriesService)
@@ -43,17 +44,17 @@ namespace PostgreSQL.Embedding.LlmServices
             _conversationId = httpContext.GetOrCreateConversationId();
             var conversationName = httpContext.GetConversationName();
 
+            // 如果是重新生成，则删除最后一条 AI 消息
             var conversationFlag = httpContext.GetConversationFlag();
             if (!conversationFlag)
             {
-                await _chatHistoriesService.AddUserMessage(_app.Id, _conversationId, input);
+                _messageReferenceId = await _chatHistoriesService.AddUserMessage(_app.Id, _conversationId, input);
                 await _chatHistoriesService.AddConversation(_app.Id, _conversationId, conversationName);
             }
             else
             {
                 await RemoveLastChatMessage(_app.Id, _conversationId);
             }
-
 
             var conversationTask = model.stream
                 ? InvokeStreamingChat(httpContext, input, cancellationToken)
@@ -85,8 +86,9 @@ namespace PostgreSQL.Embedding.LlmServices
                 if (!string.IsNullOrEmpty(content.Content)) answerBuilder.Append(content.Content);
             }
 
-            await HttpContext.WriteStreamingChatCompletion(chatResult, cancellationToken);
-            await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());
+            var messageId = await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());
+            HttpContext.Response.Headers[Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
+            await HttpContext.WriteStreamingChatCompletion(chatResult, messageId, cancellationToken);
         }
 
         /// <summary>
@@ -105,8 +107,9 @@ namespace PostgreSQL.Embedding.LlmServices
             var answer = chatResult.GetValue<string>();
             if (!string.IsNullOrEmpty(answer))
             {
-                await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answer);
-                await HttpContext.WriteChatCompletion(input);
+                var messageId = await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answer);
+                HttpContext.Response.Headers[Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
+                await HttpContext.WriteChatCompletion(input, messageId);
             }
         }
 
@@ -210,8 +213,11 @@ namespace PostgreSQL.Embedding.LlmServices
         {
             var messageList = await _chatHistoriesService.GetConversationMessages(appId, conversationId);
             messageList = messageList.OrderBy(x => x.CreatedAt).ToList();
+
+            _messageReferenceId = messageList.LastOrDefault(x => x.IsUserMessage).Id;
+
             var lastMessage = messageList.LastOrDefault();
-            if (!lastMessage.IsUserMessage)
+            if (lastMessage != null && !lastMessage.IsUserMessage)
                 await _chatHistoriesService.DeleteConversationMessage(lastMessage.Id);
         }
     }

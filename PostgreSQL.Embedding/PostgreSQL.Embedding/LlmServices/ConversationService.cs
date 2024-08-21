@@ -15,12 +15,14 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly IServiceProvider _serviceProvider;
         private readonly IRepository<LlmApp> _llmAppRepository;
         private readonly IChatHistoriesService _chatHistoryService;
+        private readonly ILogger<ConversationService> _logger;
         public ConversationService(
             IServiceProvider serviceProvider,
             IRepository<LlmApp> llmAppRepository,
             IKernelService kernelService,
             IMemoryService memoryService,
-            IChatHistoriesService chatHistoryService
+            IChatHistoriesService chatHistoryService,
+            ILogger<ConversationService> logger
             )
         {
             _kernelService = kernelService;
@@ -28,6 +30,7 @@ namespace PostgreSQL.Embedding.LlmServices
             _serviceProvider = serviceProvider;
             _llmAppRepository = llmAppRepository;
             _chatHistoryService = chatHistoryService;
+            _logger = logger;
         }
 
         public async Task InvokeAsync(OpenAIModel model, long appId, HttpContext HttpContext, CancellationToken cancellationToken = default)
@@ -52,9 +55,8 @@ namespace PostgreSQL.Embedding.LlmServices
             }
             catch (OperationCanceledException)
             {
-
+                _logger.LogWarning("The conversation is canceled.");
             }
-
         }
     }
 }

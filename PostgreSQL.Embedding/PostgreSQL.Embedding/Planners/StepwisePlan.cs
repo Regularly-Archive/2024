@@ -72,6 +72,11 @@ namespace PostgreSQL.Embedding.Planners
                 if (await TryGetActionObservationAsync(kernel, nextStep, chatHistory, cancellationToken).ConfigureAwait(false))
                     continue;
 
+                // Check FinalAnswer Again
+                finalAnswer = TryGetFinalAnswer(nextStep, stepsTaken, i + 1);
+                if (!string.IsNullOrEmpty(finalAnswer))
+                    return finalAnswer;
+
                 _logger?.LogInformation("Action: No action to take");
 
                 if (TryGetThought(nextStep, chatHistory))
@@ -94,7 +99,7 @@ namespace PostgreSQL.Embedding.Planners
 
         private async Task<string?> InvokeActionAsync(Kernel kernel, string actionName, Dictionary<string, object> actionVariables, CancellationToken cancellationToken)
         {
-            var availableFunctions = kernel.GetAvailableFunctions(x => !_config.ExcludedPlugins.Contains(x.PluginName) && !_config.ExcludedPlugins.Contains(x.Name));
+            var availableFunctions = kernel.GetAvailableFunctions(x => !_config.ExcludedPlugins.Contains(x.PluginName) && !_config.ExcludedFunctions.Contains(x.GetFullyQualifiedFunctionName()));
             var targetFunction = availableFunctions.FirstOrDefault(f => f.GetFullyQualifiedFunctionName() == actionName);
             if (targetFunction == null)
             {
@@ -145,8 +150,15 @@ namespace PostgreSQL.Embedding.Planners
                 try
                 {
                     var result = await InvokeActionAsync(kernel, step.Action, step.ActionVariables, cancellationToken).ConfigureAwait(false);
+
+                    // Set FinalAnswer if result starts with [FINAL_WANSWER] tag.
+                    // Return false to break loop.
                     if (result.StartsWith(FinalAnswerTag))
-                        chatHistory.AddUserMessage($"{FinalAnswerTag} {result.Substring(FinalAnswerTag.Length)}");
+                    {
+                        step.FinalAnswer = result.Substring(FinalAnswerTag.Length);
+                        this._logger?.LogInformation("Final Answer: \r\n{FinalAnswer}", step.FinalAnswer);
+                        return false;
+                    }
 
                     step.Observation = string.IsNullOrEmpty(result) ? "Got no result from action" : result!;
                 }

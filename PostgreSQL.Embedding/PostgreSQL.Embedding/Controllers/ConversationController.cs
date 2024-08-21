@@ -57,5 +57,12 @@ namespace PostgreSQL.Embedding.Controllers
             await _chatHistoryService.UpdateConversation(appId, conversationId, conversation.Summary);
             return ApiResult.Success<object>(null);
         }
+
+        [HttpDelete("{appId}/histories/{conversationId}/{messageId}")]
+        public async Task<JsonResult> DeleteConversationMessage(long appId, string conversationId, long messageId)
+        {
+            await _chatHistoryService.DeleteConversationMessage(messageId);
+            return ApiResult.Success<object>(null);
+        }
     }
 }

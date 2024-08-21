@@ -1,5 +1,6 @@
 ﻿using Azure.Search.Documents.Models;
 using DocumentFormat.OpenXml.InkML;
+using LLama.Batched;
 using Microsoft.AspNetCore.Http;
 using Microsoft.KernelMemory;
 using Microsoft.SemanticKernel;
@@ -35,6 +36,7 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly CallablePromptTemplate _promptTemplate;
         private readonly CallablePromptTemplate _rewritePromptTemplate;
         private string _conversationId;
+        private long _messageReferenceId;
         private readonly IRerankService _rerankService;
         private Regex _regexCitations = new Regex(@"\[\^(\d+)\]");
 
@@ -66,8 +68,18 @@ namespace PostgreSQL.Embedding.LlmServices
         {
             _conversationId = HttpContext.GetOrCreateConversationId();
             var conversationName = HttpContext.GetConversationName();
-            await _chatHistoriesService.AddUserMessage(_app.Id, _conversationId, input);
-            await _chatHistoriesService.AddConversation(_app.Id, _conversationId, conversationName);
+
+            // 如果是重新生成，则删除最后一条 AI 消息
+            var conversationFlag = HttpContext.GetConversationFlag();
+            if (!conversationFlag)
+            {
+                _messageReferenceId = await _chatHistoriesService.AddUserMessage(_app.Id, _conversationId, input);
+                await _chatHistoriesService.AddConversation(_app.Id, _conversationId, conversationName);
+            }
+            else
+            {
+                await RemoveLastChatMessage(_app.Id, _conversationId);
+            }
 
             var conversationTask = model.stream
                 ? InvokeWithKnowledgeStreaming(HttpContext, input, cancellationToken)
@@ -104,8 +116,9 @@ namespace PostgreSQL.Embedding.LlmServices
                 if (answer.IndexOf(Common.Constants.DefaultEmptyAnswer) != -1)
                 {
                     answer = Common.Constants.DefaultEmptyAnswer;
-                    await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answer);
-                    await HttpContext.WriteChatCompletion(input);
+                    var messageId = await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answer);
+                    HttpContext.Response.Headers[Common.Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
+                    await HttpContext.WriteChatCompletion(input, messageId);
                 } 
                 else
                 {
@@ -116,8 +129,9 @@ namespace PostgreSQL.Embedding.LlmServices
                     answerBuilder.AppendLine(answer);
                     answerBuilder.AppendLine(markdownFormatContext);
 
-                    await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());
-                    await HttpContext.WriteChatCompletion(answerBuilder.ToString());
+                    var messageId = await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());
+                    HttpContext.Response.Headers[Common.Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
+                    await HttpContext.WriteChatCompletion(answerBuilder.ToString(), messageId);
                 }
             }
         }
@@ -155,8 +169,9 @@ namespace PostgreSQL.Embedding.LlmServices
             if (llmResponse != null && llmResponse.IndexOf(Common.Constants.DefaultEmptyAnswer) != -1)
             {
                 llmResponse = Common.Constants.DefaultEmptyAnswer;
-                await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, llmResponse);
-                await HttpContext.WriteStreamingChatCompletion(llmResponse);
+                var messageId = await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, llmResponse);
+                HttpContext.Response.Headers[Common.Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
+                await HttpContext.WriteStreamingChatCompletion(llmResponse, messageId, cancellationToken);
             } 
             else
             {
@@ -168,8 +183,9 @@ namespace PostgreSQL.Embedding.LlmServices
                 answerBuilder.AppendLine();
                 answerBuilder.AppendLine(markdownFormatContext);
 
-                await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());
-                await HttpContext.WriteStreamingChatCompletion(answerBuilder.ToString(), cancellationToken);
+                var messageId = await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());
+                HttpContext.Response.Headers[Common.Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
+                await HttpContext.WriteStreamingChatCompletion(answerBuilder.ToString(), messageId, cancellationToken);
             }
         }
 
@@ -328,6 +344,19 @@ namespace PostgreSQL.Embedding.LlmServices
                 _logger.LogError(ex, "The rerank flow has been stoped due to unexpected reason: {0}", ex.Message);
                 return partitions;
             }
+        }
+
+        private async Task RemoveLastChatMessage(long appId, string conversationId)
+        {
+            var messageList = await _chatHistoriesService.GetConversationMessages(appId, conversationId);
+            messageList = messageList.OrderBy(x => x.CreatedAt).ToList();
+
+            _messageReferenceId = messageList.LastOrDefault(x => x.IsUserMessage).Id;
+
+            var lastMessage = messageList.LastOrDefault();
+            if (lastMessage != null && !lastMessage.IsUserMessage)
+                await _chatHistoriesService.DeleteConversationMessage(lastMessage.Id);
+
         }
     }
 }

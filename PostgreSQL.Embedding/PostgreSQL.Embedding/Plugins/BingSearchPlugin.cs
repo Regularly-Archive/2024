@@ -13,7 +13,7 @@ using System.Text.RegularExpressions;
 namespace PostgreSQL.Embedding.Plugins
 {
     [KernelPlugin(Description = "微软必应搜索插件")]
-    public class BingSearchPlugin
+    public class BingSearchPlugin : ISearchEngineProvider
     {
         private const string SELECTOR_TAG_MAIN = "main";
         private const string SELECTOR_TAG_LINK = "a";
@@ -22,12 +22,9 @@ namespace PostgreSQL.Embedding.Plugins
         private const string SELECTOR_TAG_HREF = "href";
         private const string SELECTOR_TAG_ITEM_DESC = ".b_caption";
 
-        private Regex _regexCitations = new Regex(@"\[\^(\d+)\]");
-        private const string FINAL_ANSWER_TAG = "[FINAL_ANSWER]";
-
         private readonly IServiceProvider _serviceProvider;
         private readonly IHttpClientFactory _httpClientFactory;
-        
+
         public BingSearchPlugin(IServiceProvider serviceProvider, IHttpClientFactory httpClientFactory)
         {
             _serviceProvider = serviceProvider;
@@ -36,7 +33,7 @@ namespace PostgreSQL.Embedding.Plugins
 
         [KernelFunction]
         [Description("使用关键词进行检索")]
-        public async Task<string> Search([Description("关键词")] string keyword, [Description("原始请求")] string query, Kernel kernel)
+        public async Task<string> SearchAsync([Description("关键词")] string keyword)
         {
             using var httpClient = _httpClientFactory.CreateClient();
             httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0");
@@ -48,15 +45,7 @@ namespace PostgreSQL.Embedding.Plugins
 
             var html = await response.Content.ReadAsStringAsync();
             var searchResult = await ExtractSearchResults(keyword, html);
-            if (!searchResult.Entries.Any())
-            {
-                var content = await new JinaAIPlugin(_httpClientFactory).ExtractAsync($"https://bing.com/search?q={keyword}");
-                return content;
-            }
-
-
-            var rag_answer = await RunRAGFlowAsync(query, searchResult.Entries, kernel);
-            return $"{FINAL_ANSWER_TAG}{rag_answer}";
+            return JsonConvert.SerializeObject(searchResult);
         }
 
         private async Task<SearchResult> ExtractSearchResults(string query, string html)
@@ -87,50 +76,10 @@ namespace PostgreSQL.Embedding.Plugins
 
             return seachResult;
         }
+    }
 
-        private async Task<string> RunRAGFlowAsync(string query, List<Entry> entries, Kernel kernel)
-        {
-            var clonedKernel = kernel.Clone();
-
-            var citations = entries.Select((x, i) => new LlmCitationModel
-            {
-                Index = i + 1,
-                FileName = string.Empty,
-                Relevance = 1.0f,
-                Text = $"[^{i + 1}]: {x.Description}",
-                Url = x.Url
-            }).ToList();
-
-            var jsonFormatContext = JsonConvert.SerializeObject(citations);
-
-            using var serviceScope = _serviceProvider.CreateScope();
-            var promptTemplateService = serviceScope.ServiceProvider.GetRequiredService<PromptTemplateService>();
-            var promptTemplate = promptTemplateService.LoadTemplate("RAGPrompt.txt");
-            promptTemplate.AddVariable("name", "Bing");
-            promptTemplate.AddVariable("context", jsonFormatContext);
-            promptTemplate.AddVariable("question",query);
-            promptTemplate.AddVariable("empty_answer", Common.Constants.DefaultEmptyAnswer);
-            promptTemplate.AddVariable("histories", string.Empty);
-
-            var chatResult = await promptTemplate.InvokeAsync(kernel);
-
-            var llmResponse = chatResult.GetValue<string>();
-            if (llmResponse != null && llmResponse.IndexOf(Common.Constants.DefaultEmptyAnswer) != -1)
-            {
-                return Common.Constants.DefaultEmptyAnswer;
-            }
-            else
-            {
-                var citationNumbers = _regexCitations.Matches(llmResponse).Select(x => int.Parse(x.Groups[1].Value));
-                var markdownFormatContext = string.Join("\r\n", citations.Where(x => citationNumbers.Contains(x.Index)).Select(x => $"[^{x.Index}]: {x.Url}"));
-
-                var answerBuilder = new StringBuilder();
-                answerBuilder.AppendLine(llmResponse);
-                answerBuilder.AppendLine();
-                answerBuilder.AppendLine(markdownFormatContext);
-
-                return answerBuilder.ToString();
-            }
-        }
+    public interface ISearchEngineProvider
+    {
+        Task<string> SearchAsync(string keyword);
     }
 }

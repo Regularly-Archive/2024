@@ -1,5 +1,7 @@
 ﻿using Microsoft.SemanticKernel;
+using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Attributes;
+using PostgreSQL.Embedding.Common.Models.Search;
 using System.ComponentModel;
 using System.Text;
 using System.Text.Json.Serialization;
@@ -7,7 +9,7 @@ using System.Text.Json.Serialization;
 namespace PostgreSQL.Embedding.Plugins
 {
     [KernelPlugin(Description = "一个基于 JinaAI 的插件，支持信息检索及信息提取等功能")]
-    public sealed class JinaAIPlugin
+    public sealed class JinaAIPlugin : ISearchEngineProvider
     {
         private readonly IHttpClientFactory _httpClientFactory;
         public JinaAIPlugin(IHttpClientFactory httpClientFactory)
@@ -17,22 +19,22 @@ namespace PostgreSQL.Embedding.Plugins
 
         [KernelFunction]
         [Description("一个由 JinaAI 驱动的搜索接口，返回内容格式为 JSON。")]
-        public async Task<string> SearchAsync([Description("查询关键词")] string query)
+        public async Task<string> SearchAsync([Description("查询关键词")] string keyword)
         {
             using var httpClient = _httpClientFactory.CreateClient();
             httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
-            var searchResult = await httpClient.GetFromJsonAsync<JinaAISearchResult>($"https://s.jina.ai/{query}");
+            var searchEnginePayload = await httpClient.GetFromJsonAsync<JinaAISearchResult>($"https://s.jina.ai/{keyword}");
 
-            var stringBuilder = new StringBuilder();
-            foreach (var entry in searchResult.Data)
+            var searchResults = new SearchResult() { Query = keyword };
+            searchResults.Entries = searchEnginePayload.Data.Select(x => new Entry()
             {
-                stringBuilder.AppendLine($"Url: {entry.Url}");
-                stringBuilder.AppendLine($"Title: {entry.Title}");
-                stringBuilder.AppendLine($"Description: {entry.Description}");
-                stringBuilder.AppendLine();
-            }
+                Url = x.Url,
+                Title = x.Title,
+                Description = x.Description,
+            })
+            .ToList();
 
-            return stringBuilder.ToString();
+            return JsonConvert.SerializeObject(searchResults);
         }
 
         [KernelFunction]

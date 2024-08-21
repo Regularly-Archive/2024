@@ -41,7 +41,7 @@ namespace PostgreSQL.Embedding.Planners
 
         private Task<string> CreateFunctionDescriptions(Kernel kernel)
         {
-            var availableFunctions = kernel.GetAvailableFunctions(x => !_config.ExcludedPlugins.Contains(x.PluginName) && !_config.ExcludedPlugins.Contains(x.Name));
+            var availableFunctions = kernel.GetAvailableFunctions(x => !_config.ExcludedPlugins.Contains(x.PluginName) && !_config.ExcludedFunctions.Contains(x.GetFullyQualifiedFunctionName()));
             var functionDescriptions = string.Join("\r\n", availableFunctions.Select(x => CreateFunctionDescription(x)));
 
             var arguments = new KernelArguments() { ["functionDescriptions"] = functionDescriptions };
