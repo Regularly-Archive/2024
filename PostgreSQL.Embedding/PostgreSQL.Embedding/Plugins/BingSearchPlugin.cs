@@ -13,7 +13,7 @@ using System.Text.RegularExpressions;
 namespace PostgreSQL.Embedding.Plugins
 {
     [KernelPlugin(Description = "微软必应搜索插件")]
-    public class BingSearchPlugin : ISearchEngineProvider
+    public class BingSearchPlugin : ISearchEngine
     {
         private const string SELECTOR_TAG_MAIN = "main";
         private const string SELECTOR_TAG_LINK = "a";
@@ -78,7 +78,7 @@ namespace PostgreSQL.Embedding.Plugins
         }
     }
 
-    public interface ISearchEngineProvider
+    public interface ISearchEngine
     {
         Task<string> SearchAsync(string keyword);
     }

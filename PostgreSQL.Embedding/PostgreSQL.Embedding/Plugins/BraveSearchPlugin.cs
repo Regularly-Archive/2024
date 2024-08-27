@@ -9,7 +9,7 @@ using System.Runtime.CompilerServices;
 namespace PostgreSQL.Embedding.Plugins
 {
     [KernelPlugin(Description = "Brave 搜索插件")]
-    public class BraveSearchPlugin : ISearchEngineProvider
+    public class BraveSearchPlugin : ISearchEngine
     {
         private const string SELECTOR_RESULTS = "#results";
         private const string SELECTOR_RESULTS_ITEM = ".snippet";
