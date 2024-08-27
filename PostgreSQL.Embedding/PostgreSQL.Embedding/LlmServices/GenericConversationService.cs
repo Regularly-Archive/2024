@@ -135,28 +135,6 @@ namespace PostgreSQL.Embedding.LlmServices
             }
         }
 
-        private async Task<IAsyncEnumerable<StreamingChatMessageContent>> InvokeStreamingByPlannerAsync(Kernel kernel, string input)
-        {
-#pragma warning disable SKEXP0060
-            var planner = new HandlebarsPlanner();
-#pragma warning restore SKEXP0060
-            try
-            {
-#pragma warning disable SKEXP0060
-                var plan = await planner.CreatePlanAsync(kernel, input);
-                var executionResult = await plan.InvokeAsync(kernel);
-                var promptTemplate = _promptTemplateService.LoadTemplate("AgentPrompt.txt");
-                promptTemplate.AddVariable("input", input);
-                promptTemplate.AddVariable("context", executionResult);
-                return promptTemplate.InvokeStreamingAsync(kernel);
-#pragma warning restore SKEXP0060
-            }
-            catch (Exception ex)
-            {
-                return Constants.DefaultErrorAnswer.AsStreamming();
-            }
-        }
-
         private async Task<IAsyncEnumerable<StreamingChatMessageContent>> InvokeStreamingByStepwisePlannerAsync(Kernel kernel, string input, CancellationToken cancellationToken = default)
         {
             try

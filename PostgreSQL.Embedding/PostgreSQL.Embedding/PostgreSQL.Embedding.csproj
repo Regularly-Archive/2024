@@ -15,6 +15,7 @@
     <PackageReference Include="LLamaSharp.Backend.Cpu" Version="0.13.0" />
     <PackageReference Include="LLamaSharp.kernel-memory" Version="0.13.0" />
     <PackageReference Include="LLamaSharp.semantic-kernel" Version="0.13.0" />
+    <PackageReference Include="MailKit" Version="4.7.1.1" />
     <PackageReference Include="Mapster" Version="7.4.0" />
     <PackageReference Include="Masuit.Tools.Core" Version="2.6.9.4" />
     <PackageReference Include="Microsoft.AspNet.Cors" Version="5.3.0" />
@@ -84,9 +85,6 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Assets\Models\TinyLlama-1.1B\TinyLlama-1.1B-ggml-model-q4_0.bin">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="Common\Prompts\AgentPrompt.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Common\Prompts\Default.txt">
