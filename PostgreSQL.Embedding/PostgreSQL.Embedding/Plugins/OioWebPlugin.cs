@@ -105,6 +105,14 @@ namespace PostgreSQL.Embedding.Plugins
             return $"![{image.Title}]({image.Url})";
         }
 
+        [KernelFunction]
+        [Description("获取毒鸡汤")]
+        public async Task<string> GetSoulWords()
+        {
+            using var httpClient = _httpClientFactory.CreateClient();
+            return await httpClient.GetStringAsync($"https://api.oioweb.cn/api/SoulWords");
+        }
+
         #region
         internal class HolidayInfo
         {
