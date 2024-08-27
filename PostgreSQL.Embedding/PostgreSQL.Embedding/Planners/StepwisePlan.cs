@@ -73,9 +73,8 @@ namespace PostgreSQL.Embedding.Planners
                     continue;
 
                 // Check FinalAnswer Again
-                finalAnswer = TryGetFinalAnswer(nextStep, stepsTaken, i + 1);
-                if (!string.IsNullOrEmpty(finalAnswer))
-                    return finalAnswer;
+                if (!string.IsNullOrEmpty(nextStep.FinalAnswer))
+                    return nextStep.FinalAnswer;
 
                 _logger?.LogInformation("Action: No action to take");
 
@@ -153,12 +152,12 @@ namespace PostgreSQL.Embedding.Planners
 
                     // Set FinalAnswer if result starts with [FINAL_WANSWER] tag.
                     // Return false to break loop.
-                    if (result.StartsWith(FinalAnswerTag))
-                    {
-                        step.FinalAnswer = result.Substring(FinalAnswerTag.Length);
-                        this._logger?.LogInformation("Final Answer: \r\n{FinalAnswer}", step.FinalAnswer);
-                        return false;
-                    }
+                    //if (result.StartsWith(FinalAnswerTag))
+                    //{
+                    //    step.FinalAnswer = result.Substring(FinalAnswerTag.Length);
+                    //    this._logger?.LogInformation("Final Answer: \r\n{FinalAnswer}", step.FinalAnswer);
+                    //    return false;
+                    //}
 
                     step.Observation = string.IsNullOrEmpty(result) ? "Got no result from action" : result!;
                 }
