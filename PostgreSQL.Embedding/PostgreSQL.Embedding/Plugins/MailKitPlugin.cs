@@ -34,7 +34,7 @@ namespace PostgreSQL.Embedding.Plugins
 
             using var smtp = new SmtpClient();
             smtp.Connect("smtp.126.com", 587, true);
-            smtp.Authenticate(MAIL_SENDER_EMAIL, "NIUCTOSAEHORYBDM");
+            smtp.Authenticate(MAIL_SENDER_EMAIL, "");
             return smtp.Send(email);
         }
     }
