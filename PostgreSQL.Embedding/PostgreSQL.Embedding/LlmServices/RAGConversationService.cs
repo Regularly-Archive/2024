@@ -38,7 +38,7 @@ namespace PostgreSQL.Embedding.LlmServices
         private string _conversationId;
         private long _messageReferenceId;
         private readonly IRerankService _rerankService;
-        private Regex _regexCitations = new Regex(@"\[\^(\d+)\]");
+        private Regex _regexCitations = new Regex(@"\[(\d+)\]");
 
         public RAGConversationService(
             Kernel kernel,
@@ -123,7 +123,7 @@ namespace PostgreSQL.Embedding.LlmServices
                 else
                 {
                     var citationNumbers = _regexCitations.Matches(answer).Select(x => int.Parse(x.Groups[1].Value));
-                    var markdownFormatContext = string.Join("\r\n", citations.Where(x => citationNumbers.Contains(x.Index)).Select(x => $"[^{x.Index}]: {x.Url}"));
+                    var markdownFormatContext = string.Join("\r\n", citations.Where(x => citationNumbers.Contains(x.Index)).Select(x => $"[{x.Index}]: {x.Url}"));
 
                     var answerBuilder = new StringBuilder();
                     answerBuilder.AppendLine(answer);
@@ -176,7 +176,7 @@ namespace PostgreSQL.Embedding.LlmServices
             else
             {
                 var citationNumbers = _regexCitations.Matches(llmResponse).Select(x => int.Parse(x.Groups[1].Value));
-                var markdownFormatContext = string.Join("\r\n", citations.Where(x => citationNumbers.Contains(x.Index)).Select(x => $"[^{x.Index}]: {x.Url}"));
+                var markdownFormatContext = string.Join("\r\n", citations.Where(x => citationNumbers.Contains(x.Index)).Select(x => $"[{x.Index}]: {x.Url}"));
 
                 var answerBuilder = new StringBuilder();
                 answerBuilder.AppendLine(llmResponse);
