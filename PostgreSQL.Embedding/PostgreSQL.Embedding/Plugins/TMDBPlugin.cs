@@ -37,6 +37,15 @@ namespace PostgreSQL.Embedding.Plugins
         }
 
         [KernelFunction]
+        [Description("根据 IMDB ID 获取电影信息")]
+        public async Task<string> GetMovieByIMBDAsync([Description("IMDB ID")] string imdb_id, [Description("语言，可取值为: en-US, zh-CN")] string language = "zh-CN")
+        {
+            using var httpClient = _httpClientFactory.CreateClient();
+            var response = await httpClient.GetStringAsync($"https://api.themoviedb.org/3/find/{imdb_id}?api_key={API_KEY}&external_source=IMDb&language={language}");
+            return response;
+        }
+
+        [KernelFunction]
         [Description("获取指定电影")]
         public async Task<string> GetMovieAsync([Description("影片Id")] string id, [Description("语言，可取值为: en-US, zh-CN")] string language = "zh-CN")
         {

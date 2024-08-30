@@ -48,7 +48,7 @@ namespace PostgreSQL.Embedding.Plugins
             var extractedKeywords = functionResult.GetValue<string>();
 
             // Todo: 支持分页查询
-            var papers = await GetPapersAsync($"https://export.arxiv.org/api/query?search_query=all:{extractedKeywords}");
+            var papers = await GetPapersAsync($"https://export.arxiv.org/api/query?search_query=all:{extractedKeywords}&max_results={max_results}");
             return JsonConvert.SerializeObject(papers);
         }
 
@@ -60,6 +60,11 @@ namespace PostgreSQL.Embedding.Plugins
             return JsonConvert.SerializeObject(papers);
         }
 
+        /// <summary>
+        /// 获取论文
+        /// </summary>
+        /// <param name="url"></param>
+        /// <returns></returns>
         private async Task<IEnumerable<ArxivPaper>> GetPapersAsync(string url)
         {
             using var httpClient = _httpClientFactory.CreateClient();
@@ -87,6 +92,11 @@ namespace PostgreSQL.Embedding.Plugins
             return papers;
         }
 
+        /// <summary>
+        /// 字符串格式化
+        /// </summary>
+        /// <param name="value"></param>
+        /// <returns></returns>
         private string FormatValue(string value) => value.Replace("\r", "").Replace("\n", "").Trim();
     }
 
