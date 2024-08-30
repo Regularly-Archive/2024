@@ -20,6 +20,8 @@ namespace PostgreSQL.Embedding.Common.Models.User
         public string NickName { get; set; }
         public string Intro { get; set; }
         public int Gender { get; set; }
+        public string Email { get; set; }
+        public string Mobile { get; set; }
         public List<string> Role { get; set; }
     }
 }

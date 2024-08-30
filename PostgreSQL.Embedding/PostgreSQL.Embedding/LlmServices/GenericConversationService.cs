@@ -9,6 +9,7 @@ using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.LLmServices.Extensions;
 using PostgreSQL.Embedding.Planners;
+using PostgreSQL.Embedding.Services;
 using PostgreSQL.Embedding.Utils;
 using System.Globalization;
 using System.Text;
@@ -28,6 +29,7 @@ namespace PostgreSQL.Embedding.LlmServices
         private string _conversationId;
         private long _messageReferenceId;
         private readonly Random _random = new Random();
+        private readonly IUserInfoService _userInfoService;
         public GenericConversationService(Kernel kernel, LlmApp app, IServiceProvider serviceProvider, IChatHistoriesService chatHistoriesService)
             : base(kernel, chatHistoriesService)
         {
@@ -37,6 +39,7 @@ namespace PostgreSQL.Embedding.LlmServices
             _promptTemplateService = _serviceProvider.GetService<PromptTemplateService>();
             _promptTemplate = _promptTemplateService.LoadTemplate("Default.txt");
             _chatHistoriesService = chatHistoriesService;
+            _userInfoService = _serviceProvider.GetService<IUserInfoService>();
         }
 
         public async Task InvokeAsync(OpenAIModel model, HttpContext httpContext, string input, CancellationToken cancellationToken = default)
@@ -53,6 +56,7 @@ namespace PostgreSQL.Embedding.LlmServices
             }
             else
             {
+                // Todo: 考虑为消息增加状态，这样可以查看同一条消息的不同生成结果
                 await RemoveLastChatMessage(_app.Id, _conversationId);
             }
 
@@ -139,12 +143,14 @@ namespace PostgreSQL.Embedding.LlmServices
         {
             try
             {
+                var currentUser = await _userInfoService.GetCurrentUserAsync();
                 var planner = new StepwisePlanner(_kernel, _promptTemplateService);
                 planner.AddVariable("appId", _app.Id);
                 planner.AddVariable("conversationId", _conversationId);
+                planner.AddVariable("userId", currentUser.Id);
 
                 var plan = await planner.CreatePlanAsync(input);
-                var result = await plan.ExecuteAsync(_kernel,cancellationToken);
+                var result = await plan.ExecuteAsync(_kernel, cancellationToken);
                 return result.AsStreamming();
             }
             catch (Exception ex)

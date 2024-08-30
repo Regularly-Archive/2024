@@ -14,7 +14,7 @@ namespace PostgreSQL.Embedding.Services
 {
     public interface IUserInfoService
     {
-        ClaimsPrincipal GetCurrentUser();
+        Task<UserInfo> GetCurrentUserAsync();
 
         Task<LoginResult> LoginAsync(Common.Models.User.LoginRequest request);
 
@@ -44,10 +44,15 @@ namespace PostgreSQL.Embedding.Services
             _jwtSettingOptions = jwtSettingOptions;
         }
 
-
-        public ClaimsPrincipal GetCurrentUser()
+        public async Task<UserInfo> GetCurrentUserAsync()
         {
-            return _httpContextAccessor.HttpContext?.User;
+            var userName = _httpContextAccessor.HttpContext?.User.Identity?.Name;
+            if (userName == null) return null;
+
+            var userInfo = await _systemUserRepository.SingleOrDefaultAsync(x => x.UserName == userName);
+            if (userName == null) return null;
+
+            return userInfo.Adapt<UserInfo>();
         }
 
         public async Task<LoginResult> LoginAsync(Common.Models.User.LoginRequest request)
@@ -105,7 +110,7 @@ namespace PostgreSQL.Embedding.Services
 
         public async Task ChangePassword(ChangePasswordRequest request)
         {
-            var currentUserName = GetCurrentUser().Identity.Name;
+            var currentUserName = (await GetCurrentUserAsync()).UserName;
             if (currentUserName != request.UserName)
                 throw new ArgumentException("不允许修改他人密码");
 

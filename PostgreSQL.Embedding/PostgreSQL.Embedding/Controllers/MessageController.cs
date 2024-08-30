@@ -20,7 +20,8 @@ namespace PostgreSQL.Embedding.Controllers
 
         public override async Task<JsonResult> FindList()
         {
-            var userId = _userInfoService.GetCurrentUser()?.Identity?.Name;
+            // Todo
+            var userId = (await _userInfoService.GetCurrentUserAsync()).UserName;
             var list = await _messageRepository.FindAsync(x => x.CreatedBy == userId && !x.IsRead);
             return ApiResult.Success(list);
         }
@@ -28,7 +29,8 @@ namespace PostgreSQL.Embedding.Controllers
         [HttpPut("read")]
         public async Task<JsonResult> ReadAll()
         {
-            var userId = _userInfoService.GetCurrentUser()?.Identity?.Name;
+            // Todo
+            var userId = (await _userInfoService.GetCurrentUserAsync()).UserName;
             var messages = await _messageRepository.FindAsync(x => x.CreatedBy == userId && !x.IsRead);
 
             foreach (var message in messages)
