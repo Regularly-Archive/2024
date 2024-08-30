@@ -14,30 +14,30 @@ namespace PostgreSQL.Embedding.Controllers
     [AllowAnonymous]
     public class AccountController : ControllerBase
     {
-        private readonly IUserInfoService _useInfoService;
+        private readonly IUserInfoService _userInfoService;
         public AccountController(IUserInfoService userInfoService)
         {
-            _useInfoService = userInfoService;
+            _userInfoService = userInfoService;
         }
 
         [HttpPost("login")]
         public async Task<JsonResult> Login([FromBody] LoginRequest loginRequest)
         {
-            var loginResult = await _useInfoService.LoginAsync(loginRequest);
+            var loginResult = await _userInfoService.LoginAsync(loginRequest);
             return ApiResult.Success(loginResult);
         }
 
         [HttpPost("register")]
         public async Task<JsonResult> Register([FromBody] RegisterRequest registerRequest)
         {
-            await _useInfoService.RegisterAsync(registerRequest);
+            await _userInfoService.RegisterAsync(registerRequest);
             return ApiResult.Success(new { }, "注册成功");
         }
 
         [HttpGet("{id}")]
         public virtual async Task<JsonResult> SelectById(long id)
         {
-            var userInfo = await _useInfoService.GetUserByIdAsync(id);
+            var userInfo = await _userInfoService.GetUserByIdAsync(id);
             var queryDTO = userInfo.Adapt<UserInfo>();
             return ApiResult.Success(queryDTO, "操作成功");
         }
@@ -45,14 +45,14 @@ namespace PostgreSQL.Embedding.Controllers
         [HttpPut]
         public virtual async Task<JsonResult> Update([FromBody] UpdateProfileRequest request)
         {
-            await _useInfoService.UpdateProfile(request);
+            await _userInfoService.UpdateProfile(request);
             return ApiResult.Success(new { }, "操作成功");
         }
 
         [HttpPost("ChangePassword")]
         public async Task<JsonResult> ChangePassword([FromBody] ChangePasswordRequest request)
         {
-            await _useInfoService.ChangePassword(request);
+            await _userInfoService.ChangePassword(request);
             return ApiResult.Success(new { }, "操作成功");
         }
     }
