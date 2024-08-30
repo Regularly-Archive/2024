@@ -62,7 +62,7 @@ namespace PostgreSQL.Embedding.Plugins
                 return new Entry()
                 {
                     Title = x.QuerySelector("a")?.QuerySelector(SELECTOR_RESULTS_ITEM_Title)?.TextContent,
-                    Url = x.QuerySelector("a").Attributes["href"]?.Value,
+                    Url = x.QuerySelector("a")?.Attributes["href"]?.Value,
                     Description = x.QuerySelector(SELECTOR_RESULTS_ITEM_DESCRIPTION)?.TextContent
                 };
             })

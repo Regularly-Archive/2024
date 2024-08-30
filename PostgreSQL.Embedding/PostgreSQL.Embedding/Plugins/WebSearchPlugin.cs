@@ -14,7 +14,7 @@ namespace PostgreSQL.Embedding.Plugins
     [KernelPlugin(Description = "网络搜索插件，支持以下搜索引擎：必应搜索，Brave 搜索, JianAI")]
     public class WebSearchPlugin
     {
-        private Regex _regexCitations = new Regex(@"\[\^(\d+)\]");
+        private Regex _regexCitations = new Regex(@"\[(\d+)\]");
         private const string FINAL_ANSWER_TAG = "[FINAL_ANSWER]";
 
         private readonly IServiceProvider _serviceProvider;
@@ -27,7 +27,7 @@ namespace PostgreSQL.Embedding.Plugins
 
         [KernelFunction]
         [Description("从网络中搜索信息")]
-        private async Task<string> RunAsync([Description("用户请求")] string query, Kernel kernel, [Description("搜索引擎，可选值: Bing, Brave, JianAI")] string searchEngine = "Brave", [Description("是否需要自动整理答案")]bool autoExtractAnswer = true)
+        private async Task<string> RunAsync([Description("用户请求")] string query, Kernel kernel, [Description("搜索引擎，可选值: Bing, Brave, JianAI")] string searchEngine = "Brave", [Description("是否仅搜索答案")]bool searchOnly = false)
         {
             var clonedKernel = kernel.Clone();
 
@@ -39,7 +39,7 @@ namespace PostgreSQL.Embedding.Plugins
             var citations = GetLlmCitations(searchResult);
             var jsonFormatContext = JsonConvert.SerializeObject(citations);
 
-            if (!autoExtractAnswer) return jsonFormatContext;
+            if (searchOnly) return jsonFormatContext;
 
             var promptTemplateService = serviceScope.ServiceProvider.GetRequiredService<PromptTemplateService>();
             var promptTemplate = promptTemplateService.LoadTemplate("RAGPrompt.txt");
@@ -65,14 +65,14 @@ namespace PostgreSQL.Embedding.Plugins
                 var generatedCitations = citations.Where(x => citationNumbers.Contains(x.Index)).Select(x =>
                 {
                     var newIndex = newCitationNumbers.FirstOrDefault(k => k.OriginIndex == x.Index).NewIndex;
-                    return $"[^{newIndex}]: {x.Url}";
+                    return $"[{newIndex}]: {x.Url}";
                 });
                 var markdownFormatContext = string.Join("\r\n", generatedCitations.OrderBy(x => x));
 
                 // 对答案中的引用信息重新排序
                 foreach(var ciation in newCitationNumbers)
                 {
-                    llmResponse = llmResponse.Replace($"[^{ciation.OriginIndex}]", $"[^{ciation.NewIndex}]");
+                    llmResponse = llmResponse.Replace($"[{ciation.OriginIndex}]", $"[{ciation.NewIndex}]");
                 }
 
                 var answerBuilder = new StringBuilder();
@@ -83,13 +83,11 @@ namespace PostgreSQL.Embedding.Plugins
                 llmResponse = answerBuilder.ToString();
             }
 
-            return $"""
-                The following content is sourced from an LLM response. Please keep its format for answers and citations.
+            return 
+                $"""
+                The following content is sourced from an LLM response. Please keep its format for answers and citations like '<sup>[1]</sup>'.
 
-                ```
                 {llmResponse}
-                ```
-
                 """;
         }
 
