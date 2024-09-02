@@ -73,8 +73,8 @@ namespace PostgreSQL.Embedding.LlmServices
             var conversationFlag = HttpContext.GetConversationFlag();
             if (!conversationFlag)
             {
-                _messageReferenceId = await _chatHistoriesService.AddUserMessage(_app.Id, _conversationId, input);
-                await _chatHistoriesService.AddConversation(_app.Id, _conversationId, conversationName);
+                _messageReferenceId = await _chatHistoriesService.AddUserMessageAsync(_app.Id, _conversationId, input);
+                await _chatHistoriesService.AddConversationAsync(_app.Id, _conversationId, conversationName);
             }
             else
             {
@@ -101,7 +101,7 @@ namespace PostgreSQL.Embedding.LlmServices
             var temperature = _app.Temperature / 100;
             var executionSettings = new OpenAIPromptExecutionSettings() { Temperature = (double)temperature };
 
-            var histories = await GetHistoricalMessages(_app.Id, _conversationId, _app.MaxMessageRounds);
+            var histories = await GetHistoricalMessagesAsync(_app.Id, _conversationId, _app.MaxMessageRounds);
 
             _promptTemplate.AddVariable("name", "ChatGPT");
             _promptTemplate.AddVariable("context", jsonFormatContext);
@@ -116,7 +116,7 @@ namespace PostgreSQL.Embedding.LlmServices
                 if (answer.IndexOf(Common.Constants.DefaultEmptyAnswer) != -1)
                 {
                     answer = Common.Constants.DefaultEmptyAnswer;
-                    var messageId = await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answer);
+                    var messageId = await _chatHistoriesService.AddSystemMessageAsync(_app.Id, _conversationId, answer);
                     HttpContext.Response.Headers[Common.Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
                     await HttpContext.WriteChatCompletion(input, messageId);
                 } 
@@ -158,7 +158,7 @@ namespace PostgreSQL.Embedding.LlmServices
                     answerBuilder.AppendLine();
                     answerBuilder.AppendLine(markdownFormatContext);
 
-                    var messageId = await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());
+                    var messageId = await _chatHistoriesService.AddSystemMessageAsync(_app.Id, _conversationId, answerBuilder.ToString());
                     HttpContext.Response.Headers[Common.Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
                     await HttpContext.WriteChatCompletion(answerBuilder.ToString(), messageId);
                 }
@@ -185,7 +185,7 @@ namespace PostgreSQL.Embedding.LlmServices
             var temperature = _app.Temperature / 100;
             var executionSettings = new OpenAIPromptExecutionSettings() { Temperature = (double)temperature };
 
-            var histories = await GetHistoricalMessages(_app.Id, _conversationId, _app.MaxMessageRounds);
+            var histories = await GetHistoricalMessagesAsync(_app.Id, _conversationId, _app.MaxMessageRounds);
 
             _promptTemplate.AddVariable("name", "ChatGPT");
             _promptTemplate.AddVariable("context", jsonFormatContext);
@@ -198,7 +198,7 @@ namespace PostgreSQL.Embedding.LlmServices
             if (llmResponse != null && llmResponse.IndexOf(Common.Constants.DefaultEmptyAnswer) != -1)
             {
                 llmResponse = Common.Constants.DefaultEmptyAnswer;
-                var messageId = await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, llmResponse);
+                var messageId = await _chatHistoriesService.AddSystemMessageAsync(_app.Id, _conversationId, llmResponse);
                 HttpContext.Response.Headers[Common.Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
                 await HttpContext.WriteStreamingChatCompletion(llmResponse, messageId, cancellationToken);
             } 
@@ -238,7 +238,7 @@ namespace PostgreSQL.Embedding.LlmServices
                 answerBuilder.AppendLine();
                 answerBuilder.AppendLine(markdownFormatContext);
 
-                var messageId = await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());
+                var messageId = await _chatHistoriesService.AddSystemMessageAsync(_app.Id, _conversationId, answerBuilder.ToString());
                 HttpContext.Response.Headers[Common.Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
                 await HttpContext.WriteStreamingChatCompletion(answerBuilder.ToString(), messageId, cancellationToken);
             }
@@ -403,14 +403,14 @@ namespace PostgreSQL.Embedding.LlmServices
 
         private async Task RemoveLastChatMessage(long appId, string conversationId)
         {
-            var messageList = await _chatHistoriesService.GetConversationMessages(appId, conversationId);
+            var messageList = await _chatHistoriesService.GetConversationMessagesAsync(appId, conversationId);
             messageList = messageList.OrderBy(x => x.CreatedAt).ToList();
 
             _messageReferenceId = messageList.LastOrDefault(x => x.IsUserMessage).Id;
 
             var lastMessage = messageList.LastOrDefault();
             if (lastMessage != null && !lastMessage.IsUserMessage)
-                await _chatHistoriesService.DeleteConversationMessage(lastMessage.Id);
+                await _chatHistoriesService.DeleteConversationMessageAsync(lastMessage.Id);
 
         }
     }

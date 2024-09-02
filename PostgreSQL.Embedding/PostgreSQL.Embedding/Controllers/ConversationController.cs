@@ -33,35 +33,35 @@ namespace PostgreSQL.Embedding.Controllers
         [HttpGet("{appId}/histories/{conversationId}")]
         public async Task<JsonResult> GetConversationMessages(long appId, string conversationId)
         {
-            var messsages = await _chatHistoryService.GetConversationMessages(appId, conversationId);
+            var messsages = await _chatHistoryService.GetConversationMessagesAsync(appId, conversationId);
             return ApiResult.Success(messsages);
         }
 
         [HttpGet("{appId}/histories")]
         public async Task<JsonResult> GetConversations(long appId)
         {
-            var conversations = await _chatHistoryService.GetAppConversations(appId);
+            var conversations = await _chatHistoryService.GetAppConversationsAsync(appId);
             return ApiResult.Success(conversations);
         }
 
         [HttpDelete("{appId}/histories/{conversationId}")]
         public async Task<JsonResult> DeleteConversation(long appId, string conversationId)
         {
-            await _chatHistoryService.DeleteConversation(appId, conversationId);
+            await _chatHistoryService.DeleteConversationAsync(appId, conversationId);
             return ApiResult.Success<object>(null);
         }
 
         [HttpPut("{appId}/histories/{conversationId}")]
         public async Task<JsonResult> UpdateConversation(long appId, string conversationId, [FromBody] AppConversation conversation)
         {
-            await _chatHistoryService.UpdateConversation(appId, conversationId, conversation.Summary);
+            await _chatHistoryService.UpdateConversationAsync(appId, conversationId, conversation.Summary);
             return ApiResult.Success<object>(null);
         }
 
         [HttpDelete("{appId}/histories/{conversationId}/{messageId}")]
         public async Task<JsonResult> DeleteConversationMessage(long appId, string conversationId, long messageId)
         {
-            await _chatHistoryService.DeleteConversationMessage(messageId);
+            await _chatHistoryService.DeleteConversationMessageAsync(messageId);
             return ApiResult.Success<object>(null);
         }
     }
