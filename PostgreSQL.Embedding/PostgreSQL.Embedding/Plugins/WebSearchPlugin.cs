@@ -27,7 +27,7 @@ namespace PostgreSQL.Embedding.Plugins
 
         [KernelFunction]
         [Description("从网络中搜索信息")]
-        private async Task<string> RunAsync([Description("用户请求")] string query, Kernel kernel, [Description("搜索引擎，可选值: Bing, Brave, JianAI")] string searchEngine = "Brave", [Description("是否仅搜索答案")]bool searchOnly = false)
+        private async Task<string> RunAsync([Description("用户请求")] string query, Kernel kernel, [Description("搜索引擎，可选值: Bing, Brave, JianAI")] string searchEngine = "Brave", [Description("是否仅搜索答案")] bool searchOnly = false)
         {
             var clonedKernel = kernel.Clone();
 
@@ -59,18 +59,33 @@ namespace PostgreSQL.Embedding.Plugins
             }
             else
             {
-                // 使用正则匹配引用的文档信息，生成相同顺序的脚注
-                var citationNumbers = _regexCitations.Matches(llmResponse).Select(x => int.Parse(x.Groups[1].Value)).Distinct();
-                var newCitationNumbers = citationNumbers.Select((x, i) => new { NewIndex = i + 1, OriginIndex = x });
-                var generatedCitations = citations.Where(x => citationNumbers.Contains(x.Index)).Select(x =>
+                // 匹配引用信息，对引用信息的索引进行重排
+                var index = 0;
+                var matchedCitationNumbers = _regexCitations.Matches(llmResponse).Select(x => int.Parse(x.Groups[1].Value)).ToList();
+                var newCitationNumbers = new List<LlmCitationMappingModel>();
+                foreach (var citationNumber in matchedCitationNumbers)
+                {
+                    if (!newCitationNumbers.Any(x => x.OriginIndex == citationNumber))
+                    {
+                        index += 1;
+                        newCitationNumbers.Add(new LlmCitationMappingModel() { NewIndex = index, OriginIndex = citationNumber });
+                    }
+                }
+
+                // 重新生成引用信息
+                var generatedCitations = citations.Where(x => matchedCitationNumbers.Contains(x.Index)).Select(x =>
                 {
                     var newIndex = newCitationNumbers.FirstOrDefault(k => k.OriginIndex == x.Index).NewIndex;
-                    return $"[{newIndex}]: {x.Url}";
-                });
-                var markdownFormatContext = string.Join("\r\n", generatedCitations.OrderBy(x => x));
+                    return new LlmCitationModel() { Index = newIndex, Url = x.Url };
+                })
+                .OrderBy(x => x.Index)
+                .Select(x => $"[{x.Index}]: {x.Url}")
+                .ToList();
 
-                // 对答案中的引用信息重新排序
-                foreach(var ciation in newCitationNumbers)
+                var markdownFormatContext = string.Join("\r\n", generatedCitations);
+
+                // 更新答案中的引用信息
+                foreach (var ciation in newCitationNumbers)
                 {
                     llmResponse = llmResponse.Replace($"[{ciation.OriginIndex}]", $"[{ciation.NewIndex}]");
                 }
@@ -83,7 +98,7 @@ namespace PostgreSQL.Embedding.Plugins
                 llmResponse = answerBuilder.ToString();
             }
 
-            return 
+            return
                 $"""
                 The following content is sourced from an LLM response. Please keep its format for answers and citations like '<sup>[1]</sup>'.
 
@@ -106,7 +121,7 @@ namespace PostgreSQL.Embedding.Plugins
             }
         }
 
-        private List<LlmCitationModel> GetLlmCitations(SearchResult searchResult) 
+        private List<LlmCitationModel> GetLlmCitations(SearchResult searchResult)
         {
             return searchResult.Entries.Select((x, i) => new LlmCitationModel
             {

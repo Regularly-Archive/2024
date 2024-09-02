@@ -122,11 +122,40 @@ namespace PostgreSQL.Embedding.LlmServices
                 } 
                 else
                 {
-                    var citationNumbers = _regexCitations.Matches(answer).Select(x => int.Parse(x.Groups[1].Value));
-                    var markdownFormatContext = string.Join("\r\n", citations.Where(x => citationNumbers.Contains(x.Index)).Select(x => $"[{x.Index}]: {x.Url}"));
+                    // 匹配引用信息，对引用信息的索引进行重排
+                    var index = 0;
+                    var matchedCitationNumbers = _regexCitations.Matches(answer).Select(x => int.Parse(x.Groups[1].Value)).ToList();
+                    var newCitationNumbers = new List<LlmCitationMappingModel>();
+                    foreach (var citationNumber in matchedCitationNumbers)
+                    {
+                        if (!newCitationNumbers.Any(x => x.OriginIndex == citationNumber))
+                        {
+                            index += 1;
+                            newCitationNumbers.Add(new LlmCitationMappingModel() { NewIndex = index, OriginIndex = citationNumber });
+                        }
+                    }
+
+                    // 重新生成引用信息
+                    var generatedCitations = citations.Where(x => matchedCitationNumbers.Contains(x.Index)).Select(x =>
+                    {
+                        var newIndex = newCitationNumbers.FirstOrDefault(k => k.OriginIndex == x.Index).NewIndex;
+                        return new LlmCitationModel() { Index = newIndex, Url = x.Url };
+                    })
+                    .OrderBy(x => x.Index)
+                    .Select(x => $"[{x.Index}]: {x.Url}")
+                    .ToList();
+
+                    var markdownFormatContext = string.Join("\r\n", generatedCitations);
+
+                    // 更新答案中的引用信息
+                    foreach (var ciation in newCitationNumbers)
+                    {
+                        answer = answer.Replace($"[{ciation.OriginIndex}]", $"[{ciation.NewIndex}]");
+                    }
 
                     var answerBuilder = new StringBuilder();
                     answerBuilder.AppendLine(answer);
+                    answerBuilder.AppendLine();
                     answerBuilder.AppendLine(markdownFormatContext);
 
                     var messageId = await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());
@@ -175,8 +204,34 @@ namespace PostgreSQL.Embedding.LlmServices
             } 
             else
             {
-                var citationNumbers = _regexCitations.Matches(llmResponse).Select(x => int.Parse(x.Groups[1].Value));
-                var markdownFormatContext = string.Join("\r\n", citations.Where(x => citationNumbers.Contains(x.Index)).Select(x => $"[{x.Index}]: {x.Url}"));
+                var index = 0;
+                var matchedCitationNumbers = _regexCitations.Matches(llmResponse).Select(x => int.Parse(x.Groups[1].Value)).ToList();
+                var newCitationNumbers = new List<LlmCitationMappingModel>();
+                foreach (var citationNumber in matchedCitationNumbers)
+                {
+                    if (!newCitationNumbers.Any(x => x.OriginIndex == citationNumber))
+                    {
+                        index += 1;
+                        newCitationNumbers.Add(new LlmCitationMappingModel() { NewIndex = index, OriginIndex = citationNumber });
+                    }
+                }
+
+                var generatedCitations = citations.Where(x => matchedCitationNumbers.Contains(x.Index)).Select(x =>
+                {
+                    var newIndex = newCitationNumbers.FirstOrDefault(k => k.OriginIndex == x.Index).NewIndex;
+                    return new LlmCitationModel() { Index = newIndex, Url = x.Url };
+                })
+                .OrderBy(x => x.Index)
+                .Select(x => $"[{x.Index}]: {x.Url}")
+                .ToList();
+
+                var markdownFormatContext = string.Join("\r\n", generatedCitations);
+
+                // 对答案中的引用信息重新排序
+                foreach (var ciation in newCitationNumbers)
+                {
+                    llmResponse = llmResponse.Replace($"[{ciation.OriginIndex}]", $"[{ciation.NewIndex}]");
+                }
 
                 var answerBuilder = new StringBuilder();
                 answerBuilder.AppendLine(llmResponse);
