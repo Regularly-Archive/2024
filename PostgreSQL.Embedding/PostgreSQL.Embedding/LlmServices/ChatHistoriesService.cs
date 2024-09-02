@@ -1,23 +1,37 @@
-﻿using LLama.Common;
+﻿using DocumentFormat.OpenXml.Math;
+using JiebaNet.Segmenter;
+using LLama.Common;
 using Microsoft.SemanticKernel;
+using Npgsql;
+using PostgreSQL.Embedding.Common.Models.KernelMemory;
+using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using System.Text;
+using System.Reflection;
+using SqlSugar;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
     public class ChatHistoriesService : IChatHistoriesService
     {
-        private IRepository<ChatMessage> _chatMessageRepository;
+        private readonly IRepository<ChatMessage> _chatMessageRepository;
         private readonly IRepository<AppConversation> _appConversationRepository;
-        public ChatHistoriesService(IRepository<ChatMessage> chatMessageRepository, IRepository<AppConversation> appConversationRepository)
+        private readonly JiebaSegmenter _jiebaSegmenter;
+        private readonly IConfiguration _configuration;
+        private readonly string _fullTextSearchLanguage = "chinese";
+        private readonly string _postgrelConnectionString;
+        public ChatHistoriesService(IRepository<ChatMessage> chatMessageRepository, IRepository<AppConversation> appConversationRepository, IConfiguration configuration)
         {
             _chatMessageRepository = chatMessageRepository;
             _appConversationRepository = appConversationRepository;
+            _jiebaSegmenter = new JiebaSegmenter();
+            _configuration = configuration;
+            _postgrelConnectionString = configuration["ConnectionStrings:Default"]!;
         }
 
-        public async Task<long> AddSystemMessage(long appId, string conversationId, string content)
+        public async Task<long> AddSystemMessageAsync(long appId, string conversationId, string content)
         {
             var message = await _chatMessageRepository.AddAsync(new ChatMessage()
             {
@@ -30,7 +44,7 @@ namespace PostgreSQL.Embedding.LlmServices
             return message.Id;
         }
 
-        public async Task<long> AddUserMessage(long appId, string conversationId, string content)
+        public async Task<long> AddUserMessageAsync(long appId, string conversationId, string content)
         {
             var message = await _chatMessageRepository.AddAsync(new ChatMessage()
             {
@@ -43,20 +57,20 @@ namespace PostgreSQL.Embedding.LlmServices
             return message.Id;
         }
 
-        public async Task<List<AppConversation>> GetAppConversations(long appId)
+        public async Task<List<AppConversation>> GetAppConversationsAsync(long appId)
         {
             var list = await _appConversationRepository.FindAsync(x => x.AppId == appId);
             return list.OrderByDescending(x => x.CreatedAt).ToList();
         }
 
-        public async Task<List<ChatMessage>> GetConversationMessages(long appId, string conversationId)
+        public async Task<List<ChatMessage>> GetConversationMessagesAsync(long appId, string conversationId)
         {
             var messages = await _chatMessageRepository.FindAsync(x => x.AppId == appId && x.ConversationId == conversationId);
             messages = messages.OrderBy(x => x.CreatedAt).ToList();
             return messages;
         }
 
-        public async Task AddConversation(long appId, string conversationId, string conversationName)
+        public async Task AddConversationAsync(long appId, string conversationId, string conversationName)
         {
             var conversation = await _appConversationRepository.SingleOrDefaultAsync(x => x.AppId == appId && x.ConversationId == conversationId);
             if (conversation != null) return;
@@ -69,13 +83,13 @@ namespace PostgreSQL.Embedding.LlmServices
             });
         }
 
-        public async Task DeleteConversation(long appId, string conversationId)
+        public async Task DeleteConversationAsync(long appId, string conversationId)
         {
             await _appConversationRepository.DeleteAsync(x => x.AppId == appId && x.ConversationId == conversationId);
             await _chatMessageRepository.DeleteAsync(x => x.AppId == appId && x.ConversationId == conversationId);
         }
 
-        public async Task UpdateConversation(long appId, string conversationId, string summary)
+        public async Task UpdateConversationAsync(long appId, string conversationId, string summary)
         {
             var conversation = await _appConversationRepository.SingleOrDefaultAsync(x => x.AppId == appId && x.ConversationId == conversationId);
             if (conversation == null) return;
@@ -84,9 +98,73 @@ namespace PostgreSQL.Embedding.LlmServices
             await _appConversationRepository.UpdateAsync(conversation);
         }
 
-        public Task DeleteConversationMessage(long messageId)
+        public Task DeleteConversationMessageAsync(long messageId)
         {
             return _chatMessageRepository.DeleteAsync(messageId);
+        }
+
+        public async Task<List<ChatMessage>> SearchConversationMessagesAsync(long appId, string conversationId, string query, double? minRelevance = 0.5, int? limit = 5)
+        {
+            var segments = _jiebaSegmenter.CutForSearch(query).Where(x => !string.IsNullOrWhiteSpace(x)).ToList();
+            var keywords = string.Join(" | ", segments);
+            var sqlLike = string.Join(" OR ", segments.Select(x => $"t.content LIKE '%{x}%'"));
+
+            var tableName = typeof(ChatMessage).GetCustomAttribute<SugarTable>()?.TableName ?? nameof(ChatMessage);
+
+            if (!minRelevance.HasValue) minRelevance = 0.5;
+            if (!limit.HasValue) limit = 5;
+
+            var fullTextSearchSql = $"""
+                SELECT * FROM
+                (
+                    SELECT
+                      t.*,
+                      ts_rank_cd(
+                        to_tsvector('{_fullTextSearchLanguage}', t.content),
+                        to_tsquery('{_fullTextSearchLanguage}', '{keywords}')
+                      ) AS relevance
+                    FROM
+                      "{tableName}" t
+                    WHERE
+                      (t.content @@ to_tsquery('{_fullTextSearchLanguage}', '{keywords}') OR {sqlLike}) AND t.app_id = '{appId}' AND t.conversation_id = '{conversationId}'
+                    ORDER BY
+                      relevance DESC
+                ) AS t WHERE t.relevance > {minRelevance.Value} ORDER BY t.relevance DESC LIMIT {limit.Value}
+            """;
+
+            using var connection = new NpgsqlConnection(_postgrelConnectionString);
+            using var command = new NpgsqlCommand(fullTextSearchSql, connection);
+
+            await connection.OpenAsync();
+            await CreateFullTextSearchIndex(connection, tableName);
+            using var reader = command.ExecuteReader();
+
+            var chatMessages = new List<ChatMessage>();
+            while (reader.Read())
+            {
+                var chatMessage = ParseAsChatMessage(reader);
+                chatMessages.Add(chatMessage);
+            }
+
+            return chatMessages;
+        }
+
+        private async Task CreateFullTextSearchIndex(NpgsqlConnection connection, string tableName)
+        {
+            var createIndexSql = $"""CREATE INDEX IF NOT EXISTS idx_chinese_full_text_search ON "{tableName}" USING gin(to_tsvector('chinese', 'content'))""";
+            using var command = new NpgsqlCommand(createIndexSql, connection);
+            await command.ExecuteNonQueryAsync();
+        }
+
+        private ChatMessage ParseAsChatMessage(NpgsqlDataReader reader)
+        {
+            var chatMessage = new ChatMessage();
+            chatMessage.Id = long.Parse(reader["id"].ToString());
+            chatMessage.AppId = long.Parse(reader["app_id"].ToString());
+            chatMessage.ConversationId = reader["conversation_id"].ToString();
+            chatMessage.Content = reader["content"].ToString();
+            chatMessage.IsUserMessage = bool.Parse(reader["is_user_message"].ToString());
+            return chatMessage;
         }
     }
 }
