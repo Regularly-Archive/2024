@@ -51,8 +51,8 @@ namespace PostgreSQL.Embedding.LlmServices
             var conversationFlag = httpContext.GetConversationFlag();
             if (!conversationFlag)
             {
-                _messageReferenceId = await _chatHistoriesService.AddUserMessage(_app.Id, _conversationId, input);
-                await _chatHistoriesService.AddConversation(_app.Id, _conversationId, conversationName);
+                _messageReferenceId = await _chatHistoriesService.AddUserMessageAsync(_app.Id, _conversationId, input);
+                await _chatHistoriesService.AddConversationAsync(_app.Id, _conversationId, conversationName);
             }
             else
             {
@@ -90,7 +90,7 @@ namespace PostgreSQL.Embedding.LlmServices
                 if (!string.IsNullOrEmpty(content.Content)) answerBuilder.Append(content.Content);
             }
 
-            var messageId = await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answerBuilder.ToString());
+            var messageId = await _chatHistoriesService.AddSystemMessageAsync(_app.Id, _conversationId, answerBuilder.ToString());
             HttpContext.Response.Headers[Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
             await HttpContext.WriteStreamingChatCompletion(chatResult, messageId, cancellationToken);
         }
@@ -111,7 +111,7 @@ namespace PostgreSQL.Embedding.LlmServices
             var answer = chatResult.GetValue<string>();
             if (!string.IsNullOrEmpty(answer))
             {
-                var messageId = await _chatHistoriesService.AddSystemMessage(_app.Id, _conversationId, answer);
+                var messageId = await _chatHistoriesService.AddSystemMessageAsync(_app.Id, _conversationId, answer);
                 HttpContext.Response.Headers[Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
                 await HttpContext.WriteChatCompletion(input, messageId);
             }
@@ -168,7 +168,7 @@ namespace PostgreSQL.Embedding.LlmServices
             var temperature = _app.Temperature / 100;
             var executionSettings = new OpenAIPromptExecutionSettings() { Temperature = (double)temperature };
 
-            var histories = await GetHistoricalMessages(_app.Id, _conversationId, _app.MaxMessageRounds);
+            var histories = await GetHistoricalMessagesAsync(_app.Id, _conversationId, _app.MaxMessageRounds);
 
             _promptTemplate.AddVariable("input", input);
             _promptTemplate.AddVariable("system", _app.Prompt);
@@ -184,7 +184,7 @@ namespace PostgreSQL.Embedding.LlmServices
             var temperature = _app.Temperature / 100;
             var executionSettings = new OpenAIPromptExecutionSettings() { Temperature = (double)temperature };
 
-            var histories = await GetHistoricalMessages(_app.Id, _conversationId, _app.MaxMessageRounds);
+            var histories = await GetHistoricalMessagesAsync(_app.Id, _conversationId, _app.MaxMessageRounds);
 
 
             _promptTemplate.AddVariable("input", input);
@@ -195,14 +195,14 @@ namespace PostgreSQL.Embedding.LlmServices
 
         private async Task RemoveLastChatMessage(long appId, string conversationId)
         {
-            var messageList = await _chatHistoriesService.GetConversationMessages(appId, conversationId);
+            var messageList = await _chatHistoriesService.GetConversationMessagesAsync(appId, conversationId);
             messageList = messageList.OrderBy(x => x.CreatedAt).ToList();
 
             _messageReferenceId = messageList.LastOrDefault(x => x.IsUserMessage).Id;
 
             var lastMessage = messageList.LastOrDefault();
             if (lastMessage != null && !lastMessage.IsUserMessage)
-                await _chatHistoriesService.DeleteConversationMessage(lastMessage.Id);
+                await _chatHistoriesService.DeleteConversationMessageAsync(lastMessage.Id);
         }
     }
 }
