@@ -2,7 +2,7 @@
 
 namespace PostgreSQL.Embedding.DataAccess.Entities
 {
-    [SugarTable("llm_app")]
+    [SugarTable("llm_apps")]
     public class LlmApp : BaseEntity
     {
         [SugarColumn(ColumnName = "name")]

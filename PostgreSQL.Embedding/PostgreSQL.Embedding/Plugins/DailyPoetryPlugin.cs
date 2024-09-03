@@ -1,15 +1,17 @@
 ﻿using Microsoft.SemanticKernel;
 using Newtonsoft.Json.Linq;
 using PostgreSQL.Embedding.Common.Attributes;
+using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 
 namespace PostgreSQL.Embedding.Plugins
 {
     [KernelPlugin(Description = "今日诗词插件")]
-    public class DailyPoetryPlugin
+    public class DailyPoetryPlugin : BasePlugin
     {
         private readonly IHttpClientFactory _httpClientFactory;
-        public DailyPoetryPlugin(IHttpClientFactory httpClientFactory)
+        public DailyPoetryPlugin(IHttpClientFactory httpClientFactory, IServiceProvider serviceProvider)
+            : base(serviceProvider)
         {
             _httpClientFactory = httpClientFactory;
         }
@@ -28,7 +30,7 @@ namespace PostgreSQL.Embedding.Plugins
         private async Task<string> GetToken(HttpClient httpClient)
         {
             var response = await httpClient.GetStringAsync("https://v2.jinrishici.com/token");
-            return JObject.Parse(response)["data"].Value<string>();   
+            return JObject.Parse(response)["data"].Value<string>();
         }
     }
 }

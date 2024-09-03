@@ -4,6 +4,7 @@ using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
+using PostgreSQL.Embedding.Plugins.Abstration;
 using System.Reflection;
 using System.Runtime.Loader;
 
@@ -32,7 +33,7 @@ namespace PostgreSQL.Embedding.Utils
             return services;
         }
 
-        public static Kernel ImportLlmPlugins(this Kernel kernel, IServiceProvider serviceProvider, IEnumerable<Assembly> externalAssemblies = null)
+        public static Kernel ImportLlmPlugins(this Kernel kernel, IServiceProvider serviceProvider, long? appId = null, IEnumerable<Assembly> externalAssemblies = null)
         {
             var assembies = AssemblyLoadContext.Default.Assemblies;
             if (externalAssemblies != null && assembies.Any())
@@ -47,11 +48,11 @@ namespace PostgreSQL.Embedding.Utils
                 if (pluginInstance != null)
                 {
                     var kernelPluginAttribute = pluginType.GetCustomAttribute<KernelPluginAttribute>();
-                    if (string.IsNullOrEmpty(kernelPluginAttribute.PluginName))
-                        kernelPluginAttribute.PluginName = pluginType.Name;
 
                     if (!kernelPluginAttribute.Enabled) continue;
-                    kernel.Plugins.AddFromObject(pluginInstance, kernelPluginAttribute.PluginName);
+                    if (appId.HasValue)
+                        (pluginInstance as IPlugin).Initialize(appId.Value);
+                    kernel.Plugins.AddFromObject(pluginInstance, pluginType.Name);
                 }
             }
 
@@ -66,11 +67,16 @@ namespace PostgreSQL.Embedding.Utils
             foreach (var pluginType in pluginTypes)
             {
                 var kernelPluginAttribute = pluginType.GetCustomAttribute<KernelPluginAttribute>();
-                var persistedPlugin = await pluginRepository.SingleOrDefaultAsync(x => x.TypeName == pluginType.FullName);
+                if (!kernelPluginAttribute.Enabled) continue;
+
+                var pluginInstance = serviceProvider.GetRequiredService(pluginType);
+                var pluginName = (pluginInstance as IPlugin).PluginName ?? pluginType.Name;
+
+                var persistedPlugin = await pluginRepository.SingleOrDefaultAsync(x => x.PluginName == pluginName);
                 if (persistedPlugin != null)
                 {
                     persistedPlugin.PluginIntro = kernelPluginAttribute.Description;
-                    persistedPlugin.PluginName = kernelPluginAttribute.PluginName ?? pluginType.Name;
+                    persistedPlugin.PluginName = pluginName;
                     await pluginRepository.UpdateAsync(persistedPlugin);
                 }
                 else
@@ -78,7 +84,7 @@ namespace PostgreSQL.Embedding.Utils
                     var newPlugin = new LlmPlugin()
                     {
                         PluginIntro = kernelPluginAttribute.Description,
-                        PluginName = kernelPluginAttribute.PluginName ?? pluginType.Name,
+                        PluginName = pluginName,
                         TypeName = pluginType.FullName
                     };
                     await pluginRepository.AddAsync(newPlugin);

@@ -5,6 +5,7 @@ using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Models.RAG;
 using PostgreSQL.Embedding.Common.Models.Search;
 using PostgreSQL.Embedding.LlmServices;
+using PostgreSQL.Embedding.Plugins.Abstration;
 using SqlSugar;
 using System.ComponentModel;
 using System.Text;
@@ -13,7 +14,7 @@ using System.Text.RegularExpressions;
 namespace PostgreSQL.Embedding.Plugins
 {
     [KernelPlugin(Description = "微软必应搜索插件")]
-    public class BingSearchPlugin : ISearchEngine
+    public class BingSearchPlugin : BasePlugin, ISearchEngine
     {
         private const string SELECTOR_TAG_MAIN = "main";
         private const string SELECTOR_TAG_LINK = "a";
@@ -26,6 +27,7 @@ namespace PostgreSQL.Embedding.Plugins
         private readonly IHttpClientFactory _httpClientFactory;
 
         public BingSearchPlugin(IServiceProvider serviceProvider, IHttpClientFactory httpClientFactory)
+            : base(serviceProvider)
         {
             _serviceProvider = serviceProvider;
             _httpClientFactory = httpClientFactory;

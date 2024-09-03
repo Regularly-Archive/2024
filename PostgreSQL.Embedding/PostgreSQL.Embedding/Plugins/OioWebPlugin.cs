@@ -1,18 +1,18 @@
 ﻿using Microsoft.SemanticKernel;
-using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Json;
+using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 using System.Text.Json.Serialization;
-using static PostgreSQL.Embedding.Plugins.NMCWeatherPlugin;
 
 namespace PostgreSQL.Embedding.Plugins
 {
     [KernelPlugin(Description = "教书先生API")]
-    public class OioWebPlugin
+    public class OioWebPlugin : BasePlugin
     {
         private readonly IHttpClientFactory _httpClientFactory;
-        public OioWebPlugin(IHttpClientFactory httpClientFactory)
+        public OioWebPlugin(IHttpClientFactory httpClientFactory, IServiceProvider serviceProvider)
+            : base(serviceProvider)
         {
             _httpClientFactory = httpClientFactory;
         }
