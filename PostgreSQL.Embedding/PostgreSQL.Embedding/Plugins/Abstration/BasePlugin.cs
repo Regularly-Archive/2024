@@ -31,6 +31,38 @@ namespace PostgreSQL.Embedding.Plugins.Abstration
             InitializePluginParameters(appId, pluginRepository, parameterRepostory);
         }
 
+        /// <summary>
+        /// 校验插件
+        /// </summary>
+        public bool Validate(out List<string> errorMessages)
+        {
+            errorMessages = new List<string>();
+
+            // 读取插件参数
+            var properties = GetType()
+                .GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                .Where(x => x.GetCustomAttribute<PluginParameterAttribute>() != null)
+                .ToList();
+
+            if (!properties.Any()) return true;
+
+            foreach (var property in properties)
+            {
+                var propertyValue = property.GetValue(this)?.ToString();
+                var pluginParameterAttribute = property.GetCustomAttribute<PluginParameterAttribute>();
+
+                if (pluginParameterAttribute.Required && string.IsNullOrEmpty(propertyValue))
+                    errorMessages.Add($"The parameter '{property.Name}' of plugin '{PluginName}' is required.");
+            }
+
+            return !errorMessages.Any();
+        }
+
+        /// <summary>
+        /// 当前插件名称
+        /// </summary>
+        public virtual string PluginName => this.GetType().Name;
+
         private void InitializePluginParameters(long appId, IRepository<LlmPlugin> pluginRepository, IRepository<LlmAppPluginParameter> parameterRepository)
         {
             // 读取插件信息
@@ -61,19 +93,13 @@ namespace PostgreSQL.Embedding.Plugins.Abstration
                 }
             }
         }
-
-        public virtual string PluginName 
-        {
-            get
-            {
-                return this.GetType().Name;
-            }
-        }
     }
 
     public interface IPlugin
     {
         void Initialize(long appId);
+
+        bool Validate(out List<string> errrorMessages);
 
         string PluginName { get; }
     }
