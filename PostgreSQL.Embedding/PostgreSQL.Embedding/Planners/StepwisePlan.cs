@@ -159,12 +159,12 @@ namespace PostgreSQL.Embedding.Planners
                     //    return false;
                     //}
 
-                    step.Observation = string.IsNullOrEmpty(result) ? "Got no result from action" : result!;
+                    step.Observation = string.IsNullOrEmpty(result) ? $"There is no result can be found from action '{step.Action}'." : result!;
                 }
                 catch (Exception ex)
                 {
-                    step.Observation = $"Error invoking action {step.Action} : {ex.Message}";
-                    this._logger?.LogWarning(ex, "Error invoking action {Action}", step.Action);
+                    step.Observation = $"An error occurs when invoking action '{step.Action} ': {ex.Message}";
+                    this._logger?.LogWarning(ex, "An error occurs when invoking action '{Action}'", step.Action);
                 }
 
                 this._logger?.LogInformation("Observation: \r\n{Observation}", step.Observation);
