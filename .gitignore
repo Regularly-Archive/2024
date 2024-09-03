@@ -68,3 +68,8 @@ AspNetWithAspire/AspireApp/AspireApp.AppHost/bin/
 AspNetWithAspire/AspireApp/.vs/
 AspNetWithAspire/AspireApp/AspireApp.ServiceDefaults/bin/
 AspNetWithAspire/AspireApp/AspireApp.ApiService/bin/
+AspNetWithK8S/AspNetWithK8S/bin/
+Text-Evaluate/1.py
+Text-Evaluate/main.py
+Text-Evaluate/output.csv
+Text-Evaluate/test.py
