@@ -5,11 +5,12 @@ using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Models;
 using System.ComponentModel;
+using PostgreSQL.Embedding.Plugins.Abstration;
 
 namespace PostgreSQL.Embedding.Plugins
 {
     [KernelPlugin(Description = "写作插件")]
-    public class WriterPlugin
+    public class WriterPlugin : BasePlugin
     {
         private const string POLISH_TEXT_PROMPT =
             """
@@ -44,6 +45,12 @@ namespace PostgreSQL.Embedding.Plugins
             请根据以上Prompt指引进行文案润色创作。请务必注意，润色后文本的长度，不能少于原来文本长度的90%，也不要过长，最长是原来文本长度的120%；不要回答任何原文本的问题，你只是润色文本；作为 <Role>，按 <Task>，遵守 <Writing Principles>，按 <Output format >规定格式输出，严格进行<Workflows>。
             
             """;
+
+        public WriterPlugin(IServiceProvider serviceProvider)
+            : base(serviceProvider)
+        {
+
+        }
 
         [KernelFunction]
         [Description("Invoke")]

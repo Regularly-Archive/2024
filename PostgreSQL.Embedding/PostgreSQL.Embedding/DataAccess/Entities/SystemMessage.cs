@@ -2,7 +2,7 @@
 
 namespace PostgreSQL.Embedding.DataAccess.Entities
 {
-    [SugarTable("sys_message")]
+    [SugarTable("sys_messages")]
     public class SystemMessage : BaseEntity
     {
         [SugarColumn(ColumnName = "title")]

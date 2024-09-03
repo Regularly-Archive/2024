@@ -1,14 +1,16 @@
 ﻿using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
+using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 
 namespace PostgreSQL.Embedding.Plugins
 {
     [KernelPlugin(Description = "AlgoBook API")]
-    public class AlgoBookPlugin
+    public class AlgoBookPlugin : BasePlugin
     {
         private readonly IHttpClientFactory _httpClientFactory;
-        public AlgoBookPlugin(IHttpClientFactory httpClientFactory)
+        public AlgoBookPlugin(IHttpClientFactory httpClientFactory, IServiceProvider serviceProvider) 
+            : base(serviceProvider)
         {
             _httpClientFactory = httpClientFactory;
         }

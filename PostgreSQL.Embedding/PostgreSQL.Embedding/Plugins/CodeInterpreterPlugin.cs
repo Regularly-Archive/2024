@@ -9,16 +9,18 @@ using System.ComponentModel;
 using System.IO;
 using Newtonsoft.Json;
 using Jint;
+using PostgreSQL.Embedding.Plugins.Abstration;
 
 namespace PostgreSQL.Embedding.Plugins
 {
     [KernelPlugin(Description = "一个可以运行 C#、Python、JavaScript 代码的插件")]
-    public class CodeInterpreterPlugin
+    public class CodeInterpreterPlugin : BasePlugin
     {
         private ILogger<CodeInterpreterPlugin> _logger;
         private const string NO_RETURN_VALUE = "There is no return value for the current action, please proceed.";
 
         public CodeInterpreterPlugin(IServiceProvider serviceProvider)
+            : base(serviceProvider)
         {
             using var serviceScope = serviceProvider.CreateScope();
 

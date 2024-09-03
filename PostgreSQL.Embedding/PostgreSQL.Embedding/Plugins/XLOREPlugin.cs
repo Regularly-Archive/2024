@@ -1,15 +1,17 @@
 ﻿
 using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
+using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 
 namespace PostgreSQL.Embedding.Plugins
 {
     [KernelPlugin(Description = "XLORE - 中英文跨语言知识图谱插件")]
-    public class XLOREPlugin
+    public class XLOREPlugin : BasePlugin
     {
         private readonly IHttpClientFactory _httpClientFactory;
-        public XLOREPlugin(IHttpClientFactory httpClientFactory)
+        public XLOREPlugin(IHttpClientFactory httpClientFactory, IServiceProvider serviceProvider)
+            : base(serviceProvider)
         {
             _httpClientFactory = httpClientFactory;
         }

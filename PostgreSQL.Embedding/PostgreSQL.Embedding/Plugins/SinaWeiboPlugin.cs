@@ -4,6 +4,8 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Models;
+using PostgreSQL.Embedding.Common.Models.Plugin;
+using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
@@ -12,7 +14,7 @@ using System.Text.Json.Serialization;
 namespace PostgreSQL.Embedding.Plugins
 {
     [KernelPlugin(Description = "新浪微博插件")]
-    public class SinaWeiboPlugin
+    public class SinaWeiboPlugin : BasePlugin
     {
         private const string ANALYSE_WEIBO_FEEDS_PROMPT =
             """
@@ -58,10 +60,12 @@ namespace PostgreSQL.Embedding.Plugins
 
             """";
 
-        private const int DEFAULT_RETRIEVE_NUMBER = 50;
+        [PluginParameter(Description = "抓取最新微博数目")]
+        private int DEFAULT_RETRIEVE_NUMBER = 50;
 
         private IHttpClientFactory _httpClientFactory;
-        public SinaWeiboPlugin(IHttpClientFactory httpClientFactory)
+        public SinaWeiboPlugin(IHttpClientFactory httpClientFactory, IServiceProvider serviceProvider)
+            : base(serviceProvider)
         {
             _httpClientFactory = httpClientFactory;
         }

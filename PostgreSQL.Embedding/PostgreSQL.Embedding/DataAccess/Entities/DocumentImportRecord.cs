@@ -3,7 +3,7 @@ using SqlSugar;
 
 namespace PostgreSQL.Embedding.DataAccess.Entities
 {
-    [SugarTable("document_import_record")]
+    [SugarTable("document_import_records")]
     public class DocumentImportRecord : BaseEntity
     {
         [SugarColumn(ColumnName = "task_id")]

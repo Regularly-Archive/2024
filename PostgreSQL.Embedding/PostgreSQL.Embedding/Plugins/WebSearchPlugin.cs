@@ -5,6 +5,7 @@ using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Models.RAG;
 using PostgreSQL.Embedding.Common.Models.Search;
 using PostgreSQL.Embedding.LlmServices;
+using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -12,7 +13,7 @@ using System.Text.RegularExpressions;
 namespace PostgreSQL.Embedding.Plugins
 {
     [KernelPlugin(Description = "网络搜索插件，支持以下搜索引擎：必应搜索，Brave 搜索, JianAI")]
-    public class WebSearchPlugin
+    public class WebSearchPlugin : BasePlugin
     {
         private Regex _regexCitations = new Regex(@"\[(\d+)\]");
         private const string FINAL_ANSWER_TAG = "[FINAL_ANSWER]";
@@ -21,6 +22,7 @@ namespace PostgreSQL.Embedding.Plugins
         private readonly IHttpClientFactory _httpClientFactory;
 
         public WebSearchPlugin(IServiceProvider serviceProvider, IHttpClientFactory httpClientFactory)
+            : base(serviceProvider)
         {
             _serviceProvider = serviceProvider;
         }

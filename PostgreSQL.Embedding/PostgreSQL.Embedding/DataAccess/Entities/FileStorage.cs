@@ -2,7 +2,7 @@
 
 namespace PostgreSQL.Embedding.DataAccess.Entities
 {
-    [SugarTable("file_storage")]
+    [SugarTable("file_storages")]
     public class FileStorage : BaseEntity
     {
         [SugarColumn(ColumnName = "file_id")]

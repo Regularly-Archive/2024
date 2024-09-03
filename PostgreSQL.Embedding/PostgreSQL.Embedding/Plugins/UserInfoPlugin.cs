@@ -4,16 +4,17 @@ using Microsoft.SemanticKernel;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Models.User;
+using PostgreSQL.Embedding.Plugins.Abstration;
 using PostgreSQL.Embedding.Services;
 using System.ComponentModel;
 
 namespace PostgreSQL.Embedding.Plugins
 {
     [KernelPlugin(Description = "用户信息插件")]
-    public class UserInfoPlugin
+    public class UserInfoPlugin : BasePlugin
     {
         private readonly IServiceProvider _serviceProvider;
-        public UserInfoPlugin(IServiceProvider serviceProvider)
+        public UserInfoPlugin(IServiceProvider serviceProvider) : base(serviceProvider)
         {
             _serviceProvider = serviceProvider;
         }
