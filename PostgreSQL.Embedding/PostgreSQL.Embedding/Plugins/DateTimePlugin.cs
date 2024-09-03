@@ -1,13 +1,20 @@
 ﻿using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
+using PostgreSQL.Embedding.Plugins.Abstration;
 using System;
 using System.ComponentModel;
 
 namespace PostgreSQL.Embedding.Plugins
 {
-    [KernelPlugin(Description = "一个适用于日期和时间处理的插件")] 
-    public class DateTimePlugin
+    [KernelPlugin(Description = "一个适用于日期和时间处理的插件")]
+    public class DateTimePlugin : BasePlugin
     {
+        public DateTimePlugin(IServiceProvider serviceProvider)
+            : base(serviceProvider)
+        {
+
+        }
+
         [KernelFunction]
         [Description("一个计算两个日期间差值的函数, 返回两个日期之间相差的天数")]
         public string DateDiff([Description("第一个日期，格式为：yyyy-MM-dd")] string date1, [Description("第二个日期，格式为：yyyy-MM-dd")] string date2)

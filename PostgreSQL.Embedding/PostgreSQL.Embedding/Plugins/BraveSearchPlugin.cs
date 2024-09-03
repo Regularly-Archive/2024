@@ -3,13 +3,13 @@ using Microsoft.SemanticKernel;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Models.Search;
+using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
-using System.Runtime.CompilerServices;
 
 namespace PostgreSQL.Embedding.Plugins
 {
     [KernelPlugin(Description = "Brave 搜索插件")]
-    public class BraveSearchPlugin : ISearchEngine
+    public class BraveSearchPlugin : BasePlugin, ISearchEngine
     {
         private const string SELECTOR_RESULTS = "#results";
         private const string SELECTOR_RESULTS_ITEM = ".snippet";
@@ -20,6 +20,7 @@ namespace PostgreSQL.Embedding.Plugins
         private readonly IHttpClientFactory _httpClientFactory;
 
         public BraveSearchPlugin(IServiceProvider serviceProvider, IHttpClientFactory httpClientFactory)
+            : base(serviceProvider)
         {
             _serviceProvider = serviceProvider;
             _httpClientFactory = httpClientFactory;

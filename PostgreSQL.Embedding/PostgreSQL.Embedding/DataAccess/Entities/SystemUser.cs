@@ -3,7 +3,7 @@
 namespace PostgreSQL.Embedding.DataAccess.Entities
 {
 
-    [SugarTable("sys_user")]
+    [SugarTable("sys_users")]
     public class SystemUser : BaseEntity
     {
         [SugarColumn(ColumnName = "user_name", ColumnDataType = "varchar(32)")]

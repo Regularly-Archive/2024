@@ -31,10 +31,10 @@ namespace PostgreSQL.Embedding.LlmServices
                 x => x.ModelType == (int)ModelType.TextGeneration && x.ModelName == app.TextModel
             );
 
-            return (await GetKernel(llmModel));
+            return (await GetKernel(llmModel, app.Id));
         }
 
-        public Task<Kernel> GetKernel(LlmModel llmModel)
+        public Task<Kernel> GetKernel(LlmModel llmModel, long? appId)
         {
             var options = _serviceProvider.GetRequiredService<IOptions<LlmConfig>>();
 
@@ -52,7 +52,7 @@ namespace PostgreSQL.Embedding.LlmServices
             kernel.Plugins.AddFromType<TimePlugin>();
             kernel.Plugins.AddFromType<MathPlugin>();
 
-            kernel = kernel.ImportLlmPlugins(_serviceProvider);
+            kernel = kernel.ImportLlmPlugins(_serviceProvider, appId);
 
             return Task.FromResult(kernel);
         }

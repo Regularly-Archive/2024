@@ -1,5 +1,6 @@
 ﻿using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
+using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 using System.Text.Json.Serialization;
 using ThirdParty.Json.LitJson;
@@ -7,7 +8,7 @@ using ThirdParty.Json.LitJson;
 namespace PostgreSQL.Embedding.Plugins
 {
     [KernelPlugin(Description = "中央气象台天气预报接口")]
-    public class NMCWeatherPlugin
+    public class NMCWeatherPlugin : BasePlugin
     {
         private readonly Dictionary<string, string> _provincesMap = new Dictionary<string, string>()
         {
@@ -48,7 +49,8 @@ namespace PostgreSQL.Embedding.Plugins
         };
 
         private readonly IHttpClientFactory _httpClientFactory;
-        public NMCWeatherPlugin(IHttpClientFactory httpClientFactory)
+        public NMCWeatherPlugin(IHttpClientFactory httpClientFactory, IServiceProvider serviceProvider)
+            : base(serviceProvider)
         {
             _httpClientFactory = httpClientFactory;
         }
