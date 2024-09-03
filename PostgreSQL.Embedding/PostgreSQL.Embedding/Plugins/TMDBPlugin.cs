@@ -3,18 +3,21 @@ using Elastic.Clients.Elasticsearch.Analysis;
 using Elastic.Transport;
 using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
+using PostgreSQL.Embedding.Common.Models.Plugin;
+using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 
 namespace PostgreSQL.Embedding.Plugins
 {
     [KernelPlugin(Description = "TMDB 影视数据库插件")]
-    public class TMDBPlugin
+    public class TMDBPlugin : BasePlugin
     {
-        private const string API_KEY = "0f79586eb9d92afa2b7266f7928b055c";
+        [PluginParameter(Description = "API KEY, 从 https://www.themoviedb.org/ 中获取", Required = true)]
+        private string API_KEY { get; set; }
 
         private readonly IHttpClientFactory _httpClientFactory;
-        public TMDBPlugin(IHttpClientFactory httpClientFactory) 
-        { 
+        public TMDBPlugin(IHttpClientFactory httpClientFactory, IServiceProvider serviceProvider) : base(serviceProvider)
+        {
             _httpClientFactory = httpClientFactory;
         }
 

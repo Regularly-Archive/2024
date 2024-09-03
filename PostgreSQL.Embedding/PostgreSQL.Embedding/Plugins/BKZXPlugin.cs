@@ -1,5 +1,6 @@
 ﻿using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
+using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -7,10 +8,11 @@ using System.Text.RegularExpressions;
 namespace PostgreSQL.Embedding.Plugins
 {
     [KernelPlugin(Description = "中国大百科全书数据库", Enabled = false)]
-    public class BKZXPlugin
+    public class BKZXPlugin : BasePlugin
     {
         private readonly IHttpClientFactory _httpClientFactory;
-        public BKZXPlugin(IHttpClientFactory httpClientFactory)
+        public BKZXPlugin(IHttpClientFactory httpClientFactory, IServiceProvider serviceProvider)
+            : base(serviceProvider)
         {
             _httpClientFactory = httpClientFactory;
         }

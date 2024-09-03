@@ -2,13 +2,14 @@
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Models;
+using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 using System.Xml.Linq;
 
 namespace PostgreSQL.Embedding.Plugins
 {
     [KernelPlugin(Description = "一个支持从 arXiv 上检索学术论文的插件")]
-    public class ArxivPlugin
+    public class ArxivPlugin : BasePlugin
     {
         /// <summary>
         /// 每次最多检索 5 篇论文
@@ -31,7 +32,8 @@ namespace PostgreSQL.Embedding.Plugins
             """;
 
         private readonly IHttpClientFactory _httpClientFactory;
-        public ArxivPlugin(IHttpClientFactory httpClientFactory)
+        public ArxivPlugin(IHttpClientFactory httpClientFactory, IServiceProvider serviceProvider) 
+            : base(serviceProvider)
         {
             _httpClientFactory = httpClientFactory;
         }

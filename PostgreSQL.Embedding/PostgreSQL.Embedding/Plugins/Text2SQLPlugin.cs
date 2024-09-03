@@ -2,6 +2,7 @@
 using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.LlmServices;
+using PostgreSQL.Embedding.Plugins.Abstration;
 using SqlSugar;
 using System.ComponentModel;
 using System.Text;
@@ -9,14 +10,14 @@ using System.Text;
 namespace PostgreSQL.Embedding.Plugins
 {
     [KernelPlugin(Description = "使用自然语言查询关系型数据库的插件")]
-    public class Text2SQLPlugin
+    public class Text2SQLPlugin : BasePlugin
     {
         private IServiceProvider _serviceProvider;
         private ConnectionConfig _connectionConfig;
         private PromptTemplateService _promptTemplateService;
         private ILogger<Text2SQLPlugin> _logger;
 
-        public Text2SQLPlugin(IServiceProvider serviceProvider)
+        public Text2SQLPlugin(IServiceProvider serviceProvider) : base(serviceProvider)
         {
             _serviceProvider = serviceProvider;
             _promptTemplateService = _serviceProvider.GetService<PromptTemplateService>();

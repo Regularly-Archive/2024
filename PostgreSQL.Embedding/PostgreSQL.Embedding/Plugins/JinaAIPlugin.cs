@@ -2,6 +2,7 @@
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Models.Search;
+using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 using System.Text;
 using System.Text.Json.Serialization;
@@ -9,10 +10,11 @@ using System.Text.Json.Serialization;
 namespace PostgreSQL.Embedding.Plugins
 {
     [KernelPlugin(Description = "一个基于 JinaAI 的插件，支持信息检索及信息提取等功能")]
-    public sealed class JinaAIPlugin : ISearchEngine
+    public sealed class JinaAIPlugin : BasePlugin, ISearchEngine
     {
         private readonly IHttpClientFactory _httpClientFactory;
-        public JinaAIPlugin(IHttpClientFactory httpClientFactory)
+        public JinaAIPlugin(IHttpClientFactory httpClientFactory, IServiceProvider serviceProvider)
+            : base(serviceProvider)
         {
             _httpClientFactory = httpClientFactory;
         }
