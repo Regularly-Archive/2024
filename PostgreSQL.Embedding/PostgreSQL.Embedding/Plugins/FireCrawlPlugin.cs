@@ -23,6 +23,8 @@ namespace PostgreSQL.Embedding.Plugins
         [Description("一个由 FireCraw 驱动的信息提取接口，可以返回指定网页的内容，返回格式为 Markdown。")]
         public async Task<string> ScrapeAsync([Description("地址")] string url)
         {
+            if (!Validate(out var errorMessages)) throw new Exception(string.Join("", errorMessages));
+
             using var httpClient = _httpClientFactory.CreateClient();
             httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {API_KEY}");
 
