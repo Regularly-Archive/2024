@@ -24,7 +24,7 @@ namespace PostgreSQL.Embedding.Plugins
         private string SMTP_HOST { get; set; } = "smtp.126.com";
 
         [PluginParameter(Description = "SMTP 端口号")]
-        private int SMTP_PORT { get; set; } = 857;
+        private int SMTP_PORT { get; set; } = 587;
 
         [PluginParameter(Description = "是否启用 SSL")]
         private bool STMP_USE_SSL { get; set; } = true;
@@ -39,11 +39,11 @@ namespace PostgreSQL.Embedding.Plugins
         [Description("使用 MailKit 发送邮件")]
         public string SendMailAsync([Description("主题")] string subject, [Description("正文")] string body, [Description("收件人")] string receiver)
         {
-            var email = new MimeMessage();
+            if (!Validate(out var errorMessages)) throw new Exception(string.Join("", errorMessages));
 
+            var email = new MimeMessage();
             email.From.Add(new MailboxAddress(MAIL_SENDER_NAME, MAIL_SENDER_EMAIL));
             email.To.Add(new MailboxAddress(receiver, receiver));
-
             email.Subject = subject;
             email.Body = new TextPart(MimeKit.Text.TextFormat.Plain)
             {
