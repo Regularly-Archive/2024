@@ -104,7 +104,6 @@ namespace PostgreSQL.Embedding.Controllers
             return ApiResult.Success(app);
         }
 
-        // Todo: 两者行为不一致
         [HttpGet("{appId}/plugins/paginate")]
         public async Task<JsonResult> GetPluginsByApp(long appId, int pageIndex, int pageSize)
         {
