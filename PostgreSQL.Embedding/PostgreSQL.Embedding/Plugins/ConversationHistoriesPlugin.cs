@@ -30,7 +30,7 @@ namespace PostgreSQL.Embedding.Plugins
             var serviceProvider = serviceProviderScope.ServiceProvider;
             var chatHistoriesService = serviceProvider.GetService<IChatHistoriesService>();
             var baseConversationService = new BaseConversationService(kernel, chatHistoriesService);
-            var historicalMessages = await baseConversationService.GetHistoricalMessagesAsync(appId, conversationId, 50);
+            var historicalMessages = await baseConversationService.GetHistoricalMessagesAsync(appId, conversationId, 15);
             return historicalMessages;
         }
 
@@ -46,7 +46,7 @@ namespace PostgreSQL.Embedding.Plugins
             var serviceProvider = serviceProviderScope.ServiceProvider;
             var chatHistoriesService = serviceProvider.GetService<IChatHistoriesService>();
             var baseConversationService = new BaseConversationService(kernel, chatHistoriesService);
-            var historicalMessages = await baseConversationService.SearchHistoricalMessagesAsync(appId, conversationId, query);
+            var historicalMessages = await baseConversationService.SearchHistoricalMessagesAsync(appId, conversationId, query, 15);
             return historicalMessages;
         }
     }

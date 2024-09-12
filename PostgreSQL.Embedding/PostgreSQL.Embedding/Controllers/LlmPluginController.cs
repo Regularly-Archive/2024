@@ -1,10 +1,5 @@
-﻿using DocumentFormat.OpenXml.Spreadsheet;
-using Elastic.Clients.Elasticsearch;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using PostgreSQL.Embedding.Common.Models.WebApi;
-using PostgreSQL.Embedding.DataAccess;
-using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 
 namespace PostgreSQL.Embedding.Controllers

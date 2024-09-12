@@ -1,6 +1,4 @@
-﻿using AngleSharp.Css;
-using DocumentFormat.OpenXml.Wordprocessing;
-using Microsoft.SemanticKernel;
+﻿using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Microsoft.SemanticKernel.Planning.Handlebars;
 using PostgreSQL.Embedding.Common;
@@ -11,7 +9,6 @@ using PostgreSQL.Embedding.LLmServices.Extensions;
 using PostgreSQL.Embedding.Planners;
 using PostgreSQL.Embedding.Services;
 using PostgreSQL.Embedding.Utils;
-using System.Globalization;
 using System.Text;
 
 
