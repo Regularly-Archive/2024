@@ -1,6 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.SemanticKernel;
+﻿using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
+using PostgreSQL.Embedding.Common.Models.Plugin;
 using PostgreSQL.Embedding.LlmServices;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using SqlSugar;
@@ -9,13 +9,19 @@ using System.Text;
 
 namespace PostgreSQL.Embedding.Plugins
 {
-    [KernelPlugin(Description = "使用自然语言查询关系型数据库的插件")]
+    [KernelPlugin(Description = "使用自然语言查询关系型数据库的插件", Version = "v1.1")]
     public class Text2SQLPlugin : BasePlugin
     {
         private IServiceProvider _serviceProvider;
         private ConnectionConfig _connectionConfig;
         private PromptTemplateService _promptTemplateService;
         private ILogger<Text2SQLPlugin> _logger;
+
+        [PluginParameter(Description = "连接字符串，目前仅支持 MySQL 数据库", Required = true)]
+        public string ConnectionString { get; set; }
+
+        [PluginParameter(Description = "数据库名称", Required = true)]
+        public string Database { get; set; }
 
         public Text2SQLPlugin(IServiceProvider serviceProvider) : base(serviceProvider)
         {
@@ -24,12 +30,16 @@ namespace PostgreSQL.Embedding.Plugins
 
             var loggerFactory = _serviceProvider.GetService<ILoggerFactory>();
             _logger = loggerFactory.CreateLogger<Text2SQLPlugin>();
+        }
 
+        public override void Initialize(long appId)
+        {
+            base.Initialize(appId);
             _connectionConfig = new ConnectionConfig()
             {
 
                 DbType = DbType.MySql,
-                ConnectionString = "Server=localhost;Database=Chinook;Uid=root;Pwd=1qaz2wsx3edc;Charset='utf8';SslMode=None;",
+                ConnectionString = ConnectionString,
                 IsAutoCloseConnection = true,
             };
         }
@@ -38,7 +48,7 @@ namespace PostgreSQL.Embedding.Plugins
         [Description("根据用户的输入生成和执行 SQL 并返回 Markdown 形式的表格数据")]
         public async Task<string> QueryAsync([Description("用户输入")] string input, Kernel kernel)
         {
-            var tableDescriptor = await GetTableDescriptorsAsync("Chinook");
+            var tableDescriptor = await GetTableDescriptorsAsync(Database);
             var databaseSchema = GeneratorDatabaseSchema(tableDescriptor);
 
             var promptTemplate = _promptTemplateService.LoadTemplate("Text2SQL.txt");

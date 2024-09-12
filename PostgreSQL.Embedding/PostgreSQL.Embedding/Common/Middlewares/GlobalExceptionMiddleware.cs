@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using System.Diagnostics;
 using PostgreSQL.Embedding.Common.Models.WebApi;
 using Microsoft.Extensions.Logging;
+using System.Net;
 
 namespace PostgreSQL.Embedding.Common.Middlewares
 {
@@ -26,6 +27,7 @@ namespace PostgreSQL.Embedding.Common.Middlewares
             {
                 _logger.LogError(context.Exception, string.Empty);
                 context.Result = ApiResult.Failure(context.Exception);
+                context.HttpContext.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
                 context.ExceptionHandled = true;
             }
         }

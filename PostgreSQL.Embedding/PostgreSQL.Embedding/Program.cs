@@ -161,11 +161,12 @@ builder.Services.AddScoped<IFullTextSearchService, FullTextSearchService>();
 builder.Services.AddScoped<IFileStorageService, MinioFileStorageService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddSingleton<IRerankService, BgeRerankService>();
+builder.Services.AddScoped<ILlmPluginService, LlmPluginService>();
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(builder =>
     {
-        builder.WithOrigins("http://localhost:2800", "http://192.168.1.196:2800")
+        builder.WithOrigins("http://localhost:2800", "http://192.168.1.196:2800", "http://192.168.1.116:2800")
                 .AllowAnyHeader()
                 .AllowAnyMethod()
                 .AllowCredentials();
