@@ -73,10 +73,11 @@ namespace PostgreSQL.Embedding.Utils
                 var pluginName = (pluginInstance as IPlugin).PluginName ?? pluginType.Name;
 
                 var persistedPlugin = await pluginRepository.SingleOrDefaultAsync(x => x.PluginName == pluginName);
-                if (persistedPlugin != null)
+                if (persistedPlugin != null && persistedPlugin.PluginVersion != kernelPluginAttribute.Version)
                 {
                     persistedPlugin.PluginIntro = kernelPluginAttribute.Description;
                     persistedPlugin.PluginName = pluginName;
+                    persistedPlugin.PluginVersion = kernelPluginAttribute.Version;
                     await pluginRepository.UpdateAsync(persistedPlugin);
                 }
                 else
@@ -85,7 +86,8 @@ namespace PostgreSQL.Embedding.Utils
                     {
                         PluginIntro = kernelPluginAttribute.Description,
                         PluginName = pluginName,
-                        TypeName = pluginType.FullName
+                        TypeName = pluginType.FullName,
+                        Enabled = true,
                     };
                     await pluginRepository.AddAsync(newPlugin);
                 }
