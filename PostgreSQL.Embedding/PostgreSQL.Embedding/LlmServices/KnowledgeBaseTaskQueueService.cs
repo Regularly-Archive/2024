@@ -1,17 +1,9 @@
-﻿using Microsoft.KernelMemory.Handlers;
-using Microsoft.KernelMemory.Pipeline;
-using Microsoft.KernelMemory;
-using PostgreSQL.Embedding.Common;
+﻿using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
+using PostgreSQL.Embedding.Handlers;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.Services;
-using PostgreSQL.Embedding.Common.Models.Notification;
-using Microsoft.AspNetCore.SignalR;
-using Newtonsoft.Json;
-using PostgreSQL.Embedding.Utils;
-using PostgreSQL.Embedding.Handlers;
-using System.Reflection.Metadata;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
