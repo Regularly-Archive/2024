@@ -21,7 +21,7 @@ namespace PostgreSQL.Embedding.Plugins.Abstration
         /// 初始化插件
         /// </summary>
         /// <param name="appId"></param>
-        public void Initialize(long appId)
+        public virtual void Initialize(long appId)
         {
             using var serviceScope = _serviceProvider.CreateScope();
             var serviceProvider = serviceScope.ServiceProvider;
@@ -83,9 +83,10 @@ namespace PostgreSQL.Embedding.Plugins.Abstration
 
             // 设置插件参数
             var pluginId = pluginInfo.Id;
+            var pluginParameters = parameterRepository.SqlSugarClient.Queryable<LlmAppPluginParameter>().Where(x => x.AppId == appId && x.PluginId == pluginId).ToList();
             foreach (var property in properties)
             {
-                var pluginParameter = parameterRepository.SqlSugarClient.Queryable<LlmAppPluginParameter>().First(x => x.AppId == appId && x.PluginId == pluginId && x.ParameterName == property.Name);
+                var pluginParameter = pluginParameters.FirstOrDefault(x => x.ParameterName == property.Name);
                 if (pluginParameter != null)
                 {
                     var propertyValue = Convert.ChangeType(pluginParameter.ParameterValue, property.PropertyType);
