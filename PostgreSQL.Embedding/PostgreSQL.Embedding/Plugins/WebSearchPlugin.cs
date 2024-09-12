@@ -29,7 +29,7 @@ namespace PostgreSQL.Embedding.Plugins
 
         [KernelFunction]
         [Description("从网络中搜索信息")]
-        private async Task<string> RunAsync([Description("用户请求")] string query, Kernel kernel, [Description("搜索引擎，可选值: Bing, Brave, JianAI")] string searchEngine = "Brave", [Description("是否仅搜索答案")] bool searchOnly = false)
+        public async Task<string> RunAsync([Description("用户请求")] string query, Kernel kernel, [Description("搜索引擎，可选值: Bing, Brave, JianAI")] string searchEngine = "Brave", [Description("是否仅搜索答案")] bool searchOnly = false)
         {
             var clonedKernel = kernel.Clone();
 
