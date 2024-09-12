@@ -1,16 +1,10 @@
-﻿using DocumentFormat.OpenXml.Math;
-using JiebaNet.Segmenter;
-using LLama.Common;
-using Microsoft.SemanticKernel;
+﻿using JiebaNet.Segmenter;
 using Npgsql;
-using PostgreSQL.Embedding.Common.Models.KernelMemory;
-using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
-using System.Text;
-using System.Reflection;
 using SqlSugar;
+using System.Reflection;
 
 namespace PostgreSQL.Embedding.LlmServices
 {

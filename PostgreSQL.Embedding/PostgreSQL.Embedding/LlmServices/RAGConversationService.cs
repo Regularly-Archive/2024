@@ -1,9 +1,4 @@
-﻿using Azure.Search.Documents.Models;
-using DocumentFormat.OpenXml.InkML;
-using LLama.Batched;
-using Microsoft.AspNetCore.Http;
-using Microsoft.KernelMemory;
-using Microsoft.SemanticKernel;
+﻿using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common;
@@ -15,7 +10,6 @@ using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.LLmServices.Extensions;
 using SqlSugar;
-using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
 

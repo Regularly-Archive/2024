@@ -4,7 +4,6 @@ using Newtonsoft.Json.Linq;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using System.Text;
-using static LLama.Common.ChatHistory;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
