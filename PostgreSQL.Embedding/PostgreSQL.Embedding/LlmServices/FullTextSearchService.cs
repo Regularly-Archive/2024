@@ -1,18 +1,13 @@
 ﻿using JiebaNet.Segmenter;
 using Microsoft.KernelMemory;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
-using Microsoft.SemanticKernel;
+using Newtonsoft.Json;
 using Npgsql;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Models.KernelMemory;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
-using System.Collections.Immutable;
-using System.Text;
-using static Microsoft.KernelMemory.Citation;
-using Newtonsoft.Json;
-using static Azure.Core.HttpHeader;
 
 namespace PostgreSQL.Embedding.LlmServices
 {

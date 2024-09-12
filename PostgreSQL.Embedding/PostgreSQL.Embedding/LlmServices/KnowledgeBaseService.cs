@@ -9,7 +9,6 @@ using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.Utils;
 using SqlSugar;
-using System.ServiceModel.Syndication;
 
 namespace PostgreSQL.Embedding.LlmServices
 {

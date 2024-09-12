@@ -1,7 +1,5 @@
 ﻿using Microsoft.SemanticKernel;
-using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.LlmServices.Abstration;
-using System.ComponentModel;
 using System.Text;
 
 namespace PostgreSQL.Embedding.LlmServices
@@ -17,11 +15,10 @@ namespace PostgreSQL.Embedding.LlmServices
             _chatHistoriesService = chatHistoriesService;
         }
 
-        // Todo: maxMessageRounds 从 App 上取
         public async Task<string> GetHistoricalMessagesAsync(
             long appId,
             string conversationId,
-            int maxMessageRounds = 15
+            int maxMessageRounds
         )
         {
             var stringBuilder = new StringBuilder();
@@ -58,7 +55,7 @@ namespace PostgreSQL.Embedding.LlmServices
         }
 
         // Todo: maxMessageRounds 从 App 上取
-        public async Task<string> SearchHistoricalMessagesAsync(long appId, string conversationId, string query, int maxMessageRounds = 15)
+        public async Task<string> SearchHistoricalMessagesAsync(long appId, string conversationId, string query, int maxMessageRounds)
         {
             var stringBuilder = new StringBuilder();
             var chatMessages = await _chatHistoriesService.SearchConversationMessagesAsync(appId, conversationId, query, 0);

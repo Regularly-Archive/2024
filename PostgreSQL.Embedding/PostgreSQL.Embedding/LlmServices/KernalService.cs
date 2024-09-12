@@ -1,17 +1,14 @@
-﻿using Azure.AI.OpenAI;
-using Azure;
-using Microsoft.Extensions.Azure;
+﻿using Azure;
+using Azure.AI.OpenAI;
+using Azure.Core.Pipeline;
 using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Plugins.Core;
 using PostgreSQL.Embedding.Common;
-using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.Utils;
-using System.Reflection;
-using Azure.Core.Pipeline;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
