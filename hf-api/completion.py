@@ -2,10 +2,12 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from models import CompletionRequest, ChatCompletionRequest
 from utils import Text_Generation_Model_Cache_Folder as model_cache_folder
 from utils import timer, createLogger
-import os, torch
+import os, torch, asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logger = createLogger(__name__)
+executor = ThreadPoolExecutor()
 
 @timer(logger=logger)
 def get_chat_completion(request: ChatCompletionRequest) -> str:
@@ -36,3 +38,13 @@ def get_text_completion(request: CompletionRequest) -> str:
 
     response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
     return response
+
+async def get_chat_completion_async(request: ChatCompletionRequest) -> str:
+    loop = asyncio.get_event_loop()
+    completion = await loop.run_in_executor(executor, get_chat_completion, request)
+    return completion
+
+async def get_text_completion_async(request: CompletionRequest) -> str:
+    loop = asyncio.get_event_loop()
+    completion = await loop.run_in_executor(executor, get_text_completion, request)
+    return completion

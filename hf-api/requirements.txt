@@ -1,4 +1,5 @@
 fastapi
-sentence-transformers==2.2.2
+sentence-transformers
+transformers
 uvicorn[standard]
 accelerate
