@@ -8,6 +8,7 @@ using PostgreSQL.Embedding.Common.Attributes;
 using System.Runtime.Loader;
 using Microsoft.SemanticKernel;
 using System.ComponentModel;
+using PostgreSQL.Embedding.Common.Models.WebApi.QuerableFilters;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
@@ -30,11 +31,11 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <param name="pageSize"></param>
         /// <param name="pageIndex"></param>
         /// <returns></returns>
-        public async Task<PageResult<LlmPluginModel>> GetPagedPluginListAsync(int pageSize, int pageIndex)
+        public async Task<PagedResult<LlmPluginModel>> GetPagedPluginListAsync(QueryParameter<LlmPlugin, PluginQueryableFilter> queryParameter)
         {
-            var pagedLlmPlugins = await _crudBaseService.GetPageList(pageSize, pageIndex);
+            var pagedLlmPlugins = await _crudBaseService.GetPagedListAsync(queryParameter);
 
-            var pageResult = new PageResult<LlmPluginModel>();
+            var pageResult = new PagedResult<LlmPluginModel>();
             pageResult.TotalCount = pagedLlmPlugins.TotalCount;
             pageResult.Rows = pagedLlmPlugins.Rows.Select(x => ConvertToLlmPluginModel(x)).ToList();
             return pageResult;
@@ -44,9 +45,9 @@ namespace PostgreSQL.Embedding.LlmServices
         /// 插件信息列表
         /// </summary>
         /// <returns></returns>
-        public async Task<List<LlmPluginModel>> GetPluginListAsync()
+        public async Task<List<LlmPluginModel>> GetPluginListAsync(PluginQueryableFilter filter)
         {
-            var llmPlugins = await _crudBaseService.Repository.GetAllAsync();
+            var llmPlugins = await _crudBaseService.GetListAsync(filter);
             return llmPlugins.OrderBy(x => x.PluginName).Select(x => ConvertToLlmPluginModel(x)).ToList();
         }
 
@@ -74,7 +75,7 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <returns></returns>
         public async Task<LlmPluginModel> GetPluginByIdAsync(long id)
         {
-            var llmPlugin = await _crudBaseService.GetById(id);
+            var llmPlugin = await _crudBaseService.GetByIdAsync(id);
             return ConvertToLlmPluginModel(llmPlugin);
         }
 
@@ -85,12 +86,12 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <returns></returns>
         public async Task ChangePluginStatusAsync(long id, bool status)
         {
-            var llmPlugin = await _crudBaseService.GetById(id);
+            var llmPlugin = await _crudBaseService.GetByIdAsync(id);
             if ((llmPlugin.Enabled && status) || (!llmPlugin.Enabled && !status))
                 return;
 
             llmPlugin.Enabled = status;
-            await _crudBaseService.Update(llmPlugin);
+            await _crudBaseService.UpdateAsync(llmPlugin);
         }
 
         private LlmPluginModel ConvertToLlmPluginModel(LlmPlugin llmPlugin)

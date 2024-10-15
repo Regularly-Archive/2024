@@ -5,6 +5,7 @@ using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
+using PostgreSQL.Embedding.LlmServices.Routers;
 using PostgreSQL.Embedding.Utils;
 using SqlSugar;
 
@@ -32,14 +33,14 @@ namespace PostgreSQL.Embedding.LlmServices
 
         public async Task<MemoryServerless> CreateByApp(LlmApp app)
         {
-            var generationModel = await _llmModelRepository.SingleOrDefaultAsync(x => x.ModelType == (int)ModelType.TextGeneration && x.ModelName == app.TextModel);
+            var generationModel = await _llmModelRepository.FindAsync(x => x.ModelType == (int)ModelType.TextGeneration && x.ModelName == app.TextModel);
 
             var embeddingModelId = await GetEmbeddingModelByKnowledges(app);
-            var embeddingModel = await _llmModelRepository.SingleOrDefaultAsync(x => x.ModelType == (int)ModelType.TextEmbedding && x.ModelName == embeddingModelId);
+            var embeddingModel = await _llmModelRepository.FindAsync(x => x.ModelType == (int)ModelType.TextEmbedding && x.ModelName == embeddingModelId);
 
             var options = _serviceProvider.GetRequiredService<IOptions<LlmConfig>>();
-            var embeddingHttpClient = new HttpClient(new EmbeddingRouterHandler(embeddingModel, options));
-            var generationHttpClient = new HttpClient(new OpenAIChatHandler(generationModel, options));
+            var embeddingHttpClient = new HttpClient(new LlmEmbeddingRouter(embeddingModel, options));
+            var generationHttpClient = new HttpClient(new LlmCompletionRouter(generationModel, options));
 
             var tableNamePrefix = await GenerateTableNamePrefix(embeddingModel);
 
@@ -76,12 +77,12 @@ namespace PostgreSQL.Embedding.LlmServices
 
         public async Task<MemoryServerless> CreateByKnowledgeBase(KnowledgeBase knowledgeBase)
         {
-            var embeddingModel = await _llmModelRepository.SingleOrDefaultAsync(x => x.ModelType == (int)ModelType.TextEmbedding && x.ModelName == knowledgeBase.EmbeddingModel);
-            var generationModel = await _llmModelRepository.SingleOrDefaultAsync(x => x.ModelType == (int)ModelType.TextGeneration && x.ModelName == "gpt-3.5-turbo");
+            var embeddingModel = await _llmModelRepository.FindAsync(x => x.ModelType == (int)ModelType.TextEmbedding && x.ModelName == knowledgeBase.EmbeddingModel);
+            var generationModel = await _llmModelRepository.FindAsync(x => x.ModelType == (int)ModelType.TextGeneration && x.IsDefaultModel == true);
 
             var options = _serviceProvider.GetRequiredService<IOptions<LlmConfig>>();
-            var embeddingHttpClient = new HttpClient(new EmbeddingRouterHandler(embeddingModel, options));
-            var generationHttpClient = new HttpClient();
+            var embeddingHttpClient = new HttpClient(new LlmEmbeddingRouter(embeddingModel, options));
+            var generationHttpClient = new HttpClient(new LlmCompletionRouter(generationModel, options));
 
             var tableNamePrefix = await GenerateTableNamePrefix(embeddingModel);
 
@@ -123,12 +124,15 @@ namespace PostgreSQL.Embedding.LlmServices
                     EmptyAnswer = Common.Constants.DefaultEmptyAnswer
                 });
 
+            // Todo: 考虑将这里换成 ITextEmbeddingBatchGenerator，以提高向量生成的效率
+
+
             return memoryBuilder.Build<MemoryServerless>();
         }
 
         private async Task<string> GenerateTableNamePrefix(LlmModel embeddingModel)
         {
-            var tablePrefixMapping = await _tablePrefixMappingRepository.SingleOrDefaultAsync(x => x.FullName == embeddingModel.ModelName);
+            var tablePrefixMapping = await _tablePrefixMappingRepository.FindAsync(x => x.FullName == embeddingModel.ModelName);
             if (tablePrefixMapping != null)
                 return $"sk-{tablePrefixMapping.ShortName.ToLower()}-";
 
@@ -149,7 +153,7 @@ namespace PostgreSQL.Embedding.LlmServices
 
         private async Task<string> GetEmbeddingModelByKnowledges(LlmApp app)
         {
-            var llmAppKnowledges = await _llmAppKnowledgeRepository.FindAsync(x => x.AppId == app.Id);
+            var llmAppKnowledges = await _llmAppKnowledgeRepository.FindListAsync(x => x.AppId == app.Id);
             if (llmAppKnowledges.Any())
             {
                 var knowledgeBaseId = llmAppKnowledges.FirstOrDefault().KnowledgeBaseId;

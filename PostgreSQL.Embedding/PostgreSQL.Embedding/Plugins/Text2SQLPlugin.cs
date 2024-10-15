@@ -35,13 +35,7 @@ namespace PostgreSQL.Embedding.Plugins
         public override void Initialize(long appId)
         {
             base.Initialize(appId);
-            _connectionConfig = new ConnectionConfig()
-            {
-
-                DbType = DbType.MySql,
-                ConnectionString = ConnectionString,
-                IsAutoCloseConnection = true,
-            };
+            _connectionConfig = new ConnectionConfig() { DbType = DbType.MySql, ConnectionString = ConnectionString, IsAutoCloseConnection = true };
         }
 
         [KernelFunction]

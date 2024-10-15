@@ -10,6 +10,9 @@ using System.IO;
 using Newtonsoft.Json;
 using Jint;
 using PostgreSQL.Embedding.Plugins.Abstration;
+using NRedisStack.Search;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 namespace PostgreSQL.Embedding.Plugins
 {
@@ -35,10 +38,10 @@ namespace PostgreSQL.Embedding.Plugins
         {
             if (PythonEngine.IsInitialized) return;
 
-            if (config != null && !string.IsNullOrEmpty(config.LibraryPath))
-                Runtime.PythonDLL = config.LibraryPath;
+            if (config != null && !string.IsNullOrEmpty(config.PythonLibrary))
+                Runtime.PythonDLL = config.PythonLibrary;
 
-            _logger.LogInformation($"Python Runtime is initializing: {config.LibraryPath}...");
+            _logger.LogInformation($"Python Runtime is initializing: {config.PythonLibrary}...");
 
             PythonEngine.Initialize();
             PythonEngine.BeginAllowThreads();

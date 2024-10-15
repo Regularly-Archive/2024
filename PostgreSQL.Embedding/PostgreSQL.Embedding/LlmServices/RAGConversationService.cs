@@ -247,7 +247,7 @@ namespace PostgreSQL.Embedding.LlmServices
         private async Task<List<LlmCitationModel>> BuildKnowledgeCitations(string question)
         {
             var searchResults = new List<KMCitation>();
-            var llmKappKnowledges = await _llmAppKnowledgeRepository.FindAsync(x => x.AppId == _app.Id);
+            var llmKappKnowledges = await _llmAppKnowledgeRepository.FindListAsync(x => x.AppId == _app.Id);
             if (llmKappKnowledges.Any())
             {
                 var inputs = new List<string> { question };
@@ -318,34 +318,25 @@ namespace PostgreSQL.Embedding.LlmServices
                 ? knowledgeBase.RetrievalRelevance.Value / 100 : PostgreSQL.Embedding.Common.Constants.DefaultRetrievalRelevance;
 
             using var serviceScope = _serviceProvider.CreateScope();
+            var knowledgeBaseService = _memoryService.AsKnowledgeBaseService(serviceScope.ServiceProvider);
             if (knowledgeBase.RetrievalType == (int)RetrievalType.Vectors)
             {
                 // 向量检索
-                var knowledgeBaseService = _memoryService.AsKnowledgeBaseService(serviceScope.ServiceProvider);
-                var searchResult = await knowledgeBaseService.SearchAsync(knowledgeBase.Id, question, (double)minRelevance, limit);
+                var searchResult = await knowledgeBaseService.SearchAsync(knowledgeBase.Id, question, RetrievalType.Vectors, (double)minRelevance, limit);
                 return searchResult.RelevantSources;
 
             }
             else if (knowledgeBase.RetrievalType == (int)RetrievalType.FullText)
             {
                 // 全文检索
-                var fullTextService = _memoryService.AsFullTextSearchService(serviceScope.ServiceProvider);
-                var searchResult = await fullTextService.SearchAsync(knowledgeBase.Id, question, (double)minRelevance, limit);
+                var searchResult = await knowledgeBaseService.SearchAsync(knowledgeBase.Id, question, RetrievalType.FullText, (double)minRelevance, limit);
                 return searchResult.RelevantSources;
             }
             else
             {
                 // 混合检索
-                var searchResults = new List<KMCitation>();
-                var knowledgeBaseService = _memoryService.AsKnowledgeBaseService(serviceScope.ServiceProvider);
-                var vectorSearchResult = await knowledgeBaseService.SearchAsync(knowledgeBase.Id, question, (double)minRelevance, limit);
-                if (vectorSearchResult.RelevantSources.Any()) searchResults.AddRange(vectorSearchResult.RelevantSources);
-
-                var fullTextService = _memoryService.AsFullTextSearchService(serviceScope.ServiceProvider);
-                var fullTextSearchResult = await fullTextService.SearchAsync(knowledgeBase.Id, question, (double)minRelevance, limit);
-                if (fullTextSearchResult.RelevantSources.Any()) searchResults = fullTextSearchResult.RelevantSources;
-
-                return searchResults;
+                var searchResult = await knowledgeBaseService.SearchAsync(knowledgeBase.Id, question, RetrievalType.Mixed, (double)minRelevance, limit);
+                return searchResult.RelevantSources;
             }
         }
 

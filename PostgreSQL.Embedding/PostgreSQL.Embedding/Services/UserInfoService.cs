@@ -49,7 +49,7 @@ namespace PostgreSQL.Embedding.Services
             var userName = _httpContextAccessor.HttpContext?.User.Identity?.Name;
             if (userName == null) return null;
 
-            var userInfo = await _systemUserRepository.SingleOrDefaultAsync(x => x.UserName == userName);
+            var userInfo = await _systemUserRepository.FindAsync(x => x.UserName == userName);
             if (userName == null) return null;
 
             return userInfo.Adapt<UserInfo>();
@@ -58,7 +58,7 @@ namespace PostgreSQL.Embedding.Services
         public async Task<LoginResult> LoginAsync(Common.Models.User.LoginRequest request)
         {
             var encrypted = request.Password.AESEncrypt(Default_AES_Key);
-            var userInfo = await _systemUserRepository.SingleOrDefaultAsync(x => x.UserName == request.UserName && x.Password == encrypted);
+            var userInfo = await _systemUserRepository.FindAsync(x => x.UserName == request.UserName && x.Password == encrypted);
             if (userInfo == null) throw new ArgumentException("用户名或密码不正确");
 
             var token = GenerateJwtToken(userInfo);
@@ -80,7 +80,7 @@ namespace PostgreSQL.Embedding.Services
         public async Task RegisterAsync(Common.Models.User.RegisterRequest request)
         {
             var encrypted = request.Password.AESEncrypt(Default_AES_Key);
-            var userInfo = await _systemUserRepository.SingleOrDefaultAsync(x => x.UserName == request.UserName);
+            var userInfo = await _systemUserRepository.FindAsync(x => x.UserName == request.UserName);
             if (userInfo != null) throw new ArgumentException("该用户已存在");
 
             var newUser = new SystemUser
@@ -114,7 +114,7 @@ namespace PostgreSQL.Embedding.Services
             if (currentUserName != request.UserName)
                 throw new ArgumentException("不允许修改他人密码");
 
-            var currentUser = await _systemUserRepository.SingleOrDefaultAsync(x => x.UserName == request.UserName);
+            var currentUser = await _systemUserRepository.FindAsync(x => x.UserName == request.UserName);
             if (currentUser == null) throw new ArgumentException("指定用户不存在");
 
             if (request.OldPassword == request.NewPassword)

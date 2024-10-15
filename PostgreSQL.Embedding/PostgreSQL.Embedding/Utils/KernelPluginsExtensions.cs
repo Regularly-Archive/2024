@@ -12,6 +12,12 @@ namespace PostgreSQL.Embedding.Utils
 {
     public static class KernelPluginsExtensions
     {
+        /// <summary>
+        /// 自动扫描程序集中的插件
+        /// </summary>
+        /// <param name="services"></param>
+        /// <param name="externalAssemblies"></param>
+        /// <returns></returns>
         public static IServiceCollection RegisterLlmPlugins(this IServiceCollection services, IEnumerable<Assembly> externalAssemblies = null)
         {
             var assembies = AssemblyLoadContext.Default.Assemblies;
@@ -33,6 +39,14 @@ namespace PostgreSQL.Embedding.Utils
             return services;
         }
 
+        /// <summary>
+        /// 为 Kernel 导入插件
+        /// </summary>
+        /// <param name="kernel"></param>
+        /// <param name="serviceProvider"></param>
+        /// <param name="appId"></param>
+        /// <param name="externalAssemblies"></param>
+        /// <returns></returns>
         public static Kernel ImportLlmPlugins(this Kernel kernel, IServiceProvider serviceProvider, long? appId = null, IEnumerable<Assembly> externalAssemblies = null)
         {
             var assembies = AssemblyLoadContext.Default.Assemblies;
@@ -59,6 +73,12 @@ namespace PostgreSQL.Embedding.Utils
             return kernel;
         }
 
+        /// <summary>
+        /// 持久化插件
+        /// </summary>
+        /// <param name="services"></param>
+        /// <param name="pluginTypes"></param>
+        /// <returns></returns>
         private static async Task PersistLlmPligins(IServiceCollection services, IEnumerable<Type> pluginTypes)
         {
             var serviceProvider = services.BuildServiceProvider();
@@ -72,7 +92,7 @@ namespace PostgreSQL.Embedding.Utils
                 var pluginInstance = serviceProvider.GetRequiredService(pluginType);
                 var pluginName = (pluginInstance as IPlugin).PluginName ?? pluginType.Name;
 
-                var persistedPlugin = await pluginRepository.SingleOrDefaultAsync(x => x.PluginName == pluginName);
+                var persistedPlugin = await pluginRepository.FindAsync(x => x.PluginName == pluginName);
                 if (persistedPlugin != null && persistedPlugin.PluginVersion != kernelPluginAttribute.Version)
                 {
                     persistedPlugin.PluginIntro = kernelPluginAttribute.Description;
@@ -80,13 +100,14 @@ namespace PostgreSQL.Embedding.Utils
                     persistedPlugin.PluginVersion = kernelPluginAttribute.Version;
                     await pluginRepository.UpdateAsync(persistedPlugin);
                 }
-                else
+                else if (persistedPlugin == null)
                 {
                     var newPlugin = new LlmPlugin()
                     {
                         PluginIntro = kernelPluginAttribute.Description,
                         PluginName = pluginName,
                         TypeName = pluginType.FullName,
+                        PluginVersion = kernelPluginAttribute.Version,
                         Enabled = true,
                     };
                     await pluginRepository.AddAsync(newPlugin);
