@@ -102,9 +102,9 @@ namespace PostgreSQL.Embedding.LlmServices.Ollama
                 httpResponse.EnsureSuccessStatusCode();
 
                 var returnContent = await httpResponse.Content.ReadAsStringAsync();
-                var completionResult = JObject.Parse(returnContent);
+                var embeddingResult = JObject.Parse(returnContent);
 
-                return completionResult["embedding"].Value<List<float>>();
+                return JsonConvert.DeserializeObject<List<float>>(embeddingResult["embedding"].ToString());
             }
         }
     }

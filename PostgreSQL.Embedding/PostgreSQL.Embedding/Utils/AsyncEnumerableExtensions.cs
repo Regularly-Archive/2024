@@ -16,9 +16,6 @@ namespace PostgreSQL.Embedding.Utils
             }
         }
 
-        public static FunctionResult AsFunctionResult(this string content)
-        {
-            return new FunctionResult(null, content);
-        }
+        public static FunctionResult AsFunctionResult(this string content) => new FunctionResult(null, content);
     }
 }

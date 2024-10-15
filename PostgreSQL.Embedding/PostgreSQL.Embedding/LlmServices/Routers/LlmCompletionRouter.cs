@@ -5,13 +5,13 @@ using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using System.Text;
 
-namespace PostgreSQL.Embedding.LlmServices
+namespace PostgreSQL.Embedding.LlmServices.Routers
 {
-    public class OpenAIChatHandler : HttpClientHandler
+    public class LlmCompletionRouter : HttpClientHandler
     {
         private readonly LlmModel _llmModel;
         private readonly IOptions<LlmConfig> _llmConfigOptions;
-        public OpenAIChatHandler(LlmModel llmModel, IOptions<LlmConfig> llmConfigOptions)
+        public LlmCompletionRouter(LlmModel llmModel, IOptions<LlmConfig> llmConfigOptions)
         {
             _llmModel = llmModel;
             _llmConfigOptions = llmConfigOptions;
@@ -24,22 +24,43 @@ namespace PostgreSQL.Embedding.LlmServices
             var llmServiceProvider = (LlmServiceProvider)_llmModel.ServiceProvider;
             if (llmServiceProvider != LlmServiceProvider.OpenAI)
             {
-                var requestUrl = string.Format(_llmConfigOptions.Value?.ChatEndpoint, llmServiceProvider.ToString());
-                request.RequestUri = new Uri(requestUrl);
+                switch (llmServiceProvider)
+                {
+                    case LlmServiceProvider.LLama:
+                    case LlmServiceProvider.Ollama:
+                    case LlmServiceProvider.HuggingFace:
+                        var requestUrl = string.Format(_llmConfigOptions.Value?.ChatEndpoint, llmServiceProvider.ToString());
+                        request.RequestUri = new Uri(requestUrl);
+                        break;
+                    case LlmServiceProvider.Zhipu:
+                        request.RequestUri = new Uri("https://open.bigmodel.cn/api/paas/v4/chat/completions");
+                        break;
+                    case LlmServiceProvider.DeepSeek:
+                        request.RequestUri = new Uri("https://api.deepseek.com/chat/completions");
+                        break;
+                    case LlmServiceProvider.OpenRouter:
+                        request.RequestUri = new Uri("https://openrouter.ai/api/v1/chat/completions");
+                        break;
+                    case LlmServiceProvider.SiliconFlow:
+                        request.RequestUri = new Uri("https://api.siliconflow.cn/v1/chat/completions");
+                        break;
+                    case LlmServiceProvider.MiniMax:
+                        request.RequestUri = new Uri("https://api.minimax.chat/v1/text/chatcompletion_v2");
+                        break;
+                }
+
             }
 
+            // 自定义地址
             if (!string.IsNullOrEmpty(_llmModel.BaseUrl))
-            {
                 request.RequestUri = new Uri(_llmModel.BaseUrl);
-            }
 
+            // 认证信息
             if (!string.IsNullOrEmpty(_llmModel.ApiKey))
-            {
                 request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _llmModel.ApiKey);
-            }
 
             request.Headers.Add(Constants.HttpRequestHeader_Provider, llmServiceProvider.ToString());
-            return (await base.SendAsync(request, cancellationToken));
+            return await base.SendAsync(request, cancellationToken);
         }
 
         private async Task<HttpRequestMessage> ProcessRequestMessages(HttpRequestMessage request)
@@ -50,7 +71,7 @@ namespace PostgreSQL.Embedding.LlmServices
             if (messages != null && messages.Children().Count() > 0)
             {
                 var messageList = new List<object>();
-                foreach(var message in messages.Children<JToken>())
+                foreach (var message in messages.Children<JToken>())
                 {
                     var messageRole = message["role"].Value<string>();
                     var messageContent = message["content"];
@@ -65,15 +86,16 @@ namespace PostgreSQL.Embedding.LlmServices
                     }
                 }
 
-                var payload = new { 
-                    model = dynamicObject["model"].Value<string>(), 
+                var payload = new
+                {
+                    model = dynamicObject["model"].Value<string>(),
                     messages = messageList,
                     stream = dynamicObject.ContainsKey("stream")
                 };
                 request.Content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
             }
 
-            
+
             return request;
         }
     }
