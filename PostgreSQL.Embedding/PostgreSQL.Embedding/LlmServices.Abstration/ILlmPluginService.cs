@@ -1,15 +1,17 @@
 ﻿using Masuit.Tools.Models;
 using PostgreSQL.Embedding.Common.Models.Plugin;
 using PostgreSQL.Embedding.Common.Models.WebApi;
+using PostgreSQL.Embedding.Common.Models.WebApi.QuerableFilters;
+using PostgreSQL.Embedding.DataAccess.Entities;
 using System.Reflection;
 
 namespace PostgreSQL.Embedding.LlmServices.Abstration
 {
     public interface ILlmPluginService
     {
-        Task<PageResult<LlmPluginModel>> GetPagedPluginListAsync(int pageSize, int pageIndex);
+        Task<PagedResult<LlmPluginModel>> GetPagedPluginListAsync(QueryParameter<LlmPlugin, PluginQueryableFilter> queryParameter);
 
-        Task<List<LlmPluginModel>> GetPluginListAsync();
+        Task<List<LlmPluginModel>> GetPluginListAsync(PluginQueryableFilter filter);
 
         Task<LlmPluginModel> GetPluginByIdAsync(long id);
 

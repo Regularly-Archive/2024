@@ -1,8 +1,7 @@
-﻿using PostgreSQL.Embedding.DataAccess.Entities;
-using PostgreSQL.Embedding.DataAccess;
+﻿using PostgreSQL.Embedding.DataAccess;
+using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices;
 using PostgreSQL.Embedding.LlmServices.Abstration;
-using System.Runtime.CompilerServices;
 
 namespace PostgreSQL.Embedding.LLmServices.Extensions
 {
@@ -15,6 +14,7 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
             var knowledgeBaseRepository = serviceProvider.GetRequiredService<IRepository<KnowledgeBase>>();
             var tablePrefixMappingRepository = serviceProvider.GetRequiredService<IRepository<TablePrefixMapping>>();
             var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+            var knowledgeRetrivalServices = serviceProvider.GetServices<IKnowledgeRetrievalService>();
             return new KnowledgeBaseService(
                 serviceProvider,
                 configuration,
@@ -22,7 +22,8 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
                 importRecordRepository,
                 knowledgeBaseRepository,
                 tablePrefixMappingRepository,
-                loggerFactory.CreateLogger<KnowledgeBaseService>()
+                loggerFactory.CreateLogger<KnowledgeBaseService>(),
+                knowledgeRetrivalServices
            );
         }
 

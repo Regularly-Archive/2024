@@ -12,7 +12,7 @@ using System.Text.RegularExpressions;
 
 namespace PostgreSQL.Embedding.Plugins
 {
-    [KernelPlugin(Description = "网络搜索插件，支持以下搜索引擎：必应搜索，Brave 搜索, JianAI")]
+    [KernelPlugin(Description = "网络搜索插件，支持以下搜索引擎：必应搜索，Brave 搜索, JianAI, 博查")]
     public class WebSearchPlugin : BasePlugin
     {
         private Regex _regexCitations = new Regex(@"\[(\d+)\]");
@@ -29,7 +29,7 @@ namespace PostgreSQL.Embedding.Plugins
 
         [KernelFunction]
         [Description("从网络中搜索信息")]
-        public async Task<string> RunAsync([Description("用户请求")] string query, Kernel kernel, [Description("搜索引擎，可选值: Bing, Brave, JianAI")] string searchEngine = "Brave", [Description("是否仅搜索答案")] bool searchOnly = false)
+        public async Task<string> RunAsync([Description("用户请求")] string query, Kernel kernel, [Description("搜索引擎，可选值: Bing, Brave, JianAI, BoCha")] string searchEngine = "BoCha", [Description("是否仅搜索答案")] bool searchOnly = false)
         {
             var clonedKernel = kernel.Clone();
 
@@ -118,6 +118,8 @@ namespace PostgreSQL.Embedding.Plugins
                     return serviceProvider.GetService<BraveSearchPlugin>() as ISearchEngine;
                 case "JinaAI":
                     return serviceProvider.GetService<JinaAIPlugin>() as ISearchEngine;
+                case "BoCha":
+                    return serviceProvider.GetService<BoChaAIPlugin>() as ISearchEngine;
                 default:
                     return serviceProvider.GetService<BraveSearchPlugin>() as ISearchEngine;
             }

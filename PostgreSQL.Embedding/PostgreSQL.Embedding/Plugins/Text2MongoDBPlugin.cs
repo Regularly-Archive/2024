@@ -4,6 +4,7 @@ using MongoDB.Driver;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Models;
+using PostgreSQL.Embedding.Common.Models.Plugin;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 
@@ -12,6 +13,15 @@ namespace PostgreSQL.Embedding.Plugins
     [KernelPlugin(Description = "使用自然语言查询 MongoDB 的插件")]
     public class Text2MongoDBPlugin : BasePlugin
     {
+        /// <summary>
+        /// 链接字符串
+        /// </summary>
+        [PluginParameter(Description = "连接字符串", Required = true)]
+        private string ConnectionString { get; set; }
+
+        /// <summary>
+        /// 提示词模板
+        /// </summary>
         private const string GENERATE_SCRIPT_PROMPT =
             """
             [Role]
@@ -44,12 +54,27 @@ namespace PostgreSQL.Embedding.Plugins
 
             At present, my inquiry is: {{$input}}
             """;
-        private readonly MongoDB.Driver.IMongoDatabase _database;
+
+        /// <summary>
+        /// IMongoDatabase
+        /// </summary>
+        private MongoDB.Driver.IMongoDatabase _database;
+
         public Text2MongoDBPlugin(IServiceProvider serviceProvider)
             : base(serviceProvider)
         {
-            var client = new MongoClient("mongodb://root:123456@127.0.0.1:27017/northwind?authSource=admin");
-            _database = client.GetDatabase("northwind");
+
+        }
+
+        public override void Initialize(long appId)
+        {
+            base.Initialize(appId);
+
+            if (string.IsNullOrEmpty(ConnectionString)) return;
+
+            var mongoUrl = new MongoUrl(ConnectionString);
+            var mongoClient = new MongoClient(mongoUrl);
+            _database = mongoClient.GetDatabase(mongoUrl.DatabaseName);
         }
 
         [KernelFunction]
@@ -68,7 +93,7 @@ namespace PostgreSQL.Embedding.Plugins
             promptTemplate.AddVariable("input", query);
 
             var functionResult = await promptTemplate.InvokeAsync(clonedKernel);
-            return functionResult.GetValue<string>()?.Replace("```sql", "```mongodb");
+            return functionResult.GetValue<string>()?.Replace("```sql", "```js");
         }
 
         /// <summary>

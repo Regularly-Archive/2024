@@ -20,7 +20,7 @@ namespace PostgreSQL.Embedding.Services
 
         public async Task DeleteFileAsync(string bucketName, string fileId)
         {
-            var fileStorage = await _fileStorageRepository.SingleOrDefaultAsync(x => x.FileId == fileId);
+            var fileStorage = await _fileStorageRepository.FindAsync(x => x.FileId == fileId);
             if (fileStorage == null)
                 throw new Exception($"The file '{fileId}' is not exist.");
 
@@ -33,7 +33,7 @@ namespace PostgreSQL.Embedding.Services
 
         public async Task<GetFileStorageResult> GetFileAsync(string bucketName, string fileId)
         {
-            var fileStorage = await _fileStorageRepository.SingleOrDefaultAsync(x => x.FileId == fileId);
+            var fileStorage = await _fileStorageRepository.FindAsync(x => x.FileId == fileId);
             if (fileStorage == null)
                 throw new Exception($"The file '{fileId}' is not exist.");
 
@@ -58,7 +58,7 @@ namespace PostgreSQL.Embedding.Services
 
         public async Task GetFileAsync(string bucketName, string fileId, string fileName)
         {
-            var fileStorage = await _fileStorageRepository.SingleOrDefaultAsync(x => x.FileId == fileId);
+            var fileStorage = await _fileStorageRepository.FindAsync(x => x.FileId == fileId);
             if (fileStorage == null)
                 throw new Exception($"The file '{fileId}' is not exist.");
 
