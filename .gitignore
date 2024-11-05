@@ -73,3 +73,14 @@ Text-Evaluate/1.py
 Text-Evaluate/main.py
 Text-Evaluate/output.csv
 Text-Evaluate/test.py
+Gridify.Learning/bin/
+Gridify.Learning/obj/
+Gridify.Learning/.vs/
+hf-api/.cached_models/
+code-runner/backend/.venv/
+code-runner/backend/docker/dotnet/.cache/
+code-runner/backend/docker/dotnet/.local/
+code-runner/backend/docker/dotnet/.dotnet/
+code-runner/backend/docker/dotnet/.nuget/
+code-runner/backend/__pycache__/
+SGLang-Learning/async_io_api.py
