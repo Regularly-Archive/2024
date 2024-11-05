@@ -64,7 +64,7 @@ async def run_code(request: RunCodeRequest):
             if not os.path.exists(converted_html):
                 output = 'An error occurs when executing code.ipynb file.'
             else:
-                with open(os.path.join(container_name, 'output.html'), 'r') as f:
+                with open(os.path.join(container_name, 'output.html'), 'r', encoding='utf-8') as f:
                     output = f.read()
 
             return JSONResponse(content={'type': 'text/html', 'time': time.time() - start_time, "output": output})

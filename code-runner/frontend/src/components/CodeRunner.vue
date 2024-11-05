@@ -103,7 +103,7 @@ export default {
                 body: JSON.stringify({
                     code: this.codeContent,
                     language: this.selectedLanguage,
-                    notebook: false
+                    notebook: this.selectedLanguage.indexOf('jupyter') != -1
                 }),
             })
             .then(response => response.json())
