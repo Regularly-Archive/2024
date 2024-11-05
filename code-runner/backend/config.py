@@ -20,7 +20,7 @@ LANGUAGE_CONFIG = {
     'typescript': {
         'env': 'typescript',
         'image': 'code_runner/nodejs',
-        'command': './node_modules/typescript/bin/tsc code.ts && node code.js',
+        'command': '/home/sandbox/node_modules/typescript/bin/tsc code.ts && node code.js',
         'extension': 'ts'
     },
     'csharp': {
