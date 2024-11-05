@@ -18,6 +18,7 @@ namespace WebApplication1
             builder.Services.AddSwaggerGen();
             builder.Services.AddSignalR();
             builder.Services.AddSingleton<ITextGenerator, TextGenerator>();
+            builder.Services.AddHttpContextAccessor();
             builder.Services.AddScoped<ICancellationTokenProvider, CancellationTokenProvider>();
             builder.Services.AddCors(options =>
             {
