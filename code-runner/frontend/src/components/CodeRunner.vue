@@ -15,6 +15,7 @@
                 </span>
                 <span v-else>运行代码</span>
             </button>
+            <div v-if="executionTime" class="ml-4 text-gray-600">本次运行耗时: {{ executionTime }} s</div>
         </div>
         <div class="flex flex-1 mr-5">
             <div class="flex-1 border rounded p-2 mr-5">
@@ -22,7 +23,7 @@
                     v-model:value="codeContent"
                     :options="editorOptions"
                     ref="cmRef"
-                    height="500px"
+                    height="800px"
                     width="100%"
                     @change="handleChange"
                     @input="handleInput"
@@ -30,8 +31,8 @@
                 ></Codemirror>
             </div>
             <div class="flex-1 border rounded p-2 mr-5 bg-gray-50">
-                <pre style="height: 500px;" v-if="selectedLanguage.indexOf('jupyter') == -1">{{ executionOutput }}</pre>
-                <div style="height: 500px;" v-html="executionOutput" v-else ></div>
+                <pre style="height: 800px;" v-if="selectedLanguage.indexOf('jupyter') == -1" class="bg-black text-white">{{ executionOutput }}</pre>
+                <div style="height: 800px;" v-html="executionOutput" v-else ></div>
             </div>
         </div>
     </div>
@@ -93,6 +94,7 @@ export default {
     methods: {
         executeCode() {
             this.executionOutput = ''; 
+            this.executionTime = null;
             this.isLoading = true;
 
             fetch('http://localhost:8001/api/run', {
@@ -109,6 +111,7 @@ export default {
             .then(response => response.json())
             .then(data => {
                 this.executionOutput = data.output;
+                this.executionTime = data.time;
                 this.$nextTick(() => {
                     hljs.highlightAll();
                 });
