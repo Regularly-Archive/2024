@@ -24,7 +24,7 @@
                     v-model:value="codeContent"
                     :options="editorOptions"
                     ref="cmRef"
-                    height="800px"
+                    height="100%"
                     width="100%"
                     @change="handleChange"
                     @input="handleInput"
@@ -134,7 +134,3 @@ export default {
     },
 };
 </script>
-
-<style>
-/* 这里可以添加全局样式或特定样式 */
-</style>
