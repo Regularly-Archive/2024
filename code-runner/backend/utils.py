@@ -12,7 +12,7 @@ def code_to_ipynb(code_string, notebook_name='output_notebook.ipynb'):
         nbformat.write(nb, f)
 
 def code_to_file(code_string, file_path):
-    with open(file_path, 'w') as f:
+    with open(file_path, 'w', encoding='utf-8') as f:
         f.write(code_string)
 
 

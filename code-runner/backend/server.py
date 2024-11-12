@@ -24,7 +24,7 @@ client = docker.from_env()
 class RunCodeRequest(BaseModel):
     code: str
     language: str
-    notebook: bool = False
+    notebook: bool = False,
 
 
 @app.post("/api/run")
@@ -48,28 +48,32 @@ async def run_code(request: RunCodeRequest):
         user = 'sandbox' if config['env'] != 'jupyter' else 'jovyan'
         container = client.containers.run(
             image=config['image'],
-            command=config['command'],
+            command=config['commandRedirect'],
             volumes={os.path.abspath(container_name): {
                 'bind': f'/home/{user}', 'mode': 'rw'}},
             tty=True,
-            detach=True
+            detach=True,
+            environment={
+                'LANG': 'en_US.UTF-8',
+                'LC_ALL': 'en_US.UTF-8'
+            }
         )
         container.wait()
 
         output = container.logs().decode('utf-8')
         output = remove_ansi_sequences(output)
 
-        if config['env'] == 'jupyter':
-            converted_html = os.path.join(container_name, 'output.html')
-            if not os.path.exists(converted_html):
-                output = 'An error occurs when executing code.ipynb file.'
-            else:
-                with open(os.path.join(container_name, 'output.html'), 'r', encoding='utf-8') as f:
-                    output = f.read()
+        redirected_output = os.path.join(container_name, 'output.txt')
+        if not os.path.exists(redirected_output):
+            output = 'An error occurs when executing code.'
+        else:
+            with open(os.path.join(container_name, 'output.txt'), 'r', encoding='utf-8') as f:
+                content = f.read()
+                output = content if content != '' else output
 
-            return JSONResponse(content={'type': 'text/html', 'time': time.time() - start_time, "output": output})
-
-        return JSONResponse(content={"output": output, 'type': 'text/plain', 'time': time.time() - start_time, "output": output})
+        type = 'text/html' if config['env'] == 'jupyter' else 'text/plain'
+        return JSONResponse(content={"output": output, 'type': type, 'time': time.time() - start_time, "output": output})
+            
     except Exception as e:
          raise HTTPException(status_code=500, detail=str(e))
     finally:
