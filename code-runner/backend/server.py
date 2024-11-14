@@ -67,7 +67,7 @@ async def run_code(request: RunCodeRequest):
         if not os.path.exists(redirected_output):
             output = 'An error occurs when executing code.'
         else:
-            with open(os.path.join(container_name, 'output.txt'), 'r', encoding='utf-8') as f:
+            with open(os.path.join(container_name, 'output.txt'), 'rt', encoding='utf-8') as f:
                 content = f.read()
                 output = content if content != '' else output
 
