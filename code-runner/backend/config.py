@@ -38,7 +38,7 @@ LANGUAGE_CONFIG = {
         'env' :'mono',
         'image': 'code_runner/mono',
         'command': "sh -c 'mcs -out:code -codepage:utf8 code.cs && mono code --encoding=utf8'",
-        'commandRedirect': "sh -c 'mcs -out:code -codepage:utf8 code.cs && mono code > output.txt'",
+        'commandRedirect': "sh -c 'mcs -out:code -codepage:utf8 code.cs && mono code --encoding=utf8> output.txt'",
         'extension': 'cs'
     },
     'cpp': {
@@ -81,6 +81,13 @@ LANGUAGE_CONFIG = {
         'image': 'code_runner/jupyterlab',
         'command': "python /nbconvert/convert.py /home/jovyan/code.ipynb /home/jovyan/output.txt --kernel python3",
         'commandRedirect': "python /nbconvert/convert.py /home/jovyan/code.ipynb /home/jovyan/output.txt --kernel python3",
+        'extension': 'ipynb'
+    },
+    'jupyter-r': {
+        'env': 'jupyter',
+        'image': 'code_runner/jupyterlab',
+        'command': "python /nbconvert/convert.py /home/jovyan/code.ipynb /home/jovyan/output.txt --kernel ir",
+        'commandRedirect': "python /nbconvert/convert.py /home/jovyan/code.ipynb /home/jovyan/output.txt --kernel ir",
         'extension': 'ipynb'
     },
 }
