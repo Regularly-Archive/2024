@@ -49,7 +49,7 @@ export default {
     },
     data() {
         return {
-            selectedLanguage: 'javascript',
+            selectedLanguage: 'python3',
             codeContent: '',
             executionOutput: '',
             languageOptions: this.getLanguageOptions(),
@@ -77,7 +77,7 @@ export default {
     methods: {
         getLanguageOptions() {
             return [ 
-                { value: 'python2', label: 'Python2', code: 'print("Hello, World!")' },
+                { value: 'python2', label: 'Python2', code: '# -*- coding: utf-8 -*-\nprint("Hello, World!")' },
                 { value: 'python3', label: 'Python3', code: 'print("Hello, World!")' },
                 { value: 'cpp', label: 'C++', code: '#include <iostream>\n\nusing namespace std;\nint main() {\n    cout << "Hello, World!";\n    return 0;\n}' },
                 { value: 'java', label: 'Java', code: 'public class code {\n    public static void main(String[] args) {\n        System.out.println("Hello, World!");\n    }\n}' },
@@ -89,6 +89,8 @@ export default {
                 { value: 'jupyter-python3', label: 'Jupyter/Python', code: "from matplotlib import pyplot as plt\nimport numpy as np\n\n# Generate 100 random data points along 3 dimensions\nx, y, scale = np.random.randn(3, 100)\nfig, ax = plt.subplots()\n\n# Map each onto a scatterplot we'll create with Matplotlib\nax.scatter(x=x, y=y, c=scale, s=np.abs(scale)*500)\nax.set(title=\"Some random data, created with JupyterLab!\")\nplt.show()" },
                 { value: 'jupyter-csharp', label: 'Jupyter/C#', code: 'Console.WriteLine("Hello, World!");' },
                 { value: 'jupyter-fsharp', label: 'Jupyter/F#', code: 'printfn "Hello from F#"' },
+                { value: 'jupyter-r', label: 'Jupyter/R', code: 'curve(sin(x), -2 * pi, 2 * pi)' },
+                
             ];
         },
         updateCodeContent(newLang) {
