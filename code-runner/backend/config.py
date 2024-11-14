@@ -37,8 +37,8 @@ LANGUAGE_CONFIG = {
     'csharp-mono': {
         'env' :'mono',
         'image': 'code_runner/mono',
-        'command': "sh -c 'mcs -out:code -codepage:utf8 code.cs && mono code --encoding=utf-8'",
-        'commandRedirect': "sh -c 'mcs -out:code -codepage:utf8 code.cs && mono code --encoding=utf-8 > output.txt'",
+        'command': "sh -c 'mcs -out:code -codepage:utf8 code.cs && mono code --encoding=utf8'",
+        'commandRedirect': "sh -c 'mcs -out:code -codepage:utf8 code.cs && mono code > output.txt'",
         'extension': 'cs'
     },
     'cpp': {
@@ -58,8 +58,8 @@ LANGUAGE_CONFIG = {
     'java': {
         'env': 'java',
         'image': 'code_runner/java',
-        'command': "sh -c 'javac code.java && java code'",
-        'commandRedirect': "sh -c 'javac code.java && java code > output.txt'",
+        'command': "sh -c 'javac -encoding utf-8 code.java && java code'",
+        'commandRedirect': "sh -c 'javac -encoding utf-8 code.java && java code > output.txt'",
         'extension': 'java'
     },
     'jupyter-csharp': {
