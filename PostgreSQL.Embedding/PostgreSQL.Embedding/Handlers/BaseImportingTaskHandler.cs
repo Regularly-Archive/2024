@@ -11,7 +11,7 @@ namespace PostgreSQL.Embedding.Handlers
 {
     public class BaseImportingTaskHandler : IImportingTaskHandler
     {
-        private readonly IServiceProvider _serviceProvider;
+        protected readonly IServiceProvider _serviceProvider;
         private readonly List<string> _steps = new List<string>()
         {
             "extract_text",
@@ -103,7 +103,7 @@ namespace PostgreSQL.Embedding.Handlers
 
             memoryServerless.Orchestrator.AddHandler<TextExtractionHandler>("extract_text");
             memoryServerless.Orchestrator.AddHandler<TextPartitioningHandler>("split_text_in_partitions");
-            memoryServerless.Orchestrator.AddHandler<GenerateEmbeddingsHandler>("generate_embeddings");
+            memoryServerless.Orchestrator.AddHandler<GenerateEmbeddingsParallelHandler>("generate_embeddings");
             memoryServerless.Orchestrator.AddHandler<SaveRecordsHandler>("save_memory_records");
             memoryServerless.Orchestrator.AddHandler(new UpdateQueueStatusHandler(serviceProvider, logger));
         }
@@ -132,7 +132,7 @@ namespace PostgreSQL.Embedding.Handlers
                 var knowledgeBaseId = long.Parse(pipeline.Tags[KernelMemoryTags.KnowledgeBaseId].FirstOrDefault());
 
 
-                var record = await _importRecordRepository.SingleOrDefaultAsync(x => x.KnowledgeBaseId == knowledgeBaseId && x.TaskId == taskId && x.FileName == fileName);
+                var record = await _importRecordRepository.FindAsync(x => x.KnowledgeBaseId == knowledgeBaseId && x.TaskId == taskId && x.FileName == fileName);
                 if (record != null)
                 {
                     record.QueueStatus = (int)QueueStatus.Complete;

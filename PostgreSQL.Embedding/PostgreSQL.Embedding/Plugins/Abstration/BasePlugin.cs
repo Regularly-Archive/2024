@@ -1,4 +1,7 @@
-﻿using PostgreSQL.Embedding.Common.Models.Plugin;
+﻿using Newtonsoft.Json;
+using PostgreSQL.Embedding.Common;
+using PostgreSQL.Embedding.Common.Models;
+using PostgreSQL.Embedding.Common.Models.Plugin;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using System.Reflection;
@@ -7,12 +10,20 @@ namespace PostgreSQL.Embedding.Plugins.Abstration
 {
     public class BasePlugin : IPlugin
     {
-        private ILogger<BasePlugin> _logger;
-        protected IServiceProvider _serviceProvider;
+        private SSEEmitter _sseEmitter;
+        private readonly HttpContext _httpContext;
+        private readonly ILogger<BasePlugin> _logger;
+        protected readonly IServiceProvider _serviceProvider;
 
         public BasePlugin(IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;
+
+            var httpContextAccessor = serviceProvider.GetService<IHttpContextAccessor>();
+            _httpContext = httpContextAccessor.HttpContext;
+            if (_httpContext != null)
+                _sseEmitter = new SSEEmitter(_httpContext);
+
             var loggerFactory = serviceProvider.GetService<ILoggerFactory>();
             _logger = loggerFactory.CreateLogger<BasePlugin>();
         }
@@ -56,6 +67,21 @@ namespace PostgreSQL.Embedding.Plugins.Abstration
             }
 
             return !errorMessages.Any();
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        protected async Task EmitArtifactsAsync<T>(T data)
+        {
+            if (_httpContext == null) return;
+
+            var @event = new OpenAIStreamResult() { id = Guid.NewGuid().ToString("N"), obj = "chat.artifacts" };
+            @event.choices.Add(new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant", content = JsonConvert.SerializeObject(data) } });
+            await _sseEmitter.EmitAsync(@event);
         }
 
         /// <summary>

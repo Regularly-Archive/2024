@@ -1,4 +1,5 @@
-﻿using Microsoft.SemanticKernel;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Microsoft.SemanticKernel.Planning.Handlebars;
 using PostgreSQL.Embedding.Common;
@@ -27,7 +28,10 @@ namespace PostgreSQL.Embedding.LlmServices
         private long _messageReferenceId;
         private readonly Random _random = new Random();
         private readonly IUserInfoService _userInfoService;
-        public GenericConversationService(Kernel kernel, LlmApp app, IServiceProvider serviceProvider, IChatHistoriesService chatHistoriesService)
+        private readonly HttpContext _httpContext;
+        private readonly SSEEmitter _sseEmitter;
+        private readonly ILogger<GenericConversationService> _logger;
+        public GenericConversationService(Kernel kernel, LlmApp app, IServiceProvider serviceProvider, IChatHistoriesService chatHistoriesService, HttpContext httpContext)
             : base(kernel, chatHistoriesService)
         {
             _kernel = kernel;
@@ -37,19 +41,26 @@ namespace PostgreSQL.Embedding.LlmServices
             _promptTemplate = _promptTemplateService.LoadTemplate("Default.txt");
             _chatHistoriesService = chatHistoriesService;
             _userInfoService = _serviceProvider.GetService<IUserInfoService>();
+            _logger = _serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<GenericConversationService>();
+            _httpContext = httpContext;
+            _sseEmitter = new SSEEmitter(_httpContext);
         }
 
-        public async Task InvokeAsync(OpenAIModel model, HttpContext httpContext, string input, CancellationToken cancellationToken = default)
+        public async Task InvokeAsync(ConversationRequestModel model, string input, CancellationToken cancellationToken = default)
         {
-            _conversationId = httpContext.GetOrCreateConversationId();
-            var conversationName = httpContext.GetConversationName();
+            _conversationId = !string.IsNullOrEmpty(model.ConversationId) 
+                ? model.ConversationId 
+                : Guid.NewGuid().ToString("N");
+
+            var conversationName = _httpContext.GetConversationName();
 
             // 如果是重新生成，则删除最后一条 AI 消息
-            var conversationFlag = httpContext.GetConversationFlag();
+            var conversationFlag = _httpContext.GetConversationFlag();
             if (!conversationFlag)
             {
                 _messageReferenceId = await _chatHistoriesService.AddUserMessageAsync(_app.Id, _conversationId, input);
                 await _chatHistoriesService.AddConversationAsync(_app.Id, _conversationId, conversationName);
+                _httpContext.Response.Headers[Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
             }
             else
             {
@@ -57,9 +68,10 @@ namespace PostgreSQL.Embedding.LlmServices
                 await RemoveLastChatMessage(_app.Id, _conversationId);
             }
 
-            var conversationTask = model.stream
-                ? InvokeStreamingChat(httpContext, input, cancellationToken)
-                : InvokeChat(httpContext, input, cancellationToken);
+            await _httpContext.Response.Body.FlushAsync().ConfigureAwait(false);
+            var conversationTask = model.Stream
+                ? InvokeStreamingChat(model, input, cancellationToken)
+                : InvokeChat(_httpContext, input, cancellationToken);
 
             await conversationTask;
         }
@@ -71,13 +83,9 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <param name="result"></param>
         /// <param name="input"></param>
         /// <returns></returns>
-        private async Task InvokeStreamingChat(HttpContext HttpContext, string input, CancellationToken cancellationToken = default)
+        private async Task InvokeStreamingChat(ConversationRequestModel model, string input, CancellationToken cancellationToken = default)
         {
-            if (!HttpContext.Response.HasStarted)
-                HttpContext.Response.Headers.ContentType = new Microsoft.Extensions.Primitives.StringValues("text/event-stream");
-
-            var usePlugin = true;
-            var chatResult = usePlugin
+            var chatResult = model.AgenticMode
                 ? await InvokeStreamingByStepwisePlannerAsync(_kernel, input, cancellationToken)
                 : await InvokeStreamingByKernelAsync(_kernel, input, cancellationToken);
 
@@ -88,8 +96,8 @@ namespace PostgreSQL.Embedding.LlmServices
             }
 
             var messageId = await _chatHistoriesService.AddSystemMessageAsync(_app.Id, _conversationId, answerBuilder.ToString());
-            HttpContext.Response.Headers[Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
-            await HttpContext.WriteStreamingChatCompletion(chatResult, messageId, cancellationToken);
+            //HttpContext.Response.Headers[Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
+            await _httpContext.WriteStreamingChatCompletion(chatResult, messageId, cancellationToken);
         }
 
         /// <summary>
@@ -109,7 +117,6 @@ namespace PostgreSQL.Embedding.LlmServices
             if (!string.IsNullOrEmpty(answer))
             {
                 var messageId = await _chatHistoriesService.AddSystemMessageAsync(_app.Id, _conversationId, answer);
-                HttpContext.Response.Headers[Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
                 await HttpContext.WriteChatCompletion(input, messageId);
             }
         }
@@ -132,6 +139,7 @@ namespace PostgreSQL.Embedding.LlmServices
             }
             catch (Exception ex)
             {
+                _logger.LogError($"An error occurs when execute a plan due to {ex.Message}");
                 return Constants.DefaultErrorAnswer.AsFunctionResult();
             }
         }
@@ -147,12 +155,15 @@ namespace PostgreSQL.Embedding.LlmServices
                 planner.AddVariable("userId", currentUser.Id);
 
                 var plan = await planner.CreatePlanAsync(input);
+                plan.OnStepExecute = async trace => await EmitTracesAsync(trace, cancellationToken);
                 var result = await plan.ExecuteAsync(_kernel, cancellationToken);
-                return result.AsStreamming();
+
+                return result.AsStreaming();
             }
             catch (Exception ex)
             {
-                return Constants.DefaultErrorAnswer.AsStreamming();
+                _logger.LogError($"An error occurs when execute a plan due to {ex.Message}");
+                return Constants.DefaultErrorAnswer.AsStreaming();
             }
 
         }
@@ -170,6 +181,7 @@ namespace PostgreSQL.Embedding.LlmServices
             _promptTemplate.AddVariable("input", input);
             _promptTemplate.AddVariable("system", _app.Prompt);
             _promptTemplate.AddVariable("histories", histories);
+
             return await _promptTemplate.InvokeAsync(kernel, executionSettings, cancellationToken);
         }
 
@@ -181,12 +193,12 @@ namespace PostgreSQL.Embedding.LlmServices
             var temperature = _app.Temperature / 100;
             var executionSettings = new OpenAIPromptExecutionSettings() { Temperature = (double)temperature };
 
-            var histories = await GetHistoricalMessagesAsync(_app.Id, _conversationId, _app.MaxMessageRounds);
-
+            var histories = await SearchHistoricalMessagesAsync(_app.Id, _conversationId, input, _app.MaxMessageRounds);
 
             _promptTemplate.AddVariable("input", input);
             _promptTemplate.AddVariable("system", _app.Prompt);
             _promptTemplate.AddVariable("histories", histories);
+
             return _promptTemplate.InvokeStreamingAsync(kernel, executionSettings, cancellationToken);
         }
 
@@ -200,6 +212,19 @@ namespace PostgreSQL.Embedding.LlmServices
             var lastMessage = messageList.LastOrDefault();
             if (lastMessage != null && !lastMessage.IsUserMessage)
                 await _chatHistoriesService.DeleteConversationMessageAsync(lastMessage.Id);
+        }
+
+        /// <summary>
+        /// 通过 SSE 发送日志信息
+        /// </summary>
+        /// <param name="text"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        private async Task EmitTracesAsync(string text, CancellationToken cancellationToken = default)
+        {
+            var result = new OpenAIStreamResult() { id = Guid.NewGuid().ToString("N"), obj = "chat.traces" };
+            result.choices.Add(new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant", content = text } });
+            await _sseEmitter.EmitAsync(result, cancellationToken);
         }
     }
 }

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.Common.Models.WebApi;
+using PostgreSQL.Embedding.Common.Models.WebApi.QuerableFilters;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
@@ -13,7 +14,7 @@ namespace PostgreSQL.Embedding.Controllers
     [Route("api/[controller]")]
     [ApiController]
     [AllowAnonymous]
-    public class KnowledgeBaseController : CrudBaseController<KnowledgeBase>
+    public class KnowledgeBaseController : CrudBaseController<KnowledgeBase, KnowledgeBaseQueryableFilter>
     {
         private readonly IWebHostEnvironment _webHostEnvironment;
         private readonly IKnowledgeBaseService _knowledgeBaseService;
@@ -33,37 +34,17 @@ namespace PostgreSQL.Embedding.Controllers
         }
 
         [HttpGet("{knowledgeBaseId}/search")]
-        public async Task<JsonResult> KnowledgeSearch(long knowledgeBaseId, [FromQuery] string question, [FromQuery] double? minRelevance, [FromQuery] int? limit)
+        public async Task<JsonResult> KnowledgeSearch(long knowledgeBaseId, [FromQuery] string question, [FromQuery] double? minRelevance, [FromQuery] int? limit, [FromQuery] int retrievalType = 2)
         {
-            // Todo: 这里需要重构
-            var knowledgeBase = await _crudBaseService.GetById(knowledgeBaseId);
-            if (knowledgeBase.RetrievalType == (int)RetrievalType.Vectors)
-            {
-                var searchResults = await _knowledgeBaseService.SearchAsync(knowledgeBaseId, question);
-                return ApiResult.Success(searchResults);
-            }
-            else
-            {
-                var searchResults = await _fullTextSearchService.SearchAsync(knowledgeBaseId, question);
-                return ApiResult.Success(searchResults);
-            }
+            var searchResults = await _knowledgeBaseService.SearchAsync(knowledgeBaseId, question, (RetrievalType)retrievalType, minRelevance ?? 0, limit ?? 5);
+            return ApiResult.Success(searchResults);
         }
 
         [HttpGet("{knowledgeBaseId}/ask")]
-        public async Task<JsonResult> KnowledgeBaseAsk(long knowledgeBaseId, [FromQuery] string question, [FromQuery] double minRelevance)
+        public async Task<JsonResult> KnowledgeBaseAsk(long knowledgeBaseId, [FromQuery] string question, [FromQuery] double? minRelevance, [FromQuery] int? limit, [FromQuery] int retrievalType = 2)
         {
-            // Todo: 这里需要重构
-            var knowledgeBase = await _crudBaseService.GetById(knowledgeBaseId);
-            if (knowledgeBase.RetrievalType == (int)RetrievalType.Vectors)
-            {
-                var askResults = await _knowledgeBaseService.AskAsync(knowledgeBaseId, question, minRelevance);
-                return ApiResult.Success(askResults);
-            }
-            else
-            {
-                var searchResults = await _fullTextSearchService.AskAsync(knowledgeBaseId, question);
-                return ApiResult.Success(searchResults);
-            }
+            var askResults = await _knowledgeBaseService.AskAsync(knowledgeBaseId, question, (RetrievalType)retrievalType, minRelevance ?? 0d, limit ?? 5);
+            return ApiResult.Success(askResults);
         }
 
         [HttpPost("{knowledgeBaseId}/embedding/files")]
@@ -128,9 +109,10 @@ namespace PostgreSQL.Embedding.Controllers
             return new JsonResult(details);
         }
 
-        [HttpGet("{knowledgeBaseId}/chunks/{fileName}")]
+        [HttpGet("{knowledgeBaseId}/chunks/{*fileName}")]
         public async Task<JsonResult> GetKnowledgeBaseChunksWithFileName(long knowledgeBaseId, string fileName, [FromQuery] int pageIndex, [FromQuery] int pageSize)
         {
+            fileName = Uri.UnescapeDataString(fileName);
             var details = await _knowledgeBaseService.GetKnowledgeBaseChunks(knowledgeBaseId, fileName, pageIndex, pageSize);
             return new JsonResult(details);
         }
@@ -141,29 +123,30 @@ namespace PostgreSQL.Embedding.Controllers
             await _knowledgeBaseService.DeleteKnowledgeBaseChunksById(knowledgeBaseId);
         }
 
-        [HttpDelete("{knowledgeBaseId}/chunks/{fileName}")]
+        [HttpDelete("{knowledgeBaseId}/chunks/{*fileName}")]
         public async Task DeleteKnowledgeBaseChunks(long knowledgeBaseId, string fileName)
         {
+            fileName = Uri.UnescapeDataString(fileName);
             await _knowledgeBaseService.DeleteKnowledgeBaseChunksByFileName(knowledgeBaseId, fileName);
         }
 
         [HttpGet("{knowledgeBaseId}/chunks/{fileId}/{partId}")]
         public async Task<JsonResult> GetKnowledgeBaseChunk(long knowledgeBaseId, string fileId, string partId)
         {
-            var chunk = await _knowledgeBaseService.GetKnowledgeBaseChunk(knowledgeBaseId, fileId,partId);
+            var chunk = await _knowledgeBaseService.GetKnowledgeBaseChunk(knowledgeBaseId, fileId, partId);
             return ApiResult.Success(chunk);
         }
 
-        public override async Task<JsonResult> Create(KnowledgeBase entity)
+        public override async Task<JsonResult> CreateAsync(KnowledgeBase entity)
         {
             var instance = await _knowledgeBaseService.CreateKnowledgeBase(entity);
             return ApiResult.Success(instance);
         }
 
-        public override async Task<JsonResult> Delete(string ids)
+        public override async Task<JsonResult> DeleteAsync(string ids)
         {
             // 删除知识库
-            await _crudBaseService.Delete(ids);
+            await _crudBaseService.DeleteAsync(ids);
 
             // 删除知识库文档
             var tasks = ids.Split(',').Select(x => _knowledgeBaseService.DeleteKnowledgeBaseChunksById(long.Parse(x)));
