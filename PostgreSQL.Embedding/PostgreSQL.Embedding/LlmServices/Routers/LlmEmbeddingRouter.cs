@@ -24,7 +24,7 @@ namespace PostgreSQL.Embedding.LlmServices.Routers
                     case LlmServiceProvider.LLama:
                     case LlmServiceProvider.Ollama:
                     case LlmServiceProvider.HuggingFace:
-                        var requestUrl = string.Format(_llmConfigOptions.Value?.ChatEndpoint, llmServiceProvider.ToString());
+                        var requestUrl = string.Format(_llmConfigOptions.Value?.EmbeddingEndpoint, llmServiceProvider.ToString());
                         request.RequestUri = new Uri(requestUrl);
                         break;
                     case LlmServiceProvider.Zhipu:

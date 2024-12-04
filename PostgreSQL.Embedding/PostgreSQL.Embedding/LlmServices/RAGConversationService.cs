@@ -1,4 +1,5 @@
-﻿using Microsoft.SemanticKernel;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common;
@@ -12,6 +13,7 @@ using PostgreSQL.Embedding.LLmServices.Extensions;
 using SqlSugar;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
@@ -33,13 +35,16 @@ namespace PostgreSQL.Embedding.LlmServices
         private long _messageReferenceId;
         private readonly IRerankService _rerankService;
         private Regex _regexCitations = new Regex(@"\[(\d+)\]");
+        private readonly HttpContext _httpContext;
+        private readonly SSEEmitter _sseEmitter;
 
         public RAGConversationService(
             Kernel kernel,
             LlmApp app,
             IServiceProvider serviceProvider,
             IMemoryService memoryService,
-            IChatHistoriesService chatHistoriesService
+            IChatHistoriesService chatHistoriesService,
+            HttpContext httpContext
         )
             : base(kernel, chatHistoriesService)
         {
@@ -56,28 +61,34 @@ namespace PostgreSQL.Embedding.LlmServices
             _chatHistoriesService = chatHistoriesService;
             _logger = _serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<RAGConversationService>();
             _rerankService = _serviceProvider.GetRequiredService<IRerankService>();
+            _httpContext = httpContext;
+            _sseEmitter = new SSEEmitter(httpContext);
         }
 
-        public async Task InvokeAsync(OpenAIModel model, HttpContext HttpContext, string input, CancellationToken cancellationToken = default)
+        public async Task InvokeAsync(ConversationRequestModel model, string input, CancellationToken cancellationToken = default)
         {
-            _conversationId = HttpContext.GetOrCreateConversationId();
-            var conversationName = HttpContext.GetConversationName();
+            _conversationId = !string.IsNullOrEmpty(model.ConversationId) 
+                ? model.ConversationId 
+                : Guid.NewGuid().ToString("N");
+
+            var conversationName = _httpContext.GetConversationName();
 
             // 如果是重新生成，则删除最后一条 AI 消息
-            var conversationFlag = HttpContext.GetConversationFlag();
+            var conversationFlag = _httpContext.GetConversationFlag();
             if (!conversationFlag)
             {
                 _messageReferenceId = await _chatHistoriesService.AddUserMessageAsync(_app.Id, _conversationId, input);
                 await _chatHistoriesService.AddConversationAsync(_app.Id, _conversationId, conversationName);
+                _httpContext.Response.Headers[Common.Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
             }
             else
             {
                 await RemoveLastChatMessage(_app.Id, _conversationId);
             }
 
-            var conversationTask = model.stream
-                ? InvokeWithKnowledgeStreaming(HttpContext, input, cancellationToken)
-                : InvokeWithKnowledge(HttpContext, input);
+            var conversationTask = model.Stream
+                ? InvokeWithKnowledgeStreamingAsync(input, cancellationToken)
+                : InvokeWithKnowledgeAsync(input, cancellationToken);
 
             await conversationTask;
         }
@@ -87,9 +98,9 @@ namespace PostgreSQL.Embedding.LlmServices
         /// </summary>
         /// <param name="input"></param>
         /// <returns></returns>
-        private async Task InvokeWithKnowledge(HttpContext HttpContext, string input)
+        private async Task InvokeWithKnowledgeAsync(string input, CancellationToken cancellationToken)
         {
-            var citations = await BuildKnowledgeCitations(input);
+            var citations = await BuildKnowledgeCitations(input, cancellationToken);
             var jsonFormatContext = JsonConvert.SerializeObject(citations);
 
             var temperature = _app.Temperature / 100;
@@ -111,9 +122,10 @@ namespace PostgreSQL.Embedding.LlmServices
                 {
                     answer = Common.Constants.DefaultEmptyAnswer;
                     var messageId = await _chatHistoriesService.AddSystemMessageAsync(_app.Id, _conversationId, answer);
-                    HttpContext.Response.Headers[Common.Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
-                    await HttpContext.WriteChatCompletion(input, messageId);
-                } 
+
+                    await EmitFinalAnswerAsync(messageId, answer);
+                    await EmitCompleteAsync(cancellationToken);
+                }
                 else
                 {
                     // 匹配引用信息，对引用信息的索引进行重排
@@ -147,14 +159,15 @@ namespace PostgreSQL.Embedding.LlmServices
                         answer = answer.Replace($"[{ciation.OriginIndex}]", $"[{ciation.NewIndex}]");
                     }
 
+                    // 拼接答案和引用信息
                     var answerBuilder = new StringBuilder();
                     answerBuilder.AppendLine(answer);
                     answerBuilder.AppendLine();
                     answerBuilder.AppendLine(markdownFormatContext);
 
                     var messageId = await _chatHistoriesService.AddSystemMessageAsync(_app.Id, _conversationId, answerBuilder.ToString());
-                    HttpContext.Response.Headers[Common.Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
-                    await HttpContext.WriteChatCompletion(answerBuilder.ToString(), messageId);
+                    await EmitFinalAnswerAsync(messageId, answerBuilder.ToString(), cancellationToken);
+                    await EmitCompleteAsync(cancellationToken);
                 }
             }
         }
@@ -166,20 +179,15 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <param name="result"></param>
         /// <param name="input"></param>
         /// <returns></returns>
-        private async Task InvokeWithKnowledgeStreaming(HttpContext HttpContext, string input, CancellationToken cancellationToken = default)
+        private async Task InvokeWithKnowledgeStreamingAsync(string input, CancellationToken cancellationToken = default)
         {
-            if (!HttpContext.Response.HasStarted)
-            {
-                HttpContext.Response.Headers.ContentType = new Microsoft.Extensions.Primitives.StringValues("text/event-stream");
-            }
-
-            var citations = await BuildKnowledgeCitations(input);
+            var citations = await BuildKnowledgeCitations(input, cancellationToken);
             var jsonFormatContext = JsonConvert.SerializeObject(citations);
 
             var temperature = _app.Temperature / 100;
             var executionSettings = new OpenAIPromptExecutionSettings() { Temperature = (double)temperature };
 
-            var histories = await GetHistoricalMessagesAsync(_app.Id, _conversationId, _app.MaxMessageRounds);
+            var histories = await SearchHistoricalMessagesAsync(_app.Id, _conversationId, input, _app.MaxMessageRounds);
 
             _promptTemplate.AddVariable("name", "ChatGPT");
             _promptTemplate.AddVariable("context", jsonFormatContext);
@@ -193,9 +201,9 @@ namespace PostgreSQL.Embedding.LlmServices
             {
                 llmResponse = Common.Constants.DefaultEmptyAnswer;
                 var messageId = await _chatHistoriesService.AddSystemMessageAsync(_app.Id, _conversationId, llmResponse);
-                HttpContext.Response.Headers[Common.Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
-                await HttpContext.WriteStreamingChatCompletion(llmResponse, messageId, cancellationToken);
-            } 
+                await EmitFinalAnswerAsync(messageId, llmResponse);
+                await EmitCompleteAsync(cancellationToken);
+            }
             else
             {
                 var index = 0;
@@ -233,8 +241,9 @@ namespace PostgreSQL.Embedding.LlmServices
                 answerBuilder.AppendLine(markdownFormatContext);
 
                 var messageId = await _chatHistoriesService.AddSystemMessageAsync(_app.Id, _conversationId, answerBuilder.ToString());
-                HttpContext.Response.Headers[Common.Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
-                await HttpContext.WriteStreamingChatCompletion(answerBuilder.ToString(), messageId, cancellationToken);
+
+                await EmitFinalAnswerAsync(messageId, answerBuilder.ToString());
+                await EmitCompleteAsync(cancellationToken);
             }
         }
 
@@ -244,7 +253,7 @@ namespace PostgreSQL.Embedding.LlmServices
         /// </summary>
         /// <param name="input"></param>
         /// <returns></returns>
-        private async Task<List<LlmCitationModel>> BuildKnowledgeCitations(string question)
+        private async Task<List<LlmCitationModel>> BuildKnowledgeCitations(string question, CancellationToken cancellationToken)
         {
             var searchResults = new List<KMCitation>();
             var llmKappKnowledges = await _llmAppKnowledgeRepository.FindListAsync(x => x.AppId == _app.Id);
@@ -256,7 +265,10 @@ namespace PostgreSQL.Embedding.LlmServices
                 if (_app.EnableRewrite)
                 {
                     var similarQuestions = await RewriteAsync(question);
-                    _logger.LogInformation($"查询重写，共生成{similarQuestions.Count}个相似问题：{JsonConvert.SerializeObject(similarQuestions)}.");
+                    _logger.LogInformation($"查询重写，共生成 {similarQuestions.Count} 个相似问题：{JsonConvert.SerializeObject(similarQuestions)}.");
+                    await EmitTracesAsync($"查询重写，共生成 {similarQuestions.Count} 个相似问题", cancellationToken);
+
+                    similarQuestions.ForEach(async similarQuestion => await EmitTracesAsync(similarQuestion, cancellationToken));
                     if (similarQuestions.Any()) { inputs.AddRange(similarQuestions); }
                 }
 
@@ -283,12 +295,12 @@ namespace PostgreSQL.Embedding.LlmServices
             }
 
             // 构建上下文
-            var chunks = partitions.Select((x,i) => new LlmCitationModel
+            var chunks = partitions.Select((x, i) => new LlmCitationModel
             {
-                Index =  i + 1,
+                Index = i + 1,
                 FileName = x.FileName,
                 Relevance = x.Relevance,
-                Text = $"[^{i+1}]: {x.Text}",
+                Text = $"[^{i + 1}]: {x.Text}",
                 Url = $"/api/KnowledgeBase/{x.KnowledgeBaseId}/chunks/{x.FileId}/{x.PartId}"
             })
             .OrderByDescending(x => x.Relevance)
@@ -299,11 +311,14 @@ namespace PostgreSQL.Embedding.LlmServices
             {
                 var maxRelevance = chunks.Max(x => x.Relevance);
                 var minRelevance = chunks.Min(x => x.Relevance);
-                _logger.LogInformation($"共检索到 {chunks.Count} 个文档块，相似度区间[{minRelevance},{maxRelevance}]");
+
+                _logger.LogInformation($"共检索到 {chunks.Count} 个文档块，相似度区间为 {minRelevance} ~ {maxRelevance}");
+                await EmitTracesAsync($"共检索到 {chunks.Count} 个文档块，相似度区间为 {minRelevance} ~ {maxRelevance}", cancellationToken);
             }
             else
             {
                 _logger.LogInformation($"未检索到符合条件的文档块");
+                await EmitTracesAsync($"未检索到符合条件的文档块", cancellationToken);
             }
 
             return chunks;
@@ -397,6 +412,63 @@ namespace PostgreSQL.Embedding.LlmServices
             if (lastMessage != null && !lastMessage.IsUserMessage)
                 await _chatHistoriesService.DeleteConversationMessageAsync(lastMessage.Id);
 
+        }
+
+        /// <summary>
+        /// 通过 SSE 发送最终答案
+        /// </summary>
+        /// <param name="mesageId"></param>
+        /// <param name="text"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        private async Task EmitFinalAnswerAsync(long? mesageId, string text, CancellationToken cancellationToken = default)
+        {
+            var characters = text.ToArray().Select(x => x.ToString()).ToAsyncEnumerable();
+
+            var result = new OpenAIStreamResult() { id = mesageId.HasValue ? mesageId.ToString() : Guid.NewGuid().ToString(), obj = "chat.completion" };
+            result.choices.Add(new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant" } });
+
+            await foreach (var c in characters)
+            {
+                if (cancellationToken.IsCancellationRequested) return;
+
+                result.choices[0].delta.content = text == null ? string.Empty : Convert.ToString(c);
+                result.created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                await _sseEmitter.EmitAsync(result);
+            }
+        }
+
+        /// <summary>
+        /// 通过 SSE 发送引用信息
+        /// </summary>
+        /// <param name="mesageId"></param>
+        /// <param name="text"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        private async Task EmitCitationsAsync(long? mesageId, string text, CancellationToken cancellationToken = default)
+        {
+            var result = new OpenAIStreamResult() { id = mesageId.HasValue ? mesageId.ToString() : Guid.NewGuid().ToString(), obj = "chat.completion" };
+            result.choices.Add(new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant", content = text } });
+            await _sseEmitter.EmitAsync(result, cancellationToken);
+        }
+
+        /// <summary>
+        /// 通过 SSE 发送日志信息
+        /// </summary>
+        /// <param name="text"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        private async Task EmitTracesAsync(string text, CancellationToken cancellationToken = default)
+        {
+            var result = new OpenAIStreamResult() { id = Guid.NewGuid().ToString("N"), obj = "chat.traces" };
+            result.choices.Add(new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant", content = text } });
+            await _sseEmitter.EmitAsync(result, cancellationToken);
+        }
+
+        private async Task EmitCompleteAsync(CancellationToken cancellationToken)
+        {
+            await _sseEmitter.EmitAsync("[DONE]", cancellationToken);
+            await _sseEmitter.CompleteAsync();
         }
     }
 }

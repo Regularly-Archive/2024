@@ -69,7 +69,7 @@ namespace PostgreSQL.Embedding.Common.Models
         [JsonProperty("object")]
         public string obj { get; set; } = "chat.completion";
 
-        public List<StreamChoicesModel> choices { get; set; }
+        public List<StreamChoicesModel> choices { get; set; } = [];
 
         public long created { get; set; } = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
     }

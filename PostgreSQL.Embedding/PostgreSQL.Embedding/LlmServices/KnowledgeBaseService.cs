@@ -1,14 +1,18 @@
-﻿using Microsoft.KernelMemory;
+﻿using DocumentFormat.OpenXml.Math;
+using Microsoft.KernelMemory;
+using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Newtonsoft.Json;
 using Npgsql;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Models.KernelMemory;
+using PostgreSQL.Embedding.Common.Models.RAG;
 using PostgreSQL.Embedding.Common.Models.WebApi;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.Utils;
 using SqlSugar;
+using DocumentType = PostgreSQL.Embedding.Common.DocumentType;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
@@ -22,6 +26,7 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly IRepository<KnowledgeBase> _knowledgeBaseRepository;
         private readonly IRepository<TablePrefixMapping> _tablePrefixMappingRepository;
         private readonly ILogger<KnowledgeBaseService> _logger;
+        private readonly IEnumerable<IKnowledgeRetrievalService> _knowledgeRetrievalServices;
 
         public KnowledgeBaseService(
             IServiceProvider serviceProvider,
@@ -30,7 +35,8 @@ namespace PostgreSQL.Embedding.LlmServices
             IRepository<DocumentImportRecord> importRecordRepository,
             IRepository<KnowledgeBase> knowledgeBaseRepository,
             IRepository<TablePrefixMapping> tablePrefixMappingRepository,
-            ILogger<KnowledgeBaseService> logger
+            ILogger<KnowledgeBaseService> logger,
+            IEnumerable<IKnowledgeRetrievalService> knowledgeRetrievalServices
             )
         {
             _serviceProvider = serviceProvider;
@@ -40,6 +46,7 @@ namespace PostgreSQL.Embedding.LlmServices
             _importRecordRepository = importRecordRepository;
             _knowledgeBaseRepository = knowledgeBaseRepository;
             _tablePrefixMappingRepository = tablePrefixMappingRepository;
+            _knowledgeRetrievalServices = knowledgeRetrievalServices;
             _logger = logger;
         }
 
@@ -68,11 +75,11 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <param name="knowledgeBaseId">知识库ID</param>
         /// <param name="fileName">文件名</param>
         /// <returns></returns>
-        public async Task<PageResult<KMPartition>> GetKnowledgeBaseChunks(long knowledgeBaseId, string fileName = null, int pageIndex = 1, int pageSize = 10)
+        public async Task<PagedResult<KMPartition>> GetKnowledgeBaseChunks(long knowledgeBaseId, string fileName = null, int pageIndex = 1, int pageSize = 10)
         {
             // 组装 Kernel Memory 表名
             var knowledgeBase = await _knowledgeBaseRepository.GetAsync(knowledgeBaseId);
-            var tablePrefixMapping = await _tablePrefixMappingRepository.SingleOrDefaultAsync(x => x.FullName == knowledgeBase.EmbeddingModel);
+            var tablePrefixMapping = await _tablePrefixMappingRepository.FindAsync(x => x.FullName == knowledgeBase.EmbeddingModel);
             var tableName = $"sk-{tablePrefixMapping.ShortName.ToLower()}-default";
 
             using var connection = new NpgsqlConnection(_postgrelConnectionString);
@@ -81,7 +88,7 @@ namespace PostgreSQL.Embedding.LlmServices
             var totalCount = GetKnowledgeBaseChunksCount(connection, tableName, knowledgeBaseId, fileName);
             var partitions = GetKnowledgeBaseChunksPageList(connection, tableName, pageIndex, pageSize, knowledgeBaseId, fileName);
 
-            var pageResult = new PageResult<KMPartition>() { TotalCount = (int)totalCount, Rows = partitions };
+            var pageResult = new PagedResult<KMPartition>() { TotalCount = (int)totalCount, Rows = partitions };
             return pageResult;
         }
 
@@ -150,7 +157,7 @@ namespace PostgreSQL.Embedding.LlmServices
 
                 // 如果文件重复则直接忽略
                 // Todo：考虑增加针对文件的 SHA 校验
-                var record = await _importRecordRepository.SingleOrDefaultAsync(x => x.KnowledgeBaseId == knowledgeBaseId && x.FileName == fileName); ;
+                var record = await _importRecordRepository.FindAsync(x => x.KnowledgeBaseId == knowledgeBaseId && x.FileName == fileName); ;
                 if (record != null) continue;
 
                 // 增加文件导入记录
@@ -231,7 +238,19 @@ namespace PostgreSQL.Embedding.LlmServices
             }
             else if (urlType == (int)UrlType.Sitemap)
             {
-
+                var sitemapEntries = await SitemapParser.ParseSitemap(url);
+                foreach(var sitemapEntry in sitemapEntries)
+                {
+                    await _importRecordRepository.AddAsync(new DocumentImportRecord()
+                    {
+                        TaskId = taskId,
+                        FileName = sitemapEntry.Url,
+                        QueueStatus = (int)QueueStatus.Uploaded,
+                        KnowledgeBaseId = knowledgeBaseId,
+                        DocumentType = (int)DocumentType.Url,
+                        Content = string.Empty
+                    });
+                }
             }
         }
 
@@ -242,7 +261,7 @@ namespace PostgreSQL.Embedding.LlmServices
 
             var memoryServerless = await _memoryService.CreateByKnowledgeBase(knowledgeBase);
 
-            var records = await _importRecordRepository.FindAsync(x => x.KnowledgeBaseId == knowledgeBaseId);
+            var records = await _importRecordRepository.FindListAsync(x => x.KnowledgeBaseId == knowledgeBaseId);
             foreach (var record in records)
             {
                 await memoryServerless.DeleteDocumentAsync(record.FileName);
@@ -260,36 +279,64 @@ namespace PostgreSQL.Embedding.LlmServices
             await _importRecordRepository.DeleteAsync(x => x.KnowledgeBaseId == knowledgeBaseId && x.FileName == fileName);
         }
 
-        public async Task<KMSearchResult> SearchAsync(long knowledgeBaseId, string question, double minRelevance = 0, int limit = 5)
+        public async Task<KMSearchResult> SearchAsync(long knowledgeBaseId, string question, RetrievalType retrievalType = RetrievalType.Mixed, double minRelevance = 0, int limit = 5)
         {
+            var retrievalService = _knowledgeRetrievalServices.FirstOrDefault(x => x.RetrievalType == retrievalType);
+            if (retrievalService != null)
+                return (await retrievalService.SearchAsync(knowledgeBaseId, question, minRelevance, limit));
+
+
             var kmSearchResult = new KMSearchResult() { Question = question };
-
-            // 查询知识库
-            var knowledgeBase = await _knowledgeBaseRepository.GetAsync(knowledgeBaseId);
-            if (knowledgeBase == null) throw new InvalidOperationException("The knowledgebase must exists.");
-
-            var memoryServerless = await _memoryService.CreateByKnowledgeBase(knowledgeBase);
-
-            var memoryFilter = new MemoryFilter()
-                .ByTag(KernelMemoryTags.KnowledgeBaseId, knowledgeBaseId.ToString());
-
-            var searchResult = await memoryServerless.SearchAsync(question, filter: memoryFilter, minRelevance: minRelevance, limit: limit);
-            if (searchResult.NoResult) return kmSearchResult;
-
-            if (searchResult.Results.Any())
+            foreach (var knowledgeRetrievalService in _knowledgeRetrievalServices)
             {
-                kmSearchResult.RelevantSources =
-                    searchResult.Results.Select(x => new KMCitation()
-                    {
-                        SourceName = x.SourceName,
-                        Partitions = x.Partitions.Select(y => new KMPartition(y)).ToList()
-                    })
-                    .ToList();
+                var searchResult = await knowledgeRetrievalService.SearchAsync(knowledgeBaseId, question, minRelevance, limit);
+                if (!searchResult.RelevantSources.Any()) continue;
+                kmSearchResult.RelevantSources.AddRange(searchResult.RelevantSources);
             }
+
             return kmSearchResult;
         }
 
-        public async Task<KMAskResult> AskAsync(long knowledgeBaseId, string question, double minRelevance = 0)
+        public async Task<KMAskResult> AskAsync(long knowledgeBaseId, string question, RetrievalType retrievalType = RetrievalType.Mixed, double minRelevance = 0, int limit = 5)
+        {
+            if (retrievalType == RetrievalType.Vectors)
+                return await AskByVectorsAsync(knowledgeBaseId, question, minRelevance, limit);
+
+            var llmModelRepository = _serviceProvider.GetService<IRepository<LlmModel>>();
+            var kernelService = _serviceProvider.GetService<IKernelService>();
+            var promptTemplateService = _serviceProvider.GetService<PromptTemplateService>();
+
+            var textModel = await llmModelRepository.FindAsync(x => x.ModelType == (int)ModelType.TextGeneration && x.IsDefaultModel == true);
+            var kernel = await kernelService.GetKernel(textModel);
+
+            var result = new KMAskResult();
+            result.Question = question;
+
+            var searchResult = await SearchAsync(knowledgeBaseId, question, retrievalType, minRelevance, limit);
+            if (!searchResult.RelevantSources.Any())
+            {
+                result.Answer = "抱歉，我无法回答你的问题";
+                return result;
+            }
+
+            result.RelevantSources = searchResult.RelevantSources;
+            var context = BuildKnowledgeContext(searchResult, limit);
+
+            var promptTemplate = promptTemplateService.LoadTemplate("RAGPrompt.txt");
+            promptTemplate.AddVariable("name", "ChatGPT");
+            promptTemplate.AddVariable("context", context);
+            promptTemplate.AddVariable("question", question);
+            promptTemplate.AddVariable("histories", string.Empty);
+            promptTemplate.AddVariable("empty_answer", Common.Constants.DefaultEmptyAnswer);
+
+            var executionSettings = new OpenAIPromptExecutionSettings() { Temperature = 0.75 };
+            var chatResult = await promptTemplate.InvokeAsync<string>(kernel, executionSettings);
+
+            result.Answer = chatResult;
+            return result;
+        }
+
+        private async Task<KMAskResult> AskByVectorsAsync(long knowledgeBaseId, string question, double minRelevance = 0, int limit = 5)
         {
             var askResult = new KMAskResult() { Question = question, RelevantSources = new List<KMCitation>() };
 
@@ -312,10 +359,29 @@ namespace PostgreSQL.Embedding.LlmServices
                     SourceName = x.SourceName,
                     Partitions = x.Partitions.Select(y => new KMPartition(y)).ToList()
                 })
-                .ToList();
+                .Take(limit).ToList();
             }
 
             return askResult;
+        }
+
+        private string BuildKnowledgeContext(KMSearchResult searchResult, int limit)
+        {
+            var partitions = searchResult.RelevantSources.SelectMany(x => x.Partitions).ToList();
+            var chunks = partitions.Select((x, i) => new LlmCitationModel
+            {
+                Index = i + 1,
+                FileName = x.FileName,
+                Relevance = x.Relevance,
+                Text = $"[^{i + 1}]: {x.Text}",
+                Url = $"/api/KnowledgeBase/{x.KnowledgeBaseId}/chunks/{x.FileId}/{x.PartId}"
+            })
+            .OrderByDescending(x => x.Relevance)
+            .Take(limit)
+            .ToList();
+
+            var jsonFormatContext = JsonConvert.SerializeObject(chunks);
+            return jsonFormatContext;
         }
 
         public async Task<bool> IsDocumentReady(long knowledgeBaseId, string fileName)
@@ -341,6 +407,7 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <exception cref="NotImplementedException"></exception>
         public Task ReImportKnowledges(long knowledgeBaseId, string fileName = null)
         {
+            // Todo:
             throw new NotImplementedException();
         }
 
@@ -357,7 +424,7 @@ namespace PostgreSQL.Embedding.LlmServices
         {
             // 组装 Kernel Memory 表名
             var knowledgeBase = await _knowledgeBaseRepository.GetAsync(knowledgeBaseId);
-            var tablePrefixMapping = await _tablePrefixMappingRepository.SingleOrDefaultAsync(x => x.FullName == knowledgeBase.EmbeddingModel);
+            var tablePrefixMapping = await _tablePrefixMappingRepository.FindAsync(x => x.FullName == knowledgeBase.EmbeddingModel);
             var tableName = $"sk-{tablePrefixMapping.ShortName.ToLower()}-default";
 
             using var connection = new NpgsqlConnection(_postgrelConnectionString);
@@ -371,8 +438,8 @@ namespace PostgreSQL.Embedding.LlmServices
         {
             // 拼接 SQL 语句，按标签进行过滤
             var sqlText = $"""
-            SELECT t.* FROM "{tableName}" t WHERE t.tags @> ARRAY['{KernelMemoryTags.KnowledgeBaseId}:{knowledgeBaseId}']
-                AND t.tags @> ARRAY['{KernelMemoryTags.FileId}:{fileId}'] AND t.tags @> ARRAY['{KernelMemoryTags.PartId}:{partId}']
+                SELECT t.* FROM "{tableName}" t WHERE t.tags @> ARRAY['{KernelMemoryTags.KnowledgeBaseId}:{knowledgeBaseId}']
+                    AND t.tags @> ARRAY['{KernelMemoryTags.FileId}:{fileId}'] AND t.tags @> ARRAY['{KernelMemoryTags.PartId}:{partId}']
             """;
 
             using var queryCommand = new NpgsqlCommand(sqlText, connection);
@@ -414,7 +481,7 @@ namespace PostgreSQL.Embedding.LlmServices
             var tags = ((string[])reader["tags"]);
             var tag = tags.FirstOrDefault(x => x.IndexOf(key) != -1);
             if (tag != null)
-                return tag.Split(new Char[] { ':' })[1];
+                return tag.Split(new Char[] { ':' }, 2)[1];
 
             return string.Empty;
         }

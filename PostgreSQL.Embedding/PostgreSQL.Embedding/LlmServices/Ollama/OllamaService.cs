@@ -53,12 +53,12 @@ namespace PostgreSQL.Embedding.LlmServices.Ollama
                 var httpResponse = await httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead);
                 httpResponse.EnsureSuccessStatusCode();
 
-                using (var responseStream = await httpResponse.Content.ReadAsStreamAsync())
+                using (var responseStream = await httpResponse.Content.ReadAsStreamAsync().ConfigureAwait(false))
                 {
                     using (var reader = new StreamReader(responseStream))
                     {
                         string line;
-                        while ((line = await reader.ReadLineAsync()) != null)
+                        while ((line = await reader.ReadLineAsync().ConfigureAwait(false)) != null)
                         {
                             if (string.IsNullOrEmpty(line)) continue;
 
