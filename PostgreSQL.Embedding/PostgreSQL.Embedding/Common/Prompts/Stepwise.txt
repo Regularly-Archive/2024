@@ -32,7 +32,7 @@ Here is an example of a valid $JSON_BLOB with no parameters:
 
 [VALID STEP LIST]
 [QUESTION] - The input question I must answer
-[THOUGHT] - A thought I have about the question and how to answer it.
+[THOUGHT] - A thought I have about the question and how to answer it step by step.
 [ACTION] - A single $JSON_BLOB representing a single action to be performed
 [OBSERVATION] - The result of the action will be provided here
 [FINAL ANSWER] - Once I have gathered all the necessary observations through producing thoughts and actions, I can provide the final answer in a clear and human-readable format.

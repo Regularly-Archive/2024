@@ -47,6 +47,9 @@ namespace PostgreSQL.Embedding.LlmServices.Routers
                     case LlmServiceProvider.MiniMax:
                         request.RequestUri = new Uri("https://api.minimax.chat/v1/text/chatcompletion_v2");
                         break;
+                    case LlmServiceProvider.LingYi:
+                        request.RequestUri = new Uri("https://api.lingyiwanwu.com/v1/chat/completions");
+                        break;
                 }
 
             }

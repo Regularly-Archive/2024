@@ -1,20 +1,16 @@
 using LLama;
 using LLama.Common;
-using LLamaSharp.KernelMemory;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Azure;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.KernelMemory;
-using Microsoft.KernelMemory.Postgres;
 using Microsoft.OpenApi.Models;
 using Minio;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Confirguration;
 using PostgreSQL.Embedding.Common.Converters;
 using PostgreSQL.Embedding.Common.Middlewares;
+using PostgreSQL.Embedding.Common.Models.WebApi;
 using PostgreSQL.Embedding.Common.Settings;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.Handlers;
@@ -23,11 +19,12 @@ using PostgreSQL.Embedding.LlmServices;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.LLmServices.Extensions;
 using PostgreSQL.Embedding.Services;
+using PostgreSQL.Embedding.Utils;
 using SqlSugar;
 using System.Text;
 using System.Text.Encodings.Web;
+using System.Text.Json;
 using System.Text.Unicode;
-using PostgreSQL.Embedding.Utils;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -70,13 +67,14 @@ builder.Services.AddAuthorization(options =>
 
 builder.Services.AddControllers(options =>
 {
-
+    options.ModelBinderProviders.Insert(0, new QueryParameterBinderProvider());
     options.Filters.Add<GlobalExceptionFilter>();
 })
 .AddJsonOptions(cfg =>
 {
     cfg.JsonSerializerOptions.Converters.Add(new BigIntJsonConverter());
     cfg.JsonSerializerOptions.Encoder = JavaScriptEncoder.Create(UnicodeRanges.All);
+    cfg.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
 });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -101,10 +99,18 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 });
-builder.Services.AddSignalR();
+builder.Services.AddSignalR(options => {
+    options.KeepAliveInterval = TimeSpan.FromSeconds(30);
+});
 builder.Services.AddSingleton<INotificationService, NotificationService>();
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddHttpClient();
+builder.Services.AddHttpClient()
+    .ConfigureHttpClientDefaults(httpClientBuilder =>
+    {
+        httpClientBuilder.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler() { 
+            ServerCertificateCustomValidationCallback = (a, b, c, d) => true 
+        });
+    });
 builder.Services.AddScoped<IConversationService, ConversationService>();
 builder.Services.AddScoped<IUserInfoService, UserInfoService>();
 builder.Services.AddScoped<IKernelService, KernalService>();
@@ -113,7 +119,7 @@ builder.Services.AddScoped<IImportingTaskHandler, FileImportingTaskHandler>();
 builder.Services.AddScoped<IImportingTaskHandler, TextImportingTaskHandler>();
 builder.Services.AddScoped<IImportingTaskHandler, UrlImportingTaskHandler>();
 
-// Todo: 需要实现按指定模型加载
+// Todo: 
 builder.Services.AddSingleton<LLamaEmbedder>(sp =>
 {
     var modelPath = Path.Combine(builder.Environment.ContentRootPath, builder.Configuration["LLamaConfig:ModelPath"]!);
@@ -142,6 +148,7 @@ builder.Services.AddLLama().AddHuggingFace().AddOllama();
 builder.Services.Configure<LlmConfig>(builder.Configuration.GetSection(nameof(LlmConfig)));
 builder.Services.Configure<JwtSetting>(builder.Configuration.GetSection(nameof(JwtSetting)));
 builder.Services.Configure<PythonConfig>(builder.Configuration.GetSection(nameof(PythonConfig)));
+builder.Services.Configure<CodeInterpreterConfig>(builder.Configuration.GetSection(nameof(CodeInterpreterConfig)));
 builder.Services.AddSingleton<ILlmServiceFactory, LlmServiceFactory>();
 builder.Services.AddScoped<IKnowledgeBaseService, KnowledgeBaseService>();
 builder.Services.AddScoped<IKnowledgeBaseTaskQueueService, KnowledgeBaseTaskQueueService>();
@@ -162,6 +169,8 @@ builder.Services.AddScoped<IFileStorageService, MinioFileStorageService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddSingleton<IRerankService, BgeRerankService>();
 builder.Services.AddScoped<ILlmPluginService, LlmPluginService>();
+builder.Services.AddScoped<IKnowledgeRetrievalService, VectorsRetrievalService>();
+builder.Services.AddScoped<IKnowledgeRetrievalService, FullTextRetrievalService>();
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(builder =>
@@ -188,6 +197,8 @@ app.UseStaticFiles(new StaticFileOptions()
     FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.ContentRootPath)),
     RequestPath = "/statics"
 });
+
+app.UseMiddleware<DisableCompressionMiddleware>();
 
 app.UseAuthentication();
 

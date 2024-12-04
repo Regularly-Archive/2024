@@ -5,6 +5,6 @@ namespace PostgreSQL.Embedding.Common
     public enum ModelType
     {
         [Description("文本生成")] TextGeneration = 0,
-        [Description("文本嵌入")] TextEmbedding = 1
+        [Description("向量生成")] TextEmbedding = 1
     }
 }

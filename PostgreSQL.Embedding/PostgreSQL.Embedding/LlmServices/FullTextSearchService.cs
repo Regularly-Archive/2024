@@ -47,7 +47,7 @@ namespace PostgreSQL.Embedding.LlmServices
             result.Question = question;
 
             // 构建 Kernel
-            var textModel = await _llmModelRepository.SingleOrDefaultAsync(x => x.ModelType == (int)ModelType.TextGeneration && x.ModelName == "gpt-3.5-turbo");
+            var textModel = await _llmModelRepository.FindAsync(x => x.ModelType == (int)ModelType.TextGeneration && x.IsDefaultModel == true);
             var kernel = await _kernelService.GetKernel(textModel);
 
             // 全文检索
@@ -84,7 +84,7 @@ namespace PostgreSQL.Embedding.LlmServices
 
             // 组装 Kernel Memory 表名
             var knowledgeBase = await _knowledgeBaseRepository.GetAsync(knowledgeBaseId);
-            var tablePrefixMapping = await _tablePrefixMappingRepository.SingleOrDefaultAsync(x => x.FullName == knowledgeBase.EmbeddingModel);
+            var tablePrefixMapping = await _tablePrefixMappingRepository.FindAsync(x => x.FullName == knowledgeBase.EmbeddingModel);
             var tableName = $"sk-{tablePrefixMapping.ShortName.ToLower()}-default";
 
             if (!minRelevance.HasValue) minRelevance = 0.5;

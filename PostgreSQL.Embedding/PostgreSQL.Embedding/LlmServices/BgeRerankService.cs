@@ -9,6 +9,7 @@ namespace PostgreSQL.Embedding.LlmServices
 {
     public class BgeRerankService : IRerankService
     {
+        // BAAI/bge-reranker-v2-m3
         private readonly string _modelName = "AI-ModelScope/bge-reranker-v2-gemma";
         private readonly dynamic _flagReranker;
 
@@ -16,16 +17,19 @@ namespace PostgreSQL.Embedding.LlmServices
         public BgeRerankService(IOptions<PythonConfig> options, ILogger<BgeRerankService> logger)
         {
             _logger = logger;
+            
             InitPython(options.Value);
             _flagReranker = InitModel(_modelName);
         }
 
         private void InitPython(PythonConfig config)
         {
-            if (config != null && !string.IsNullOrEmpty(config.LibraryPath))
-                Runtime.PythonDLL = config.LibraryPath;
+            if (PythonEngine.IsInitialized) return;
 
-            _logger.LogInformation($"Python Runtime is initializing: {config.LibraryPath}...");
+            if (config != null && !string.IsNullOrEmpty(config.PythonLibrary))
+                Runtime.PythonDLL = config.PythonLibrary;
+
+            _logger.LogInformation($"Python Runtime is initializing: {config.PythonLibrary}...");
             PythonEngine.Initialize();
             PythonEngine.BeginAllowThreads();
             _logger.LogInformation($"Python Runtime has been initialized.");

@@ -5,6 +5,7 @@ using Microsoft.SemanticKernel.Services;
 using Microsoft.SemanticKernel.TextGeneration;
 using PostgreSQL.Embedding.Common.Json;
 using PostgreSQL.Embedding.LLmServices.Extensions;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -18,15 +19,26 @@ namespace PostgreSQL.Embedding.Planners
         private readonly string _systemMessage;
         private readonly StepwisePlannerConfig _config;
         private readonly ILogger<StepwisePlan> _logger;
+        public string PlanId { get; private set; }
 
         private const string ObservationTag = "[OBSERVATION]";
         private const string ActionTag = "[ACTION]";
         private const string ThoughtTag = "[THOUGHT]";
+        private const string QuestionTag = "[QUESTION]";
         private const string FinalAnswerTag = "[FINAL_ANSWER]";
         private const string TrimMessageFormat = "... I've removed the first {0} steps of my previous work to make room for the new stuff ...";
         private const string MainKey = "INPUT";
 
+        private const string QuestionEmoji = "🌟";
+        private const string ThoughtEmoji = "💭";
+        private const string ActionEmoji = "⚙️";
+        private const string FinalAnswerEmoji = "📜";
+
         private readonly Dictionary<string, string> _variables = new Dictionary<string, string>();
+
+        public Action<string> OnStepExecute { get; set; }
+
+        private Stopwatch _stopwatch;
 
         public StepwisePlan(string systemMessage, string userMessage, StepwisePlannerConfig config, ILogger<StepwisePlan> logger)
         {
@@ -34,6 +46,7 @@ namespace PostgreSQL.Embedding.Planners
             _userMessage = userMessage;
             _systemMessage = systemMessage;
             _logger = logger;
+            PlanId = Guid.NewGuid().ToString("N");
         }
 
         public async Task<string> ExecuteAsync(Kernel kernel, CancellationToken cancellationToken = default)
@@ -51,7 +64,12 @@ namespace PostgreSQL.Embedding.Planners
 
             for (var i = 0; i < _config.MaxIterations; i++)
             {
-                if (cancellationToken.IsCancellationRequested) break;
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    var output = $"The task '{PlanId}' is cancelled by user.";
+                    _logger.LogInformation(output);
+                    return output;
+                }
 
                 if (i > 0) await Task.Delay(_config.MinIterationTimeMs, cancellationToken).ConfigureAwait(false);
 
@@ -91,7 +109,22 @@ namespace PostgreSQL.Embedding.Planners
         private bool TryGetThought(SystemStep step, ChatHistory chatHistory)
         {
             if (!string.IsNullOrEmpty(step.Thought))
+            {
                 chatHistory.AddAssistantMessage($"{ThoughtTag} {step.Thought}");
+                if (step.Thought.IndexOf(QuestionTag) != -1)
+                {
+                    var question = step.Thought.Split("\n\n")[0].Replace(QuestionTag, "").Replace("-", "").Trim();
+                    var thought = step.Thought.Split("\n\n")[1].Replace("-", "").Trim();
+
+                    OnStepExecute?.Invoke($"{QuestionEmoji} {question}");
+                    OnStepExecute?.Invoke($"{ThoughtEmoji} {thought}");
+                }
+                else
+                {
+                    var trimedThought = step.Thought.Replace("-", "").Trim();
+                    OnStepExecute?.Invoke($"{ThoughtEmoji} {trimedThought}");
+                }
+            }
 
             return false;
         }
@@ -114,14 +147,19 @@ namespace PostgreSQL.Embedding.Planners
                 var kernelArguments = new KernelArguments(actionVariables);
                 kernelArguments = kernelArguments.MergeArguments(_config.Variables);
 
-                var kernelResult = await kernel.InvokeAsync(kernelFunction, kernelArguments);
+                _stopwatch = Stopwatch.StartNew();
+                var kernelResult = await kernel.InvokeAsync(kernelFunction, kernelArguments, cancellationToken);
                 var result = kernelResult.GetValue<string>();
 
+                _stopwatch.Stop();
                 this._logger?.LogTrace($"Invoked {actionName}. Result: {result}");
+                OnStepExecute?.Invoke($"{ActionEmoji} 调用工具 {actionName}(), 耗时 {_stopwatch.Elapsed.TotalSeconds} 秒");
                 return result;
             }
             catch (Exception e)
             {
+                _stopwatch.Stop();
+                OnStepExecute?.Invoke($"{ActionEmoji} 调用工具 {actionName}(), 耗时 {_stopwatch.Elapsed.TotalSeconds} 秒");
                 this._logger?.LogError(e, "Something went wrong in system step: {Plugin}.{Function}. Error: {Error}", targetFunction.PluginName, targetFunction.Name, e.Message);
                 throw;
             }
@@ -194,6 +232,20 @@ namespace PostgreSQL.Embedding.Planners
             else
             {
                 _logger?.LogInformation("Thought: {Thought}", step.Thought);
+                if (step.Thought.IndexOf(QuestionTag) != -1)
+                {
+                    var question = step.Thought.Split("\n\n")[0].Replace(QuestionTag, "").Replace("-", "").Trim();
+                    var thought = step.Thought.Split("\n\n")[1].Replace("-", "").Trim();
+
+                    OnStepExecute?.Invoke($"{QuestionEmoji} {question}");
+                    OnStepExecute?.Invoke($"{ThoughtEmoji} {thought}");
+                }
+                else
+                {
+                    var trimedThought = step.Thought.Replace("-", "").Trim();
+                    OnStepExecute?.Invoke($"{ThoughtEmoji} {trimedThought}");
+                }
+
                 stepsTaken.Add(step);
                 lastStep = step;
             }
@@ -268,6 +320,7 @@ namespace PostgreSQL.Embedding.Planners
 
                 AddExecutionStatsToContext(stepsTaken, iterations);
 
+                OnStepExecute?.Invoke($"{FinalAnswerEmoji} {step.FinalAnswer}");
                 return step.FinalAnswer;
             }
 

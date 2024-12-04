@@ -8,6 +8,7 @@ using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
+using PostgreSQL.Embedding.LlmServices.Routers;
 using PostgreSQL.Embedding.Utils;
 
 namespace PostgreSQL.Embedding.LlmServices
@@ -24,7 +25,7 @@ namespace PostgreSQL.Embedding.LlmServices
 
         public async Task<Kernel> GetKernel(LlmApp app)
         {
-            var llmModel = await _llmModelRepository.SingleOrDefaultAsync(
+            var llmModel = await _llmModelRepository.FindAsync(
                 x => x.ModelType == (int)ModelType.TextGeneration && x.ModelName == app.TextModel
             );
 
@@ -35,7 +36,7 @@ namespace PostgreSQL.Embedding.LlmServices
         {
             var options = _serviceProvider.GetRequiredService<IOptions<LlmConfig>>();
 
-            var httpClient = new HttpClient(new OpenAIChatHandler(llmModel, options));
+            var httpClient = new HttpClient(new LlmCompletionRouter(llmModel, options));
             httpClient.Timeout = Timeout.InfiniteTimeSpan;
 
             var kernelBuilder = Kernel.CreateBuilder();

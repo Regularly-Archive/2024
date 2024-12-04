@@ -2,13 +2,14 @@
 using DocumentFormat.OpenXml.Spreadsheet;
 using Microsoft.AspNetCore.Mvc;
 using PostgreSQL.Embedding.Common.Models.WebApi;
+using PostgreSQL.Embedding.Common.Models.WebApi.QuerableFilters;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.Services;
 
 namespace PostgreSQL.Embedding.Controllers
 {
-    public class MessageController : CrudBaseController<SystemMessage>
+    public class MessageController : CrudBaseController<SystemMessage, SystemMessageQueryableFilter>
     {
         private readonly IUserInfoService _userInfoService;
         private readonly IRepository<SystemMessage> _messageRepository;
@@ -18,20 +19,11 @@ namespace PostgreSQL.Embedding.Controllers
             _messageRepository = crudBaseService.Repository;
         }
 
-        public override async Task<JsonResult> FindList()
-        {
-            // Todo
-            var userId = (await _userInfoService.GetCurrentUserAsync()).UserName;
-            var list = await _messageRepository.FindAsync(x => x.CreatedBy == userId && !x.IsRead);
-            return ApiResult.Success(list);
-        }
-
         [HttpPut("read")]
         public async Task<JsonResult> ReadAll()
         {
-            // Todo
             var userId = (await _userInfoService.GetCurrentUserAsync()).UserName;
-            var messages = await _messageRepository.FindAsync(x => x.CreatedBy == userId && !x.IsRead);
+            var messages = await _messageRepository.FindListAsync(x => x.CreatedBy == userId && !x.IsRead);
 
             foreach (var message in messages)
             {

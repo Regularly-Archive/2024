@@ -31,23 +31,23 @@ namespace PostgreSQL.Embedding.LlmServices
             _logger = logger;
         }
 
-        public async Task InvokeAsync(OpenAIModel model, long appId, HttpContext HttpContext, CancellationToken cancellationToken = default)
+        public async Task InvokeAsync(ConversationRequestModel model, long appId, HttpContext HttpContext, CancellationToken cancellationToken = default)
         {
             try
             {
                 var app = await _llmAppRepository.GetAsync(appId);
                 var kernel = await _kernelService.GetKernel(app);
 
-                var input = model.messages[model.messages.Count - 1].content;
+                var input = model.Messages[model.Messages.Count - 1].content;
                 switch (app.AppType)
                 {
                     case (int)LlmAppType.Chat:
-                        var genericConversationService = new GenericConversationService(kernel, app, _serviceProvider, _chatHistoryService);
-                        await genericConversationService.InvokeAsync(model, HttpContext, input, cancellationToken);
+                        var genericConversationService = new GenericConversationService(kernel, app, _serviceProvider, _chatHistoryService,HttpContext);
+                        await genericConversationService.InvokeAsync(model, input, cancellationToken);
                         break;
                     case (int)LlmAppType.Knowledge:
-                        var ragConversationService = new RAGConversationService(kernel, app, _serviceProvider, _memoryService, _chatHistoryService);
-                        await ragConversationService.InvokeAsync(model, HttpContext, input, cancellationToken);
+                        var ragConversationService = new RAGConversationService(kernel, app, _serviceProvider, _memoryService, _chatHistoryService, HttpContext);
+                        await ragConversationService.InvokeAsync(model, input, cancellationToken);
                         break;
                 }
             }

@@ -1,27 +1,31 @@
 ﻿using DocumentFormat.OpenXml.Vml.Office;
 using PostgreSQL.Embedding.Common;
+using PostgreSQL.Embedding.Common.Models.WebApi;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.Services;
 using SqlSugar;
+using System.Linq;
 using System.Linq.Expressions;
 
 namespace PostgreSQL.Embedding.DataAccess
 {
-    public interface IRepository<TEntity> where TEntity : BaseEntity, new()
+    public interface IRepository<T> where T : BaseEntity, new()
     {
         ISqlSugarClient SqlSugarClient { get; }
-        Task<TEntity> AddAsync(TEntity entity);
-        Task AddAsync(params TEntity[] entities);
-        Task UpdateAsync(TEntity entity);
+        Task<T> AddAsync(T entity);
+        Task AddAsync(params T[] entities);
+        Task UpdateAsync(T entity);
         Task DeleteAsync(long id);
-        Task DeleteAsync(Expression<Func<TEntity, bool>> predicate);
-        Task<List<TEntity>> GetAllAsync();
-        Task<TEntity> GetAsync(long id);
-        Task<List<TEntity>> FindAsync(Expression<Func<TEntity, bool>> predicate);
-        Task<TEntity> SingleOrDefaultAsync(Expression<Func<TEntity, bool>> predicate);
-        Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate = null);
-        Task<bool> ExistsAsync(Expression<Func<TEntity, bool>> predicate);
-        Task<List<TEntity>> PaginateAsync(Expression<Func<TEntity, bool>> predicate, int pageIndex, int pageSize);
+        Task DeleteAsync(Expression<Func<T, bool>> predicate);
+        Task<List<T>> GetAllAsync();
+        Task<T> GetAsync(long id);
+        Task<List<T>> FindListAsync(Expression<Func<T, bool>> predicate);
+        Task<T> FindAsync(Expression<Func<T, bool>> predicate);
+        Task<int> CountAsync(Expression<Func<T, bool>> predicate = null);
+        Task<bool> ExistsAsync(Expression<Func<T, bool>> predicate);
+        Task<List<T>> PaginateAsync(Expression<Func<T, bool>> predicate, int pageIndex, int pageSize);
+        Task<PagedResult<T>> PaginateAsync<TQueryFilter>(QueryParameter<T, TQueryFilter> queryParameter, ISugarQueryable<T> queryable = null) where TQueryFilter : class, IQueryableFilter<T>;
+        Task<List<T>> FindListAsync<TQueryFilter>(TQueryFilter filter, ISugarQueryable<T> queryable = null) where TQueryFilter : class, IQueryableFilter<T>;
     }
 
     public class Repository<T> : SimpleClient<T>, IRepository<T> where T : BaseEntity, new()
@@ -78,13 +82,13 @@ namespace PostgreSQL.Embedding.DataAccess
             return base.GetByIdAsync(id);
         }
 
-        public Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate)
+        public Task<List<T>> FindListAsync(Expression<Func<T, bool>> predicate)
         {
             if (predicate == null) predicate = x => true;
             return base.GetListAsync(predicate);
         }
 
-        public Task<T> SingleOrDefaultAsync(Expression<Func<T, bool>> predicate)
+        public Task<T> FindAsync(Expression<Func<T, bool>> predicate)
         {
             if (predicate == null) throw new ArgumentNullException(nameof(predicate));
             return base.GetFirstAsync(predicate);
@@ -109,6 +113,32 @@ namespace PostgreSQL.Embedding.DataAccess
             return base.GetPageListAsync(predicate, pageModel);
         }
 
+        public async Task<PagedResult<T>> PaginateAsync<TQueryFilter>(QueryParameter<T, TQueryFilter> queryParameter, ISugarQueryable<T> queryable = null) where TQueryFilter : class, IQueryableFilter<T>
+        {
+            queryable = queryable ?? base.AsQueryable();
+
+            if (queryParameter.Filter != null)
+                queryable = queryParameter.Filter.Apply(queryable);
+
+            var total = await queryable.CountAsync();
+
+            queryable = queryable.Skip((queryParameter.PageIndex - 1) * queryParameter.PageSize).Take(queryParameter.PageSize);
+
+            if (!string.IsNullOrEmpty(queryParameter.SortBy))
+                queryable = queryable.OrderByPropertyName(queryParameter.SortBy, queryParameter.IsDescending ? OrderByType.Desc : OrderByType.Asc);
+
+            var list = await queryable.ToListAsync();
+            return new PagedResult<T> { TotalCount = total, Rows = list };
+        }
+
+        public Task<List<T>> FindListAsync<TQueryFilter>(TQueryFilter filter, ISugarQueryable<T> queryable = null) where TQueryFilter : class, IQueryableFilter<T>
+        {
+            queryable = queryable ?? base.AsQueryable();
+            if (filter != null) queryable = filter.Apply(queryable);
+
+            return queryable.ToListAsync();
+        }
+
         private void EnrichBaseProperties(T entity, bool isCreate)
         {
             if (isCreate)
@@ -124,5 +154,7 @@ namespace PostgreSQL.Embedding.DataAccess
                 entity.UpdatedBy = _httpContextAccessor.HttpContext?.User?.Identity?.Name ?? Constants.Admin;
             }
         }
+
+
     }
 }

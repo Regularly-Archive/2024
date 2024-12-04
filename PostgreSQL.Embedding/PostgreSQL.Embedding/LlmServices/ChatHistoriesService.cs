@@ -72,7 +72,7 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <returns></returns>
         public async Task<List<AppConversation>> GetAppConversationsAsync(long appId)
         {
-            var list = await _appConversationRepository.FindAsync(x => x.AppId == appId);
+            var list = await _appConversationRepository.FindListAsync(x => x.AppId == appId);
             return list.OrderByDescending(x => x.CreatedAt).ToList();
         }
 
@@ -84,7 +84,7 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <returns></returns>
         public async Task<List<ChatMessage>> GetConversationMessagesAsync(long appId, string conversationId)
         {
-            var messages = await _chatMessageRepository.FindAsync(x => x.AppId == appId && x.ConversationId == conversationId);
+            var messages = await _chatMessageRepository.FindListAsync(x => x.AppId == appId && x.ConversationId == conversationId);
             messages = messages.OrderBy(x => x.CreatedAt).ToList();
             return messages;
         }
@@ -98,7 +98,7 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <returns></returns>
         public async Task AddConversationAsync(long appId, string conversationId, string conversationName)
         {
-            var conversation = await _appConversationRepository.SingleOrDefaultAsync(x => x.AppId == appId && x.ConversationId == conversationId);
+            var conversation = await _appConversationRepository.FindAsync(x => x.AppId == appId && x.ConversationId == conversationId);
             if (conversation != null) return;
 
             await _appConversationRepository.AddAsync(new AppConversation()
@@ -130,7 +130,7 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <returns></returns>
         public async Task UpdateConversationAsync(long appId, string conversationId, string summary)
         {
-            var conversation = await _appConversationRepository.SingleOrDefaultAsync(x => x.AppId == appId && x.ConversationId == conversationId);
+            var conversation = await _appConversationRepository.FindAsync(x => x.AppId == appId && x.ConversationId == conversationId);
             if (conversation == null) return;
 
             conversation.Summary = summary;
