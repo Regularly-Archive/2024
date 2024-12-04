@@ -11,6 +11,7 @@
 6. You DO NOT need to explain to me the specific meaning of the SQL statement.
 7. You DO NOT need to return any content other than the SQL statement.
 8. You are only allowed to return one SQL statement at a time.
+9. If you need to generate complex queries, please first break them down into several sub-queries, and then combine them together.
 
 You have access to the following tables: 
 {{$schema}}

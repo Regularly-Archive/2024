@@ -2,6 +2,6 @@
 {
     public class PythonConfig
     {
-        public string LibraryPath { get; set; }
+        public string PythonLibrary { get; set; }
     }
 }

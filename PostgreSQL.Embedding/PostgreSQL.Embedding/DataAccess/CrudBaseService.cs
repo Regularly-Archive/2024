@@ -1,6 +1,7 @@
 ﻿using PostgreSQL.Embedding.Common.Models.WebApi;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using SqlSugar;
+using System.Linq.Expressions;
 
 namespace PostgreSQL.Embedding.DataAccess
 {
@@ -15,23 +16,33 @@ namespace PostgreSQL.Embedding.DataAccess
             _repository = repository;
         }
 
-        public Task<T> Create(T entity) => _repository.AddAsync(entity);
+        public Task<T> CreateAsync(T entity) => _repository.AddAsync(entity);
 
-        public Task Update(T entity) => _repository.UpdateAsync(entity);
+        public Task UpdateAsync(T entity) => _repository.UpdateAsync(entity);
 
-        public Task Delete(string ids)
+        public Task DeleteAsync(string ids)
         {
             var keys = ids.Split(',').Select(x => long.Parse(x)).ToList();
             return _repository.DeleteAsync(x => keys.Contains(x.Id));
         }
 
-        public Task<T> GetById(long id) => _repository.GetAsync(id);
+        public Task<T> GetByIdAsync(long id) => _repository.GetAsync(id);
 
-        public async Task<PageResult<T>> GetPageList(int pageSize, int pageIndex)
+        public async Task<PagedResult<T>> GetPagedListAsync(int pageSize, int pageIndex)
         {
             var total = await _repository.CountAsync();
             var list = (await _repository.PaginateAsync(null, pageIndex, pageSize)).OrderByDescending(x => x.CreatedAt).ToList();
-            return new PageResult<T> { TotalCount = total, Rows = list };
+            return new PagedResult<T> { TotalCount = total, Rows = list };
+        }
+
+        public Task<PagedResult<T>> GetPagedListAsync<TQueryableFilter>(QueryParameter<T, TQueryableFilter> queryParameter, ISugarQueryable<T> queryable = null) where TQueryableFilter : class, IQueryableFilter<T>
+        {
+            return _repository.PaginateAsync(queryParameter, queryable);
+        }
+
+        public Task<List<T>> GetListAsync<TQueryableFilter>(TQueryableFilter filter, ISugarQueryable<T> queryable = null) where TQueryableFilter : class, IQueryableFilter<T>
+        {
+            return _repository.FindListAsync(filter, queryable);
         }
     }
 }

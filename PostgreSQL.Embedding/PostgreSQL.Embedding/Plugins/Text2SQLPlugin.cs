@@ -1,5 +1,6 @@
 ﻿using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
+using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.Common.Models.Plugin;
 using PostgreSQL.Embedding.LlmServices;
 using PostgreSQL.Embedding.Plugins.Abstration;
@@ -117,28 +118,62 @@ namespace PostgreSQL.Embedding.Plugins
         private async Task<string> ExecuteSQLAsync(string sql)
         {
             using var sqlClient = new SqlSugarClient(_connectionConfig);
-            var rows = await sqlClient.Ado.SqlQueryAsync<dynamic>(sql);
 
+            var rows = await sqlClient.Ado.SqlQueryAsync<dynamic>(sql);
             var columnNames = ((IDictionary<string, object>)rows[0]).Keys.ToList();
 
+            await SendArtifacts(rows);
+
+            var maxWidths = new Dictionary<string, int>();
+
             var stringBuilder = new StringBuilder();
-            stringBuilder.AppendLine(RenderMarkdownTableHeader(columnNames));
-            stringBuilder.AppendLine(RenderMarkdownTableBody(rows, columnNames));
+            stringBuilder.AppendLine(RenderMarkdownTableHeader(rows, columnNames, ref maxWidths));
+            stringBuilder.AppendLine(RenderMarkdownTableBody(rows, columnNames,maxWidths));
             return stringBuilder.ToString();
         }
 
-        private string RenderMarkdownTableHeader(List<string> columnNames)
+        private string RenderMarkdownTableHeader(List<dynamic> rows, List<string> columnNames, ref Dictionary<string, int> maxWidths)
         {
             var stringBuilder = new StringBuilder();
+
+            // 初始化每列的最大宽度
+            foreach (var columnName in columnNames)
+            {
+                maxWidths[columnName] = columnName.Length; // 初始化为列名长度
+            }
+
+            // 遍历数据行，更新每列的最大宽度
+            foreach (var row in rows)
+            {
+                foreach (var columnName in columnNames)
+                {
+                    var value = ((IDictionary<string, object>)row)[columnName]?.ToString() ?? "NULL";
+                    int currentLength = value.Length;
+
+                    // 更新最大宽度
+                    if (currentLength > maxWidths[columnName])
+                    {
+                        maxWidths[columnName] = currentLength;
+                    }
+                }
+            }
+
+            // 构建表头
             stringBuilder.AppendLine(" | " + string.Join(" | ", columnNames) + " | ");
 
-            var maxLength = columnNames.Max(x => x.Length);
-            var headerDividers = columnNames.Select(x => new string('-', maxLength * 2));
+            // 使用局部变量来构建分隔线
+            var headerDividers = new List<string>();
+            foreach (var columnName in columnNames)
+            {
+                headerDividers.Add(new string('-', maxWidths[columnName] + 2)); // 加上两边的空格
+            }
+
             stringBuilder.AppendLine(" | " + string.Join(" | ", headerDividers) + " | ");
+
             return stringBuilder.ToString();
         }
 
-        private string RenderMarkdownTableBody(List<dynamic> rows, List<string> columnNames)
+        private string RenderMarkdownTableBody(List<dynamic> rows, List<string> columnNames, Dictionary<string, int> maxWidths)
         {
             var stringBuilder = new StringBuilder();
 
@@ -148,7 +183,8 @@ namespace PostgreSQL.Embedding.Plugins
                 foreach (var columnName in columnNames)
                 {
                     var value = ((IDictionary<string, object>)row)[columnName]?.ToString() ?? "NULL";
-                    rowValues.Add(value);
+                    // 根据最大宽度格式化每个值
+                    rowValues.Add(value.PadRight(maxWidths[columnName]));
                 }
                 stringBuilder.AppendLine(" | " + string.Join(" | ", rowValues) + " | ");
             }
@@ -169,6 +205,13 @@ namespace PostgreSQL.Embedding.Plugins
             public string DataType { get; set; }
             public bool IsNullable { get; set; }
             public string Description { get; set; }
+        }
+
+        private async Task SendArtifacts(List<dynamic> rows)
+        {
+            var artifact = new LlmArtifactResponseModel("动态表格", ArtifactType.Table);
+            artifact.SetData(rows);
+            await EmitArtifactsAsync(artifact);
         }
     }
 }

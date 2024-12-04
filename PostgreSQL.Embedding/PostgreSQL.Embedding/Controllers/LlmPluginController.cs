@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using PostgreSQL.Embedding.Common.Models.WebApi;
+using PostgreSQL.Embedding.Common.Models.WebApi.QuerableFilters;
+using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 
 namespace PostgreSQL.Embedding.Controllers
@@ -15,16 +17,16 @@ namespace PostgreSQL.Embedding.Controllers
         }
 
         [HttpGet("paginate")]
-        public async Task<JsonResult> GetByPage(int pageSize, int pageIndex)
+        public async Task<JsonResult> GetByPage([FromQuery]QueryParameter<LlmPlugin, PluginQueryableFilter> queryParameter)
         {
-            var result = await _llmPluginService.GetPagedPluginListAsync(pageSize, pageIndex);
+            var result = await _llmPluginService.GetPagedPluginListAsync(queryParameter);
             return ApiResult.Success(result, "操作成功");
         }
 
         [HttpGet("list")]
-        public async Task<JsonResult> FindList()
+        public async Task<JsonResult> FindList(PluginQueryableFilter filter)
         {
-            var results = await _llmPluginService.GetPluginListAsync();
+            var results = await _llmPluginService.GetPluginListAsync(filter);
             return ApiResult.Success(results, "操作成功");
         }
 

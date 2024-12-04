@@ -1,18 +1,14 @@
-﻿using Microsoft.AspNetCore.Mvc.ModelBinding;
+﻿using Jint;
 using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Confirguration;
-using PostgreSQL.Embedding.LlmServices;
+using PostgreSQL.Embedding.Common.Models;
+using PostgreSQL.Embedding.Plugins.Abstration;
 using Python.Runtime;
 using System.ComponentModel;
-using System.IO;
-using Newtonsoft.Json;
-using Jint;
-using PostgreSQL.Embedding.Plugins.Abstration;
-using NRedisStack.Search;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
 
 namespace PostgreSQL.Embedding.Plugins
 {
@@ -20,77 +16,72 @@ namespace PostgreSQL.Embedding.Plugins
     public class CodeInterpreterPlugin : BasePlugin
     {
         private ILogger<CodeInterpreterPlugin> _logger;
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly CodeInterpreterConfig _codeInterpreterConfig;
+
         private const string NO_RETURN_VALUE = "There is no return value for the current action, please proceed.";
 
-        public CodeInterpreterPlugin(IServiceProvider serviceProvider)
+        public CodeInterpreterPlugin(IServiceProvider serviceProvider, IOptions<CodeInterpreterConfig> options, IHttpClientFactory httpClientFactory)
             : base(serviceProvider)
         {
-            using var serviceScope = serviceProvider.CreateScope();
-
-            var loggerFactory = serviceScope.ServiceProvider.GetRequiredService<ILoggerFactory>();
+            var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
             _logger = loggerFactory.CreateLogger<CodeInterpreterPlugin>();
 
-            var options = serviceScope.ServiceProvider.GetRequiredService<IOptions<PythonConfig>>();
-            InitPython(options.Value);
-        }
-
-        private void InitPython(PythonConfig config)
-        {
-            if (PythonEngine.IsInitialized) return;
-
-            if (config != null && !string.IsNullOrEmpty(config.PythonLibrary))
-                Runtime.PythonDLL = config.PythonLibrary;
-
-            _logger.LogInformation($"Python Runtime is initializing: {config.PythonLibrary}...");
-
-            PythonEngine.Initialize();
-            PythonEngine.BeginAllowThreads();
-
-            _logger.LogInformation($"Python Runtime has been initialized.");
+            _codeInterpreterConfig = options.Value;
+            _httpClientFactory = httpClientFactory;
         }
 
         [KernelFunction]
         [Description("运行 Python 代码并输出结果")]
-        public Task<string> RunPython([Description("脚本内容")] string script)
+        public async Task<string> RunPython([Description("脚本内容")] string code)
         {
-            using var gil = Py.GIL();
-            using dynamic scope = Py.CreateScope();
-
-            scope.io = Py.Import("io");
-            scope.sys = Py.Import("sys");
-
-            dynamic stringIO = scope.io.StringIO();
-            scope.sys.stdout = stringIO;
-
-            dynamic execution = scope.Exec(script);
-
-            if (execution.Contains("result"))
-            {
-                // 有返回值，则直接取 result 即可
-                var result = execution.result.ToString();
-                return Task.FromResult(result);
-            }
-            else
-            {
-                // 无返回值，需要拦截控制台输出
-                var output = scope.sys.stdout.getvalue();
-                scope.sys.stdout = scope.sys.__stdout__;
-
-                output = output.ToString();
-                output = string.IsNullOrEmpty(output) ? NO_RETURN_VALUE : output;
-                return Task.FromResult(output);
-            }
+            var response = await RunCodeAsync("python3", code);
+            var output = JObject.Parse(response)["output"]?.Value<string>();
+            await SendArtifacts(code, output, "python");
+            return output;
         }
 
-        [KernelFunction]
+        [KernelFunction()]
         [Description("运行 JavaScript 代码并输出结果")]
-        public Task<string> RunJavaScript([Description("脚本内容")] string script)
+        public async Task<string> RunJavaScript([Description("脚本内容")] string code)
         {
-            var engine = new Engine();
-            engine.SetValue("console.log", new Action<object>(Console.WriteLine));
+            var response = await RunCodeAsync("javascript", code);
+            var output = JObject.Parse(response)["output"]?.Value<string>();
+            await SendArtifacts(code, output, "javascript");
+            return output;
+        }
 
-            var output = Console.ReadLine();
-            return Task.FromResult(output);
+        [KernelFunction()]
+        [Description("运行 C# 代码并输出结果")]
+        public async Task<string> RunCSharp([Description("脚本内容")] string code)
+        {
+            var response = await RunCodeAsync("csharp", code);
+            var output = JObject.Parse(response)["output"]?.Value<string>();
+            await SendArtifacts(code, output, "csharp");
+            return output;
+        }
+
+        private async Task<string> RunCodeAsync(string language, string code)
+        {
+            using var httpClient = _httpClientFactory.CreateClient();
+            httpClient.BaseAddress = new Uri(_codeInterpreterConfig.BaseUrl);
+
+            var payload = new { language = language, code = code, notebook = false };
+            var content = JsonContent.Create<dynamic>(payload);
+
+            var response = await httpClient.PostAsync("/api/run", content);
+            response.EnsureSuccessStatusCode();
+
+            var body = await response.Content.ReadAsStringAsync();
+            return body;
+        }
+
+        private async Task SendArtifacts(string code, string output, string language)
+        {
+            var payload = new { code = code, output = output, language = language };
+            var artifacts = new LlmArtifactResponseModel("代码解释器", ArtifactType.Code);
+            artifacts.SetData(payload);
+            await EmitArtifactsAsync(artifacts);
         }
     }
 }
