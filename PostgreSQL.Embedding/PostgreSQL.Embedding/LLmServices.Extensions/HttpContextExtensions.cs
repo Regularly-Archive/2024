@@ -5,6 +5,7 @@ using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.LlmServices.LLama;
 using System.Text;
 using System.Web;
+using static LLama.Common.ChatHistory;
 
 namespace PostgreSQL.Embedding.LLmServices.Extensions
 {
@@ -84,13 +85,16 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
             {
                 if (cancellationToken.IsCancellationRequested) { return; }
 
+                await Task.Delay(50);
+
+                result.created = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 result.choices[0].delta.content = text == null ? string.Empty : Convert.ToString(text);
                 string message = $"data: {JsonConvert.SerializeObject(result)}\n\n";
-                await context.Response.WriteAsync(message, Encoding.UTF8);
-                await context.Response.Body.FlushAsync();
+                await context.Response.WriteAsync(message, Encoding.UTF8, cancellationToken);
+                await context.Response.Body.FlushAsync(cancellationToken);
             }
-            await context.Response.WriteAsync("data: [DONE]");
-            await context.Response.Body.FlushAsync();
+            await context.Response.WriteAsync("data: [DONE]", cancellationToken);
+            await context.Response.Body.FlushAsync(cancellationToken);
             await context.Response.CompleteAsync();
         }
 
@@ -106,14 +110,16 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
             {
                 if (cancellationToken.IsCancellationRequested) { return; }
 
-                result.created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                await Task.Delay(50);
+
+                result.created = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 result.choices[0].delta.content = text.Content ?? string.Empty;
                 string message = $"data: {JsonConvert.SerializeObject(result)}\n\n";
-                await context.Response.WriteAsync(message, Encoding.UTF8);
-                await context.Response.Body.FlushAsync();
+                await context.Response.WriteAsync(message, Encoding.UTF8, cancellationToken);
+                await context.Response.Body.FlushAsync(cancellationToken);
             }
-            await context.Response.WriteAsync("data: [DONE]");
-            await context.Response.Body.FlushAsync();
+            await context.Response.WriteAsync("data: [DONE]", cancellationToken);
+            await context.Response.Body.FlushAsync(cancellationToken);
             await context.Response.CompleteAsync();
         }
 
@@ -132,6 +138,7 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
                 if (cancellationToken.IsCancellationRequested) { return; }
 
                 result.choices[0].delta.content = text == null ? string.Empty : Convert.ToString(text);
+                result.created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                 string message = $"data: {JsonConvert.SerializeObject(result)}\n\n";
                 await context.Response.WriteAsync(message, Encoding.UTF8);
                 await context.Response.Body.FlushAsync();

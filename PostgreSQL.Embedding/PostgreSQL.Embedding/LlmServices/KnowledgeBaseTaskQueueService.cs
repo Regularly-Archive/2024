@@ -32,7 +32,7 @@ namespace PostgreSQL.Embedding.LlmServices
         public async Task FetchAsync(int batchLimit = 5)
         {
             var records =
-                (await _importRecordRepository.FindAsync(x => x.QueueStatus == (int)QueueStatus.Uploaded))
+                (await _importRecordRepository.FindListAsync(x => x.QueueStatus == (int)QueueStatus.Uploaded))
                 .OrderBy(x => x.CreatedAt)
                 .Take(batchLimit)
                 .ToList();
@@ -72,7 +72,7 @@ namespace PostgreSQL.Embedding.LlmServices
 
         private async Task RollbackAsync()
         {
-            var records = await _importRecordRepository.FindAsync(x => x.QueueStatus == (int)QueueStatus.Processing);
+            var records = await _importRecordRepository.FindListAsync(x => x.QueueStatus == (int)QueueStatus.Processing);
             foreach (var record in records)
             {
                 record.QueueStatus = (int)QueueStatus.Uploaded;

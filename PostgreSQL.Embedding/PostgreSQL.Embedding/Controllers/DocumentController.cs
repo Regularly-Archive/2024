@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Models.WebApi;
+using PostgreSQL.Embedding.Common.Models.WebApi.QuerableFilters;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
@@ -9,7 +10,7 @@ using SqlSugar;
 
 namespace PostgreSQL.Embedding.Controllers
 {
-    public class DocumentController : CrudBaseController<DocumentImportRecord>
+    public class DocumentController : CrudBaseController<DocumentImportRecord, DocumentQueryableFilter>
     {
         private IKnowledgeBaseService _knowledgeBaseService;
         public DocumentController(
@@ -20,20 +21,20 @@ namespace PostgreSQL.Embedding.Controllers
             _knowledgeBaseService = knowledgeBaseService;
         }
 
-        public override async Task<JsonResult> SelectById(long id)
+        public override async Task<JsonResult> SelectByIdAsync(long id)
         {
             var db = _crudBaseService.SqlSugarClient;
 
-            var importRecord = await _crudBaseService.GetById(id);
+            var importRecord = await _crudBaseService.GetByIdAsync(id);
             var knowledgeBase = await db.Queryable<KnowledgeBase>().Where(x => x.Id == importRecord.KnowledgeBaseId).FirstAsync();
             importRecord.KnowledgeBaseName = knowledgeBase != null ? knowledgeBase.Name : string.Empty;
             return ApiResult.Success(importRecord);
         }
 
-        public override async Task<JsonResult> GetByPage(int pageSize, int pageIndex)
+        [HttpGet("paginate")]
+        public override async Task<JsonResult> GetByPageAsync(QueryParameter<DocumentImportRecord, DocumentQueryableFilter> queryParameter)
         {
-            var db = _crudBaseService.SqlSugarClient;
-            var list = (await db.Queryable<DocumentImportRecord>()
+            var queryable = _crudBaseService.SqlSugarClient.Queryable<DocumentImportRecord>()
               .LeftJoin<KnowledgeBase>((r, k) => r.KnowledgeBaseId == k.Id)
               .Select((r, k) => new DocumentImportRecord()
               {
@@ -53,21 +54,53 @@ namespace PostgreSQL.Embedding.Controllers
                   DocumentType = r.DocumentType,
                   Content = r.Content,
               })
-              .Skip((pageIndex - 1) * pageSize)
-              .Take(pageSize)
-              .OrderByDescending(r => r.CreatedAt)
-              .ToListAsync())
-              .ToList();
+              .OrderByDescending(r => r.CreatedAt);
 
-            var total = await _crudBaseService.Repository.CountAsync();
-            var result = new PageResult<DocumentImportRecord> { TotalCount = total, Rows = list };
+            if (queryParameter != null && queryParameter.Filter != null)
+                queryable = queryParameter.Filter.Apply(queryable);
+
+            var total = await queryable.CountAsync();
+            var list = queryable.Skip(queryParameter.PageSize * (queryParameter.PageIndex - 1)).Take(queryParameter.PageSize).ToList();
+            var result = new PagedResult<DocumentImportRecord> { TotalCount = total, Rows = list };
             return ApiResult.Success(result);
         }
 
-        public override async Task<JsonResult> Delete(string ids)
+
+        public override async Task<JsonResult> FindListAsync([FromQuery] DocumentQueryableFilter filter = null)
+        {
+            var queryable = _crudBaseService.SqlSugarClient.Queryable<DocumentImportRecord>()
+              .LeftJoin<KnowledgeBase>((r, k) => r.KnowledgeBaseId == k.Id)
+              .Select((r, k) => new DocumentImportRecord()
+              {
+                  Id = r.Id,
+                  TaskId = r.TaskId,
+                  FileName = r.FileName,
+                  QueueStatus = r.QueueStatus,
+                  KnowledgeBaseId = r.KnowledgeBaseId,
+                  KnowledgeBaseName = k.Name,
+                  CreatedAt = r.CreatedAt,
+                  CreatedBy = r.CreatedBy,
+                  UpdatedAt = r.UpdatedAt,
+                  UpdatedBy = r.UpdatedBy,
+                  ProcessStartTime = r.ProcessStartTime,
+                  ProcessEndTime = r.ProcessEndTime,
+                  ProcessDuartionTime = r.ProcessDuartionTime,
+                  DocumentType = r.DocumentType,
+                  Content = r.Content,
+              })
+              .OrderByDescending(r => r.CreatedAt);
+
+            if (filter != null)
+                queryable = filter.Apply(queryable);
+
+            var list = queryable.ToListAsync();
+            return ApiResult.Success(list);
+        }
+
+        public override async Task<JsonResult> DeleteAsync(string ids)
         {
             var keys = ids.Split(',').Select(x => long.Parse(x)).ToList();
-            var importRecords = await _crudBaseService.Repository.FindAsync(x => keys.Contains(x.Id));
+            var importRecords = await _crudBaseService.Repository.FindListAsync(x => keys.Contains(x.Id));
 
             if (importRecords.Any(x => x.QueueStatus == (int)QueueStatus.Processing))
             {

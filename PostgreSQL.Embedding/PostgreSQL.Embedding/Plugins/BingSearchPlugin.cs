@@ -2,10 +2,12 @@
 using Microsoft.SemanticKernel;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Attributes;
+using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.Common.Models.RAG;
 using PostgreSQL.Embedding.Common.Models.Search;
 using PostgreSQL.Embedding.LlmServices;
 using PostgreSQL.Embedding.Plugins.Abstration;
+using PostgreSQL.Embedding.Utils;
 using SqlSugar;
 using System.ComponentModel;
 using System.Text;
@@ -41,13 +43,24 @@ namespace PostgreSQL.Embedding.Plugins
             httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0");
             httpClient.DefaultRequestHeaders.Referrer = new Uri("https://bing.com/");
 
-            var response = await httpClient.GetAsync($"https://bing.com/search?q={keyword}");
-            response.EnsureSuccessStatusCode();
+            try
+            {
+                var response = await httpClient.GetAsync($"https://bing.com/search?q={keyword}");
+                response.EnsureSuccessStatusCode();
 
 
-            var html = await response.Content.ReadAsStringAsync();
-            var searchResult = await ExtractSearchResults(keyword, html);
-            return JsonConvert.SerializeObject(searchResult);
+                var html = await response.Content.ReadAsStringAsync();
+                var searchResult = await ExtractSearchResults(keyword, html);
+                await SendArtifacts(searchResult);
+                return JsonConvert.SerializeObject(searchResult);
+            }
+            catch (HttpRequestException ex)
+            {
+                var html = await new HeadlessBrowser().FetchAsync($"https://bing.com/search?q={keyword}");
+                var searchResult = await ExtractSearchResults(keyword, html);
+                await SendArtifacts(searchResult);
+                return JsonConvert.SerializeObject(searchResult);
+            }
         }
 
         private async Task<SearchResult> ExtractSearchResults(string query, string html)
@@ -71,12 +84,27 @@ namespace PostgreSQL.Embedding.Plugins
                 {
                     Title = eleTitle.TextContent,
                     Url = eleTitle.QuerySelector(SELECTOR_TAG_LINK).Attributes[SELECTOR_TAG_HREF].Value,
-                    Description = x.QuerySelector(SELECTOR_TAG_ITEM_DESC).TextContent
+                    Description = x.QuerySelector(SELECTOR_TAG_ITEM_DESC)?.TextContent ?? string.Empty
                 };
             })
             .ToList();
 
             return seachResult;
+        }
+
+        private async Task SendArtifacts(SearchResult searchResult)
+        {
+            if (searchResult == null || !searchResult.Entries.Any()) return;
+
+            var artifact = new LlmArtifactResponseModel("搜索结果", ArtifactType.Search);
+            var payloads = searchResult.Entries.Select(x => new
+            {
+                link = x.Url,
+                title = x.Title,
+                description = x.Description
+            });
+            artifact.SetData(payloads);
+            await EmitArtifactsAsync(artifact);
         }
     }
 

@@ -1,4 +1,5 @@
 ﻿using DocumentFormat.OpenXml.Spreadsheet;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Attributes;
@@ -12,7 +13,7 @@ using System.Text.RegularExpressions;
 
 namespace PostgreSQL.Embedding.Plugins
 {
-    [KernelPlugin(Description = "网络搜索插件，支持以下搜索引擎：必应搜索，Brave 搜索, JianAI, 博查")]
+    [KernelPlugin(Description = "网络搜索插件，支持以下搜索引擎：必应搜索，Brave 搜索, JianAI, 博查, SerpApi")]
     public class WebSearchPlugin : BasePlugin
     {
         private Regex _regexCitations = new Regex(@"\[(\d+)\]");
@@ -29,7 +30,7 @@ namespace PostgreSQL.Embedding.Plugins
 
         [KernelFunction]
         [Description("从网络中搜索信息")]
-        public async Task<string> RunAsync([Description("用户请求")] string query, Kernel kernel, [Description("搜索引擎，可选值: Bing, Brave, JianAI, BoCha")] string searchEngine = "BoCha", [Description("是否仅搜索答案")] bool searchOnly = false)
+        public async Task<string> RunAsync([Description("用户请求")] string query, Kernel kernel, [Description("搜索引擎，可选值: Bing, Brave, JianAI, BoCha, SerpApi")] string searchEngine = "Brave", [Description("是否仅搜索答案")] bool searchOnly = false)
         {
             var clonedKernel = kernel.Clone();
 
@@ -37,6 +38,7 @@ namespace PostgreSQL.Embedding.Plugins
             var serviceEngine = GetSearchEngine(serviceScope.ServiceProvider, searchEngine);
             var searchEnginePayload = await serviceEngine.SearchAsync(query);
             var searchResult = JsonConvert.DeserializeObject<SearchResult>(searchEnginePayload);
+
 
             var citations = GetLlmCitations(searchResult);
             var jsonFormatContext = JsonConvert.SerializeObject(citations);
@@ -113,15 +115,17 @@ namespace PostgreSQL.Embedding.Plugins
             switch (searchEngine)
             {
                 case "Bing":
-                    return serviceProvider.GetService<BingSearchPlugin>() as ISearchEngine;
+                    return serviceProvider.GetRequiredService<BingSearchPlugin>() as ISearchEngine;
                 case "Brave":
-                    return serviceProvider.GetService<BraveSearchPlugin>() as ISearchEngine;
+                    return serviceProvider.GetRequiredService<BraveSearchPlugin>() as ISearchEngine;
                 case "JinaAI":
-                    return serviceProvider.GetService<JinaAIPlugin>() as ISearchEngine;
+                    return serviceProvider.GetRequiredService<JinaAIPlugin>() as ISearchEngine;
                 case "BoCha":
-                    return serviceProvider.GetService<BoChaAIPlugin>() as ISearchEngine;
+                    return serviceProvider.GetRequiredService<BoChaAIPlugin>() as ISearchEngine;
+                case "SerpApi":
+                    return serviceProvider.GetRequiredService<SerpApiPlugin>() as ISearchEngine;
                 default:
-                    return serviceProvider.GetService<BraveSearchPlugin>() as ISearchEngine;
+                    return serviceProvider.GetRequiredService<BraveSearchPlugin>() as ISearchEngine;
             }
         }
 

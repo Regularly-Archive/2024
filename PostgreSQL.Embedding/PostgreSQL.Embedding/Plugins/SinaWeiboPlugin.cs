@@ -1,4 +1,5 @@
-﻿using Microsoft.SemanticKernel;
+﻿using DocumentFormat.OpenXml.Math;
+using Microsoft.SemanticKernel;
 using MongoDB.Driver;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -95,28 +96,38 @@ namespace PostgreSQL.Embedding.Plugins
         }
 
         /// <summary>
-        /// 嘲讽指定微博用户
+        /// 搜索微博用户
         /// </summary>
         /// <param name="uid"></param>
         /// <param name="kernel"></param>
         /// <returns></returns>
         [KernelFunction]
-        [Description("嘲讽指定微博用户")]
-        public async Task<string> MockingAsync([Description("微博用户Id")] string uid, Kernel kernel)
+        [Description("搜索微博用户")]
+        public async Task<string> SearchAsync([Description("关键词")] string keyword, [Description("检索数目")] int limit = 5)
         {
             using var httpClient = _httpClientFactory.CreateClient();
 
-            var profile = await GetWeiboProfileAsync(httpClient, uid);
-            var feeds = await GetWeiboFeedsAsync(httpClient, uid);
+            var parameters = new Dictionary<string, string>
+            {
+                { "containerid", $"100103type=3&q={keyword}&t=" },
+                { "page_type", "searchall" }
+            };
+            var encodedParams = await new FormUrlEncodedContent(parameters).ReadAsStringAsync();
 
-            var clonedKernel = kernel.Clone();
-            var promptTemplate = new CallablePromptTemplate(MOCKING_WEIBO_FEEDS_PROMPT);
-            promptTemplate.AddVariable("profile", JsonConvert.SerializeObject(profile));
-            promptTemplate.AddVariable("feeds", string.Join("\r\n", feeds.Select(x => x.Content)));
+            var response = await httpClient.GetAsync($"https://m.weibo.cn/api/container/getIndex?{encodedParams}");
+            response.EnsureSuccessStatusCode();
 
-            var functionResult = await promptTemplate.InvokeAsync(clonedKernel);
-            return functionResult.GetValue<string>();
+            var jsonResponse = await response.Content.ReadAsStringAsync();
+            var result = JObject.Parse(jsonResponse);
+            var cards = result["data"]["cards"];
+            if (cards == null || cards.Count() < 2)
+                return JsonConvert.SerializeObject(Enumerable.Empty<dynamic>());
+
+
+            var cardGroup = cards[1]["card_group"];
+            return JsonConvert.SerializeObject(cardGroup.Select(x => x["user"]).ToList());
         }
+
 
 
         private async Task<WeiboProfile> GetWeiboProfileAsync(HttpClient httpClient, string uid)

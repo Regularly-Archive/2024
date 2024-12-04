@@ -9,7 +9,7 @@ namespace PostgreSQL.Embedding.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class CrudBaseController<T>: ControllerBase where T : BaseEntity, new()
+    public class CrudBaseController<T, TQueryableFilter> : ControllerBase where T : BaseEntity, new() where TQueryableFilter : class, IQueryableFilter<T>
     {
         protected readonly CrudBaseService<T> _crudBaseService;
         public CrudBaseController(CrudBaseService<T> crudBaseService)
@@ -18,44 +18,44 @@ namespace PostgreSQL.Embedding.Controllers
         }
 
         [HttpGet("{id}")]
-        public virtual async Task<JsonResult> SelectById(long id)
+        public virtual async Task<JsonResult> SelectByIdAsync(long id)
         {
-            var instance = await _crudBaseService.GetById(id);
+            var instance = await _crudBaseService.GetByIdAsync(id);
             return ApiResult.Success(instance, "操作成功");
         }
 
         [HttpPost]
-        public virtual async Task<JsonResult> Create(T entity)
+        public virtual async Task<JsonResult> CreateAsync(T entity)
         {
-            var instance = await _crudBaseService.Create(entity);
+            var instance = await _crudBaseService.CreateAsync(entity);
             return ApiResult.Success(instance, "操作成功");
         }
 
         [HttpPut]
-        public virtual async Task<JsonResult> Update(T entity)
+        public virtual async Task<JsonResult> UpdateAsync(T entity)
         {
-            await _crudBaseService.Update(entity);
+            await _crudBaseService.UpdateAsync(entity);
             return ApiResult.Success(new { }, "操作成功");
         }
 
         [HttpDelete]
-        public virtual async Task<JsonResult> Delete(string ids)
+        public virtual async Task<JsonResult> DeleteAsync(string ids)
         {
-            await _crudBaseService.Delete(ids);
+            await _crudBaseService.DeleteAsync(ids);
             return ApiResult.Success(new { }, "操作成功");
         }
 
         [HttpGet("paginate")]
-        public virtual async Task<JsonResult> GetByPage(int pageSize, int pageIndex)
+        public virtual async Task<JsonResult> GetByPageAsync([FromQuery]QueryParameter<T,TQueryableFilter> queryParameter)
         {
-            var result = await _crudBaseService.GetPageList(pageSize, pageIndex);
+            var result = await _crudBaseService.GetPagedListAsync(queryParameter);
             return ApiResult.Success(result, "操作成功");
         }
 
         [HttpGet("list")]
-        public virtual async Task<JsonResult> FindList()
+        public virtual async Task<JsonResult> FindListAsync([FromQuery]TQueryableFilter filter = null)
         {
-            var results = await _crudBaseService.Repository.GetAllAsync();
+            var results = await _crudBaseService.GetListAsync(filter);
             return ApiResult.Success(results, "操作成功");
         }
     }
