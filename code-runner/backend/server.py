@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Body, Query
 from fastapi.responses import JSONResponse
 import docker
 from pydantic import BaseModel
@@ -28,7 +28,7 @@ class RunCodeRequest(BaseModel):
 
 
 @app.post("/api/run")
-async def run_code(request: RunCodeRequest):
+async def run_code(request: RunCodeRequest = Body(...), format: str = Query(default='html')):
     start_time = time.time()
     container_name = f"./runner_{uuid.uuid4().hex}"
     config = LANGUAGE_CONFIG.get(request.language)
@@ -50,12 +50,14 @@ async def run_code(request: RunCodeRequest):
             image=config['image'],
             command=config['commandRedirect'],
             volumes={os.path.abspath(container_name): {
-                'bind': f'/home/{user}', 'mode': 'rw'}},
+                'bind': f'/home/{user}', 'mode': 'rw'}
+            },
             tty=True,
             detach=True,
             environment={
                 'LANG': 'en_US.UTF-8',
-                'LC_ALL': 'en_US.UTF-8'
+                'LC_ALL': 'en_US.UTF-8',
+                'NBCONVERT_OUTPUT_FORMAT': format
             }
         )
         container.wait()
@@ -71,8 +73,8 @@ async def run_code(request: RunCodeRequest):
                 content = f.read()
                 output = content if content != '' else output
 
-        type = 'text/html' if config['env'] == 'jupyter' else 'text/plain'
-        return JSONResponse(content={"output": output, 'type': type, 'time': time.time() - start_time, "output": output})
+        type = f'text/{format}' if config['env'] == 'jupyter' else 'text/plain'
+        return JSONResponse(content={"output": output, 'type': type, 'time': time.time() - start_time})
             
     except Exception as e:
          raise HTTPException(status_code=500, detail=str(e))
