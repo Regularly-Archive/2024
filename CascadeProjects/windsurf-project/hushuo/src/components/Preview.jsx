@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-export default function Preview({ image, lines, textStyle, showSubtitles }) {
+export default function Preview({ image, lines, textStyle }) {
   const canvasRef = useRef(null)
   const { fontSize, fontFamily, blockHeight } = textStyle
 
@@ -12,52 +12,58 @@ export default function Preview({ image, lines, textStyle, showSubtitles }) {
     const img = new Image()
 
     img.onload = () => {
-      const extraLines = lines.length - 1
-      const totalExtraHeight = Math.max(0, extraLines * blockHeight)
+      // 计算新的画布尺寸
+      const extraLines = lines.length - 1 // 减去第一行，因为第一行直接绘制在原图上
+      const totalExtraHeight = Math.max(0, extraLines * blockHeight) // 额外需要的总高度
+      
+      // 设置画布大小为原图高度加上额外文字区域的总高度
       canvas.width = img.width
       canvas.height = img.height + totalExtraHeight
 
+      // 首先绘制原始图片
       ctx.drawImage(img, 0, 0)
+
+      // 设置文字样式
       ctx.textAlign = 'center'
       ctx.font = `${fontSize}px "${fontFamily}", sans-serif`
 
-      // 绘制第一行文字
+      // 绘制第一行文字（在原图上）
       if (lines[0]) {
         const firstLineY = img.height - blockHeight * 0.3
+        // 绘制文字描边
         ctx.strokeStyle = 'black'
         ctx.lineWidth = Math.max(3, fontSize / 10)
         ctx.strokeText(lines[0], img.width / 2, firstLineY)
+        // 绘制文字
         ctx.fillStyle = 'white'
         ctx.fillText(lines[0], img.width / 2, firstLineY)
       }
 
-      // 绘制英文字幕
-      if (showSubtitles && lines[1]) {
-        const subtitleY = img.height + blockHeight * 0.5;
-        ctx.fillStyle = 'yellow'; // 设置英文字幕颜色
-        ctx.fillText(lines[1], img.width / 2, subtitleY);
-      }
-
       // 从第二行开始，为每行文字创建一个新的区域
       lines.slice(1).forEach((line, index) => {
+        // 计算当前文字块的位置
         const blockY = img.height + (index * blockHeight)
+        
+        // 从原图底部截取一部分并绘制到新位置
         const sourceY = Math.max(0, img.height - blockHeight)
         ctx.drawImage(
           img,
-          0, sourceY,
-          img.width, blockHeight,
-          0, blockY,
-          img.width, blockHeight
+          0, sourceY, // 源图片的裁剪起始位置
+          img.width, blockHeight, // 源图片的裁剪尺寸
+          0, blockY, // 目标位置
+          img.width, blockHeight // 目标尺寸
         )
 
-        // 绘制当前行文字
-        if (line) {
-          ctx.strokeStyle = 'black'
-          ctx.lineWidth = Math.max(3, fontSize / 10)
-          ctx.strokeText(line, img.width / 2, blockY + blockHeight * 0.7)
-          ctx.fillStyle = 'white'
-          ctx.fillText(line, img.width / 2, blockY + blockHeight * 0.7)
-        }
+        // 绘制文字
+        const textY = blockY + (blockHeight * 0.6)
+        
+        // 绘制文字描边
+        ctx.strokeStyle = 'black'
+        ctx.lineWidth = Math.max(3, fontSize / 10)
+        ctx.strokeText(line, img.width / 2, textY)
+        // 绘制文字
+        ctx.fillStyle = 'white'
+        ctx.fillText(line, img.width / 2, textY)
       })
 
       // 添加水印
@@ -94,7 +100,7 @@ export default function Preview({ image, lines, textStyle, showSubtitles }) {
     }
 
     img.src = image
-  }, [image, lines, textStyle, showSubtitles])
+  }, [image, lines, fontSize, fontFamily, blockHeight])
 
   return (
     <div className="relative w-full">
