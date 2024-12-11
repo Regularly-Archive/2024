@@ -33,7 +33,6 @@ def notebook_to_notebook(notebook_path, output_path, kernel_name=None):
     for cell in notebook_content.cells:
         if cell.cell_type == 'code':
             cell.metadata['hide_input'] = True
-            cell.source = ''
 
     with open(output_path, 'w', encoding='utf-8') as f:
         nbformat.write(notebook_content, f)
