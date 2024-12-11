@@ -1,5 +1,6 @@
 ﻿using Microsoft.SemanticKernel;
 using Newtonsoft.Json;
+using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.Plugins.Abstration;
