@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Confirguration;
 using PostgreSQL.Embedding.Common.Models;
@@ -52,8 +53,8 @@ namespace PostgreSQL.Embedding.Plugins
         }
 
         [KernelFunction()]
-        [Description("运行 C# 代码并输出结果")]
-        public async Task<string> RunCSharp([Description("脚本内容")] string code)
+        [Description("运行 C# 代码并输出结果, 你可以使用 csharp 和 csharp-mono 两种后端，对于前者，请使用顶级语句；对于后者，请使用常规语法")]
+        public async Task<string> RunCSharp([Description("脚本内容")] string code, [Description("后端支持")] string backend = "csharp")
         {
             var response = await RunCodeAsync("csharp", code);
             var output = JObject.Parse(response)["output"]?.Value<string>();

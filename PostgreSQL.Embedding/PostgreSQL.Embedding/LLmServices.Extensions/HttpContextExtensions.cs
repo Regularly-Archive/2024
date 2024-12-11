@@ -85,7 +85,7 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
             {
                 if (cancellationToken.IsCancellationRequested) { return; }
 
-                await Task.Delay(50);
+                await Task.Delay(100);
 
                 result.created = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 result.choices[0].delta.content = text == null ? string.Empty : Convert.ToString(text);
@@ -110,7 +110,7 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
             {
                 if (cancellationToken.IsCancellationRequested) { return; }
 
-                await Task.Delay(50);
+                await Task.Delay(100);
 
                 result.created = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 result.choices[0].delta.content = text.Content ?? string.Empty;
@@ -136,6 +136,8 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
             await foreach (var text in texts)
             {
                 if (cancellationToken.IsCancellationRequested) { return; }
+
+                await Task.Delay(100);
 
                 result.choices[0].delta.content = text == null ? string.Empty : Convert.ToString(text);
                 result.created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();

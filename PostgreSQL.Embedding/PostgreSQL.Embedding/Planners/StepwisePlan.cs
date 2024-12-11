@@ -234,8 +234,8 @@ namespace PostgreSQL.Embedding.Planners
                 _logger?.LogInformation("Thought: {Thought}", step.Thought);
                 if (step.Thought.IndexOf(QuestionTag) != -1)
                 {
-                    var question = step.Thought.Split("\n\n")[0].Replace(QuestionTag, "").Replace("-", "").Trim();
-                    var thought = step.Thought.Split("\n\n")[1].Replace("-", "").Trim();
+                    var question = step.Thought.Split("\n", StringSplitOptions.RemoveEmptyEntries)[0].Replace(QuestionTag, "").Replace("-", "").Trim();
+                    var thought = step.Thought.Split("\n", StringSplitOptions.RemoveEmptyEntries)[1].Replace("-", "").Trim();
 
                     OnStepExecute?.Invoke($"{QuestionEmoji} {question}");
                     OnStepExecute?.Invoke($"{ThoughtEmoji} {thought}");
