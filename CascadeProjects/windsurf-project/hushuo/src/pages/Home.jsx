@@ -13,17 +13,14 @@ export default function Home() {
               </span>
             </a>
           </div>
-          <blockquote className="mt-6 border-l-4 border-blue-500 pl-4 font-bold text-gray-600">
+          <blockquote className="mt-6 border-l-4 border-blue-500 pl-4 italic text-gray-600">
             "我实在没有说过这样的话。"
             <footer className="mt-2 text-sm text-gray-500">
               — 鲁迅
             </footer>
           </blockquote>
-          <h1 className="mt-10 text-3xl font-bold tracking-tight text-gray-900 sm:text-6xl">
-            胡说
-          </h1>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-6xl">
-          一本正经地胡说八道 
+          <h1 className="mt-10 text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl">
+            给图片加文字，就用胡说
           </h1>
           <p className="mt-6 text-lg leading-8 text-gray-600">
             一个专门用来制作"名人名言"的工具，让你轻松创作出令人捧腹的内容。无论是恶搞还是娱乐，让你的创意自由发挥。
@@ -44,7 +41,7 @@ export default function Home() {
         <div className="mx-auto mt-16 flex max-w-2xl sm:mt-24 lg:ml-10 lg:mr-0 lg:mt-0 lg:max-w-none xl:ml-32">
           <div className="max-w-3xl flex-none sm:max-w-5xl lg:max-w-none">
             <img
-              src="/images/193a9a422f139.png"
+              src="/preview.png"
               alt="App screenshot"
               width={2432}
               height={1442}
