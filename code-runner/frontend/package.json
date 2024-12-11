@@ -15,6 +15,7 @@
     "codemirror": "^5.65.18",
     "codemirror-editor-vue3": "^2.8.0",
     "html2canvas": "^1.4.1",
+    "render-jupyter-notebook-vue": "^2.2.4",
     "vue": "^3.4.29",
     "vue-router": "^4.3.3"
   },

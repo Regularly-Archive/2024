@@ -33,7 +33,8 @@
             </div>
             <div class="flex-1 border rounded p-2 bg-gray-50">
                 <pre class="h-full bg-black text-white" v-if="selectedLanguage.indexOf('jupyter') == -1">{{ executionOutput }}</pre>
-                <div class="h-full" v-html="executionOutput" v-else></div>
+                <div class="h-full" v-html="executionOutput" v-if="selectedLanguage.indexOf('jupyter') != -1 && outputType == 'text/html'"></div>
+                <RenderJupyterNotebook class="h-full" :notebook="JSON.parse(executionOutput)" v-if="selectedLanguage.indexOf('jupyter') != -1 && outputType == 'text/notebook'"/>
             </div>
         </div>
     </div>
@@ -42,16 +43,19 @@
 <script>
 import "codemirror/mode/javascript/javascript.js";
 import Codemirror from "codemirror-editor-vue3"; 
+import RenderJupyterNotebook from 'render-jupyter-notebook-vue'
 
 export default {
     components: {
-        Codemirror
+        Codemirror,
+        RenderJupyterNotebook
     },
     data() {
         return {
             selectedLanguage: 'python3',
             codeContent: '',
             executionOutput: '',
+            outputType: '',
             languageOptions: this.getLanguageOptions(),
             isLoading: false,
             editorOptions: {
@@ -103,8 +107,9 @@ export default {
             this.executionOutput = ''; 
             this.executionTime = null;
             this.isLoading = true;
+            this.outputType = ''
 
-            fetch('http://localhost:8001/api/run', {
+            fetch('http://localhost:8001/api/run?format=html', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -119,6 +124,7 @@ export default {
             .then(data => {
                 this.executionOutput = data.output;
                 this.executionTime = data.time;
+                this.outputType = data.type
                 this.$nextTick(() => {
                     hljs.highlightAll();
                 });
