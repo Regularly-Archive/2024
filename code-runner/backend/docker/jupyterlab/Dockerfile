@@ -46,7 +46,8 @@ COPY convert.py /nbconvert/convert.py
 RUN sudo chown -R jovyan /nbconvert
 
 # 设置 JupyterLab 为默认启动界面
-RUN pip install jupyterlab
+RUN pip install jupyterlab plotly seaborn mplfonts && \
+    mplfonts init
 
 # 设置工作目录和启动命令
 USER jovyan
