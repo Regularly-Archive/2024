@@ -15,7 +15,6 @@ export default function Editor() {
     blockHeight: 80,
   })
   const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false)
-  const [showEnglishSubtitles, setShowEnglishSubtitles] = useState(false)
 
   const handleImageUpload = (imageData) => {
     setImage(imageData)
@@ -54,18 +53,6 @@ export default function Editor() {
 
   return (
     <main className="flex-1 px-4 py-6">
-      {/* 标题区域 */}
-      <div className="mx-auto max-w-2xl lg:text-center mb-12">
-        <h2 className="text-base font-semibold leading-7 text-blue-600">创作工作台</h2>
-        <p className="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-          让创意自由流动
-        </p>
-        <p className="mt-6 text-lg leading-8 text-gray-600">
-          在这里，你可以上传图片、编辑文字、调整样式，创作出独特的作品。
-        </p>
-      </div>
-
-      {/* 主要内容区域 */}
       <div className="flex flex-col lg:flex-row gap-8 max-w-[1920px] mx-auto">
         {/* 左侧面板 */}
         <div className="lg:w-1/2 flex flex-col gap-4">
@@ -90,16 +77,6 @@ export default function Editor() {
             <div className="h-[320px]">
               <TextEditor onTextChange={handleTextChange} value={lines} />
             </div>
-            <div className="flex items-center mt-4">
-              <input
-                type="checkbox"
-                id="showEnglishSubtitles"
-                checked={showEnglishSubtitles}
-                onChange={() => setShowEnglishSubtitles(!showEnglishSubtitles)}
-                className="mr-2"
-              />
-              <label htmlFor="showEnglishSubtitles" className="text-gray-700">显示英文字幕</label>
-            </div>
           </section>
 
           {image && (
@@ -116,7 +93,7 @@ export default function Editor() {
           {image ? (
             <>
               <div className="relative">
-                <Preview image={image} lines={lines} textStyle={textStyle} showSubtitles={showEnglishSubtitles} />
+                <Preview image={image} lines={lines} textStyle={textStyle} />
               </div>
               <button
                 onClick={handleDownload}
