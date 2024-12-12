@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { FiTrash2 } from 'react-icons/fi'
 
 export default function TextEditor({ onTextChange, value }) {
   const [lines, setLines] = useState(value || ['', '', '', '', ''])
@@ -44,10 +45,11 @@ export default function TextEditor({ onTextChange, value }) {
             />
             <button
               onClick={() => removeLine(index)}
-              className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
               disabled={lines.length === 1}
+              title="删除"
             >
-              删除
+              <FiTrash2 className="w-5 h-5" />
             </button>
           </div>
         ))}
