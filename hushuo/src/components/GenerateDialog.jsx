@@ -1,27 +1,19 @@
 import { Fragment, useState } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
+import { generateQuote } from '../services/generateService'
 
 export default function GenerateDialog({ isOpen, onClose, onGenerate }) {
   const [name, setName] = useState('')
   const [prompt, setPrompt] = useState('')
+  const [count, setCount] = useState(5)
   const [isLoading, setIsLoading] = useState(false)
 
   const handleGenerate = async () => {
     setIsLoading(true)
     try {
-      // TODO: 替换为实际的 API 调用
-      const response = await fetch('/api/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name,
-          prompt,
-        }),
-      })
-      const data = await response.json()
-      onGenerate(data.lines || [])
+      const lines = await generateQuote(name, prompt, count)
+      const zhLines = lines.map(x => x.zh)
+      onGenerate(zhLines)
       onClose()
     } catch (error) {
       console.error('生成失败:', error)
@@ -57,7 +49,7 @@ export default function GenerateDialog({ isOpen, onClose, onGenerate }) {
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+              <Dialog.Panel className="w-full max-w-xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
                 <Dialog.Title
                   as="h3"
                   className="text-lg font-medium leading-6 text-gray-900 flex items-center gap-2"
@@ -77,7 +69,7 @@ export default function GenerateDialog({ isOpen, onClose, onGenerate }) {
                       id="name"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      className="mt-1 block w-full rounded-md border-2 border-gray-400 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 sm:text-sm py-2 px-2"
                       placeholder="例如：鲁迅"
                     />
                   </div>
@@ -90,8 +82,23 @@ export default function GenerateDialog({ isOpen, onClose, onGenerate }) {
                       value={prompt}
                       onChange={(e) => setPrompt(e.target.value)}
                       rows={5}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      className="mt-1 block w-full rounded-md border-2 border-gray-400 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 sm:text-sm px-2"
                       placeholder="例如：讽刺当代社会现象，带有幽默感"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="count" className="block text-sm font-medium text-gray-700">
+                      生成数量
+                    </label>
+                    <input
+                      type="number"
+                      id="count"
+                      value={count}
+                      onChange={(e) => setCount(parseInt(e.target.value))}
+                      min={5}
+                      max={10}
+                      className="mt-1 block w-full rounded-md border-2 border-gray-400 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 sm:text-sm py-3 px-2"
+                      placeholder="生成数量（1-5）"
                     />
                   </div>
                 </div>
