@@ -89,3 +89,5 @@ face-classify/collections/
 face-classify/.venv/
 face-classify/output/
 PostgreSQL.Embedding/.idea/
+face-classify/__pycache__/kernels.cpython-39.pyc
+face-classify/testcases/
