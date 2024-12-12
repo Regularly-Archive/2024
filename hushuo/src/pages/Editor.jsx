@@ -116,7 +116,7 @@ export default function Editor() {
           {image ? (
             <>
               <div className="relative">
-                <Preview image={image} lines={lines} textStyle={textStyle} showSubtitles={showEnglishSubtitles} />
+                <Preview image={image} lines={lines} textStyle={textStyle} showSubtitles={showEnglishSubtitles} showWatermark={false} />
               </div>
               <button
                 onClick={handleDownload}
