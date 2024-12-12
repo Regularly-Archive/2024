@@ -1,4 +1,4 @@
-import { SYSTEM_PROMPTS, SAMPLE_JSON_OUTPUT } from '../constants/prompts'
+import { PROMPT_TEMPLATES, SAMPLE_JSON_OUTPUT } from '../constants/prompts'
 
 export const generateQuote = async (name, prompt, count) => {
   try {
@@ -15,11 +15,11 @@ export const generateQuote = async (name, prompt, count) => {
         messages: [
           {
             role: 'system', 
-            content: SYSTEM_PROMPTS.QUOTE_GENERATION(SAMPLE_JSON_OUTPUT)
+            content: PROMPT_TEMPLATES.SYSTEM_PROMPT(SAMPLE_JSON_OUTPUT)
           },
           {
             role: 'user',
-            content: `请模仿${name}的语气、口吻以及风格，根据以下要求，生成由 ${count} 个短句组成的一段话。\n\n要求：${prompt}`
+            content: PROMPT_TEMPLATES.USER_PROMPT(name, prompt, count)
           }
         ],
         temperature: 0.75,
