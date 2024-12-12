@@ -1,7 +1,9 @@
 from time import time
 import sys, logging
-Embedding_Model_Cache_Folder = './models/embedding/'
-Text_Generation_Model_Cache_Folder = './models/text-generation/'
+from collections import OrderedDict
+
+Embedding_Model_Cache_Folder = './.cached_models/embedding/'
+Text_Generation_Model_Cache_Folder = './.cached_models/text-generation/'
 
 def timer(logger):
     def wrapper(func):
@@ -24,3 +26,26 @@ def createLogger(name):
     stream_handler.setFormatter(log_formatter)
     logger.addHandler(stream_handler)
     return logger
+
+
+class LRUCache:
+    def __init__(self, capacity: int):
+        self.cache = OrderedDict()
+        self.capacity = capacity
+
+    def get(self, key: str) -> object:
+        if key not in self.cache:
+            return None
+        else:
+            self.cache.move_to_end(key)
+            return self.cache[key]
+
+    def put(self, key: str, value: object) -> None:
+        if key in self.cache:
+            del self.cache[key]
+        elif len(self.cache) >= self.capacity:
+            self.cache.popitem(last=False)
+        self.cache[key] = value
+
+    def hasKey(self, key: str):
+        return key in self.cache
