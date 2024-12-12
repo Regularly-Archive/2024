@@ -86,3 +86,6 @@ code-runner/backend/__pycache__/
 SGLang-Learning/async_io_api.py
 face-classify/dataset/
 face-classify/collections/
+face-classify/.venv/
+face-classify/output/
+PostgreSQL.Embedding/.idea/
