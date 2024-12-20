@@ -12,8 +12,7 @@ export default function GenerateDialog({ isOpen, onClose, onGenerate }) {
     setIsLoading(true)
     try {
       const lines = await generateQuote(name, prompt, count)
-      const zhLines = lines.map(x => x.zh)
-      onGenerate(zhLines)
+      onGenerate(lines)
       onClose()
     } catch (error) {
       console.error('生成失败:', error)

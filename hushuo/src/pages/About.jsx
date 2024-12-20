@@ -5,12 +5,15 @@ export default function About() {
     <main className="flex-1 px-4 py-6 bg-gray-50">
       {/* 标题区域 */}
       <div className="mx-auto max-w-2xl lg:text-center mb-12">
+        <div className="mx-auto max-w-2xl lg:text-center mb-12 flex justify-center">
+          <img src="/images/about_logo.png" className="p-2 w-64" />
+        </div>
         <h2 className="text-base font-semibold leading-7 text-blue-600">关于胡说</h2>
         <p className="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
           让图片说话的艺术
         </p>
         <p className="mt-6 text-lg leading-8 text-gray-600">
-          胡说是一个简单而强大的图片文字编辑工具，专注于为用户提供最佳的文字叠加体验。
+        胡说是一个简单而强大的图片文字编辑工具，专注于为用户提供最佳的文字叠加体验
         </p>
       </div>
 
