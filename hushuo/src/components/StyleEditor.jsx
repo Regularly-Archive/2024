@@ -8,15 +8,19 @@ const FONTS = [
   { value: 'STXihei', label: '华文细黑' },
 ]
 
-export default function StyleEditor({ imageHeight, onStyleChange }) {
+export default function StyleEditor({ imageHeight, onStyleChange, showEnglishSubtitles }) {
   const [fontSize, setFontSize] = useState(32)
   const [selectedFont, setSelectedFont] = useState(FONTS[0].value)
   const [blockHeight, setBlockHeight] = useState(
-    Math.floor(imageHeight / 6)  // 默认为图片高度的1/6
+    showEnglishSubtitles ? Math.floor(imageHeight / 8) : Math.floor(imageHeight / 16)
   )
+  
+  // 设置第一行文本高度的默认值和最小值
+  const minFirstLineHeightOffset = 10;
+  const maxFirstLineHeightOffset = 40;
+  const [firstLineHeightOffset, setFirstLineHeightOffset] = useState(0);
 
-  // 计算高度的范围
-  const minHeight = Math.max(40, Math.floor(imageHeight / 16))
+  const minHeight = Math.max(32, Math.floor(imageHeight / 16))
   const maxHeight = Math.floor(imageHeight / 8)
 
   useEffect(() => {
@@ -24,8 +28,9 @@ export default function StyleEditor({ imageHeight, onStyleChange }) {
       fontSize,
       fontFamily: selectedFont,
       blockHeight,
+      firstLineHeightOffset,
     })
-  }, [fontSize, selectedFont, blockHeight])
+  }, [fontSize, selectedFont, blockHeight, firstLineHeightOffset])
 
   return (
     <div className="space-y-6">
@@ -94,6 +99,28 @@ export default function StyleEditor({ imageHeight, onStyleChange }) {
         <div className="flex justify-between text-xs text-gray-500">
           <span>{minHeight}px</span>
           <span>{maxHeight}px</span>
+        </div>
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium text-gray-700">
+            首行文本偏移量
+          </label>
+          <span className="text-sm text-gray-500">
+            {firstLineHeightOffset}px
+          </span>
+        </div>
+        <input
+          type="range"
+          min={minFirstLineHeightOffset}
+          max={maxFirstLineHeightOffset}
+          value={firstLineHeightOffset}
+          onChange={(e) => setFirstLineHeightOffset(Number(e.target.value))}
+          className="w-full"
+        />
+        <div className="flex justify-between text-xs text-gray-500">
+          <span>{minFirstLineHeightOffset}px</span>
+          <span>{maxFirstLineHeightOffset}px</span>
         </div>
       </div>
     </div>
