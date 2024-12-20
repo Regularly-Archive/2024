@@ -107,7 +107,7 @@ export default function StyleEditor({ imageHeight, onStyleChange, showEnglishSub
             首行文本偏移量
           </label>
           <span className="text-sm text-gray-500">
-            {firstLineHeightOffset}px
+            -{firstLineHeightOffset}px
           </span>
         </div>
         <input
