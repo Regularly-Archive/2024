@@ -17,7 +17,7 @@ export default function Preview({ image, lines, textStyle, showSubtitles, showWa
       const extraLines = lines.length - 1
       const totalExtraHeight = Math.max(0, extraLines * blockHeight)
       canvas.width = img.width
-      canvas.height = img.height + totalExtraHeight
+      canvas.height = img.height + totalExtraHeight - firstLineHeightOffset
 
       ctx.drawImage(img, 0, 0)
       ctx.textAlign = 'center'
