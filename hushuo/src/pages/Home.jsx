@@ -6,18 +6,25 @@ export default function Home() {
     <div className="relative isolate overflow-hidden">
       <div className="mx-auto max-w-7xl px-6 pb-24 pt-10 sm:pb-32 lg:flex lg:px-8 lg:py-40">
         <div className="mx-auto max-w-2xl flex-shrink-0 lg:mx-0 lg:max-w-xl lg:pt-8">
-          <div className="mt-24 sm:mt-32 lg:mt-16">
+          <div className="mt-24 sm:mt-32 lg:mt-16 text-left">
             <a href="#" className="inline-flex space-x-6">
               <span className="rounded-full bg-blue-500/10 px-3 py-1 text-sm font-semibold leading-6 text-blue-500 ring-1 ring-inset ring-blue-500/20">
                 灵感来源
               </span>
             </a>
           </div>
-          <blockquote className="mt-6 border-l-4 border-blue-500 pl-4 font-bold text-gray-600">
-            "我实在没有说过这样的话。"
-            <footer className="mt-2 text-sm text-gray-500">
-              — 鲁迅
-            </footer>
+          <blockquote className="mt-6 border-l-4 border-blue-500 pl-4 font-bold text-gray-600 text-left flex items-center">
+            <img
+              src="/images/luxun-avatar.jpg"
+              alt="鲁迅头像"
+              className="h-10 w-10 rounded-full border-2 border-gray-500 shadow-md mr-4"
+            />
+            <div>
+              "我实在没有说过这样的话。"
+              <footer className="mt-2 text-sm text-gray-500">
+                — 鲁迅
+              </footer>
+            </div>
           </blockquote>
           <h1 className="mt-10 text-3xl font-bold tracking-tight text-gray-900 sm:text-6xl">
             胡说
