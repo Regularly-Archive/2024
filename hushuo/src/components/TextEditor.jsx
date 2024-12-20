@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { FiTrash2 } from 'react-icons/fi'
 
-export default function TextEditor({ onTextChange, value }) {
-  const [lines, setLines] = useState(value || ['', '', '', '', ''])
+export default function TextEditor({ onTextChange, value, showEnglishSubtitles }) {
+  const [lines, setLines] = useState(value || [{ zh: '', en: '' }, { zh: '', en: '' }, { zh: '', en: '' }, { zh: '', en: '' }, { zh: '', en: '' }])
 
   useEffect(() => {
     if (value && JSON.stringify(value) !== JSON.stringify(lines)) {
@@ -10,15 +10,15 @@ export default function TextEditor({ onTextChange, value }) {
     }
   }, [value])
 
-  const handleChange = (index, newValue) => {
+  const handleChange = (index, newValue, lang) => {
     const newLines = [...lines]
-    newLines[index] = newValue
+    newLines[index][lang] = newValue
     setLines(newLines)
     onTextChange(newLines)
   }
 
   const addLine = () => {
-    const newLines = [...lines, '']
+    const newLines = [...lines, { zh: '', en: '' }]
     setLines(newLines)
     onTextChange(newLines)
   }
@@ -38,10 +38,18 @@ export default function TextEditor({ onTextChange, value }) {
           <div key={index} className="flex gap-2 items-center">
             <input
               type="text"
-              value={line}
-              onChange={(e) => handleChange(index, e.target.value)}
+              value={line.zh}
+              onChange={(e) => handleChange(index, e.target.value, 'zh')}
               className="flex-1 px-3 py-2 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder={`第 ${index + 1} 行文字`}
+              placeholder={`第 ${index + 1} 行中文文字`}
+            />
+            <input
+              type="text"
+              value={line.en}
+              onChange={(e) => handleChange(index, e.target.value, 'en')}
+              className="flex-1 px-3 py-2 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder={`第 ${index + 1} 行英文文字`}
+              style={{ display: showEnglishSubtitles ? 'block' : 'none' }}
             />
             <button
               onClick={() => removeLine(index)}

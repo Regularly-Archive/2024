@@ -9,6 +9,7 @@ export default function Navbar() {
         <div className="flex justify-between h-16">
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
+              <img src="/images/navbar_logo.png" alt="Logo" className="h-8 w-8 mr-3" />
               <Link to="/" className="text-2xl font-bold text-gray-900">
                 胡说
               </Link>

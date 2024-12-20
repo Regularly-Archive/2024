@@ -16,6 +16,7 @@ export default function Editor() {
   })
   const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false)
   const [showEnglishSubtitles, setShowEnglishSubtitles] = useState(false)
+  const [firstLineHeightOffset, setFirstLineHeightOffset] = useState(0)
 
   const handleImageUpload = (imageData) => {
     setImage(imageData)
@@ -88,7 +89,7 @@ export default function Editor() {
               </button>
             </div>
             <div className="h-[320px]">
-              <TextEditor onTextChange={handleTextChange} value={lines} />
+              <TextEditor onTextChange={handleTextChange} value={lines} showEnglishSubtitles={showEnglishSubtitles} />
             </div>
             <div className="flex items-center mt-4">
               <input
@@ -105,7 +106,7 @@ export default function Editor() {
           {image && (
             <section className="bg-white p-6 rounded-xl shadow-sm">
               <h2 className="text-2xl font-semibold mb-4 text-gray-700">3. 调整样式</h2>
-              <StyleEditor imageHeight={imageHeight} onStyleChange={handleStyleChange} />
+              <StyleEditor imageHeight={imageHeight} onStyleChange={handleStyleChange} showEnglishSubtitles={showEnglishSubtitles} firstLineHeightOffset={firstLineHeightOffset} />
             </section>
           )}
         </div>
