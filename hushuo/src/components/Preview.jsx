@@ -2,9 +2,8 @@ import { useEffect, useRef } from 'react'
 
 export default function Preview({ image, lines, textStyle, showSubtitles, showWatermark = true }) {
   const canvasRef = useRef(null)
-  const { fontSize, fontFamily, blockHeight, firstLineHeightOffset } = textStyle
+  const { fontSize, fontFamily, blockHeight, firstLineHeightOffset, isBackgroundDarkened, subtitleYFactor } = textStyle
   const englishFontSize = fontSize * 0.75; 
-  const subtitleYFactor = 0.35;
 
   useEffect(() => {
     if (!image || !canvasRef.current || lines.length === 0) return
@@ -26,6 +25,13 @@ export default function Preview({ image, lines, textStyle, showSubtitles, showWa
       // 绘制第一行文字
       if (lines[0]) {
         const firstLineY = img.height - blockHeight * 0.5 - firstLineHeightOffset
+        
+        // 如果需要背景加深效果
+        if (isBackgroundDarkened) {
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // 黑色半透明背景
+          ctx.fillRect(0, firstLineY - blockHeight * 0.5, img.width, blockHeight);
+        }
+
         ctx.strokeStyle = 'black'
         ctx.lineWidth = Math.max(3, fontSize / 10)
         ctx.strokeText(lines[0].zh, img.width / 2, firstLineY)
@@ -36,6 +42,13 @@ export default function Preview({ image, lines, textStyle, showSubtitles, showWa
         if (showSubtitles && lines[0].en) {
           ctx.font = `${englishFontSize}px "${fontFamily}", sans-serif`;
           const subtitleY = firstLineY + blockHeight * subtitleYFactor;
+          
+          // 如果需要背景加深效果
+          if (isBackgroundDarkened) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // 黑色半透明背景
+            ctx.fillRect(0, subtitleY - englishFontSize * 0.5, img.width, englishFontSize);
+          }
+
           ctx.strokeStyle = 'black';
           ctx.strokeText(lines[0].en, img.width / 2, subtitleY);
           ctx.fillStyle = 'yellow';
@@ -58,6 +71,12 @@ export default function Preview({ image, lines, textStyle, showSubtitles, showWa
 
         // 绘制当前行文字
         if (line) {
+          // 如果需要背景加深效果
+          if (isBackgroundDarkened) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // 黑色半透明背景
+            ctx.fillRect(0, blockY - blockHeight * 0.5, img.width, blockHeight);
+          }
+
           ctx.strokeStyle = 'black'
           ctx.lineWidth = Math.max(3, fontSize / 10)
           const lineTextY = blockY + blockHeight * 0.5
@@ -69,6 +88,13 @@ export default function Preview({ image, lines, textStyle, showSubtitles, showWa
           if (showSubtitles && line.en) {
             ctx.font = `${englishFontSize}px "${fontFamily}", sans-serif`; 
             const subtitleY = lineTextY + blockHeight * subtitleYFactor;
+            
+            // 如果需要背景加深效果
+            if (isBackgroundDarkened) {
+              ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // 黑色半透明背景
+              ctx.fillRect(0, subtitleY - englishFontSize * 0.5, img.width, englishFontSize);
+            }
+
             ctx.strokeStyle = 'black';
             ctx.strokeText(line.en, img.width / 2, subtitleY);
             ctx.fillStyle = 'yellow';

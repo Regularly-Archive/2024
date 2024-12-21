@@ -13,6 +13,7 @@
     "@headlessui/react": "^1.7.17",
     "@radix-ui/react-dialog": "^1.1.2",
     "@radix-ui/react-slider": "^1.2.1",
+    "@react-icons/all-files": "^4.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.468.0",

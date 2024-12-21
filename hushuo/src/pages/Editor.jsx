@@ -13,7 +13,8 @@ export default function Editor() {
     fontSize: 32,
     fontFamily: 'Microsoft YaHei',
     blockHeight: 80,
-    firstLineHeightOffset: 0
+    firstLineHeightOffset: 0,
+    isBackgroundDarkened: false
   })
   const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false)
   const [showEnglishSubtitles, setShowEnglishSubtitles] = useState(false)
@@ -54,8 +55,7 @@ export default function Editor() {
   }
 
   return (
-    <main className="flex-1 px-4 py-6">
-      {/* 标题区域 */}
+    <main className="flex-1 px-4 py-6 mt-16 bg-gray-50">
       <div className="mx-auto max-w-2xl lg:text-center mb-12">
         <h2 className="text-base font-semibold leading-7 text-blue-600">创作工作台</h2>
         <p className="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
@@ -66,18 +66,17 @@ export default function Editor() {
         </p>
       </div>
 
-      {/* 主要内容区域 */}
       <div className="flex flex-col lg:flex-row gap-8 max-w-[1920px] mx-auto">
         {/* 左侧面板 */}
-        <div className="lg:w-1/2 flex flex-col gap-4">
-          <section className="bg-white p-6 rounded-xl shadow-sm">
-            <h2 className="text-2xl font-semibold mb-4 text-gray-700">1. 上传图片</h2>
+        <div className="lg:w-1/2 flex flex-col gap-4 overflow-y-auto max-h-[80vh] bg-white rounded-lg shadow-md p-4">
+          <section className="p-6 rounded-xl shadow-sm">
+            <h2 className="text-2xl font-semibold mb-4 text-gray-700 text-left">1. 上传图片</h2>
             <ImageUploader onImageUpload={handleImageUpload} />
           </section>
 
-          <section className="bg-white p-6 rounded-xl shadow-sm flex-1">
+          <section className="p-6 rounded-xl shadow-sm flex-1">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-semibold text-gray-700">2. 编辑文字</h2>
+              <h2 className="text-2xl font-semibold text-gray-700 text-left">2. 编辑文字</h2>
               <button
                 onClick={() => setIsGenerateDialogOpen(true)}
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors duration-200 shadow-sm"
@@ -104,8 +103,8 @@ export default function Editor() {
           </section>
 
           {image && (
-            <section className="bg-white p-6 rounded-xl shadow-sm">
-              <h2 className="text-2xl font-semibold mb-4 text-gray-700">3. 调整样式</h2>
+            <section className="p-6 rounded-xl shadow-sm">
+              <h2 className="text-2xl font-semibold mb-4 text-gray-700 text-left">3. 调整样式</h2>
               <StyleEditor imageHeight={imageHeight} onStyleChange={handleStyleChange} showEnglishSubtitles={showEnglishSubtitles} firstLineHeightOffset={textStyle.firstLineHeightOffset} />
             </section>
           )}
@@ -113,11 +112,17 @@ export default function Editor() {
 
         {/* 右侧预览面板 */}
         <div className="lg:w-1/2 lg:self-start bg-white p-6 rounded-xl shadow-sm">
-          <h2 className="text-2xl font-semibold mb-4 text-gray-700">4. 预览效果</h2>
+          <h2 className="text-2xl font-semibold mb-4 text-gray-700 text-left">4. 预览效果</h2>
           {image ? (
             <>
               <div className="relative">
-                <Preview image={image} lines={lines} textStyle={textStyle} showSubtitles={showEnglishSubtitles} showWatermark={false} />
+                <Preview 
+                  image={image} 
+                  lines={lines} 
+                  textStyle={textStyle} 
+                  showSubtitles={showEnglishSubtitles} 
+                  showWatermark={false} 
+                />
               </div>
               <button
                 onClick={handleDownload}
