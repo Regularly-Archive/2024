@@ -8,17 +8,22 @@ const FONTS = [
   { value: 'STXihei', label: '华文细黑' },
 ]
 
-export default function StyleEditor({ imageHeight, onStyleChange, showEnglishSubtitles }) {
+export default function StyleEditor({ imageHeight, onStyleChange, showEnglishSubtitles}) {
   const [fontSize, setFontSize] = useState(32)
   const [selectedFont, setSelectedFont] = useState(FONTS[0].value)
   const [blockHeight, setBlockHeight] = useState(
     showEnglishSubtitles ? Math.floor(imageHeight / 8) : Math.floor(imageHeight / 16)
   )
+
+  const [isBackgroundDarkened, setIsBackgroundDarkened] = useState(false);
   
   // 设置第一行文本高度的默认值和最小值
-  const minFirstLineHeightOffset = 10;
-  const maxFirstLineHeightOffset = 40;
+  const minFirstLineHeightOffset = 0;
+  const maxFirstLineHeightOffset = imageHeight / 2;
   const [firstLineHeightOffset, setFirstLineHeightOffset] = useState(0);
+
+  // 新增的状态：中英文字幕间距
+  const [subtitleYFactor, setSubtitleYFactor] = useState(0.35); // 默认值
 
   const minHeight = Math.max(32, Math.floor(imageHeight / 16))
   const maxHeight = Math.floor(imageHeight / 8)
@@ -29,8 +34,10 @@ export default function StyleEditor({ imageHeight, onStyleChange, showEnglishSub
       fontFamily: selectedFont,
       blockHeight,
       firstLineHeightOffset,
+      isBackgroundDarkened,
+      subtitleYFactor, // 传递新的状态
     })
-  }, [fontSize, selectedFont, blockHeight, firstLineHeightOffset])
+  }, [fontSize, selectedFont, blockHeight, firstLineHeightOffset, isBackgroundDarkened, subtitleYFactor])
 
   return (
     <div className="space-y-6">
@@ -122,6 +129,39 @@ export default function StyleEditor({ imageHeight, onStyleChange, showEnglishSub
           <span>{minFirstLineHeightOffset}px</span>
           <span>{maxFirstLineHeightOffset}px</span>
         </div>
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium text-gray-700">
+            中英文字幕间距
+          </label>
+          <span className="text-sm text-gray-500">
+            {subtitleYFactor}
+          </span>
+        </div>
+        <input
+          type="range"
+          min={0.3}
+          max={0.5}
+          step={0.01} // 允许小数步进
+          value={subtitleYFactor}
+          onChange={(e) => setSubtitleYFactor(Number(e.target.value))}
+          className="w-full"
+        />
+        <div className="flex justify-between text-xs text-gray-500">
+          <span>0.3</span>
+          <span>0.5</span>
+        </div>
+      </div>
+      <div className="flex items-center mt-4">
+        <input
+          type="checkbox"
+          id="isBackgroundDarkened"
+          checked={isBackgroundDarkened}
+          onChange={() => setIsBackgroundDarkened(!isBackgroundDarkened)}
+          className="mr-2"
+        />
+        <label htmlFor="isBackgroundDarkened" className="text-gray-700">字幕背景增强</label>
       </div>
     </div>
   )

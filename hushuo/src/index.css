@@ -67,6 +67,25 @@ button:focus-visible {
   background: #a1a1a1;
 }
 
+/* 自定义滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px; /* 滚动条宽度 */
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1; /* 滚动条轨道背景 */
+  border-radius: 10px; /* 圆角 */
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888; /* 滚动条颜色 */
+  border-radius: 10px; /* 圆角 */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555; /* 滚动条悬停颜色 */
+}
+
 /* 现代化滑杆样式 */
 input[type="range"] {
   @apply h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer;
