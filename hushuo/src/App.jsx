@@ -5,6 +5,7 @@ import Home from './pages/Home'
 import Editor from './pages/Editor'
 import About from './pages/About'
 import './App.css'
+import './index.css'
 
 function App() {
   return (
