@@ -14,10 +14,12 @@ export default function Editor() {
     fontFamily: 'Microsoft YaHei',
     blockHeight: 80,
     firstLineHeightOffset: 0,
-    isBackgroundDarkened: false
+    isBackgroundDarkened: false,
+    splitCount: 1,
   })
   const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false)
   const [showEnglishSubtitles, setShowEnglishSubtitles] = useState(false)
+  const [englishSubtitleColor, setEnglishSubtitleColor] = useState('yellow')
 
   const handleImageUpload = (imageData) => {
     setImage(imageData)
@@ -44,14 +46,12 @@ export default function Editor() {
     setLines(generatedLines)
   }
 
-  const handleDownload = () => {
-    const canvas = document.querySelector('canvas')
-    if (canvas) {
-      const link = document.createElement('a')
-      link.download = '胡说.png'
-      link.href = canvas.toDataURL('image/png')
-      link.click()
-    }
+  const handleEnglishSubtitleColorChange = (newVal) => {
+    setEnglishSubtitleColor(newVal)
+    setTextStyle(prev => ({
+      ...prev,
+      englishSubtitleColor: newVal
+    }))
   }
 
   return (
@@ -98,14 +98,21 @@ export default function Editor() {
                 onChange={() => setShowEnglishSubtitles(!showEnglishSubtitles)}
                 className="mr-2"
               />
-              <label htmlFor="showEnglishSubtitles" className="text-gray-700">显示英文字幕</label>
+              <label htmlFor="showEnglishSubtitles" className="text-gray-700 text-sm">显示英文字幕</label>
             </div>
           </section>
 
           {image && (
             <section className="p-6 rounded-xl shadow-sm">
               <h2 className="text-2xl font-semibold mb-4 text-gray-700 text-left">3. 调整样式</h2>
-              <StyleEditor imageHeight={imageHeight} onStyleChange={handleStyleChange} showEnglishSubtitles={showEnglishSubtitles} firstLineHeightOffset={textStyle.firstLineHeightOffset} />
+              <StyleEditor 
+                imageHeight={imageHeight} 
+                onStyleChange={handleStyleChange} 
+                showEnglishSubtitles={showEnglishSubtitles} 
+                firstLineHeightOffset={textStyle.firstLineHeightOffset} 
+                englishSubtitleColor={englishSubtitleColor} 
+                onEnglishSubtitleColorChange={handleEnglishSubtitleColorChange}
+              />
             </section>
           )}
         </div>
@@ -121,15 +128,9 @@ export default function Editor() {
                   lines={lines} 
                   textStyle={textStyle} 
                   showSubtitles={showEnglishSubtitles} 
-                  showWatermark={false} 
+                  showWatermark={false}
                 />
               </div>
-              <button
-                onClick={handleDownload}
-                className="mt-4 w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium shadow-sm"
-              >
-                下载图片
-              </button>
             </>
           ) : (
             <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center text-gray-500">
