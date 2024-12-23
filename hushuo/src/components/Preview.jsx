@@ -1,19 +1,32 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { FiArrowLeft, FiArrowRight } from 'react-icons/fi'; // 引入箭头图标
 
 export default function Preview({ image, lines, textStyle, showSubtitles, showWatermark = true }) {
   const canvasRef = useRef(null)
-  const { fontSize, fontFamily, blockHeight, firstLineHeightOffset, isBackgroundDarkened, subtitleYFactor } = textStyle
+  const [currentIndex, setCurrentIndex] = useState(0); // 当前图片索引
+  const { fontSize, fontFamily, blockHeight, firstLineHeightOffset, isBackgroundDarkened, subtitleYFactor, englishSubtitleColor } = textStyle
   const englishFontSize = fontSize * 0.75; 
+  
+  const splitLines = () => {
+    const chunkSize = lines.length / textStyle.splitCount;
+    const chunks = [];
+    for (let i = 0; i < lines.length; i += chunkSize) {
+      chunks.push(lines.slice(i, i + chunkSize));
+    }
+    return chunks;
+  };
+
+  const currentLines = splitLines()[currentIndex] || [];
 
   useEffect(() => {
-    if (!image || !canvasRef.current || lines.length === 0) return
+    if (!image || !canvasRef.current || currentLines.length === 0) return
 
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
     const img = new Image()
 
     img.onload = () => {
-      const extraLines = lines.length - 1
+      const extraLines = currentLines.length - 1
       const totalExtraHeight = Math.max(0, extraLines * blockHeight)
       canvas.width = img.width
       canvas.height = img.height + totalExtraHeight - firstLineHeightOffset
@@ -23,41 +36,34 @@ export default function Preview({ image, lines, textStyle, showSubtitles, showWa
       ctx.font = `${fontSize}px "${fontFamily}", sans-serif`
 
       // 绘制第一行文字
-      if (lines[0]) {
+      if (currentLines[0]) {
         const firstLineY = img.height - blockHeight * 0.5 - firstLineHeightOffset
         
         // 如果需要背景加深效果
         if (isBackgroundDarkened) {
           ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // 黑色半透明背景
-          ctx.fillRect(0, firstLineY - blockHeight * 0.5, img.width, blockHeight);
+          ctx.fillRect(0, img.height - blockHeight - firstLineHeightOffset, img.width, blockHeight);
         }
 
         ctx.strokeStyle = 'black'
         ctx.lineWidth = Math.max(3, fontSize / 10)
-        ctx.strokeText(lines[0].zh, img.width / 2, firstLineY)
+        ctx.strokeText(currentLines[0].zh, img.width / 2, firstLineY)
         ctx.fillStyle = 'white'
-        ctx.fillText(lines[0].zh, img.width / 2, firstLineY)
+        ctx.fillText(currentLines[0].zh, img.width / 2, firstLineY)
 
         // 绘制英文字幕
-        if (showSubtitles && lines[0].en) {
+        if (showSubtitles && currentLines[0].en) {
           ctx.font = `${englishFontSize}px "${fontFamily}", sans-serif`;
           const subtitleY = firstLineY + blockHeight * subtitleYFactor;
-          
-          // 如果需要背景加深效果
-          if (isBackgroundDarkened) {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // 黑色半透明背景
-            ctx.fillRect(0, subtitleY - englishFontSize * 0.5, img.width, englishFontSize);
-          }
-
           ctx.strokeStyle = 'black';
-          ctx.strokeText(lines[0].en, img.width / 2, subtitleY);
-          ctx.fillStyle = 'yellow';
-          ctx.fillText(lines[0].en, img.width / 2, subtitleY);
+          ctx.strokeText(currentLines[0].en, img.width / 2, subtitleY);
+          ctx.fillStyle = englishSubtitleColor;
+          ctx.fillText(currentLines[0].en, img.width / 2, subtitleY);
         }
       }
 
       // 从第二行开始，为每行文字创建一个新的区域
-      lines.slice(1).forEach((line, index) => {
+      currentLines.slice(1).forEach((line, index) => {
         ctx.font = `${fontSize}px "${fontFamily}", sans-serif`
         const blockY = img.height + (index * blockHeight) - firstLineHeightOffset
         const sourceY = Math.max(0, img.height - blockHeight)
@@ -74,7 +80,7 @@ export default function Preview({ image, lines, textStyle, showSubtitles, showWa
           // 如果需要背景加深效果
           if (isBackgroundDarkened) {
             ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // 黑色半透明背景
-            ctx.fillRect(0, blockY - blockHeight * 0.5, img.width, blockHeight);
+            ctx.fillRect(0, blockY, img.width, blockHeight);
           }
 
           ctx.strokeStyle = 'black'
@@ -88,16 +94,9 @@ export default function Preview({ image, lines, textStyle, showSubtitles, showWa
           if (showSubtitles && line.en) {
             ctx.font = `${englishFontSize}px "${fontFamily}", sans-serif`; 
             const subtitleY = lineTextY + blockHeight * subtitleYFactor;
-            
-            // 如果需要背景加深效果
-            if (isBackgroundDarkened) {
-              ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // 黑色半透明背景
-              ctx.fillRect(0, subtitleY - englishFontSize * 0.5, img.width, englishFontSize);
-            }
-
             ctx.strokeStyle = 'black';
             ctx.strokeText(line.en, img.width / 2, subtitleY);
-            ctx.fillStyle = 'yellow';
+            ctx.fillStyle = englishSubtitleColor;
             ctx.fillText(line.en, img.width / 2, subtitleY);
           }
         }
@@ -140,14 +139,87 @@ export default function Preview({ image, lines, textStyle, showSubtitles, showWa
     }
 
     img.src = image
-  }, [image, lines, textStyle, showSubtitles, showWatermark])
+  }, [image, currentLines, textStyle, showSubtitles, showWatermark])
+  
+  const formatTimestamp = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0'); // 月份从0开始
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const milliseconds = String(now.getMilliseconds()).padStart(3, '0');
+    return `${year}${month}${day}${hours}${minutes}${seconds}${milliseconds}`;
+  };
+
+  const handleDownloadCurrent = () => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const timestamp = formatTimestamp(); // 获取格式化的时间戳
+      const link = document.createElement('a');
+      const fileName = textStyle.splitCount > 1 
+        ? `胡说_${timestamp}_${currentIndex + 1}.png`
+        : `胡说_${timestamp}.png`
+      link.download = fileName; 
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+  };
+
+  const handleDownloadAll = async () => {
+    const originalIndex = currentIndex; // 记录当前索引
+    const canvas = canvasRef.current;
+
+    if (canvas && textStyle.splitCount > 1) {
+      const timestamp = formatTimestamp()
+      for (let i = 0; i < splitLines().length; i++) {
+        setCurrentIndex(i); // 切换到下一个索引
+        await new Promise(resolve => setTimeout(resolve, 100)); // 等待渲染完成
+        const link = document.createElement('a');
+        const fileName = `胡说_${timestamp}_${i + 1}.png`
+        link.download = fileName
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      }
+    }
+
+    setCurrentIndex(originalIndex); // 重置索引
+  };
 
   return (
     <div className="relative w-full">
+      <div className="flex justify-between items-center mb-2">
+        {textStyle.splitCount > 1 && (
+          <>
+            <button 
+              className='bg-blue-600 text-white rounded-lg hover:bg-blue-700'
+              onClick={() => setCurrentIndex((prev) => Math.max(prev - 1, 0))}>
+              <FiArrowLeft /> {/* 使用左箭头图标 */}
+            </button>
+            <span className="mx-4">
+              {currentIndex + 1} / {splitLines().length} {/* 显示当前索引和总数 */}
+            </span>
+            <button 
+              className='bg-blue-600 text-white rounded-lg hover:bg-blue-700'
+              onClick={() => setCurrentIndex((prev) => Math.min(prev + 1, splitLines().length - 1))}>
+              <FiArrowRight /> {/* 使用右箭头图标 */}
+            </button>
+          </>
+        )}
+      </div>
       <canvas
         ref={canvasRef}
         className="max-w-full h-auto mx-auto border rounded-lg shadow-lg"
       />
+      <button onClick={handleDownloadCurrent} className="mt-4 w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium shadow-sm">
+        下载当前图片
+      </button>
+      {textStyle.splitCount > 1 && (
+        <button onClick={handleDownloadAll} className="mt-4 w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium shadow-sm">
+          下载全部图片
+        </button>
+      )}
     </div>
   )
 }
