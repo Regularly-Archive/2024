@@ -8,7 +8,7 @@ const FONTS = [
   { value: 'STXihei', label: '华文细黑' },
 ]
 
-export default function StyleEditor({ imageHeight, onStyleChange, showEnglishSubtitles}) {
+export default function StyleEditor({ imageHeight, onStyleChange, showEnglishSubtitles, firstLineHeightOffset: initialFirstLineHeightOffset, englishSubtitleColor, onEnglishSubtitleColorChange }) {
   const [fontSize, setFontSize] = useState(32)
   const [selectedFont, setSelectedFont] = useState(FONTS[0].value)
   const [blockHeight, setBlockHeight] = useState(
@@ -17,16 +17,19 @@ export default function StyleEditor({ imageHeight, onStyleChange, showEnglishSub
 
   const [isBackgroundDarkened, setIsBackgroundDarkened] = useState(false);
   
+  
   // 设置第一行文本高度的默认值和最小值
+  const [firstLineHeightOffset, setFirstLineHeightOffset] = useState(initialFirstLineHeightOffset)
   const minFirstLineHeightOffset = 0;
   const maxFirstLineHeightOffset = imageHeight / 2;
-  const [firstLineHeightOffset, setFirstLineHeightOffset] = useState(0);
 
   // 新增的状态：中英文字幕间距
   const [subtitleYFactor, setSubtitleYFactor] = useState(0.35); // 默认值
 
   const minHeight = Math.max(32, Math.floor(imageHeight / 16))
   const maxHeight = Math.floor(imageHeight / 8)
+
+  const [splitCount, setSplitCount] = useState(1)
 
   useEffect(() => {
     onStyleChange({
@@ -35,9 +38,14 @@ export default function StyleEditor({ imageHeight, onStyleChange, showEnglishSub
       blockHeight,
       firstLineHeightOffset,
       isBackgroundDarkened,
-      subtitleYFactor, // 传递新的状态
+      subtitleYFactor,
+      splitCount,
     })
-  }, [fontSize, selectedFont, blockHeight, firstLineHeightOffset, isBackgroundDarkened, subtitleYFactor])
+  }, [fontSize, selectedFont, blockHeight, firstLineHeightOffset, isBackgroundDarkened, subtitleYFactor, splitCount])
+
+  const handleColorChange = (event) => {
+    onEnglishSubtitleColorChange(event.target.value);
+  };
 
   return (
     <div className="space-y-6">
@@ -161,8 +169,33 @@ export default function StyleEditor({ imageHeight, onStyleChange, showEnglishSub
           onChange={() => setIsBackgroundDarkened(!isBackgroundDarkened)}
           className="mr-2"
         />
-        <label htmlFor="isBackgroundDarkened" className="text-gray-700">字幕背景增强</label>
+        <label htmlFor="isBackgroundDarkened" className="text-gray-700 text-sm">字幕背景增强</label>
       </div>
+      {showEnglishSubtitles && (
+        <div className="mb-4 flex items-center">
+          <label className="block text-gray-700 text-sm mr-2" htmlFor="englishSubtitleColor">
+            英文字幕颜色
+          </label>
+          <input
+            type="color"
+            id="englishSubtitleColor"
+            value={englishSubtitleColor}
+            onChange={handleColorChange}
+            className="border rounded-md p-1"
+          />
+        </div>
+      )}
+      <label className="flex items-center text-gray-700 text-sm">
+        将图片分隔为 
+        <input 
+          type="number" 
+          onChange={(e) => setSplitCount(Math.max(1, Number(e.target.value)))} 
+          min="1"
+          value={splitCount}
+          className="mx-2 p-2 border border-gray-300 rounded-lg w-24" 
+        />
+        张图片
+      </label>
     </div>
   )
 }
