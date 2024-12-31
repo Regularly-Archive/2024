@@ -6,6 +6,7 @@ from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import silhouette_score
 
 detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor("./models/shape_predictor_68_face_landmarks.dat")
@@ -95,38 +96,72 @@ def get_eps_by_k_distance_diagram(dataset_path):
     plt.grid(True)
     plt.show()
 
+def find_best_params(features, eps_range, min_samples_range):
+    best_score = -1
+    best_eps = None
+    best_min_samples = None
+    
+    results = []
+    
+    for eps in eps_range:
+        for min_samples in min_samples_range:
+            clustering = DBSCAN(eps=eps, min_samples=min_samples)
+            labels = clustering.fit_predict(features)
+            
+            # 只有当聚类结果至少有两类时才计算轮廓系数
+            n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
+            if n_clusters < 2:
+                continue
+                
+            # 计算轮廓系数时排除噪声点（标签为-1的点）
+            mask = labels != -1
+            if np.sum(mask) < 2:
+                continue
+                
+            score = silhouette_score(features[mask], labels[mask])
+            results.append({
+                'eps': eps,
+                'min_samples': min_samples,
+                'n_clusters': n_clusters,
+                'score': score,
+                'noise_points': np.sum(labels == -1)
+            })
+            
+            if score > best_score:
+                best_score = score
+                best_eps = eps
+                best_min_samples = min_samples
+    
+    return best_eps, best_min_samples, results
     
 def face_clustering_pipeline(dataset_path):
 
-    get_eps_by_k_distance_diagram(dataset_path)
+    #get_eps_by_k_distance_diagram(dataset_path)
+    
 
     # 加载数据集
     features, valid_paths = load_dataset(dataset_path)
 
-    scaler = StandardScaler()
-    features = scaler.fit_transform(features)
+    best_eps, best_min_samples, results = find_best_params(features, np.arange(0.3, 0.8, 0.01), range(6, 10))
+
+    #scaler = StandardScaler()
+    #X = scaler.fit_transform(features)
+    X = features
     
     # 对向量进行降维
-    pca = PCA(n_components=30)
-    features = pca.fit_transform(features) 
+    #pca = PCA(n_components=30)
+    #features = pca.fit_transform(features) 
 
-    clustering = DBSCAN(eps=0.45, min_samples=6)
-    labels = clustering.fit_predict(features)
+    db = DBSCAN(eps=best_eps, min_samples=best_min_samples)
+    db.fit(X)
+    labels = db.labels_
     
-    refined_labels = refine_clusters(np.array(features), labels)
-    
-    results = {}
-    for path, label in zip(valid_paths, refined_labels):
-        if label not in results:
-            results[label] = []
-        results[label].append(path)
-    
-    return results
+    n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
+    n_noise_ = list(labels).count(-1)
+
+    print('Estimated number of clusters: %d' % n_clusters_)
+    print('Estimated number of noise points: %d' % n_noise_)
 
 # 使用示例
 dataset_path = './collections'
-clustered_faces = face_clustering_pipeline(dataset_path)
-
-# 展示结果
-for cluster_id, paths in clustered_faces.items():
-    print(f"Cluster {cluster_id} has {len(paths)} images")
+face_clustering_pipeline(dataset_path)

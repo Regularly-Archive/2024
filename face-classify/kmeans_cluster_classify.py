@@ -50,7 +50,8 @@ def extract_face_rect(image_path):
 def load_dataset(dataset_path):
     X = []
     image_paths = []
-
+    
+    print('开始加载训练数据...')
     for image_name in os.listdir(dataset_path):
         image_path = os.path.join(dataset_path, image_name)
         features = extract_face_features(image_path)
@@ -134,7 +135,6 @@ def get_k_by_bouldin_score(X):
     plt.grid(True)
     plt.show()
 
-
 # 主程序
 if __name__ == "__main__":
     dataset_path = "./collections"
@@ -143,8 +143,6 @@ if __name__ == "__main__":
 
     scaler = StandardScaler()
     X = scaler.fit_transform(X)
-
-    get_k_by_bouldin_score(X)
 
     # 使用 K-means 进行聚类
     num_clusters = 6
