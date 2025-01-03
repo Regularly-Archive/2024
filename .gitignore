@@ -89,3 +89,4 @@ face-classify/collections/
 face-classify/.venv/
 face-classify/output/
 PostgreSQL.Embedding/.idea/
+face-classify/testcases/
