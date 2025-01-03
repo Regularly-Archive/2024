@@ -138,7 +138,7 @@ def get_k_by_bouldin_score(X):
 # 主程序
 if __name__ == "__main__":
     dataset_path = "./collections"
-    output_dir = "./output/clusering_results"
+    output_path = "./output/clusering_results"
     X, image_paths = load_dataset(dataset_path)
 
     scaler = StandardScaler()
@@ -153,7 +153,7 @@ if __name__ == "__main__":
     labels = kmeans.labels_
 
     # 将图片移动到对应的聚类文件夹
-    save_clustered_images(image_paths, labels, num_clusters, output_dir)
+    save_clustered_images(image_paths, labels, num_clusters, output_path)
 
     # 使用 PCA 降维到 2 维
     pca = PCA(n_components=2)
