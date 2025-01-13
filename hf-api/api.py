@@ -1,13 +1,13 @@
 from fastapi import FastAPI
 from models import CompletionRequest, ChatCompletionRequest, EmbeddingsRequest, EmbeddingsObjectResponse, EmbeddingsResponse, Usage, CompletionResponse, CompletionResponseChoice, ChatCompletionResponse, ChatCompletionResponseChoice, ChatMessage
 from fastapi import FastAPI, HTTPException
-from completion import get_chat_completion_async, get_text_completion_async
-from embeddings import get_embeddings_async
-import os, uvicorn, asyncio
+from completion import get_chat_completion_async, get_text_completion_async, release_completion_models
+from embeddings import get_embeddings_async, release_embedding_models
+import os, uvicorn
 from uvicorn.config import LOGGING_CONFIG
 
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-app = FastAPI(title='A OpenAI Compatible API for HuggingFace')
+app = FastAPI(title='A OpenAI Compatible API for HuggingFace & ModelScope')
 
 @app.post("/v1/embeddings")
 async def text_embeddings(request: EmbeddingsRequest) -> EmbeddingsResponse:
@@ -40,6 +40,12 @@ async def completions(request: CompletionRequest):
         choices=[CompletionResponseChoice(text=text, index=0, finish_reason='length', logprobs=None)],
         usage=Usage()
     )
+
+@app.get("/v1/release")
+def release():
+    release_completion_models()
+    release_embedding_models()
+    return { 'success': True}
     
 if __name__ == '__main__':
     LOGGING_CONFIG["formatters"]["access"]["fmt"] = ("%(asctime)s " + LOGGING_CONFIG["formatters"]["access"]["fmt"])
