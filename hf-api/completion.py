@@ -1,19 +1,25 @@
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from models import CompletionRequest, ChatCompletionRequest
 from utils import Text_Generation_Model_Cache_Folder as model_cache_folder
-from utils import timer, createLogger
-import os, torch, asyncio
+from utils import timer, createLogger, LRUCache
+import os, gc, torch, asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logger = createLogger(__name__)
-executor = ThreadPoolExecutor()
+
+max_workers = int(os.getenv('MAX-WORKERS', '10'))
+executor = ThreadPoolExecutor(max_workers)
+
+cached_models = LRUCache(3)
+cached_tokenizers = LRUCache(3)
 
 @timer(logger=logger)
 def get_chat_completion(request: ChatCompletionRequest) -> str:
     cache_dir = os.path.join(model_cache_folder, request.model)
-    model = AutoModelForCausalLM.from_pretrained(request.model, torch_dtype="auto", device_map="auto", cache_dir=cache_dir)
-    tokenizer = AutoTokenizer.from_pretrained(request.model)
+
+    (model, tokenizer) = get_cached_model(request.model, cache_dir)
+
     text = tokenizer.apply_chat_template(request.messages, tokenize=False, add_generation_prompt=True)
     model_inputs = tokenizer([text], return_tensors="pt").to(device)
 
@@ -26,8 +32,9 @@ def get_chat_completion(request: ChatCompletionRequest) -> str:
 @timer(logger=logger)
 def get_text_completion(request: CompletionRequest) -> str:
     cache_dir = os.path.join(model_cache_folder, request.model)
-    model = AutoModelForCausalLM.from_pretrained(request.model, torch_dtype="auto", device_map="auto", cache_dir=cache_dir, trust_remote_code=True)
-    tokenizer = AutoTokenizer.from_pretrained(request.model)
+
+    (model, tokenizer) = get_cached_model(request.model, cache_dir)
+    
     messages = [{"role": "user", "content": request.prompt}] if isinstance(request.prompt, str) else request.prompt
 
     text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
@@ -39,6 +46,16 @@ def get_text_completion(request: CompletionRequest) -> str:
     response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
     return response
 
+def get_cached_model(model_name: str, cache_dir: str):
+    if cached_models.hasKey(model_name):
+        return (cached_models.get(model_name), cached_tokenizers.get(model_name))
+    else:
+        model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype="auto", device_map="auto", cache_dir=cache_dir)
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        cached_models.put(model_name, model)
+        cached_tokenizers.put(model_name, tokenizer)
+        return (model, tokenizer)
+
 async def get_chat_completion_async(request: ChatCompletionRequest) -> str:
     loop = asyncio.get_event_loop()
     completion = await loop.run_in_executor(executor, get_chat_completion, request)
@@ -48,3 +65,6 @@ async def get_text_completion_async(request: CompletionRequest) -> str:
     loop = asyncio.get_event_loop()
     completion = await loop.run_in_executor(executor, get_text_completion, request)
     return completion
+
+def release_completion_models():
+    gc.collect()
