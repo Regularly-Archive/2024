@@ -90,3 +90,4 @@ face-classify/.venv/
 face-classify/output/
 PostgreSQL.Embedding/.idea/
 face-classify/testcases/
+CloudMusicCrawler/__pycache__/
