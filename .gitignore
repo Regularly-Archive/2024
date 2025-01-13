@@ -91,3 +91,5 @@ face-classify/output/
 PostgreSQL.Embedding/.idea/
 face-classify/testcases/
 CloudMusicCrawler/__pycache__/
+face-classify/__pycache__/kernels.cpython-39.pyc
+face-classify/testcases/
