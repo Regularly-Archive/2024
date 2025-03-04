@@ -23,7 +23,7 @@ export default function StyleEditor({ imageHeight, onStyleChange, showEnglishSub
   const minFirstLineHeightOffset = 0;
   const maxFirstLineHeightOffset = imageHeight / 2;
 
-  // 新增的状态：中英文字幕间距
+  // 中英文字幕间距
   const [subtitleYFactor, setSubtitleYFactor] = useState(0.35); // 默认值
 
   const minHeight = Math.max(32, Math.floor(imageHeight / 16))
