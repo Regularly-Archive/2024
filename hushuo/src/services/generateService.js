@@ -14,10 +14,6 @@ export const generateQuote = async (name, prompt, count) => {
         model: 'deepseek-chat',
         messages: [
           {
-            role: 'system', 
-            content: PROMPT_TEMPLATES.SYSTEM_PROMPT(SAMPLE_JSON_OUTPUT)
-          },
-          {
             role: 'user',
             content: PROMPT_TEMPLATES.USER_PROMPT(name, prompt, count)
           }
@@ -36,7 +32,7 @@ export const generateQuote = async (name, prompt, count) => {
 
     const data = await response.json()
     const quote = data.choices[0].message.content.trim().replaceAll('\n','')
-    return JSON.parse(quote)
+    return JSON.parse(quote)['response']
   } catch (error) {
     console.error('生成名言失败:', error)
     throw error
