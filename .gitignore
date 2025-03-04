@@ -93,3 +93,6 @@ face-classify/testcases/
 CloudMusicCrawler/__pycache__/
 face-classify/__pycache__/kernels.cpython-39.pyc
 face-classify/testcases/
+KnowledgeBase/db/
+PostgreSQL.Embedding/PostgreSQL.Embedding/Assets/Scripts/demo.py
+PostgreSQL.Embedding/PostgreSQL.Embedding/Assets/Scripts/.venv/
