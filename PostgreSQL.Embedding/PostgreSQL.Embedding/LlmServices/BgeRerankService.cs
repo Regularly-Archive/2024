@@ -1,13 +1,8 @@
 ﻿using CSnakes.Runtime;
-using Mapster;
 using Microsoft.Extensions.Options;
-using Microsoft.JSInterop;
 using PostgreSQL.Embedding.Common.Confirguration;
 using PostgreSQL.Embedding.LlmServices.Abstration;
-using System.Diagnostics;
-using System.Linq;
 using System.Linq.Expressions;
-using System.Runtime.InteropServices;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
@@ -60,11 +55,6 @@ namespace PostgreSQL.Embedding.LlmServices
             _flagReranker = environment.Reranker();
 
             _logger.LogInformation($"The model '{modelName}' has been initialized.");
-        }
-
-        public double Compute(string a, string b)
-        {
-            return _flagReranker.ComputeScore(new List<string> { a, b });
         }
 
         public IEnumerable<RerankResult<T>> Sort<T>(string question, List<T> documents, Expression<Func<T, string>> keyExps)
