@@ -2,6 +2,7 @@
 {
     public class PythonConfig
     {
-        public string PythonLibrary { get; set; }
+        public string PythonExecute { get; set; }
+        public string PythonVersion { get; set; }
     }
 }
