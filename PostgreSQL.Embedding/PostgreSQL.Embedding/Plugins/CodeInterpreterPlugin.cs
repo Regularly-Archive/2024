@@ -1,5 +1,4 @@
-﻿using Jint;
-using Microsoft.Extensions.Options;
+﻿using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -8,7 +7,6 @@ using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Confirguration;
 using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.Plugins.Abstration;
-using Python.Runtime;
 using System.ComponentModel;
 
 namespace PostgreSQL.Embedding.Plugins
