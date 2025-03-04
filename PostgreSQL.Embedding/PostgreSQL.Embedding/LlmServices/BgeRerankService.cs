@@ -1,92 +1,81 @@
-﻿using Microsoft.Extensions.Options;
+﻿using CSnakes.Runtime;
+using Mapster;
+using Microsoft.Extensions.Options;
 using Microsoft.JSInterop;
 using PostgreSQL.Embedding.Common.Confirguration;
 using PostgreSQL.Embedding.LlmServices.Abstration;
-using Python.Runtime;
+using System.Diagnostics;
+using System.Linq;
 using System.Linq.Expressions;
+using System.Runtime.InteropServices;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
     public class BgeRerankService : IRerankService
     {
         // BAAI/bge-reranker-v2-m3
-        private readonly string _modelName = "AI-ModelScope/bge-reranker-v2-gemma";
-        private readonly dynamic _flagReranker;
+        private readonly string _modelName = "BAAI/bge-reranker-v2-m3";
+        private IReranker _flagReranker;
 
         private readonly ILogger<BgeRerankService> _logger;
         public BgeRerankService(IOptions<PythonConfig> options, ILogger<BgeRerankService> logger)
         {
             _logger = logger;
-            
-            InitPython(options.Value);
-            _flagReranker = InitModel(_modelName);
+
+            var environment = InitPython(options.Value);
+            InitModel(environment, _modelName);
         }
 
-        private void InitPython(PythonConfig config)
+        private IPythonEnvironment InitPython(PythonConfig config)
         {
-            if (PythonEngine.IsInitialized) return;
+            var virtualEnvPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Python");
+            var dependencyPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Scripts", "requirements.txt");
 
-            if (config != null && !string.IsNullOrEmpty(config.PythonLibrary))
-                Runtime.PythonDLL = config.PythonLibrary;
+            _logger.LogInformation($"Python Runtime is initializing: {config.PythonExecute}...");
 
-            _logger.LogInformation($"Python Runtime is initializing: {config.PythonLibrary}...");
-            PythonEngine.Initialize();
-            PythonEngine.BeginAllowThreads();
+            var homePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Scripts");
+            var venvPath = Path.Combine(homePath, ".venv");
+
+            var services = new ServiceCollection().AddLogging();
+            services
+                .WithPython()
+                .WithHome(homePath)
+                .WithVirtualEnvironment(venvPath)
+                .FromFolder(config.PythonExecute, config.PythonVersion)
+                .WithPipInstaller();
+
+            var serviceProvider = services.BuildServiceProvider();
+            var environment = serviceProvider.GetRequiredService<IPythonEnvironment>();
+
             _logger.LogInformation($"Python Runtime has been initialized.");
+
+            return environment;
         }
 
-        private dynamic InitModel(string modelName)
+        private void InitModel(IPythonEnvironment environment, string modelName)
         {
-            using (Py.GIL())
-            {
-                _logger.LogInformation($"The model '{modelName}' is initializing...");
+            _logger.LogInformation($"The model '{modelName}' is initializing...");
 
-                dynamic modelscope = Py.Import("modelscope");
-                dynamic flagEmbedding = Py.Import("FlagEmbedding");
+            Environment.SetEnvironmentVariable("RERANKER_MODEL_NAME", modelName);
+            _flagReranker = environment.Reranker();
 
-                dynamic rerankModelDir = modelscope.snapshot_download(modelName, revision: "master");
-                dynamic flagReranker = flagEmbedding.FlagReranker(rerankModelDir, use_fp16: true);
-
-                _logger.LogInformation($"The model '{modelName}' has been initialized.");
-
-                return flagReranker;
-            }
+            _logger.LogInformation($"The model '{modelName}' has been initialized.");
         }
 
         public double Compute(string a, string b)
         {
-            using (Py.GIL())
-            {
-                var pyList = new PyList();
-                pyList.Append(a.ToPython());
-                pyList.Append(b.ToPython());
-
-                PyObject result = _flagReranker.compute_score(pyList, normalize: true);
-                return result.As<double>();
-            }
+            return _flagReranker.ComputeScore(new List<string> { a, b });
         }
 
         public IEnumerable<RerankResult<T>> Sort<T>(string question, List<T> documents, Expression<Func<T, string>> keyExps)
         {
             var keyFunc = keyExps.Compile();
-            using (Py.GIL())
+            var pairs = documents.Select(x => new List<string> { question, keyFunc(x) }).ToList();
+            var scores = _flagReranker.ComputeScores(pairs);
+
+            for (var i = 0; i < documents.Count; i++)
             {
-                var pyList = new PyList();
-                foreach (var document in documents)
-                {
-                    var pair = new PyList();
-                    pair.Append(question.ToPython());
-                    pair.Append(keyFunc(document).ToPython());
-                    pyList.Append(pair.ToPython());
-                }
-
-                PyObject result = _flagReranker.compute_score(pyList, normalize: true);
-                var scores = result.As<PyList>();
-
-                for (var i = 0; i < documents.Count; i++)
-                {
-                    yield return new RerankResult<T>() { Score = scores[i].As<double>(), Document = documents[i] };
-                }
+                yield return new RerankResult<T>() { Score = scores[i], Document = documents[i] };
             }
         }
     }

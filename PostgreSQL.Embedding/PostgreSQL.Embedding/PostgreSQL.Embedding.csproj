@@ -9,8 +9,22 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Assets\Scripts\demo.py" />
+    <None Remove="Assets\Scripts\reranker.py" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="Assets\Scripts\demo.py">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </AdditionalFiles>
+    <AdditionalFiles Include="Assets\Scripts\reranker.py">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </AdditionalFiles>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CSnakes.Runtime" Version="1.0.27" />
     <PackageReference Include="jieba.NET" Version="0.42.2" />
-    <PackageReference Include="Jint" Version="4.0.1" />
     <PackageReference Include="LLamaSharp" Version="0.13.0" />
     <PackageReference Include="LLamaSharp.Backend.Cpu" Version="0.13.0" />
     <PackageReference Include="LLamaSharp.kernel-memory" Version="0.13.0" />
@@ -36,7 +50,6 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Pgvector.EntityFrameworkCore" Version="0.2.0" />
     <PackageReference Include="PuppeteerSharp" Version="20.0.5" />
-    <PackageReference Include="pythonnet" Version="3.0.3" />
     <PackageReference Include="SqlSugarCore" Version="5.1.4.145" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.4.1" />
@@ -87,6 +100,9 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Assets\Models\TinyLlama-1.1B\TinyLlama-1.1B-ggml-model-q4_0.bin">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\Scripts\requirements.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Common\Prompts\DataAnalysis.txt">
