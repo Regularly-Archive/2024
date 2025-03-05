@@ -10,6 +10,13 @@ namespace PostgreSQL.Embedding.LlmServices
     {
         // BAAI/bge-reranker-v2-m3
         private readonly string _modelName = "BAAI/bge-reranker-v2-m3";
+
+        private readonly string _homePath = 
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Scripts");
+
+        private readonly string _venvPath = 
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Scripts", ".venv");
+
         private IReranker _flagReranker;
 
         private readonly ILogger<BgeRerankService> _logger;
@@ -23,19 +30,13 @@ namespace PostgreSQL.Embedding.LlmServices
 
         private IPythonEnvironment InitPython(PythonConfig config)
         {
-            var virtualEnvPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Python");
-            var dependencyPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Scripts", "requirements.txt");
-
-            _logger.LogInformation($"Python Runtime is initializing: {config.PythonExecute}...");
-
-            var homePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Scripts");
-            var venvPath = Path.Combine(homePath, ".venv");
+            _logger.LogInformation($"Python Runtime is initializing: {config.PythonExecute}, Version={config.PythonVersion}...");
 
             var services = new ServiceCollection().AddLogging();
             services
                 .WithPython()
-                .WithHome(homePath)
-                .WithVirtualEnvironment(venvPath)
+                .WithHome(_homePath)
+                .WithVirtualEnvironment(_venvPath)
                 .FromFolder(config.PythonExecute, config.PythonVersion)
                 .WithPipInstaller();
 
@@ -51,7 +52,10 @@ namespace PostgreSQL.Embedding.LlmServices
         {
             _logger.LogInformation($"The model '{modelName}' is initializing...");
 
-            Environment.SetEnvironmentVariable("RERANKER_MODEL_NAME", modelName);
+            var envfile = Path.Combine(_homePath, ".env");
+            if (File.Exists(envfile)) File.Delete(envfile);
+            File.WriteAllText(envfile, $"RERANKER_MODEL_NAME={modelName}");
+
             _flagReranker = environment.Reranker();
 
             _logger.LogInformation($"The model '{modelName}' has been initialized.");
