@@ -9,14 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="Assets\Scripts\demo.py" />
     <None Remove="Assets\Scripts\reranker.py" />
   </ItemGroup>
 
   <ItemGroup>
-    <AdditionalFiles Include="Assets\Scripts\demo.py">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </AdditionalFiles>
     <AdditionalFiles Include="Assets\Scripts\reranker.py">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </AdditionalFiles>
