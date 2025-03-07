@@ -373,9 +373,10 @@ namespace PostgreSQL.Embedding.Planners
 
         private async Task<string> GetCompletionAsync(IAIService aiService, ChatHistory chatHistory, bool addThought, CancellationToken CancellationToken)
         {
+            var promptExecutionSettings = new PromptExecutionSettings() { FunctionChoiceBehavior = FunctionChoiceBehavior.None() };
             if (aiService is IChatCompletionService chatCompletionService)
             {
-                var chatMessageContent = await chatCompletionService.GetChatMessageContentAsync(chatHistory);
+                var chatMessageContent = await chatCompletionService.GetChatMessageContentAsync(chatHistory, promptExecutionSettings);
                 return (chatMessageContent.InnerContent as Azure.AI.OpenAI.ChatResponseMessage)?.Content;
             }
             else if (aiService is ITextGenerationService textGenerationService)
