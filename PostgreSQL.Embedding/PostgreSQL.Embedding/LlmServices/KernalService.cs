@@ -10,6 +10,7 @@ using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.LlmServices.Routers;
 using PostgreSQL.Embedding.Utils;
+using System.Diagnostics;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
@@ -32,7 +33,7 @@ namespace PostgreSQL.Embedding.LlmServices
             return (await GetKernel(llmModel, app.Id));
         }
 
-        public Task<Kernel> GetKernel(LlmModel llmModel, long? appId)
+        public async Task<Kernel> GetKernel(LlmModel llmModel, long? appId)
         {
             var options = _serviceProvider.GetRequiredService<IOptions<LlmConfig>>();
 
@@ -49,10 +50,17 @@ namespace PostgreSQL.Embedding.LlmServices
             kernel.Plugins.AddFromType<ConversationSummaryPlugin>();
             kernel.Plugins.AddFromType<TimePlugin>();
             kernel.Plugins.AddFromType<MathPlugin>();
-
             kernel = kernel.ImportLlmPlugins(_serviceProvider, appId);
+            await kernel.AddMCPServer2(
+                name: "playwright",
+                command: "npx",
+                version: "1.0.0",
+                args: ["-y", "@executeautomation/playwright-mcp-server"],
+                //args: ["-y", "@modelcontextprotocol/server-everything"],
+                env: null
+            );
 
-            return Task.FromResult(kernel);
+            return kernel;
         }
 
         private OpenAIClient GetOpenAIClient(HttpClient httpClient, LlmModel llmModel)
