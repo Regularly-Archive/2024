@@ -38,7 +38,7 @@
     </PackageReference>
     <PackageReference Include="Microsoft.KernelMemory.Core" Version="0.64.240619.1" />
     <PackageReference Include="Microsoft.KernelMemory.MemoryDb.Postgres" Version="0.64.240619.1" />
-    <PackageReference Include="Microsoft.SemanticKernel" Version="1.15.0" />
+    <PackageReference Include="Microsoft.SemanticKernel" Version="1.40.1" />
     <PackageReference Include="Microsoft.SemanticKernel.Planners.Handlebars" Version="1.15.0-preview" />
     <PackageReference Include="Microsoft.SemanticKernel.Plugins.Core" Version="1.15.0-alpha" />
     <PackageReference Include="Microsoft.SemanticKernel.Plugins.Memory" Version="1.15.0-alpha" />

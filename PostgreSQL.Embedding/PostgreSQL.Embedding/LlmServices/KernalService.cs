@@ -51,28 +51,35 @@ namespace PostgreSQL.Embedding.LlmServices
             kernel.Plugins.AddFromType<TimePlugin>();
             kernel.Plugins.AddFromType<MathPlugin>();
             kernel = kernel.ImportLlmPlugins(_serviceProvider, appId);
-            await kernel.AddMCPServer2(
+            await kernel.AddMCPServer(
                 name: "playwright",
                 command: "npx",
                 version: "1.0.0",
                 args: ["-y", "@executeautomation/playwright-mcp-server"],
-                //args: ["-y", "@modelcontextprotocol/server-everything"],
                 env: null
             );
 
+            await kernel.AddMCPServer(
+                name: "memory",
+                command: "npx",
+                version: "1.0.0",
+                args: ["-y", "@modelcontextprotocol/server-memory"],
+                env: null
+            );
+            await kernel.AddMCPServer(
+                name: "filesystem",
+                command: "npx",
+                version: "1.0.0",
+                args: ["-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\Administrator"],
+                env: null
+            );
+            await kernel.AddMCPServer(
+                name: "git",
+                command: "uvx",
+                args: ["mcp-server-git", "--repository", "D:\\Projects\\2024"],
+                env: null
+            );
             return kernel;
-        }
-
-        private OpenAIClient GetOpenAIClient(HttpClient httpClient, LlmModel llmModel)
-        {
-            var clientOptions = new OpenAIClientOptions();
-
-            clientOptions.Transport = new HttpClientTransport(httpClient);
-
-            clientOptions.Retry.MaxRetries = 1;
-            clientOptions.Retry.NetworkTimeout = TimeSpan.FromMinutes(10);
-
-            return new OpenAIClient(new Uri("https://api.openai.com/v1"), new AzureKeyCredential(llmModel.ApiKey ?? Guid.NewGuid().ToString()), clientOptions);
         }
     }
 }

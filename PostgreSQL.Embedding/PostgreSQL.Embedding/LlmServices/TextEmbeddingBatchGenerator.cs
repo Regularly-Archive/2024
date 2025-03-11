@@ -6,7 +6,9 @@ namespace PostgreSQL.Embedding.LlmServices
     // Todo
     public class TextEmbeddingBatchGenerator : ITextEmbeddingBatchGenerator
     {
-        #pragma warning disable SKEXP0001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+        public int MaxBatchSize { get; set; }
+
+#pragma warning disable SKEXP0001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
         public readonly ITextEmbeddingGenerationService _embeddingGenerationService;
         #pragma warning restore SKEXP0001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
         #pragma warning disable SKEXP0001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.

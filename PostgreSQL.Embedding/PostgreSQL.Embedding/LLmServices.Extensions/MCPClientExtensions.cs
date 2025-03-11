@@ -1,9 +1,6 @@
-﻿using Elastic.Clients.Elasticsearch;
-using MCPSharp;
+﻿using MCPSharp;
 using MCPSharp.Model;
 using Microsoft.SemanticKernel;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 
 namespace PostgreSQL.Embedding.LLmServices.Extensions
 {

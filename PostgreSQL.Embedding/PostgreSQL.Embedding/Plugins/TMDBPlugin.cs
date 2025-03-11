@@ -1,11 +1,7 @@
-﻿
-using Elastic.Clients.Elasticsearch.Analysis;
-using Elastic.Transport;
-using Microsoft.SemanticKernel;
+﻿using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Models.Plugin;
 using PostgreSQL.Embedding.Plugins.Abstration;
-using System;
 using System.ComponentModel;
 
 namespace PostgreSQL.Embedding.Plugins

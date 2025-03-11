@@ -9,6 +9,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
 namespace PostgreSQL.Embedding.Planners
@@ -78,7 +79,7 @@ namespace PostgreSQL.Embedding.Planners
 
                 var finalAnswer = TryGetFinalAnswer(nextStep, stepsTaken, i + 1);
 
-                if (!string.IsNullOrEmpty(finalAnswer))
+                if (!string.IsNullOrEmpty(finalAnswer) && string.IsNullOrEmpty(nextStep.Action))
                     return finalAnswer;
 
                 if (TryGetObservations(nextStep, chatHistory, stepsTaken, lastStep))
@@ -141,13 +142,13 @@ namespace PostgreSQL.Embedding.Planners
 
             try
             {
+                _stopwatch = Stopwatch.StartNew();
                 var kernelFunction = kernel.GetKernelFunction(actionName);
                 actionVariables = BindFunctionParameter(actionVariables, kernelFunction);
 
                 var kernelArguments = new KernelArguments(actionVariables);
                 kernelArguments = kernelArguments.MergeArguments(_config.Variables);
 
-                _stopwatch = Stopwatch.StartNew();
                 var kernelResult = await kernel.InvokeAsync(kernelFunction, kernelArguments, cancellationToken);
                 var result = kernelResult.GetValue<string>();
 
@@ -315,7 +316,7 @@ namespace PostgreSQL.Embedding.Planners
         {
             if (!string.IsNullOrEmpty(step.FinalAnswer))
             {
-                _variables.Add("INPUT", step.FinalAnswer);
+                _variables["INPUT"] = step.FinalAnswer;
                 stepsTaken.Add(step);
 
                 AddExecutionStatsToContext(stepsTaken, iterations);
@@ -377,7 +378,7 @@ namespace PostgreSQL.Embedding.Planners
             if (aiService is IChatCompletionService chatCompletionService)
             {
                 var chatMessageContent = await chatCompletionService.GetChatMessageContentAsync(chatHistory, promptExecutionSettings);
-                return (chatMessageContent.InnerContent as Azure.AI.OpenAI.ChatResponseMessage)?.Content;
+                return chatMessageContent.Content;
             }
             else if (aiService is ITextGenerationService textGenerationService)
             {
@@ -415,7 +416,8 @@ namespace PostgreSQL.Embedding.Planners
             // object
             if (returnType.BaseType != typeof(ValueType))
             {
-                return JsonSerializer.Deserialize(element.ToString(), returnType);
+                return JsonObject.Parse(element.ToString());
+                //return JsonSerializer.Deserialize(element.ToString(), returnType);
             }
 
             // number
