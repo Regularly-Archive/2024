@@ -1,6 +1,4 @@
-﻿using Elastic.Clients.Elasticsearch;
-using Microsoft.AspNetCore.Http.Features;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using System.Text;
 
 namespace PostgreSQL.Embedding.Common

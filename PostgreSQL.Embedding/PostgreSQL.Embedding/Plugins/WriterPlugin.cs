@@ -1,11 +1,9 @@
 ﻿using DocumentFormat.OpenXml.Wordprocessing;
-using Elastic.Clients.Elasticsearch.Core.Search;
-using Elastic.Clients.Elasticsearch;
 using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Models;
-using System.ComponentModel;
 using PostgreSQL.Embedding.Plugins.Abstration;
+using System.ComponentModel;
 
 namespace PostgreSQL.Embedding.Plugins
 {

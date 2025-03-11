@@ -125,26 +125,24 @@ namespace PostgreSQL.Embedding.Utils
             }
         }
 
-        /// <summary>
-        /// 添加MCP服务器
-        /// </summary>
-        /// <param name="services"></param>
-        public static async Task AddMCPServer(this Kernel kernel, string name, string command, string version = "1.0.0", string[] args = null, Dictionary<string, string> env = null)
-        {
-            var client = new MCPClient(name, version, command, string.Join(' ', args ?? []), env);
-            var kernelFunctions = await client.GetKernelFunctionsAsync();
-            kernel.ImportPluginFromFunctions(name, kernelFunctions);
-        }
+        ///// <summary>
+        ///// 添加MCP服务器
+        ///// </summary>
+        ///// <param name="services"></param>
+        //public static async Task AddMCPServer(this Kernel kernel, string name, string command, string version = "1.0.0", string[] args = null, Dictionary<string, string> env = null)
+        //{
+        //    var client = new MCPClient(name, version, command, string.Join(' ', args ?? []), env);
+        //    var kernelFunctions = await client.GetKernelFunctionsAsync();
+        //    kernel.ImportPluginFromFunctions(name, kernelFunctions);
+        //}
 
-        public static async Task AddMCPServer2(this Kernel kernel, string name, string command, string version = "1.0.0", string[] args = null, Dictionary<string, string> env = null)
+        public static async Task AddMCPServer(this Kernel kernel, string name, string command, string version = "1.0.0", string[] args = null, Dictionary<string, string> env = null)
         {
             var clientOptions = new McpClientOptions()
             {
                 ClientInfo = new McpDotNet.Protocol.Types.Implementation() { Name = name, Version = "1.0.0" },
             };
 
-            var argumentsPrefix = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "/c " : string.Empty;
-            argumentsPrefix = string.Empty;
             var serverConfig = new McpServerConfig()
             {
                 Id = name,
@@ -153,7 +151,7 @@ namespace PostgreSQL.Embedding.Utils
                 TransportOptions = new Dictionary<string, string>
                 {
                     ["command"] = command,
-                    ["arguments"] = argumentsPrefix + string.Join(' ', args ?? []),
+                    ["arguments"] = string.Join(' ', args ?? []),
                 }
             };
 

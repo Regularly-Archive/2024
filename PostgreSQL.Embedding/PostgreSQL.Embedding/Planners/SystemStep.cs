@@ -45,7 +45,6 @@ namespace PostgreSQL.Embedding.Planners
             if (finalAnswerMatch.Success)
             {
                 result.FinalAnswer = finalAnswerMatch.Groups[1].Value.Trim();
-                return result;
             }
 
             var thoughtMatch = s_thoughtRegex.Match(input);
