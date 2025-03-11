@@ -153,6 +153,7 @@ namespace PostgreSQL.Embedding.LlmServices
                 planner.AddVariable("appId", _app.Id);
                 planner.AddVariable("conversationId", _conversationId);
                 planner.AddVariable("userId", currentUser.Id);
+                planner.AddVariable("currentTime", DateTime.Now);
 
                 var plan = await planner.CreatePlanAsync(input);
                 plan.OnStepExecute = async trace => await EmitTracesAsync(trace, cancellationToken);
