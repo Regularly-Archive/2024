@@ -1,6 +1,5 @@
 ﻿using McpDotNet.Client;
 using McpDotNet.Protocol.Types;
-using MCPSharp;
 using Microsoft.SemanticKernel;
 
 namespace PostgreSQL.Embedding.LLmServices.Extensions
@@ -19,33 +18,24 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
             {
                 try
                 {
-                    // Convert arguments to dictionary format expected by mcpdotnet
-                    Dictionary<string, object> mcpArguments = [];
+                    var mcpArguments = new Dictionary<string, object>();
                     foreach (var arg in arguments)
                     {
-                        if (arg.Value is not null)
-                        {
-                            mcpArguments[arg.Key] = function.ToArgumentValue(arg.Key, arg.Value);
-                        }
+                        if (arg.Value is not null) mcpArguments[arg.Key] = function.ToArgumentValue(arg.Key, arg.Value);
                     }
 
-                    // Call the tool through mcpdotnet
                     var result = await client.CallToolAsync(
                         tool.Name,
                         mcpArguments,
                         cancellationToken: cancellationToken
                     ).ConfigureAwait(false);
 
-                    // Extract the text content from the result
                     return string.Join("\n", result.Content
                         .Where(c => c.Type == "text")
                         .Select(c => c.Text));
                 }
-                catch (Exception ex)
+                catch
                 {
-                    Console.Error.WriteLine($"Error invoking tool '{tool.Name}': {ex.Message}");
-
-                    // Rethrowing to allow the kernel to handle the exception
                     throw;
                 }
             }
@@ -63,19 +53,16 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
         {
             var inputSchema = tool.InputSchema;
             var properties = inputSchema?.Properties;
-            if (properties == null)
-            {
-                return null;
-            }
+            if (properties == null) return [];
 
             HashSet<string> requiredProperties = new(inputSchema!.Required ?? []);
-            return properties.Select(kvp =>
-                new KernelParameterMetadata(kvp.Key)
-                {
-                    Description = kvp.Value.Description,
-                    ParameterType = ConvertParameterDataType(kvp.Value, requiredProperties.Contains(kvp.Key)),
-                    IsRequired = requiredProperties.Contains(kvp.Key)
-                }).ToList();
+            return properties.Select(kvp => new KernelParameterMetadata(kvp.Key)
+            {
+                Description = kvp.Value.Description,
+                ParameterType = ConvertParameterDataType(kvp.Value, requiredProperties.Contains(kvp.Key)),
+                IsRequired = requiredProperties.Contains(kvp.Key)
+            })
+            .ToList();
         }
 
         private static Type ConvertParameterDataType(JsonSchemaProperty property, bool required)
