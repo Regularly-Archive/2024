@@ -1,21 +1,13 @@
-﻿using DocumentFormat.OpenXml.Office2016.Drawing.ChartDrawing;
-using DocumentFormat.OpenXml.Wordprocessing;
+﻿using McpDotNet.Client;
+using McpDotNet.Configuration;
 using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
+using PostgreSQL.Embedding.LLmServices.Extensions;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using System.Reflection;
 using System.Runtime.Loader;
-using MCPSharp.Core;
-using MCPSharp;
-using PostgreSQL.Embedding.LLmServices.Extensions;
-using McpDotNet.Client;
-using McpDotNet.Configuration;
-using Microsoft.Extensions.Logging.Abstractions;
-using SharpCompress.Factories;
-using static Org.BouncyCastle.Math.EC.ECCurve;
-using System.Runtime.InteropServices;
 
 namespace PostgreSQL.Embedding.Utils
 {
@@ -125,18 +117,7 @@ namespace PostgreSQL.Embedding.Utils
             }
         }
 
-        ///// <summary>
-        ///// 添加MCP服务器
-        ///// </summary>
-        ///// <param name="services"></param>
-        //public static async Task AddMCPServer(this Kernel kernel, string name, string command, string version = "1.0.0", string[] args = null, Dictionary<string, string> env = null)
-        //{
-        //    var client = new MCPClient(name, version, command, string.Join(' ', args ?? []), env);
-        //    var kernelFunctions = await client.GetKernelFunctionsAsync();
-        //    kernel.ImportPluginFromFunctions(name, kernelFunctions);
-        //}
-
-        public static async Task AddMCPServer(this Kernel kernel, string name, string command, string version = "1.0.0", string[] args = null, Dictionary<string, string> env = null)
+        public static async Task AddMCPServerAsync(this Kernel kernel, string name, string command, string version = "1.0.0", string[] args = null, Dictionary<string, string> env = null)
         {
             var clientOptions = new McpClientOptions()
             {
