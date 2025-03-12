@@ -1,6 +1,7 @@
 ﻿using Azure;
 using Azure.AI.OpenAI;
 using Azure.Core.Pipeline;
+using DocumentFormat.OpenXml.Spreadsheet;
 using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Plugins.Core;
@@ -51,7 +52,7 @@ namespace PostgreSQL.Embedding.LlmServices
             kernel.Plugins.AddFromType<TimePlugin>();
             kernel.Plugins.AddFromType<MathPlugin>();
             kernel = kernel.ImportLlmPlugins(_serviceProvider, appId);
-            await kernel.AddMCPServer(
+            await kernel.AddMCPServerAsync(
                 name: "playwright",
                 command: "npx",
                 version: "1.0.0",
@@ -59,26 +60,34 @@ namespace PostgreSQL.Embedding.LlmServices
                 env: null
             );
 
-            await kernel.AddMCPServer(
+            await kernel.AddMCPServerAsync(
                 name: "memory",
                 command: "npx",
                 version: "1.0.0",
                 args: ["-y", "@modelcontextprotocol/server-memory"],
                 env: null
             );
-            await kernel.AddMCPServer(
+            await kernel.AddMCPServerAsync(
                 name: "filesystem",
                 command: "npx",
                 version: "1.0.0",
-                args: ["-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\Administrator"],
+                args: ["-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\Administrator", "D:\\Projects\\2024", "D:\\Projects\\hugo-blog\\content\\posts"],
                 env: null
             );
-            await kernel.AddMCPServer(
+            await kernel.AddMCPServerAsync(
                 name: "git",
                 command: "uvx",
                 args: ["mcp-server-git", "--repository", "D:\\Projects\\2024"],
                 env: null
             );
+
+            //await kernel.AddMCPServerAsync(
+            //    name: "postgresql",
+            //    command: "npx",
+            //    args: ["-y", "@modelcontextprotocol/server-postgres", "postgresql://postgresql:postgresql@localhost:5432/wiki"],
+            //    env: null
+            //);
+
             return kernel;
         }
     }
