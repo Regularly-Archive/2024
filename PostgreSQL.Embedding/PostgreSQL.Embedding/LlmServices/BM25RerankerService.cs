@@ -6,26 +6,23 @@ using System.Linq.Expressions;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
-    public class BgeRerankService : IRerankService
+    public class BM25RerankerService : IRerankService
     {
-        // BAAI/bge-reranker-v2-m3
-        private readonly string _modelName = "BAAI/bge-reranker-v2-m3";
-
         private readonly string _homePath =
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Scripts");
 
         private readonly string _venvPath =
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Scripts", ".venv");
 
-        private IBGEReranker _bgeReranker;
+        private IBM25Reranker _bm25Reranker;
 
-        private readonly ILogger<BgeRerankService> _logger;
-        public BgeRerankService(IOptions<PythonConfig> options, ILogger<BgeRerankService> logger)
+        private readonly ILogger<BM25RerankerService> _logger;
+        public BM25RerankerService(IOptions<PythonConfig> options, ILogger<BM25RerankerService> logger)
         {
             _logger = logger;
 
             var environment = InitPython(options.Value);
-            InitModel(environment, _modelName);
+            InitModel(environment);
         }
 
         private IPythonEnvironment InitPython(PythonConfig config)
@@ -48,24 +45,20 @@ namespace PostgreSQL.Embedding.LlmServices
             return environment;
         }
 
-        private void InitModel(IPythonEnvironment environment, string modelName)
+        private void InitModel(IPythonEnvironment environment)
         {
-            _logger.LogInformation($"The BGEReranker with model '{modelName}' is initializing...");
+            _logger.LogInformation($"The BM25Reranker is initializing...");
 
-            var envfile = Path.Combine(_homePath, ".env");
-            if (File.Exists(envfile)) File.Delete(envfile);
-            File.WriteAllText(envfile, $"RERANKER_MODEL_NAME={modelName}");
+            _bm25Reranker = environment.BM25Reranker();
 
-            _bgeReranker = environment.BGEReranker();
-
-            _logger.LogInformation($"The BGEReranker with model '{modelName}' has been initialized.");
+            _logger.LogInformation($"The BM25Reranker has been initialized.");
         }
 
         public IEnumerable<RerankResult<T>> Sort<T>(string question, List<T> documents, Expression<Func<T, string>> keyExps)
         {
             var keyFunc = keyExps.Compile();
             var keyedDocuments = documents.Select(x => keyFunc(x)).ToList();
-            var scores = _bgeReranker.ComputeScores(question, keyedDocuments);
+            var scores = _bm25Reranker.ComputeScores(question, keyedDocuments);
 
             for (var i = 0; i < documents.Count; i++)
             {
