@@ -3,3 +3,5 @@ FlagEmbedding
 numpy==2.0.2
 python-dotenv
 easyocr
+jieba
+rank_bm25
