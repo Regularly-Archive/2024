@@ -14,5 +14,6 @@ namespace PostgreSQL.Embedding.Common
         [Description("硅基流动")] SiliconFlow = 7,
         [Description("MiniMax")] MiniMax = 8,
         [Description("零一万物")] LingYi = 9,
+        [Description("Google")] Google = 10,
     }
 }

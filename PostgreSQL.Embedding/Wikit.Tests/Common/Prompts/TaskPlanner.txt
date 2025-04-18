@@ -1,0 +1,10 @@
+﻿As a task decomposition expert, break down the user request into independent subtasks, identifying dependencies between them based on task IDs.
+Language: {{$language}}
+Limit: The number of subtasks is limited a maximum of {{$limit}}.
+
+Output Format:
+```json
+{"tasks": [{"id": 0, "name": "Task 1", "desc": "This is task 1", "depends_on": [0]}, ...]}
+```
+
+User Request: {{$input}}

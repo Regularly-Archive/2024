@@ -58,8 +58,8 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <returns></returns>
         public List<TypeInfo> GetPluginTypeList(IEnumerable<Assembly> externalAssemblies = null)
         {
-            var assembies = AssemblyLoadContext.Default.Assemblies;
-            //var assembies = AssemblyLoadContext.Default.Assemblies.ToList().Where(x => x.FullName.Contains("PostgreSQL.Embedding"));
+            //var assembies = AssemblyLoadContext.Default.Assemblies;
+            var assembies = AssemblyLoadContext.Default.Assemblies.ToList().Where(x => x.FullName.Contains("PostgreSQL.Embedding"));
             if (externalAssemblies != null && assembies.Any())
                 assembies = assembies.Concat(externalAssemblies);
 

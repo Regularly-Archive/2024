@@ -1,4 +1,5 @@
-﻿using PostgreSQL.Embedding.Common.Json;
+﻿using Elastic.Clients.Elasticsearch;
+using PostgreSQL.Embedding.Common.Json;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -15,9 +16,13 @@ namespace PostgreSQL.Embedding.Planners
         private static readonly Regex s_finalAnswerRegex =
             new(@"\[FINAL[_\s\-]?ANSWER\](?<final_answer>.+)", RegexOptions.Singleline | RegexOptions.IgnoreCase);
 
+        private static readonly Regex s_actionRegex =
+            new(@"\{[^{}]*""action""\s*:\s*""[^""]*"".*?""action_variables""\s*:\s*\{.*?\}.*?\}", RegexOptions.Singleline | RegexOptions.IgnoreCase);
+
         private const string ActionTag = "[ACTION]";
 
         private const string ThoughtTag = "[THOUGHT]";
+        private const string FinalAnswerTag = "[FINAL_ANSWER]";
 
         [JsonPropertyName("thought")]
         public string Thought { get; set; }
@@ -48,26 +53,24 @@ namespace PostgreSQL.Embedding.Planners
             }
 
             var thoughtMatch = s_thoughtRegex.Match(input);
-            if (thoughtMatch.Success)
+            if (thoughtMatch.Success && !thoughtMatch.Value.Contains(ActionTag))
             {
-                if (!thoughtMatch.Value.Contains(ActionTag))
-                {
-                    result.Thought = thoughtMatch.Value.Trim();
-                }
-            }
-            else if (!input.Contains(ActionTag))
-            {
-                result.Thought = input;
-            }
-            else
-            {
-                return result;
+                result.Thought = thoughtMatch.Value.Trim();
             }
 
             result.Thought = result.Thought?.Replace(ThoughtTag, string.Empty).Trim();
+            result.FinalAnswer = result.FinalAnswer?.Replace(FinalAnswerTag, string.Empty).Trim();
 
+            ExtractAction(input, result);
+
+            return result;
+        }
+
+        public override string ToString() => JsonSerializerExtensions.Serialize(this);
+
+        private static void ExtractAction(string input, SystemStep step)
+        {
             int actionIndex = input.IndexOf(ActionTag, StringComparison.OrdinalIgnoreCase);
-
             if (actionIndex != -1)
             {
                 int jsonStartIndex = input.IndexOf("{", actionIndex, StringComparison.OrdinalIgnoreCase);
@@ -80,25 +83,43 @@ namespace PostgreSQL.Embedding.Planners
 
                         try
                         {
-                            var systemStepResults = JsonSerializer.Deserialize<SystemStep>(json);
+                            var actionStep = JsonSerializer.Deserialize<SystemStep>(json);
 
-                            if (systemStepResults is not null)
+                            if (actionStep is not null)
                             {
-                                result.Action = systemStepResults.Action;
-                                result.ActionVariables = systemStepResults.ActionVariables ?? new Dictionary<string, object>();
+                                step.Action = actionStep.Action;
+                                step.ActionVariables = actionStep.ActionVariables ?? new Dictionary<string, object>();
                             }
                         }
-                        catch (JsonException je)
+                        catch (JsonException ex)
                         {
-                            result.Observation = $"Action parsing error: {je.Message}\nInvalid action: {json}";
+                            step.Observation = $"Unable to parse JSON string \n{json}\n, Exception: {ex.Message}.";
                         }
                     }
                 }
             }
+            else
+            {
+                var actionMatch = s_actionRegex.Match(input);
+                if (actionMatch.Success)
+                {
+                    var json = actionMatch.Value.Trim();
+                    try
+                    {
+                        var actionStep = JsonSerializer.Deserialize<SystemStep>(json);
 
-            return result;
+                        if (actionStep is not null)
+                        {
+                            step.Action = actionStep.Action;
+                            step.ActionVariables = actionStep.ActionVariables ?? new Dictionary<string, object>();
+                        }
+                    }
+                    catch (JsonException ex)
+                    {
+                        step.Observation = $"Unable to parse JSON string \n{json}\n, Exception: {ex.Message}.";
+                    }
+                }
+            }
         }
-
-        public override string ToString() => JsonSerializerExtensions.Serialize(this);
     }
 }

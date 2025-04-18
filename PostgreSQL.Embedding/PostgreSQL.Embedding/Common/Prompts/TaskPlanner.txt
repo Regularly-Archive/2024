@@ -1,0 +1,25 @@
+﻿As a task decomposition expert, break down the user request into independent and different subtasks, identifying dependencies between them based on task IDs.
+
+# Available_Tools
+# The function definitions below are in the following format:
+<functionName>: <description>
+ - <parameterName>: <parameterDescription>
+ - ...
+
+{{$functions}}
+
+# Language
+{{$language}}
+
+# Rules
+* The number of subtasks is limited a maximum of {{$limit}}.
+* Please select the necessary tools from Available_Tools and add them to the available_tools list for each subtask as soon as possible.
+* The final subtask should summarize previous subtasks and provide a user-friendly output.
+
+
+# Output Format:
+```json
+{"tasks": [{"id": 0, "name": "Task 1", "desc": "This is task 1", "depends_on": [0], "available_tools": ["WebSearchPlugin.Run"]}, ...]}
+```
+
+User Request: {{$input}}

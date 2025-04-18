@@ -1,21 +1,26 @@
-﻿using McpDotNet.Client;
+﻿using Masuit.Tools;
+using McpDotNet.Client;
+using McpDotNet.Configuration;
 using McpDotNet.Protocol.Types;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.SemanticKernel;
 
 namespace PostgreSQL.Embedding.LLmServices.Extensions
 {
     public static class McpDotNetExtensions
     {
-        public static async Task<IEnumerable<KernelFunction>> GetKernelFunctionsAsync(this IMcpClient client)
+        public static async Task<IEnumerable<KernelFunction>> GetKernelFunctionsAsync(this IMcpClient client, ILoggerFactory loggerFactory)
         {
             var listToolsResult = await client.ListToolsAsync().ConfigureAwait(false);
-            return listToolsResult.Tools.Select(tool => ToKernelFunction(tool, client)).ToList();
+            return listToolsResult.Tools.Select(tool => ToKernelFunction(tool, client, loggerFactory)).ToList();
         }
 
-        private static KernelFunction ToKernelFunction(this Tool tool, IMcpClient client)
+        private static KernelFunction ToKernelFunction(this Tool tool, IMcpClient client, ILoggerFactory loggerFactory)
         {
             async Task<string> InvokeToolAsync(Kernel kernel, KernelFunction function, KernelArguments arguments, CancellationToken cancellationToken)
             {
+                var logger = loggerFactory.CreateLogger<KernelFunction>();
                 try
                 {
                     var mcpArguments = new Dictionary<string, object>();
@@ -34,9 +39,10 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
                         .Where(c => c.Type == "text")
                         .Select(c => c.Text));
                 }
-                catch
+                catch (Exception ex)
                 {
-                    throw;
+                    logger.LogError(ex, $"An error occurs when invoking tool '{tool.Name}'");
+                    return ex.Message;
                 }
             }
 
@@ -45,7 +51,8 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
                 functionName: tool.Name,
                 description: tool.Description,
                 parameters: ToKernelParameters(tool),
-                returnParameter: ToKernelReturnParameter()
+                returnParameter: ToKernelReturnParameter(),
+                loggerFactory: loggerFactory ?? NullLoggerFactory.Instance
             );
         }
 

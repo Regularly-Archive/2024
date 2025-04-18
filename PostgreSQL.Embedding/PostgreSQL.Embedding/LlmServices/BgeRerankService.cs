@@ -1,7 +1,9 @@
 ﻿using CSnakes.Runtime;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using PostgreSQL.Embedding.Common.Confirguration;
 using PostgreSQL.Embedding.LlmServices.Abstration;
+using PostgreSQL.Embedding.Utils;
 using System.Linq.Expressions;
 
 namespace PostgreSQL.Embedding.LlmServices
@@ -11,36 +13,21 @@ namespace PostgreSQL.Embedding.LlmServices
         // BAAI/bge-reranker-v2-m3
         private readonly string _modelName = "BAAI/bge-reranker-v2-m3";
 
-        private readonly string _homePath =
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Scripts");
-
-        private readonly string _venvPath =
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Scripts", ".venv");
-
         private IBGEReranker _bgeReranker;
 
         private readonly ILogger<BgeRerankService> _logger;
-        public BgeRerankService(IOptions<PythonConfig> options, ILogger<BgeRerankService> logger)
+        public BgeRerankService(IServiceProvider serviceProvider, IOptions<PythonConfig> options, ILogger<BgeRerankService> logger)
         {
             _logger = logger;
 
-            var environment = InitPython(options.Value);
+            var environment = InitPython(serviceProvider, options.Value);
             InitModel(environment, _modelName);
         }
 
-        private IPythonEnvironment InitPython(PythonConfig config)
+        private IPythonEnvironment InitPython(IServiceProvider serviceProvider, PythonConfig config)
         {
             _logger.LogInformation($"Python Runtime is initializing: {config.PythonExecute}, Version={config.PythonVersion}...");
 
-            var services = new ServiceCollection().AddLogging();
-            services
-                .WithPython()
-                .WithHome(_homePath)
-                .WithVirtualEnvironment(_venvPath)
-                .FromFolder(config.PythonExecute, config.PythonVersion)
-                .WithPipInstaller();
-
-            var serviceProvider = services.BuildServiceProvider();
             var environment = serviceProvider.GetRequiredService<IPythonEnvironment>();
 
             _logger.LogInformation($"Python Runtime has been initialized.");
@@ -52,7 +39,7 @@ namespace PostgreSQL.Embedding.LlmServices
         {
             _logger.LogInformation($"The BGEReranker with model '{modelName}' is initializing...");
 
-            var envfile = Path.Combine(_homePath, ".env");
+            var envfile = Path.Combine(CSnakeExtensions.HomePath, ".env");
             if (File.Exists(envfile)) File.Delete(envfile);
             File.WriteAllText(envfile, $"RERANKER_MODEL_NAME={modelName}");
 
