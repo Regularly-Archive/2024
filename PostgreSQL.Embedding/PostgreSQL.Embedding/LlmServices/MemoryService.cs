@@ -94,8 +94,7 @@ namespace PostgreSQL.Embedding.LlmServices
 
             // Todo
             // 需要解除对 OpenAIConfig 的依赖
-            var openAIConfig = new OpenAIConfig();
-            _configuration.BindSection(nameof(OpenAIConfig), openAIConfig);
+            var openAIConfig = new OpenAIConfig() { APIKey = Guid.NewGuid().ToString() };
             openAIConfig.EmbeddingModel = embeddingModel.ModelName;
             openAIConfig.TextModel = generationModel.ModelName;
 

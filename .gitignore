@@ -99,3 +99,6 @@ PostgreSQL.Embedding/PostgreSQL.Embedding/Assets/Scripts/demo.py
 PostgreSQL.Embedding/PostgreSQL.Embedding/Assets/Scripts/.venv/
 =======
 >>>>>>> main
+PostgreSQL.Embedding/Wikit.Tests/bin/
+PostgreSQL.Embedding/Wikit.Tests/obj/Release/net8.0/ref/Wikit.Tests.dll
+PostgreSQL.Embedding/Wikit.Tests/obj/

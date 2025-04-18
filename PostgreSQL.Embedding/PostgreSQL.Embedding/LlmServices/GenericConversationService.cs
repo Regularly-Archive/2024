@@ -1,9 +1,12 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Microsoft.SemanticKernel.Planning.Handlebars;
+using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Models;
+using PostgreSQL.Embedding.Common.Models.Planners;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.LLmServices.Extensions;
@@ -149,17 +152,25 @@ namespace PostgreSQL.Embedding.LlmServices
             try
             {
                 var currentUser = await _userInfoService.GetCurrentUserAsync();
-                var planner = new StepwisePlanner(_kernel, _promptTemplateService);
+                var chatHistory = new ChatHistory();
+
+                var taskPlanner = new TaskPlanner(kernel);
+                var subTasks = await taskPlanner.GetSubTasksAsync(input, limit: 3);
+
+                subTasks.ForEach(async (subTask) => await EmitTracesAsync(subTask.AsStepTrace(), cancellationToken));
+
+                var planner = new StepwisePlanner(_kernel, _promptTemplateService,new StepwisePlannerConfig() { MaxIterations = 10});
                 planner.AddVariable("appId", _app.Id);
                 planner.AddVariable("conversationId", _conversationId);
                 planner.AddVariable("userId", currentUser.Id);
                 planner.AddVariable("currentTime", DateTime.Now);
 
-                var plan = await planner.CreatePlanAsync(input);
-                plan.OnStepExecute = async trace => await EmitTracesAsync(trace, cancellationToken);
-                var result = await plan.ExecuteAsync(_kernel, cancellationToken);
+                var graphExecutor = new DAGraphExecutor(input, subTasks, planner);
+                graphExecutor.OnStepChanged = async (stepTrace) => await EmitTracesAsync(stepTrace);
+                await graphExecutor.ExecuteAsync();
 
-                return result.AsStreaming();
+                await EmitTracesAsync(StepTrace.Done());
+                return subTasks.OrderByDescending(x => x.Id).FirstOrDefault().ExecuteResult.AsStreaming();
             }
             catch (Exception ex)
             {
@@ -221,10 +232,10 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <param name="text"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        private async Task EmitTracesAsync(string text, CancellationToken cancellationToken = default)
+        private async Task EmitTracesAsync(StepTrace stepTrace, CancellationToken cancellationToken = default)
         {
             var result = new OpenAIStreamResult() { id = Guid.NewGuid().ToString("N"), obj = "chat.traces" };
-            result.choices.Add(new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant", content = text } });
+            result.choices.Add(new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant", content = JsonConvert.SerializeObject(stepTrace) } });
             await _sseEmitter.EmitAsync(result, cancellationToken);
         }
     }

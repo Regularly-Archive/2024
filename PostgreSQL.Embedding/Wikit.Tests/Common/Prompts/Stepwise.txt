@@ -14,7 +14,6 @@ The keys in "action_variables" value should match the defined [PARAMETERS] of th
 The values in "action_variables" must be of type string and represent the actual values to be passed to the function. Do not attempt to pass a variable name or other reference to a function.
 If a function has no parameters, the "action_variables" key may be omitted.
 Ensure that the $JSON_BLOB contains only a SINGLE action; do NOT return multiple actions.
-If you don't need to call an action, please returning an answer with prefix [FINAL_ANSWER] directly.
 IMPORTANT: Use only the available functions listed in the [AVAILABLE FUNCTIONS] section. Do not attempt to use any other functions that are not specified.
 
 Here is an example of a valid $JSON_BLOB:
@@ -36,7 +35,7 @@ Here is an example of a valid $JSON_BLOB with no parameters:
 [THOUGHT] - A thought I have about the question and how to answer it step by step.
 [ACTION] - A single $JSON_BLOB representing a single action to be performed
 [OBSERVATION] - The result of the action will be provided here
-[FINAL_ANSWER] - Once I have gathered all the necessary observations through producing thoughts and actions, I can provide the final answer in a clear and human-readable format.
+[FINAL ANSWER] - Once I have gathered all the necessary observations through producing thoughts and actions, I can provide the final answer in a clear and human-readable format.
 [END VALID STEP LIST]
 
 Every Question should be followed by a Thought.

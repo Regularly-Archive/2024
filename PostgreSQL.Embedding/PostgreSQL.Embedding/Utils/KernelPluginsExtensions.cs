@@ -1,5 +1,7 @@
-﻿using McpDotNet.Client;
+﻿using Masuit.Tools;
+using McpDotNet.Client;
 using McpDotNet.Configuration;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.DataAccess;
@@ -21,7 +23,8 @@ namespace PostgreSQL.Embedding.Utils
         /// <returns></returns>
         public static IServiceCollection RegisterLlmPlugins(this IServiceCollection services, IEnumerable<Assembly> externalAssemblies = null)
         {
-            var assembies = AssemblyLoadContext.Default.Assemblies;
+            //var assembies = AssemblyLoadContext.Default.Assemblies;
+            var assembies = AssemblyLoadContext.Default.Assemblies.ToList().Where(x => x.FullName.Contains("PostgreSQL.Embedding"));
             if (externalAssemblies != null && assembies.Any())
                 assembies = assembies.Concat(externalAssemblies);
 
@@ -33,7 +36,7 @@ namespace PostgreSQL.Embedding.Utils
                 var kernelPluginAttribute = pluginType.GetCustomAttribute<KernelPluginAttribute>();
                 if (!kernelPluginAttribute.Enabled) continue;
 
-                services.AddScoped(pluginType);
+                services.TryAddScoped(pluginType);
             }
 
             Task.Run(async () => await PersistLlmPliginsAsync(services, pluginTypes));
@@ -50,8 +53,8 @@ namespace PostgreSQL.Embedding.Utils
         /// <returns></returns>
         public static Kernel ImportLlmPlugins(this Kernel kernel, IServiceProvider serviceProvider, long? appId = null, IEnumerable<Assembly> externalAssemblies = null)
         {
-            //var assembies = AssemblyLoadContext.Default.Assemblies.ToList().Where(x => c);
-            var assembies = AssemblyLoadContext.Default.Assemblies;
+            //var assembies = AssemblyLoadContext.Default.Assemblies;
+            var assembies = AssemblyLoadContext.Default.Assemblies.ToList().Where(x => x.FullName.Contains("PostgreSQL.Embedding"));
             if (externalAssemblies != null && assembies.Any())
                 assembies = assembies.Concat(externalAssemblies);
 
@@ -68,7 +71,10 @@ namespace PostgreSQL.Embedding.Utils
                     if (!kernelPluginAttribute.Enabled) continue;
                     if (appId.HasValue)
                         (pluginInstance as IPlugin).Initialize(appId.Value);
-                    kernel.Plugins.AddFromObject(pluginInstance, pluginType.Name);
+
+                    if (!kernel.Plugins.TryGetPlugin(pluginType.Name, out _)) {
+                        kernel.Plugins.AddFromObject(pluginInstance, pluginType.Name);
+                    }
                 }
             }
 
@@ -119,10 +125,7 @@ namespace PostgreSQL.Embedding.Utils
 
         public static async Task AddMCPServerAsync(this Kernel kernel, string name, string command, string version = "1.0.0", string[] args = null, Dictionary<string, string> env = null)
         {
-            var clientOptions = new McpClientOptions()
-            {
-                ClientInfo = new McpDotNet.Protocol.Types.Implementation() { Name = name, Version = "1.0.0" },
-            };
+            var clientOptions  = kernel.Services.GetRequiredService<McpClientOptions>();
 
             var serverConfig = new McpServerConfig()
             {
@@ -133,14 +136,16 @@ namespace PostgreSQL.Embedding.Utils
                 {
                     ["command"] = command,
                     ["arguments"] = string.Join(' ', args ?? []),
-                }
+                },
             };
+
+            if (env != null) env.ForEach(kv => serverConfig.TransportOptions[$"env:{kv.Key}"] = kv.Value);
 
             var loggerFactory = kernel.Services.GetRequiredService<ILoggerFactory>();
             var clientFactory = new McpClientFactory([serverConfig], clientOptions, loggerFactory);
 
             var client = await clientFactory.GetClientAsync(serverConfig.Id).ConfigureAwait(false);
-            var kernelFunctions = await client.GetKernelFunctionsAsync();
+            var kernelFunctions = await client.GetKernelFunctionsAsync(loggerFactory);
             kernel.Plugins.AddFromFunctions(name, kernelFunctions);
         }
     }
