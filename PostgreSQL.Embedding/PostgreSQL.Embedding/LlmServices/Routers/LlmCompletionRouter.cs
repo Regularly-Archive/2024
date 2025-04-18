@@ -50,6 +50,9 @@ namespace PostgreSQL.Embedding.LlmServices.Routers
                     case LlmServiceProvider.LingYi:
                         request.RequestUri = new Uri("https://api.lingyiwanwu.com/v1/chat/completions");
                         break;
+                    case LlmServiceProvider.Google:
+                        request.RequestUri = new Uri("https://generativelanguage.googleapis.com/v1beta/");
+                        break;
                 }
 
             }

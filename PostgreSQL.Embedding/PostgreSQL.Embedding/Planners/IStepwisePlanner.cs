@@ -2,6 +2,6 @@
 {
     public interface IStepwisePlanner
     {
-        Task<StepwisePlan> CreatePlanAsync(string goal);
+        Task<StepwisePlan> CreatePlanAsync();
     }
 }
