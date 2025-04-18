@@ -1,9 +1,11 @@
-﻿using Microsoft.EntityFrameworkCore.Metadata;
+﻿using McpDotNet.Protocol.Types;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Services;
 using Microsoft.SemanticKernel.TextGeneration;
 using PostgreSQL.Embedding.Common.Json;
+using PostgreSQL.Embedding.Common.Models.Planners;
 using PostgreSQL.Embedding.LLmServices.Extensions;
 using System.Diagnostics;
 using System.Globalization;
@@ -16,10 +18,10 @@ namespace PostgreSQL.Embedding.Planners
 {
     public class StepwisePlan
     {
-        private readonly string _userMessage;
         private readonly string _systemMessage;
         private readonly StepwisePlannerConfig _config;
         private readonly ILogger<StepwisePlan> _logger;
+        private readonly Kernel _kernel;
         public string PlanId { get; private set; }
 
         private const string ObservationTag = "[OBSERVATION]";
@@ -30,35 +32,31 @@ namespace PostgreSQL.Embedding.Planners
         private const string TrimMessageFormat = "... I've removed the first {0} steps of my previous work to make room for the new stuff ...";
         private const string MainKey = "INPUT";
 
-        private const string QuestionEmoji = "🌟";
-        private const string ThoughtEmoji = "💭";
-        private const string ActionEmoji = "⚙️";
-        private const string FinalAnswerEmoji = "📜";
-
         private readonly Dictionary<string, string> _variables = new Dictionary<string, string>();
 
-        public Action<string> OnStepExecute { get; set; }
+        public Action<StepTrace> OnStepExecute { get; set; }
 
         private Stopwatch _stopwatch;
 
-        public StepwisePlan(string systemMessage, string userMessage, StepwisePlannerConfig config, ILogger<StepwisePlan> logger)
+        public StepwisePlan(string systemMessage, StepwisePlannerConfig config, ILogger<StepwisePlan> logger, Kernel kernel)
         {
             _config = config;
-            _userMessage = userMessage;
             _systemMessage = systemMessage;
             _logger = logger;
             PlanId = Guid.NewGuid().ToString("N");
+            _kernel = kernel;
         }
 
-        public async Task<string> ExecuteAsync(Kernel kernel, CancellationToken cancellationToken = default)
+        public async Task<string> ExecuteAsync(string goal, ChatHistory chatHistory = null, CancellationToken cancellationToken = default)
         {
             var stepsTaken = new List<SystemStep>();
 
-            var chatHistory = new ChatHistory();
-            chatHistory.AddSystemMessage(_systemMessage);
-            chatHistory.AddUserMessage(_userMessage);
+            if (chatHistory == null) chatHistory = new ChatHistory();
 
-            var aiService = GetAIService(kernel);
+            chatHistory.Insert(0, new ChatMessageContent(AuthorRole.System, _systemMessage, null, null, Encoding.UTF8, null));
+            chatHistory.AddUserMessage($"{QuestionTag} {goal}");
+
+            var aiService = GetAIService(_kernel);
             var startingMessageCount = chatHistory.Count;
 
             SystemStep? lastStep = null;
@@ -80,7 +78,11 @@ namespace PostgreSQL.Embedding.Planners
                 var finalAnswer = TryGetFinalAnswer(nextStep, stepsTaken, i + 1);
 
                 if (!string.IsNullOrEmpty(finalAnswer) && string.IsNullOrEmpty(nextStep.Action))
+                {
+                    OnStepExecute?.Invoke(StepTrace.Done());
                     return finalAnswer;
+                }
+
 
                 if (TryGetObservations(nextStep, chatHistory, stepsTaken, lastStep))
                     continue;
@@ -88,12 +90,16 @@ namespace PostgreSQL.Embedding.Planners
                 nextStep = AddNextStep(nextStep, lastStep, chatHistory, stepsTaken, startingMessageCount);
 
 
-                if (await TryGetActionObservationAsync(kernel, nextStep, chatHistory, cancellationToken).ConfigureAwait(false))
+                if (await TryGetActionObservationAsync(_kernel, nextStep, chatHistory, cancellationToken).ConfigureAwait(false))
                     continue;
 
                 // Check FinalAnswer Again
                 if (!string.IsNullOrEmpty(nextStep.FinalAnswer))
+                {
+                    OnStepExecute?.Invoke(StepTrace.Done());
                     return nextStep.FinalAnswer;
+                }
+
 
                 _logger?.LogInformation("Action: No action to take");
 
@@ -117,13 +123,12 @@ namespace PostgreSQL.Embedding.Planners
                     var question = step.Thought.Split("\n\n")[0].Replace(QuestionTag, "").Replace("-", "").Trim();
                     var thought = step.Thought.Split("\n\n")[1].Replace("-", "").Trim();
 
-                    OnStepExecute?.Invoke($"{QuestionEmoji} {question}");
-                    OnStepExecute?.Invoke($"{ThoughtEmoji} {thought}");
+                    OnStepExecute?.Invoke(StepTrace.Thought(question, thought));
                 }
                 else
                 {
                     var trimedThought = step.Thought.Replace("-", "").Trim();
-                    OnStepExecute?.Invoke($"{ThoughtEmoji} {trimedThought}");
+                    OnStepExecute?.Invoke(StepTrace.Thought("", trimedThought));
                 }
             }
 
@@ -154,13 +159,13 @@ namespace PostgreSQL.Embedding.Planners
 
                 _stopwatch.Stop();
                 this._logger?.LogTrace($"Invoked {actionName}. Result: {result}");
-                OnStepExecute?.Invoke($"{ActionEmoji} 调用工具 {actionName}(), 耗时 {_stopwatch.Elapsed.TotalSeconds} 秒");
+                OnStepExecute?.Invoke(StepTrace.Action(actionName, actionVariables, _stopwatch.Elapsed.TotalSeconds, true));
                 return result;
             }
             catch (Exception e)
             {
                 _stopwatch.Stop();
-                OnStepExecute?.Invoke($"{ActionEmoji} 调用工具 {actionName}(), 耗时 {_stopwatch.Elapsed.TotalSeconds} 秒");
+                OnStepExecute?.Invoke(StepTrace.Action(actionName, actionVariables, _stopwatch.Elapsed.TotalSeconds, false));
                 this._logger?.LogError(e, "Something went wrong in system step: {Plugin}.{Function}. Error: {Error}", targetFunction.PluginName, targetFunction.Name, e.Message);
                 throw;
             }
@@ -233,18 +238,18 @@ namespace PostgreSQL.Embedding.Planners
             else
             {
                 _logger?.LogInformation("Thought: {Thought}", step.Thought);
-                if (step.Thought.IndexOf(QuestionTag) != -1)
+                
+                if (!string.IsNullOrEmpty(step.Thought) && step.Thought.IndexOf(QuestionTag) != -1)
                 {
-                    var question = step.Thought.Split("\n", StringSplitOptions.RemoveEmptyEntries)[0].Replace(QuestionTag, "").Replace("-", "").Trim();
-                    var thought = step.Thought.Split("\n", StringSplitOptions.RemoveEmptyEntries)[1].Replace("-", "").Trim();
+                    var question = step.Thought?.Split("\n", StringSplitOptions.RemoveEmptyEntries)[0]?.Replace(QuestionTag, "").Replace("-", "").Trim();
+                    var thought = step.Thought?.Split("\n", StringSplitOptions.RemoveEmptyEntries)[1]?.Replace("-", "").Trim();
 
-                    OnStepExecute?.Invoke($"{QuestionEmoji} {question}");
-                    OnStepExecute?.Invoke($"{ThoughtEmoji} {thought}");
+                    OnStepExecute?.Invoke(StepTrace.Thought(question, thought));
                 }
                 else
                 {
-                    var trimedThought = step.Thought.Replace("-", "").Trim();
-                    OnStepExecute?.Invoke($"{ThoughtEmoji} {trimedThought}");
+                    var trimedThought = step.Thought?.Replace("-", "").Trim();
+                    OnStepExecute?.Invoke(StepTrace.Thought("", trimedThought));
                 }
 
                 stepsTaken.Add(step);
@@ -321,7 +326,7 @@ namespace PostgreSQL.Embedding.Planners
 
                 AddExecutionStatsToContext(stepsTaken, iterations);
 
-                OnStepExecute?.Invoke($"{FinalAnswerEmoji} {step.FinalAnswer}");
+                //OnStepExecute?.Invoke($"{FinalAnswerEmoji} {step.FinalAnswer}");
                 return step.FinalAnswer;
             }
 

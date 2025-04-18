@@ -1,3 +1,4 @@
+using CSnakes.Runtime;
 using LLama;
 using LLama.Common;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -168,6 +169,7 @@ builder.Services.AddScoped<IFullTextSearchService, FullTextSearchService>();
 builder.Services.AddScoped<IFileStorageService, MinioFileStorageService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddSingleton<IRerankService, BgeRerankService>();
+builder.Services.AddSingleton<IRerankService, BM25RerankerService>();
 builder.Services.AddScoped<ILlmPluginService, LlmPluginService>();
 builder.Services.AddScoped<IKnowledgeRetrievalService, VectorsRetrievalService>();
 builder.Services.AddScoped<IKnowledgeRetrievalService, FullTextRetrievalService>();
@@ -181,6 +183,7 @@ builder.Services.AddCors(options =>
                 .AllowCredentials();
     });
 });
+builder.Services.AddPythonRuntime(builder.Configuration);
 builder.Services.RegisterLlmPlugins();
 var app = builder.Build();
 
