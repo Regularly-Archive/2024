@@ -125,7 +125,7 @@ namespace PostgreSQL.Embedding.Handlers
                 _logger = logger;
             }
 
-            public async Task<(bool success, DataPipeline updatedPipeline)> InvokeAsync(DataPipeline pipeline, CancellationToken cancellationToken = default)
+            public async Task<(ReturnType returnType, DataPipeline updatedPipeline)> InvokeAsync(DataPipeline pipeline, CancellationToken cancellationToken = default)
             {
                 var taskId = pipeline.Tags[KernelMemoryTags.TaskId].FirstOrDefault();
                 var fileName = pipeline.Tags[KernelMemoryTags.FileName].FirstOrDefault();
@@ -154,7 +154,7 @@ namespace PostgreSQL.Embedding.Handlers
                     });
                 }
 
-                return (true, pipeline);
+                return (ReturnType.Success, pipeline);
             }
         }
     }

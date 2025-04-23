@@ -42,7 +42,7 @@ namespace PostgreSQL.Embedding.Common.Models.Planners
     {
         Pending = 0,
         InProgress = 1,
-        Success = 2,
+        Completed = 2,
         Failed = 3,
     }
 }

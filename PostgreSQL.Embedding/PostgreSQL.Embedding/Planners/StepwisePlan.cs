@@ -1,6 +1,4 @@
-﻿using McpDotNet.Protocol.Types;
-using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.SemanticKernel;
+﻿using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Services;
 using Microsoft.SemanticKernel.TextGeneration;
@@ -31,6 +29,8 @@ namespace PostgreSQL.Embedding.Planners
         private const string FinalAnswerTag = "[FINAL_ANSWER]";
         private const string TrimMessageFormat = "... I've removed the first {0} steps of my previous work to make room for the new stuff ...";
         private const string MainKey = "INPUT";
+
+        private readonly Regex _regexRAG = new Regex(@"<RAG>(.*?)</RAG>", RegexOptions.Singleline | RegexOptions.IgnoreCase);
 
         private readonly Dictionary<string, string> _variables = new Dictionary<string, string>();
 
@@ -155,7 +155,15 @@ namespace PostgreSQL.Embedding.Planners
                 kernelArguments = kernelArguments.MergeArguments(_config.Variables);
 
                 var kernelResult = await kernel.InvokeAsync(kernelFunction, kernelArguments, cancellationToken);
-                var result = kernelResult.GetValue<string>();
+                var result = string.Empty;
+                if (kernelResult.ValueType == typeof(string))
+                {
+                    result = kernelResult.GetValue<string>();
+                } 
+                else
+                {
+                    result = Newtonsoft.Json.JsonConvert.SerializeObject(kernelResult.GetValue<object>());
+                }
 
                 _stopwatch.Stop();
                 this._logger?.LogTrace($"Invoked {actionName}. Result: {result}");
@@ -192,7 +200,7 @@ namespace PostgreSQL.Embedding.Planners
                 // Invoke the action
                 try
                 {
-                    var result = await InvokeActionAsync(kernel, step.Action, step.ActionVariables, cancellationToken).ConfigureAwait(false);
+                  var result = await InvokeActionAsync(kernel, step.Action, step.ActionVariables, cancellationToken).ConfigureAwait(false);
 
                     // Set FinalAnswer if result starts with [FINAL_WANSWER] tag.
                     // Return false to break loop.
@@ -204,6 +212,13 @@ namespace PostgreSQL.Embedding.Planners
                     //}
 
                     step.Observation = string.IsNullOrEmpty(result) ? $"There is no result can be found from action '{step.Action}'." : result!;
+                    var ragMatch = _regexRAG.Match(step.Observation);
+                    if (ragMatch.Success)
+                    {
+                        step.FinalAnswer = ragMatch.Groups[1].Value.Trim();
+                        return false;
+                    }
+                    
                 }
                 catch (Exception ex)
                 {
