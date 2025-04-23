@@ -18,18 +18,15 @@ namespace PostgreSQL.Embedding.Controllers
     {
         private readonly IWebHostEnvironment _webHostEnvironment;
         private readonly IKnowledgeBaseService _knowledgeBaseService;
-        private readonly IFullTextSearchService _fullTextSearchService;
         private readonly IFileStorageService _fileStorageService;
         public KnowledgeBaseController(
             IWebHostEnvironment hostingEnvironment,
             IKnowledgeBaseService knowledgeBaseService,
-            IFullTextSearchService fullTextSearchService,
             IFileStorageService fileStorageService,
             CrudBaseService<KnowledgeBase> crudBaseService) : base(crudBaseService)
         {
             _webHostEnvironment = hostingEnvironment;
             _knowledgeBaseService = knowledgeBaseService;
-            _fullTextSearchService = fullTextSearchService;
             _fileStorageService = fileStorageService;
         }
 

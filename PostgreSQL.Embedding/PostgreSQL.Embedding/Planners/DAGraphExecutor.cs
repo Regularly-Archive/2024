@@ -62,12 +62,12 @@ namespace PostgreSQL.Embedding.Planners
 
                 var result = await plan.ExecuteAsync(subTask.Description, chatHistory);
                 subTask.ExecuteResult = result;
-                subTask.Status = string.IsNullOrEmpty(result) ? Common.Models.Planners.TaskStatus.Failed : Common.Models.Planners.TaskStatus.Success;
+                subTask.Status = string.IsNullOrEmpty(result) ? Common.Models.Planners.TaskStatus.Failed : Common.Models.Planners.TaskStatus.Completed;
             }
             else
             {
                 var dependencies = _subTasks.FindAll(x => subTask.DependsOn.Contains(x.Id));
-                if (dependencies.All(x => x.Status == Common.Models.Planners.TaskStatus.Success))
+                if (dependencies.All(x => x.Status == Common.Models.Planners.TaskStatus.Completed))
                 {
                     var chatHistory = new ChatHistory();
                     chatHistory.AddAssistantMessage($"""
@@ -81,7 +81,7 @@ namespace PostgreSQL.Embedding.Planners
 
                     var result = await plan.ExecuteAsync(subTask.Description, chatHistory);
                     subTask.ExecuteResult = result;
-                    subTask.Status = string.IsNullOrEmpty(result) ? Common.Models.Planners.TaskStatus.Failed : Common.Models.Planners.TaskStatus.Success;
+                    subTask.Status = string.IsNullOrEmpty(result) ? Common.Models.Planners.TaskStatus.Failed : Common.Models.Planners.TaskStatus.Completed;
                 }
             }
 

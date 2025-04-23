@@ -1,10 +1,7 @@
-﻿using Elastic.Clients.Elasticsearch;
-using PostgreSQL.Embedding.Common.Json;
-using System.Text.Encodings.Web;
+﻿using PostgreSQL.Embedding.Common.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
-using System.Text.Unicode;
 
 namespace PostgreSQL.Embedding.Planners
 {

@@ -1,8 +1,8 @@
 ﻿using Masuit.Tools;
-using McpDotNet.Client;
-using McpDotNet.Configuration;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.SemanticKernel;
+using ModelContextProtocol.Client;
+using ModelContextProtocol.Protocol.Transport;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
@@ -72,7 +72,8 @@ namespace PostgreSQL.Embedding.Utils
                     if (appId.HasValue)
                         (pluginInstance as IPlugin).Initialize(appId.Value);
 
-                    if (!kernel.Plugins.TryGetPlugin(pluginType.Name, out _)) {
+                    if (!kernel.Plugins.TryGetPlugin(pluginType.Name, out _))
+                    {
                         kernel.Plugins.AddFromObject(pluginInstance, pluginType.Name);
                     }
                 }
@@ -123,30 +124,39 @@ namespace PostgreSQL.Embedding.Utils
             }
         }
 
-        public static async Task AddMCPServerAsync(this Kernel kernel, string name, string command, string version = "1.0.0", string[] args = null, Dictionary<string, string> env = null)
+        public static async Task AddMCPServerAsync(this Kernel kernel, string name, string command, string[] args = null, Dictionary<string, string> env = null)
         {
-            var clientOptions  = kernel.Services.GetRequiredService<McpClientOptions>();
-
-            var serverConfig = new McpServerConfig()
+            var validName = name.Replace("-", "_");
+            var clientTransport = new StdioClientTransport(new StdioClientTransportOptions
             {
-                Id = name,
-                Name = name,
-                TransportType = "stdio",
-                TransportOptions = new Dictionary<string, string>
-                {
-                    ["command"] = command,
-                    ["arguments"] = string.Join(' ', args ?? []),
-                },
-            };
-
-            if (env != null) env.ForEach(kv => serverConfig.TransportOptions[$"env:{kv.Key}"] = kv.Value);
+                Name = validName,
+                Command = command,
+                Arguments = args ?? [],
+                EnvironmentVariables = env ?? new Dictionary<string, string>()
+            });
 
             var loggerFactory = kernel.Services.GetRequiredService<ILoggerFactory>();
-            var clientFactory = new McpClientFactory([serverConfig], clientOptions, loggerFactory);
+            var client = await McpClientFactory.CreateAsync(clientTransport, loggerFactory: loggerFactory);
 
-            var client = await clientFactory.GetClientAsync(serverConfig.Id).ConfigureAwait(false);
             var kernelFunctions = await client.GetKernelFunctionsAsync(loggerFactory);
-            kernel.Plugins.AddFromFunctions(name, kernelFunctions);
+            kernel.Plugins.AddFromFunctions(validName, kernelFunctions);
+        }
+
+        public static async Task AddMCPServerAsync(this Kernel kernel, string name, string url, Dictionary<string, string> headers = null)
+        {
+            var validName = name.Replace("-", "_");
+            var clientTransport = new SseClientTransport(new SseClientTransportOptions
+            {
+                Name = validName,
+                Endpoint = new Uri(url),
+                AdditionalHeaders = headers ?? new Dictionary<string, string>()
+            });
+
+            var loggerFactory = kernel.Services.GetRequiredService<ILoggerFactory>();
+            var client = await McpClientFactory.CreateAsync(clientTransport, loggerFactory: loggerFactory);
+
+            var kernelFunctions = await client.GetKernelFunctionsAsync(loggerFactory);
+            kernel.Plugins.AddFromFunctions(validName, kernelFunctions);
         }
     }
 }

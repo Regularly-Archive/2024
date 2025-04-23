@@ -1,22 +1,22 @@
 ﻿using Masuit.Tools;
-using McpDotNet.Client;
-using McpDotNet.Configuration;
-using McpDotNet.Protocol.Types;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.SemanticKernel;
+using ModelContextProtocol.Client;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace PostgreSQL.Embedding.LLmServices.Extensions
 {
-    public static class McpDotNetExtensions
+    public static class MCPExtensions
     {
         public static async Task<IEnumerable<KernelFunction>> GetKernelFunctionsAsync(this IMcpClient client, ILoggerFactory loggerFactory)
         {
             var listToolsResult = await client.ListToolsAsync().ConfigureAwait(false);
-            return listToolsResult.Tools.Select(tool => ToKernelFunction(tool, client, loggerFactory)).ToList();
+            return listToolsResult.Select(tool => ToKernelFunction(tool, client, loggerFactory)).ToList();
         }
 
-        private static KernelFunction ToKernelFunction(this Tool tool, IMcpClient client, ILoggerFactory loggerFactory)
+        private static KernelFunction ToKernelFunction(this McpClientTool tool, IMcpClient client, ILoggerFactory loggerFactory)
         {
             async Task<string> InvokeToolAsync(Kernel kernel, KernelFunction function, KernelArguments arguments, CancellationToken cancellationToken)
             {
@@ -48,7 +48,7 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
 
             return KernelFunctionFactory.CreateFromMethod(
                 method: InvokeToolAsync,
-                functionName: tool.Name,
+                functionName: tool.Name.Replace("-","_"),
                 description: tool.Description,
                 parameters: ToKernelParameters(tool),
                 returnParameter: ToKernelReturnParameter(),
@@ -56,9 +56,9 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
             );
         }
 
-        private static List<KernelParameterMetadata> ToKernelParameters(Tool tool)
+        private static List<KernelParameterMetadata> ToKernelParameters(McpClientTool tool)
         {
-            var inputSchema = tool.InputSchema;
+            var inputSchema = tool.JsonSchema.Deserialize<JsonSchema>();
             var properties = inputSchema?.Properties;
             if (properties == null) return [];
 
@@ -109,5 +109,41 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
                 _ => value,
             } ?? value;
         }
+    }
+
+    internal class JsonSchema
+    {
+        /// <summary>
+        /// The type of the schema, should be "object".
+        /// </summary>
+        [JsonPropertyName("type")]
+        public string Type { get; set; } = "object";
+
+        /// <summary>
+        /// Map of property names to property definitions.
+        /// </summary>
+        [JsonPropertyName("properties")]
+        public Dictionary<string, JsonSchemaProperty>? Properties { get; set; }
+
+        /// <summary>
+        /// List of required property names.
+        /// </summary>
+        [JsonPropertyName("required")]
+        public List<string>? Required { get; set; }
+    }
+
+    internal class JsonSchemaProperty
+    {
+        /// <summary>
+        /// The type of the property. Should be a JSON Schema type and is required.
+        /// </summary>
+        [JsonPropertyName("type")]
+        public string Type { get; set; } = string.Empty;
+
+        /// <summary>
+        /// A human-readable description of the property.
+        /// </summary>
+        [JsonPropertyName("description")]
+        public string? Description { get; set; } = string.Empty;
     }
 }

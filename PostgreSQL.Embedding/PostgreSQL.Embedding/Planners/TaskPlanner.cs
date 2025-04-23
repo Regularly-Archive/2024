@@ -1,9 +1,12 @@
-﻿using Microsoft.SemanticKernel;
+﻿using DocumentFormat.OpenXml.Math;
+using Microsoft.SemanticKernel;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.Common.Models.Planners;
 using PostgreSQL.Embedding.LlmServices;
 using PostgreSQL.Embedding.LLmServices.Extensions;
+using PostgreSQL.Embedding.Plugins;
+using System.Linq.Expressions;
 using System.Text;
 
 namespace PostgreSQL.Embedding.Planners
@@ -44,9 +47,32 @@ namespace PostgreSQL.Embedding.Planners
             }
         }
 
-        private Task<string> CreateFunctionDescriptions(Kernel kernel)
+        public async Task<List<SubTask>> GetRAGTasks(string query)
         {
-            var availableFunctions = kernel.GetAvailableFunctions();
+            _promptTemplate.AddVariable("input", query);
+            _promptTemplate.AddVariable("language", "chinese");
+            _promptTemplate.AddVariable("limit", 1);
+
+            var functions = await CreateFunctionDescriptions(_kernel, x => x.PluginName == nameof(RAGFlowPlugin));
+            _promptTemplate.AddVariable("functions", functions);
+
+            var kernelResult = await _promptTemplate.InvokeAsync<string>(_kernel);
+            try
+            {
+                kernelResult = kernelResult.Replace("```json", "").Replace("```", "");
+                var planResult = JsonConvert.DeserializeObject<PlanResult>(kernelResult);
+                return planResult.Tasks;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Unable to create tasks for query '{query}'");
+                return [];
+            }
+        }
+
+        private Task<string> CreateFunctionDescriptions(Kernel kernel, Expression<Func<KernelFunctionMetadata, bool>> expression = null)
+        {
+            var availableFunctions = kernel.GetAvailableFunctions(expression);
             var functionDescriptions = string.Join("\r\n", availableFunctions.Select(x => CreateFunctionDescription(x)));
 
             var arguments = new KernelArguments() { ["functionDescriptions"] = functionDescriptions };

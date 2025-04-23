@@ -155,7 +155,9 @@ namespace PostgreSQL.Embedding.LlmServices
                 var chatHistory = new ChatHistory();
 
                 var taskPlanner = new TaskPlanner(kernel);
-                var subTasks = await taskPlanner.GetSubTasksAsync(input, limit: 3);
+                var subTasks = _app.AppType == (int)LlmAppType.Chat
+                    ? await taskPlanner.GetSubTasksAsync(input, limit: 3)
+                    : await taskPlanner.GetRAGTasks(input);
 
                 subTasks.ForEach(async (subTask) => await EmitTracesAsync(subTask.AsStepTrace(), cancellationToken));
 
