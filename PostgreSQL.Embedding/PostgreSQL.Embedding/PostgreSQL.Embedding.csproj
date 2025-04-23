@@ -25,28 +25,29 @@
   <ItemGroup>
     <PackageReference Include="CSnakes.Runtime" Version="1.0.27" />
     <PackageReference Include="jieba.NET" Version="0.42.2" />
-    <PackageReference Include="LLamaSharp" Version="0.13.0" />
-    <PackageReference Include="LLamaSharp.Backend.Cpu" Version="0.13.0" />
-    <PackageReference Include="LLamaSharp.kernel-memory" Version="0.13.0" />
-    <PackageReference Include="LLamaSharp.semantic-kernel" Version="0.13.0" />
+    <PackageReference Include="LLamaSharp" Version="0.23.0" />
+    <PackageReference Include="LLamaSharp.Backend.Cpu" Version="0.23.0" />
+    <PackageReference Include="LLamaSharp.kernel-memory" Version="0.23.0" />
+    <PackageReference Include="LLamaSharp.semantic-kernel" Version="0.23.0" />
     <PackageReference Include="MailKit" Version="4.7.1.1" />
     <PackageReference Include="Mapster" Version="7.4.0" />
     <PackageReference Include="Masuit.Tools.Core" Version="2.6.9.4" />
-    <PackageReference Include="mcpdotnet" Version="1.1.0.1" />
     <PackageReference Include="Microsoft.AspNet.Cors" Version="5.3.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.3" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.2">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.KernelMemory.Core" Version="0.64.240619.1" />
-    <PackageReference Include="Microsoft.KernelMemory.MemoryDb.Postgres" Version="0.64.240619.1" />
+    <PackageReference Include="Microsoft.KernelMemory.AI.OpenAI" Version="0.98.250324.1" />
+    <PackageReference Include="Microsoft.KernelMemory.Core" Version="0.98.250324.1" />
+    <PackageReference Include="Microsoft.KernelMemory.MemoryDb.Postgres" Version="0.98.250324.1" />
     <PackageReference Include="Microsoft.SemanticKernel" Version="1.40.1" />
     <PackageReference Include="Microsoft.SemanticKernel.Planners.Handlebars" Version="1.15.0-preview" />
     <PackageReference Include="Microsoft.SemanticKernel.Plugins.Core" Version="1.15.0-alpha" />
     <PackageReference Include="Microsoft.SemanticKernel.Plugins.Memory" Version="1.15.0-alpha" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.19.5" />
     <PackageReference Include="Minio" Version="6.0.2" />
+    <PackageReference Include="ModelContextProtocol" Version="0.1.0-preview.10" />
     <PackageReference Include="MongoDB.Driver" Version="2.28.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Pgvector.EntityFrameworkCore" Version="0.2.0" />

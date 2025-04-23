@@ -165,11 +165,10 @@ builder.Services.AddMinio(minioClient =>
 builder.Services.AddSingleton<KnowledgeBaseBackgroundService>();
 builder.Services.AddHostedService<KnowledgeBaseBackgroundService>();
 builder.Services.AddSingleton<EnumValuesConverter>();
-builder.Services.AddScoped<IFullTextSearchService, FullTextSearchService>();
 builder.Services.AddScoped<IFileStorageService, MinioFileStorageService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddSingleton<IRerankService, BgeRerankService>();
-builder.Services.AddSingleton<IRerankService, BM25RerankerService>();
+//builder.Services.AddSingleton<IRerankService, BM25RerankerService>();
 builder.Services.AddScoped<ILlmPluginService, LlmPluginService>();
 builder.Services.AddScoped<IKnowledgeRetrievalService, VectorsRetrievalService>();
 builder.Services.AddScoped<IKnowledgeRetrievalService, FullTextRetrievalService>();

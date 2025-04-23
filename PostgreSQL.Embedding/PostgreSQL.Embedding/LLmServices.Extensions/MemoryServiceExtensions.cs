@@ -26,10 +26,5 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
                 knowledgeRetrivalServices
            );
         }
-
-        public static IFullTextSearchService AsFullTextSearchService(this IMemoryService memoryService, IServiceProvider serviceProvider)
-        {
-            return serviceProvider.GetService<IFullTextSearchService>();
-        }
     }
 }

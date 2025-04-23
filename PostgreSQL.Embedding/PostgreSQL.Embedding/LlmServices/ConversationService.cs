@@ -39,17 +39,21 @@ namespace PostgreSQL.Embedding.LlmServices
                 var kernel = await _kernelService.GetKernel(app);
 
                 var input = model.Messages[model.Messages.Count - 1].content;
-                switch (app.AppType)
-                {
-                    case (int)LlmAppType.Chat:
-                        var genericConversationService = new GenericConversationService(kernel, app, _serviceProvider, _chatHistoryService,HttpContext);
-                        await genericConversationService.InvokeAsync(model, input, cancellationToken);
-                        break;
-                    case (int)LlmAppType.Knowledge:
-                        var ragConversationService = new RAGConversationService(kernel, app, _serviceProvider, _memoryService, _chatHistoryService, HttpContext);
-                        await ragConversationService.InvokeAsync(model, input, cancellationToken);
-                        break;
-                }
+
+                var genericConversationService = new GenericConversationService(kernel, app, _serviceProvider, _chatHistoryService, HttpContext);
+                await genericConversationService.InvokeAsync(model, input, cancellationToken);
+
+                //switch (app.AppType)
+                //{
+                //    case (int)LlmAppType.Chat:
+                //        var genericConversationService = new GenericConversationService(kernel, app, _serviceProvider, _chatHistoryService,HttpContext);
+                //        await genericConversationService.InvokeAsync(model, input, cancellationToken);
+                //        break;
+                //    case (int)LlmAppType.Knowledge:
+                //        var ragConversationService = new RAGConversationService(kernel, app, _serviceProvider, _memoryService, _chatHistoryService, HttpContext);
+                //        await ragConversationService.InvokeAsync(model, input, cancellationToken);
+                //        break;
+                //}
             }
             catch (OperationCanceledException)
             {
