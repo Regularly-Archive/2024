@@ -44,7 +44,6 @@ namespace PostgreSQL.Embedding.LlmServices.LLama
 
             _inferenceParams = new InferenceParams()
             {
-                RepeatPenalty = 1.0f,
                 AntiPrompts = new string[] { "User:" },
             };
 
@@ -102,8 +101,8 @@ namespace PostgreSQL.Embedding.LlmServices.LLama
 
         public async Task<List<float>> Embedding(OpenAIEmbeddingModel embeddingModel)
         {
-            float[] embeddings = await _embedder.GetEmbeddings(embeddingModel.input[0]);
-            return embeddings.ToList();
+            var embeddings = await _embedder.GetEmbeddings(embeddingModel.input[0]);
+            return embeddings[0].ToList();
         }
     }
 }

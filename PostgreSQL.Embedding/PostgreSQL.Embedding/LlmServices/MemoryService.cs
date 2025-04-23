@@ -6,8 +6,10 @@ using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.LlmServices.Routers;
+using PostgreSQL.Embedding.LLmServices.Extensions;
 using PostgreSQL.Embedding.Utils;
 using SqlSugar;
+using System.Diagnostics.CodeAnalysis;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
@@ -57,22 +59,28 @@ namespace PostgreSQL.Embedding.LlmServices
 
             var memoryBuilder = new KernelMemoryBuilder();
 
+#pragma warning disable KMEXP01 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
             memoryBuilder
                 .WithPostgresMemoryDb(postgresConfig)
                 .WithOpenAITextGeneration(openAIConfig, httpClient: generationHttpClient)
-                .WithOpenAITextEmbeddingGeneration(openAIConfig, httpClient: embeddingHttpClient)
+                //.WithOpenAITextEmbeddingGeneration(openAIConfig, httpClient: embeddingHttpClient)
+                .WithOpenAICompatibleTextEmbeddingGeneration(openAIConfig, httpClient: embeddingHttpClient)
                 .WithCustomTextPartitioningOptions(new TextPartitioningOptions()
                 {
                     MaxTokensPerParagraph = DefaultTextPartitioningOptions.MaxTokensPerParagraph,
-                    MaxTokensPerLine = DefaultTextPartitioningOptions.MaxTokensPerLine,
                     OverlappingTokens = DefaultTextPartitioningOptions.OverlappingTokens
                 })
                 .WithSearchClientConfig(new SearchClientConfig()
                 {
                     EmptyAnswer = Common.Constants.DefaultEmptyAnswer
-                });
 
-            return memoryBuilder.Build<MemoryServerless>();
+                });
+#pragma warning restore KMEXP01 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+
+            return memoryBuilder.Build<MemoryServerless>(new KernelMemoryBuilderBuildOptions()
+            {
+                AllowMixingVolatileAndPersistentData = true,
+            });
         }
 
         public async Task<MemoryServerless> CreateByKnowledgeBase(KnowledgeBase knowledgeBase)
@@ -94,39 +102,37 @@ namespace PostgreSQL.Embedding.LlmServices
 
             // Todo
             // 需要解除对 OpenAIConfig 的依赖
-            var openAIConfig = new OpenAIConfig() { APIKey = Guid.NewGuid().ToString() };
+            var openAIConfig = new OpenAIConfig() { APIKey = Guid.NewGuid().ToString(), MaxEmbeddingBatchSize =  1};
             openAIConfig.EmbeddingModel = embeddingModel.ModelName;
             openAIConfig.TextModel = generationModel.ModelName;
 
             var memoryBuilder = new KernelMemoryBuilder();
 
+#pragma warning disable KMEXP01 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
             memoryBuilder
                 .WithPostgresMemoryDb(postgresConfig)
                 .WithOpenAITextGeneration(openAIConfig, httpClient: generationHttpClient)
-                .WithOpenAITextEmbeddingGeneration(openAIConfig, httpClient: embeddingHttpClient)
+                //.WithOpenAITextEmbeddingGeneration(openAIConfig, httpClient: embeddingHttpClient)
+                .WithOpenAICompatibleTextEmbeddingGeneration(openAIConfig, httpClient: embeddingHttpClient)
                 .WithCustomTextPartitioningOptions(new TextPartitioningOptions()
                 {
                     MaxTokensPerParagraph = (knowledgeBase.MaxTokensPerParagraph.HasValue ?
                         knowledgeBase.MaxTokensPerParagraph.Value :
                         DefaultTextPartitioningOptions.MaxTokensPerParagraph),
-
-                    MaxTokensPerLine = (knowledgeBase.MaxTokensPerLine.HasValue ?
-                        knowledgeBase.MaxTokensPerLine.Value :
-                        DefaultTextPartitioningOptions.MaxTokensPerLine),
-
                     OverlappingTokens = (knowledgeBase.OverlappingTokens.HasValue ?
-                    knowledgeBase.OverlappingTokens.Value :
-                    DefaultTextPartitioningOptions.OverlappingTokens),
+                        knowledgeBase.OverlappingTokens.Value :
+                        DefaultTextPartitioningOptions.OverlappingTokens),
                 })
                 .WithSearchClientConfig(new SearchClientConfig()
                 {
                     EmptyAnswer = Common.Constants.DefaultEmptyAnswer
                 });
+#pragma warning restore KMEXP01 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 
-            // Todo: 考虑将这里换成 ITextEmbeddingBatchGenerator，以提高向量生成的效率
-
-
-            return memoryBuilder.Build<MemoryServerless>();
+            return memoryBuilder.Build<MemoryServerless>(new KernelMemoryBuilderBuildOptions()
+            {
+                AllowMixingVolatileAndPersistentData = true,
+            });
         }
 
         private async Task<string> GenerateTableNamePrefix(LlmModel embeddingModel)
