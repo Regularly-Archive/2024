@@ -4,8 +4,10 @@ namespace PostgreSQL.Embedding.Common.Models.Search
 {
     public class SearchResult
     {
-        public List<Entry> Entries { get; set; } = new List<Entry>();
         public string Query { get; set; }
+        public List<Entry> Entries { get; set; } = new List<Entry>();
+        public bool HasNextPage { get; set; } = false;
+        public string NextPage {  get; set; }
 
         public override string ToString()
         {
@@ -15,7 +17,7 @@ namespace PostgreSQL.Embedding.Common.Models.Search
             {
                 stringBuilder.AppendLine($"Url: {entry.Url}");
                 stringBuilder.AppendLine($"Title: {entry.Title}");
-                stringBuilder.AppendLine($"Description: {entry.Description}");
+                stringBuilder.AppendLine($"Description: {entry.Snippet}");
                 stringBuilder.AppendLine();
             }
 
@@ -27,6 +29,6 @@ namespace PostgreSQL.Embedding.Common.Models.Search
     {
         public string Url { get; set; }
         public string Title { get; set; }
-        public string Description { get; set; }
+        public string Snippet { get; set; }
     }
 }

@@ -1,18 +1,18 @@
 ﻿using AngleSharp;
+using DocumentFormat.OpenXml.Office2016.Drawing.Command;
 using Microsoft.SemanticKernel;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Models;
-using PostgreSQL.Embedding.Common.Models.RAG;
 using PostgreSQL.Embedding.Common.Models.Search;
-using PostgreSQL.Embedding.LlmServices;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using PostgreSQL.Embedding.Utils;
 using SqlSugar;
 using System.ComponentModel;
-using System.Text;
-using System.Text.RegularExpressions;
+using System.Net;
+using System.Net.Http;
+using static System.Net.WebRequestMethods;
 
 namespace PostgreSQL.Embedding.Plugins
 {
@@ -25,6 +25,8 @@ namespace PostgreSQL.Embedding.Plugins
         private const string SELECTOR_TAG_ITEM_TITLE = "h2";
         private const string SELECTOR_TAG_HREF = "href";
         private const string SELECTOR_TAG_ITEM_DESC = ".b_caption";
+        private const string SELECTOR_TAG_PAGINATION = ".b_pag";
+        private const string SELECTOR_TAG_PAGINATION_NEXT = ".sw_next";
 
         private readonly IServiceProvider _serviceProvider;
         private readonly IHttpClientFactory _httpClientFactory;
@@ -38,7 +40,7 @@ namespace PostgreSQL.Embedding.Plugins
 
         [KernelFunction]
         [Description("使用关键词进行检索")]
-        public async Task<string> SearchAsync([Description("关键词")] string keyword)
+        public async Task<string> SearchAsync([Description("关键词")] string query, int limit = 30)
         {
             using var httpClient = _httpClientFactory.CreateClient();
             httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0");
@@ -46,21 +48,65 @@ namespace PostgreSQL.Embedding.Plugins
 
             try
             {
-                var response = await httpClient.GetAsync($"https://bing.com/search?q={keyword}");
-                response.EnsureSuccessStatusCode();
-
-
-                var html = await response.Content.ReadAsStringAsync();
-                var searchResult = await ExtractSearchResults(keyword, html);
+                var searchResult = await GetAsync(httpClient, query, $"https://bing.com/search?q={WebUtility.UrlEncode(query)}");
+                while (searchResult.Entries.Count < limit && searchResult.HasNextPage)
+                {
+                    var newSearchResult = await GetAsync(httpClient, query, searchResult.NextPage);
+                    if (searchResult.Entries.Any())
+                    {
+                        searchResult.Entries.AddRange(newSearchResult.Entries);
+                        searchResult.NextPage = newSearchResult.NextPage;
+                        searchResult.HasNextPage = newSearchResult.HasNextPage;
+                    }
+                }
                 await SendArtifacts(searchResult);
                 return JsonConvert.SerializeObject(searchResult);
             }
             catch (HttpRequestException ex)
             {
-                var html = await new HeadlessBrowser().FetchAsync($"https://bing.com/search?q={keyword}");
-                var searchResult = await ExtractSearchResults(keyword, html);
+                var html = await new HeadlessBrowser().FetchAsync($"https://bing.com/search?q={query}");
+                var searchResult = await ExtractSearchResults(query, html);
                 await SendArtifacts(searchResult);
                 return JsonConvert.SerializeObject(searchResult);
+            }
+        }
+
+        public async Task<SearchResult> SearchV2Async([Description("关键词")] string query, int limit = 30)
+        {
+            using var httpClient = _httpClientFactory.CreateClient();
+            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0");
+            httpClient.DefaultRequestHeaders.Referrer = new Uri("https://bing.com/");
+
+            var searchResult = await GetAsync(httpClient, query, $"https://bing.com/search?q={WebUtility.UrlEncode(query)}");
+            while (searchResult.Entries.Count < limit && searchResult.HasNextPage)
+            {
+                var newSearchResult = await GetAsync(httpClient, query, searchResult.NextPage);
+                if (searchResult.Entries.Any())
+                {
+                    searchResult.Entries.AddRange(newSearchResult.Entries);
+                    searchResult.NextPage = newSearchResult.NextPage;
+                    searchResult.HasNextPage = newSearchResult.HasNextPage;
+                }
+            }
+
+            return searchResult;
+        }
+
+        private async Task<SearchResult> GetAsync(HttpClient httpClient, string query, string url)
+        {
+            try
+            {
+                var response = await httpClient.GetAsync(url);
+                response.EnsureSuccessStatusCode();
+
+                var resonseBody = await response.Content.ReadAsStringAsync();
+                var searchResult = await ExtractSearchResults(query, resonseBody);
+
+                return searchResult;
+            }
+            catch (HttpRequestException ex)
+            {
+                return new SearchResult() { Query = query };
             }
         }
 
@@ -75,6 +121,17 @@ namespace PostgreSQL.Embedding.Plugins
             var eleMain = document.QuerySelector(SELECTOR_TAG_MAIN);
             if (eleMain == null) return seachResult;
 
+            var elePag = eleMain.QuerySelector(SELECTOR_TAG_PAGINATION);
+            if (elePag != null)
+            {
+                var eleNextPage = elePag.QuerySelector(SELECTOR_TAG_PAGINATION_NEXT);
+                if (eleNextPage != null)
+                {
+                    seachResult.HasNextPage = true;
+                    seachResult.NextPage = "https://bing.com" + eleNextPage.ParentElement.Attributes[SELECTOR_TAG_HREF].Value;
+                }
+            }
+
             var eleItems = eleMain.QuerySelectorAll(SELECTOR_TAG_ITEM);
             if (eleItems == null || !eleItems.Any()) return seachResult;
 
@@ -85,7 +142,7 @@ namespace PostgreSQL.Embedding.Plugins
                 {
                     Title = eleTitle.TextContent,
                     Url = eleTitle.QuerySelector(SELECTOR_TAG_LINK).Attributes[SELECTOR_TAG_HREF].Value,
-                    Description = x.QuerySelector(SELECTOR_TAG_ITEM_DESC)?.TextContent ?? string.Empty
+                    Snippet = x.QuerySelector(SELECTOR_TAG_ITEM_DESC)?.TextContent ?? string.Empty
                 };
             })
             .ToList();
@@ -102,7 +159,7 @@ namespace PostgreSQL.Embedding.Plugins
             {
                 link = x.Url,
                 title = x.Title,
-                description = x.Description
+                description = x.Snippet
             });
             artifact.SetData(payloads);
             await EmitArtifactsAsync(artifact);
@@ -111,6 +168,6 @@ namespace PostgreSQL.Embedding.Plugins
 
     public interface ISearchEngine
     {
-        Task<string> SearchAsync(string keyword);
+        Task<string> SearchAsync(string keyword, int limit = 30);
     }
 }
