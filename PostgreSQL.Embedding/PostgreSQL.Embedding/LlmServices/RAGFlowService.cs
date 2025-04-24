@@ -28,7 +28,7 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly PromptTemplateService _promptTemplateService;
         private readonly ILogger<RAGConversationService> _logger;
         private readonly CallablePromptTemplate _promptTemplate;
-        private Regex _regexCitations = new Regex(@"\[(\d+)\]");
+        private Regex _regexCitations = new Regex(@"\^(\d+)");
         public RAGFlowService(Kernel kernel,
             IServiceProvider serviceProvider,
             IMemoryService memoryService,
@@ -47,6 +47,14 @@ namespace PostgreSQL.Embedding.LlmServices
             _logger = _serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<RAGConversationService>();
         }
 
+        /// <summary>
+        /// 生成答案
+        /// </summary>
+        /// <param name="appId"></param>
+        /// <param name="conversationId"></param>
+        /// <param name="input"></param>
+        /// <param name="citations"></param>
+        /// <returns></returns>
         public async Task<string> GenerateAnswerAsync(long appId, string conversationId, string input, List<LlmCitationModel> citations)
         {
             if (citations == null || !citations.Any())
@@ -80,50 +88,21 @@ namespace PostgreSQL.Embedding.LlmServices
                 else
                 {
                     // 匹配引用信息，对引用信息的索引进行重排
-                    var index = 0;
-                    var matchedCitationNumbers = _regexCitations.Matches(answer).Select(x => int.Parse(x.Groups[1].Value)).ToList();
-                    var newCitationNumbers = new List<LlmCitationMappingModel>();
-                    foreach (var citationNumber in matchedCitationNumbers)
-                    {
-                        if (!newCitationNumbers.Any(x => x.OriginIndex == citationNumber))
-                        {
-                            index += 1;
-                            newCitationNumbers.Add(new LlmCitationMappingModel() { NewIndex = index, OriginIndex = citationNumber });
-                        }
-                    }
-
-                    // 重新生成引用信息
-                    var generatedCitations = citations.Where(x => matchedCitationNumbers.Contains(x.Index)).Select(x =>
-                    {
-                        var newIndex = newCitationNumbers.FirstOrDefault(k => k.OriginIndex == x.Index).NewIndex;
-                        return new LlmCitationModel() { Index = newIndex, Url = x.Url };
-                    })
-                    .OrderBy(x => x.Index)
-                    .Select(x => $"[{x.Index}]: {x.Url}")
-                    .ToList();
-
-                    var markdownFormatContext = string.Join("\r\n", generatedCitations);
-
-                    // 更新答案中的引用信息
-                    foreach (var ciation in newCitationNumbers)
-                    {
-                        answer = answer.Replace($"[{ciation.OriginIndex}]", $"[{ciation.NewIndex}]");
-                    }
-
-                    // 拼接答案和引用信息
-                    var answerBuilder = new StringBuilder();
-                    answerBuilder.AppendLine(answer);
-                    answerBuilder.AppendLine();
-                    answerBuilder.AppendLine(markdownFormatContext);
-
-                    return $"<RAG>{answerBuilder.ToString()}</RAG>";
+                    var newAnswer = ReorderReferences(citations, answer);
+                    return $"<RAG>{newAnswer}</RAG>";
                 }
             }
 
             return Common.Constants.DefaultEmptyAnswer;
         }
 
-        public async Task<List<LlmCitationModel>> RetrieveCitationsAsync(long appId, string question)
+        /// <summary>
+        /// 生成引用
+        /// </summary>
+        /// <param name="appId"></param>
+        /// <param name="question"></param>
+        /// <returns></returns>
+        public async Task<List<LlmCitationModel>> GenerateCitationsAsync(long appId, string question)
         {
             var app = await _llmAppRepository.GetAsync(appId);
             if (app == null) return [];
@@ -138,7 +117,7 @@ namespace PostgreSQL.Embedding.LlmServices
             // 查询重写
             if (app.EnableRewrite)
             {
-                var similarQuestions = await RewriteAsync(question, _kernel);
+                var similarQuestions = await RewriteQueryAsync(question, _kernel);
                 _logger.LogInformation($"查询重写，共生成 {similarQuestions.Count} 个相似问题：{JsonConvert.SerializeObject(similarQuestions)}.");
                 //await EmitTracesAsync($"查询重写，共生成 {similarQuestions.Count} 个相似问题", cancellationToken);
 
@@ -153,7 +132,7 @@ namespace PostgreSQL.Embedding.LlmServices
 
                 foreach (var input in inputs)
                 {
-                    var retrieveResult = await RetrieveAsync(knowledgeBase, input);
+                    var retrieveResult = await RetrieveDocumentsAsync(knowledgeBase, input);
                     if (retrieveResult != null && retrieveResult.Any()) searchResults.AddRange(retrieveResult);
                 }
             }
@@ -161,7 +140,7 @@ namespace PostgreSQL.Embedding.LlmServices
             var partitions = searchResults.SelectMany(x => x.Partitions).ToList();
 
             // 结果重排
-            if (app.EnableRerank) partitions = Rerank(question, partitions);
+            if (app.EnableRerank) partitions = RerankDocuments(question, partitions);
 
             // 构建上下文
             var chunks = partitions.Select((x, i) => LlmCitationModel.FromKnowledgeBase(i + 1, x))
@@ -186,7 +165,13 @@ namespace PostgreSQL.Embedding.LlmServices
             return chunks;
         }
 
-        private async Task<List<KMCitation>> RetrieveAsync(KnowledgeBase knowledgeBase, string question)
+        /// <summary>
+        /// 检索文档
+        /// </summary>
+        /// <param name="knowledgeBase"></param>
+        /// <param name="question"></param>
+        /// <returns></returns>
+        private async Task<List<KMCitation>> RetrieveDocumentsAsync(KnowledgeBase knowledgeBase, string question)
         {
             var limit = knowledgeBase.RetrievalLimit.HasValue ?
                 knowledgeBase.RetrievalLimit.Value : PostgreSQL.Embedding.Common.Constants.DefaultRetrievalLimit;
@@ -217,7 +202,13 @@ namespace PostgreSQL.Embedding.LlmServices
             }
         }
 
-        private async Task<List<string>> RewriteAsync(string question, Kernel kernel)
+        /// <summary>
+        /// 查询重写
+        /// </summary>
+        /// <param name="question"></param>
+        /// <param name="kernel"></param>
+        /// <returns></returns>
+        private async Task<List<string>> RewriteQueryAsync(string question, Kernel kernel)
         {
 
             try
@@ -243,7 +234,13 @@ namespace PostgreSQL.Embedding.LlmServices
             }
         }
 
-        private List<KMPartition> Rerank(string question, List<KMPartition> partitions)
+        /// <summary>
+        /// 文档重排
+        /// </summary>
+        /// <param name="question"></param>
+        /// <param name="partitions"></param>
+        /// <returns></returns>
+        private List<KMPartition> RerankDocuments(string question, List<KMPartition> partitions)
         {
             using var serviceScope = _serviceProvider.CreateScope();
             var rerankService = serviceScope.ServiceProvider.GetRequiredService<IRerankService>();
@@ -266,6 +263,55 @@ namespace PostgreSQL.Embedding.LlmServices
                 _logger.LogError(ex, "");
                 return partitions;
             }
+        }
+
+        /// <summary>
+        /// 引用重排
+        /// </summary>
+        /// <param name="text"></param>
+        /// <returns></returns>
+        private string ReorderReferences(List<LlmCitationModel> originCitations, string generatedAnswer)
+        {
+            var markdownCitations = new List<string>();
+
+            var matches = _regexCitations.Matches(generatedAnswer);
+
+            var referenceOrder = new List<int>();
+            var usedReferences = new HashSet<int>();
+
+            foreach (Match match in matches)
+            {
+                var referenceNumber = int.Parse(match.Groups[1].Value);
+                usedReferences.Add(referenceNumber);
+
+                if (!referenceOrder.Contains(referenceNumber))
+                {
+                    referenceOrder.Add(referenceNumber);
+                }
+            }
+
+            var referenceMapping = new Dictionary<int, int>();
+            for (int i = 0; i < referenceOrder.Count; i++)
+            {
+                referenceMapping[referenceOrder[i]] = i + 1;
+            }
+
+            string result = _regexCitations.Replace(generatedAnswer, match =>
+            {
+                var oldNumber = int.Parse(match.Groups[1].Value);
+                var newNumber = referenceMapping[oldNumber];
+                var citation = originCitations.First(x => x.Index == oldNumber);
+                markdownCitations.Add($"[{newNumber}]: {citation.Url}");
+                return $"<sup>[{newNumber}]</sup>";
+            });
+
+
+            var stringBuilder = new StringBuilder();
+            stringBuilder.AppendLine(result);
+            stringBuilder.AppendLine();
+            stringBuilder.AppendLine(string.Join("\r\n", markdownCitations));
+
+            return stringBuilder.ToString();
         }
     }
 }
