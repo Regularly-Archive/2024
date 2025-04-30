@@ -17,9 +17,9 @@ namespace PostgreSQL.Embedding.Planners
 
         public List<string> ExcludedFunctions { get; set; } = new List<string>()
         {
-            "BingSearchPlugin.Search",
-            "BraveSearchPlugin.Search",
-            "JinaAIPlugin.Search",
+            //"BingSearchPlugin.Search",
+            //"BraveSearchPlugin.Search",
+            //"JinaAIPlugin.Search",
         };
 
         public Dictionary<string, object> Variables { get; set; } = new Dictionary<string, object>();

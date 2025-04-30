@@ -1,4 +1,5 @@
 ﻿using Microsoft.KernelMemory;
+using PostgreSQL.Embedding.Common.Models.Search;
 
 namespace PostgreSQL.Embedding.Common.Models.KernelMemory
 {
@@ -44,5 +45,11 @@ namespace PostgreSQL.Embedding.Common.Models.KernelMemory
         {
             Relevance = relevance;
         }
+    }
+
+    public enum PartitionType
+    {
+        Document,
+        WebPage
     }
 }
