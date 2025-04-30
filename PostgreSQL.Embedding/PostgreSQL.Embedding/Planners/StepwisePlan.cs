@@ -167,13 +167,13 @@ namespace PostgreSQL.Embedding.Planners
 
                 _stopwatch.Stop();
                 this._logger?.LogTrace($"Invoked {actionName}. Result: {result}");
-                OnStepExecute?.Invoke(StepTrace.Action(actionName, actionVariables, _stopwatch.Elapsed.TotalSeconds, true));
+                OnStepExecute?.Invoke(StepTrace.Action(actionName, actionVariables, result, _stopwatch.Elapsed.TotalSeconds, true));
                 return result;
             }
             catch (Exception e)
             {
                 _stopwatch.Stop();
-                OnStepExecute?.Invoke(StepTrace.Action(actionName, actionVariables, _stopwatch.Elapsed.TotalSeconds, false));
+                OnStepExecute?.Invoke(StepTrace.Action(actionName, actionVariables, string.Empty, _stopwatch.Elapsed.TotalSeconds, false));
                 this._logger?.LogError(e, "Something went wrong in system step: {Plugin}.{Function}. Error: {Error}", targetFunction.PluginName, targetFunction.Name, e.Message);
                 throw;
             }
