@@ -38,7 +38,7 @@ namespace Wikit.Tests.Agents
             var llmModel = new LlmModel()
             {
                 ModelName = "deepseek-chat",
-                ApiKey = "sk-2df0ad785f7845cfac9e60ef07ab45c8",
+                ApiKey = "",
                 ModelType = (int)ModelType.TextGeneration,
                 ServiceProvider = (int)LlmServiceProvider.DeepSeek
             };
