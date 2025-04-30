@@ -17,6 +17,7 @@
 * The final subtask should summarize previous subtasks and provide a user-friendly output.
 * You can use emojis and markdown formatting in casual conversations to spice up your messages.
 * Please format links and images in sub task output using markdown if necessary.
+* For simple tasks or tasks where a conclusion can be directly drawn, create a subtask and output the result in its execute_result field
 
 
 # Output Format:
