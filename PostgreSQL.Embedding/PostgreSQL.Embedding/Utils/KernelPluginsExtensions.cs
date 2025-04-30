@@ -8,6 +8,7 @@ using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LLmServices.Extensions;
 using PostgreSQL.Embedding.Plugins.Abstration;
+using System.Net;
 using System.Reflection;
 using System.Runtime.Loader;
 
@@ -124,25 +125,38 @@ namespace PostgreSQL.Embedding.Utils
             }
         }
 
-        public static async Task AddMCPServerAsync(this Kernel kernel, string name, string command, string[] args = null, Dictionary<string, string> env = null)
+        public static async Task AddMCPServerAsync(this Kernel kernel, string name, string command, string[] args = null, Dictionary<string, string> env = null, Dictionary<string, IMcpClient> mcpClientsPool = null)
         {
-            var validName = name.Replace("-", "_");
-            var clientTransport = new StdioClientTransport(new StdioClientTransportOptions
+            try
             {
-                Name = validName,
-                Command = command,
-                Arguments = args ?? [],
-                EnvironmentVariables = env ?? new Dictionary<string, string>()
-            });
+                var validName = name.Replace("-", "_");
+                var clientTransport = new StdioClientTransport(new StdioClientTransportOptions
+                {
+                    Name = validName,
+                    Command = command,
+                    Arguments = args ?? [],
+                    EnvironmentVariables = env ?? new Dictionary<string, string>()
+                });
 
-            var loggerFactory = kernel.Services.GetRequiredService<ILoggerFactory>();
-            var client = await McpClientFactory.CreateAsync(clientTransport, loggerFactory: loggerFactory);
+                var loggerFactory = kernel.Services.GetRequiredService<ILoggerFactory>();
 
-            var kernelFunctions = await client.GetKernelFunctionsAsync(loggerFactory);
-            kernel.Plugins.AddFromFunctions(validName, kernelFunctions);
+                IMcpClient client = mcpClientsPool.ContainsKey(validName)
+                    ? mcpClientsPool[validName]
+                    : await McpClientFactory.CreateAsync(clientTransport, loggerFactory: loggerFactory);
+
+                if (!mcpClientsPool.ContainsKey(validName)) mcpClientsPool[validName] = client;
+
+                var kernelFunctions = await client.GetKernelFunctionsAsync(loggerFactory);
+                kernel.Plugins.AddFromFunctions(validName, kernelFunctions);
+            }
+            catch (Exception ex)
+            {
+                await Task.CompletedTask;
+            }
+
         }
 
-        public static async Task AddMCPServerAsync(this Kernel kernel, string name, string url, Dictionary<string, string> headers = null)
+        public static async Task AddMCPServerAsync(this Kernel kernel, string name, string url, Dictionary<string, string> headers = null, Dictionary<string, IMcpClient> mcpClientsPool = null)
         {
             var validName = name.Replace("-", "_");
             var clientTransport = new SseClientTransport(new SseClientTransportOptions
@@ -153,10 +167,50 @@ namespace PostgreSQL.Embedding.Utils
             });
 
             var loggerFactory = kernel.Services.GetRequiredService<ILoggerFactory>();
-            var client = await McpClientFactory.CreateAsync(clientTransport, loggerFactory: loggerFactory);
+
+            IMcpClient client = mcpClientsPool.ContainsKey(validName)
+                ? mcpClientsPool[validName]
+                : await McpClientFactory.CreateAsync(clientTransport, loggerFactory: loggerFactory);
+
+            if (!mcpClientsPool.ContainsKey(validName)) mcpClientsPool[validName] = client;
 
             var kernelFunctions = await client.GetKernelFunctionsAsync(loggerFactory);
             kernel.Plugins.AddFromFunctions(validName, kernelFunctions);
+        }
+
+        public static async Task AddMCPServerAsync(this Kernel kernel, MCPServer mcpServer, Dictionary<string, IMcpClient> mcpClientsPool)
+        {
+            if (mcpServer.TransportType == (int)Common.TransportType.Stdio)
+            {
+                await kernel.AddMCPServerAsync(mcpServer.Name, mcpServer.Command, mcpServer.Arguments, mcpServer.EnvVars, mcpClientsPool);
+            }
+            else
+            {
+                await kernel.AddMCPServerAsync(mcpServer.Name, mcpServer.Endpoint, mcpServer.ExtraHeaders, mcpClientsPool);
+            }
+        }
+
+        public static async Task<Kernel> ImportMCPServer(this Kernel kernel, IServiceProvider serviceProvider, long? appId = null, Dictionary<string, IMcpClient> mcpClientsPool = null)
+        {
+            var mcpServerRepository = serviceProvider.GetService<IRepository<MCPServer>>();
+            if (appId.HasValue)
+            {
+                var mcpServers = await mcpServerRepository.FindListAsync(x => x.AppId == appId.Value);
+                foreach (var mcpServer in mcpServers)
+                {
+                    await kernel.AddMCPServerAsync(mcpServer, mcpClientsPool);
+                }
+            }
+            else
+            {
+                var mcpServers = await mcpServerRepository.GetAllAsync();
+                foreach (var mcpServer in mcpServers)
+                {
+                    await kernel.AddMCPServerAsync(mcpServer, mcpClientsPool);
+                }
+            }
+
+            return kernel;
         }
     }
 }

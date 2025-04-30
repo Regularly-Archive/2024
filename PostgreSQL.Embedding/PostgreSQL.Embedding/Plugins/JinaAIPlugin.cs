@@ -21,7 +21,7 @@ namespace PostgreSQL.Embedding.Plugins
 
         [KernelFunction]
         [Description("一个由 JinaAI 驱动的搜索接口，返回内容格式为 JSON。")]
-        public async Task<string> SearchAsync([Description("查询关键词")] string keyword)
+        public async Task<SearchResult> SearchAsync([Description("查询关键词")] string keyword, int limit = 30)
         {
             using var httpClient = _httpClientFactory.CreateClient();
             httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
@@ -32,11 +32,11 @@ namespace PostgreSQL.Embedding.Plugins
             {
                 Url = x.Url,
                 Title = x.Title,
-                Description = x.Description,
+                Snippet = x.Description,
             })
             .ToList();
 
-            return JsonConvert.SerializeObject(searchResults);
+            return searchResults;
         }
 
         [KernelFunction]

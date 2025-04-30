@@ -1,17 +1,14 @@
-﻿using Azure;
-using Azure.AI.OpenAI;
-using Azure.Core.Pipeline;
-using DocumentFormat.OpenXml.Spreadsheet;
+﻿using Microsoft.Extensions.ObjectPool;
 using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Plugins.Core;
+using ModelContextProtocol.Client;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.LlmServices.Routers;
 using PostgreSQL.Embedding.Utils;
-using System.Diagnostics;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
@@ -19,6 +16,8 @@ namespace PostgreSQL.Embedding.LlmServices
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly IRepository<LlmModel> _llmModelRepository;
+        private readonly Dictionary<string,IMcpClient> _mcpClientsPool = new Dictionary<string,IMcpClient>();
+
         public KernalService(IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;
@@ -52,42 +51,7 @@ namespace PostgreSQL.Embedding.LlmServices
             kernel.Plugins.AddFromType<TimePlugin>();
             kernel.Plugins.AddFromType<MathPlugin>();
             kernel = kernel.ImportLlmPlugins(_serviceProvider, appId);
-            await kernel.AddMCPServerAsync(
-                name: "playwright",
-                command: "npx",
-                version: "1.0.0",
-                args: ["-y", "@executeautomation/playwright-mcp-server"],
-                env: null
-            );
-
-            await kernel.AddMCPServerAsync(
-                name: "memory",
-                command: "npx",
-                version: "1.0.0",
-                args: ["-y", "@modelcontextprotocol/server-memory"],
-                env: null
-            );
-            await kernel.AddMCPServerAsync(
-                name: "filesystem",
-                command: "npx",
-                version: "1.0.0",
-                args: ["-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\Administrator", "D:\\Projects\\2024", "D:\\Projects\\hugo-blog\\content\\posts"],
-                env: null
-            );
-            await kernel.AddMCPServerAsync(
-                name: "git",
-                command: "uvx",
-                args: ["mcp-server-git", "--repository", "D:\\Projects\\2024"],
-                env: null
-            );
-
-            //await kernel.AddMCPServerAsync(
-            //    name: "postgresql",
-            //    command: "npx",
-            //    args: ["-y", "@modelcontextprotocol/server-postgres", "postgresql://postgresql:postgresql@localhost:5432/wiki"],
-            //    env: null
-            //);
-
+            kernel = await kernel.ImportMCPServer(_serviceProvider, appId, _mcpClientsPool);
             return kernel;
         }
     }

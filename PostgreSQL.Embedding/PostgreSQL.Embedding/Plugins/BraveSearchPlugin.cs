@@ -29,28 +29,14 @@ namespace PostgreSQL.Embedding.Plugins
 
         [KernelFunction]
         [Description("使用关键词进行检索")]
-        public async Task<string> SearchAsync([Description("关键词")] string query, int limit = 30)
-        {
-            using var httpClient = _httpClientFactory.CreateClient();
-            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0");
-            httpClient.DefaultRequestHeaders.Referrer = new Uri("https://search.brave.com");
-
-            var response = await httpClient.GetAsync($"https://search.brave.com/search?q={query}&source=web");
-            response.EnsureSuccessStatusCode();
-
-            var responseBody = await response.Content.ReadAsStringAsync();
-            var searchResult = await ExtractSearchResults(query, responseBody);
-            return JsonConvert.SerializeObject(searchResult);
-        }
-
-        public async Task<SearchResult> SearchV2Async([Description("关键词")] string query, int limit = 30)
+        public async Task<SearchResult> SearchAsync([Description("关键词")] string query, int limit = 30)
         {
             using var httpClient = _httpClientFactory.CreateClient();
             httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0");
             httpClient.DefaultRequestHeaders.Referrer = new Uri("https://search.brave.com");
 
             var searchResult = await GetAsync(httpClient, query, $"https://search.brave.com/search?q={WebUtility.UrlEncode(query)}&source=web");
-            while(searchResult.HasNextPage && searchResult.Entries.Count < limit)
+            while (searchResult.HasNextPage && searchResult.Entries.Count < limit)
             {
                 var newSearchResult = await GetAsync(httpClient, query, searchResult.NextPage);
                 if (searchResult.Entries.Any())

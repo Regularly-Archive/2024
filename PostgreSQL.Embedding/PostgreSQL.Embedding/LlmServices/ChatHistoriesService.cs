@@ -45,6 +45,16 @@ namespace PostgreSQL.Embedding.LlmServices
             return message.Id;
         }
 
+        public async Task UpdateSystemMessageAsync(long messageId, string content)
+        {
+            var message = await _chatMessageRepository.GetAsync(messageId);
+            if (message != null)
+            {
+                message.Content = content;
+                await _chatMessageRepository.UpdateAsync(message);
+            }
+        }
+
         /// <summary>
         /// 添加用户消息
         /// </summary>
@@ -136,7 +146,7 @@ namespace PostgreSQL.Embedding.LlmServices
             conversation.Summary = summary;
             await _appConversationRepository.UpdateAsync(conversation);
         }
-        
+
         /// <summary>
         /// 删除会话
         /// </summary>
