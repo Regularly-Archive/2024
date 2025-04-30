@@ -1,19 +1,35 @@
 ﻿using Masuit.Tools;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.SemanticKernel;
 using ModelContextProtocol.Client;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using UglyToad.PdfPig.Tokens;
 
 namespace PostgreSQL.Embedding.LLmServices.Extensions
 {
     public static class MCPExtensions
     {
-        public static async Task<IEnumerable<KernelFunction>> GetKernelFunctionsAsync(this IMcpClient client, ILoggerFactory loggerFactory)
+        private static MemoryCache _memoryCache = new MemoryCache(new MemoryCacheOptions());
+        public static async Task<IEnumerable<KernelFunction>> GetKernelFunctionsAsync(this IMcpClient client, ILoggerFactory loggerFactory, bool cacheToolsList = true)
         {
-            var listToolsResult = await client.ListToolsAsync().ConfigureAwait(false);
-            return listToolsResult.Select(tool => ToKernelFunction(tool, client, loggerFactory)).ToList();
+            if (!cacheToolsList)
+            {
+                var toolsList = await client.ListToolsAsync().ConfigureAwait(false);
+                return toolsList.Select(tool => ToKernelFunction(tool, client, loggerFactory)).ToList();
+            }
+
+            var cacheKey = client.ServerInfo.Name;
+            if (_memoryCache.TryGetValue(cacheKey, out List<McpClientTool> tools))
+                return tools.Select(tool => ToKernelFunction(tool, client, loggerFactory)).ToList();
+
+
+            tools = (await client.ListToolsAsync().ConfigureAwait(false)).ToList();
+            var cacheEntryOptions = new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1) };
+            _memoryCache.Set(cacheKey, tools, cacheEntryOptions);
+            return tools.Select(tool => ToKernelFunction(tool, client, loggerFactory)).ToList();
         }
 
         private static KernelFunction ToKernelFunction(this McpClientTool tool, IMcpClient client, ILoggerFactory loggerFactory)
@@ -48,7 +64,7 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
 
             return KernelFunctionFactory.CreateFromMethod(
                 method: InvokeToolAsync,
-                functionName: tool.Name.Replace("-","_"),
+                functionName: tool.Name.Replace("-", "_"),
                 description: tool.Description,
                 parameters: ToKernelParameters(tool),
                 returnParameter: ToKernelReturnParameter(),

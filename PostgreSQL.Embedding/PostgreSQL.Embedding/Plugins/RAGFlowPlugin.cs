@@ -28,7 +28,7 @@ namespace PostgreSQL.Embedding.Plugins
 
 
             var ragFlowService = new RAGFlowService(kernel, _serviceProvider, memoryService, chatHistoryService);
-            var citations = await ragFlowService.RetrieveCitationsAsync(appId, question);
+            var citations = await ragFlowService.GenerateCitationsAsync(appId, question);
             var answer = await ragFlowService.GenerateAnswerAsync(appId, conversationId, question, citations);
             return answer;
         }

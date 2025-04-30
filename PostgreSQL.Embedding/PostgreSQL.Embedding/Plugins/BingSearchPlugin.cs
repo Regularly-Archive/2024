@@ -40,42 +40,12 @@ namespace PostgreSQL.Embedding.Plugins
 
         [KernelFunction]
         [Description("使用关键词进行检索")]
-        public async Task<string> SearchAsync([Description("关键词")] string query, int limit = 30)
+        public async Task<SearchResult> SearchAsync([Description("关键词")] string query, int limit = 30)
         {
             using var httpClient = _httpClientFactory.CreateClient();
             httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0");
             httpClient.DefaultRequestHeaders.Referrer = new Uri("https://bing.com/");
 
-            try
-            {
-                var searchResult = await GetAsync(httpClient, query, $"https://bing.com/search?q={WebUtility.UrlEncode(query)}");
-                while (searchResult.Entries.Count < limit && searchResult.HasNextPage)
-                {
-                    var newSearchResult = await GetAsync(httpClient, query, searchResult.NextPage);
-                    if (searchResult.Entries.Any())
-                    {
-                        searchResult.Entries.AddRange(newSearchResult.Entries);
-                        searchResult.NextPage = newSearchResult.NextPage;
-                        searchResult.HasNextPage = newSearchResult.HasNextPage;
-                    }
-                }
-                await SendArtifacts(searchResult);
-                return JsonConvert.SerializeObject(searchResult);
-            }
-            catch (HttpRequestException ex)
-            {
-                var html = await new HeadlessBrowser().FetchAsync($"https://bing.com/search?q={query}");
-                var searchResult = await ExtractSearchResults(query, html);
-                await SendArtifacts(searchResult);
-                return JsonConvert.SerializeObject(searchResult);
-            }
-        }
-
-        public async Task<SearchResult> SearchV2Async([Description("关键词")] string query, int limit = 30)
-        {
-            using var httpClient = _httpClientFactory.CreateClient();
-            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0");
-            httpClient.DefaultRequestHeaders.Referrer = new Uri("https://bing.com/");
 
             var searchResult = await GetAsync(httpClient, query, $"https://bing.com/search?q={WebUtility.UrlEncode(query)}");
             while (searchResult.Entries.Count < limit && searchResult.HasNextPage)
@@ -88,7 +58,7 @@ namespace PostgreSQL.Embedding.Plugins
                     searchResult.HasNextPage = newSearchResult.HasNextPage;
                 }
             }
-
+            await SendArtifacts(searchResult);
             return searchResult;
         }
 
@@ -168,6 +138,6 @@ namespace PostgreSQL.Embedding.Plugins
 
     public interface ISearchEngine
     {
-        Task<string> SearchAsync(string keyword, int limit = 30);
+        Task<SearchResult> SearchAsync(string keyword, int limit = 30);
     }
 }

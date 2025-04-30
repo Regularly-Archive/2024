@@ -24,7 +24,7 @@ namespace PostgreSQL.Embedding.Plugins
 
         [KernelFunction]
         [Description("从网络中搜索信息")]
-        public async Task<string> SearchAsync([Description("关键词")] string keyword)
+        public async Task<SearchResult> SearchAsync([Description("关键词")] string keyword, int limit = 30)
         {
             if (!Validate(out var errorMessages)) throw new Exception(string.Join("", errorMessages));
 
@@ -41,7 +41,7 @@ namespace PostgreSQL.Embedding.Plugins
             var searchResult = ExtractSearchResult(await response.Content.ReadAsStringAsync());
             searchResult.Query = keyword;
 
-            return JsonConvert.SerializeObject(searchResult);
+            return searchResult;
         }
 
         private SearchResult ExtractSearchResult(string content)
@@ -58,7 +58,7 @@ namespace PostgreSQL.Embedding.Plugins
             {
                 Url = x["url"].Value<string>(),
                 Title = x["name"].Value<string>(),
-                Description = x["snippet"].Value<string>()
+                Snippet = x["snippet"].Value<string>()
             });
 
             return new SearchResult() { Entries = entries.ToList() };

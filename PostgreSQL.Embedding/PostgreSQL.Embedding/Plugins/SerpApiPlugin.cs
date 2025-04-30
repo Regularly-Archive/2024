@@ -27,7 +27,7 @@ namespace PostgreSQL.Embedding.Plugins
 
         [KernelFunction]
         [Description("使用关键词进行检索")]
-        public async Task<string> SearchAsync([Description("关键词")] string keyword)
+        public async Task<SearchResult> SearchAsync([Description("关键词")] string keyword, int limit = 30)
         {
             if (!Validate(out var errorMessages)) throw new Exception(string.Join("", errorMessages));
 
@@ -39,7 +39,7 @@ namespace PostgreSQL.Embedding.Plugins
             searchResult.Query = keyword;
 
             await SendArtifacts(searchResult);
-            return JsonConvert.SerializeObject(searchResult);
+            return searchResult;
         }
 
         private SearchResult ExtractSearchResult(string content)
@@ -54,7 +54,7 @@ namespace PostgreSQL.Embedding.Plugins
             {
                 Url = x["link"].Value<string>(),
                 Title = x["title"].Value<string>(),
-                Description = x["snippet"].Value<string>()
+                Snippet = x["snippet"].Value<string>()
             });
 
             return new SearchResult() { Entries = entries.ToList() };
@@ -67,7 +67,7 @@ namespace PostgreSQL.Embedding.Plugins
             {
                 link = x.Url,
                 title = x.Title,
-                description = x.Description
+                description = x.Snippet
             });
             artifact.SetData(payloads);
             await EmitArtifactsAsync(artifact);
