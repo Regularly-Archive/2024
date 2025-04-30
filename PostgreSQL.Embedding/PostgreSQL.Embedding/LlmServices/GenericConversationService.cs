@@ -51,11 +51,11 @@ namespace PostgreSQL.Embedding.LlmServices
 
         public async Task InvokeAsync(ConversationRequestModel model, string input, CancellationToken cancellationToken = default)
         {
-            _conversationId = !string.IsNullOrEmpty(model.ConversationId) 
-                ? model.ConversationId 
-                : Guid.NewGuid().ToString("N");
-
+            _conversationId = !string.IsNullOrEmpty(model.ConversationId) ? model.ConversationId : Guid.NewGuid().ToString("N");
             var conversationName = _httpContext.GetConversationName();
+
+            AgentExecutionContextExtensions.SetAppId(_app.Id);
+            AgentExecutionContextExtensions.SetConversationId(_conversationId);
 
             // 如果是重新生成，则删除最后一条 AI 消息
             var conversationFlag = _httpContext.GetConversationFlag();
@@ -64,6 +64,7 @@ namespace PostgreSQL.Embedding.LlmServices
                 _messageReferenceId = await _chatHistoriesService.AddUserMessageAsync(_app.Id, _conversationId, input);
                 await _chatHistoriesService.AddConversationAsync(_app.Id, _conversationId, conversationName);
                 _httpContext.Response.Headers[Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
+                AgentExecutionContextExtensions.SetReferenceMessageId(_messageReferenceId);
             }
             else
             {
@@ -88,6 +89,9 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <returns></returns>
         private async Task InvokeStreamingChat(ConversationRequestModel model, string input, CancellationToken cancellationToken = default)
         {
+            var messageId = await _chatHistoriesService.AddSystemMessageAsync(_app.Id, _conversationId, string.Empty);
+            AgentExecutionContextExtensions.SetMessageId(messageId);
+
             var chatResult = model.AgenticMode
                 ? await InvokeStreamingByStepwisePlannerAsync(_kernel, input, cancellationToken)
                 : await InvokeStreamingByKernelAsync(_kernel, input, cancellationToken);
@@ -98,9 +102,9 @@ namespace PostgreSQL.Embedding.LlmServices
                 if (!string.IsNullOrEmpty(content.Content)) answerBuilder.Append(content.Content);
             }
 
-            var messageId = await _chatHistoriesService.AddSystemMessageAsync(_app.Id, _conversationId, answerBuilder.ToString());
             //HttpContext.Response.Headers[Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
             await _httpContext.WriteStreamingChatCompletion(chatResult, messageId, cancellationToken);
+            await _chatHistoriesService.UpdateSystemMessageAsync(messageId, answerBuilder.ToString());
         }
 
         /// <summary>
@@ -111,6 +115,7 @@ namespace PostgreSQL.Embedding.LlmServices
         private async Task InvokeChat(HttpContext HttpContext, string input, CancellationToken cancellationToken = default)
         {
             var usePlugin = false;
+            var messageId = await _chatHistoriesService.AddSystemMessageAsync(_app.Id, _conversationId, string.Empty);
 
             var chatResult = usePlugin
                 ? await InvokeByPlannerAsync(_kernel, input)
@@ -119,8 +124,8 @@ namespace PostgreSQL.Embedding.LlmServices
             var answer = chatResult.GetValue<string>();
             if (!string.IsNullOrEmpty(answer))
             {
-                var messageId = await _chatHistoriesService.AddSystemMessageAsync(_app.Id, _conversationId, answer);
-                await HttpContext.WriteChatCompletion(input, messageId);
+                await HttpContext.WriteChatCompletion(answer, messageId);
+                await _chatHistoriesService.UpdateSystemMessageAsync(messageId, answer);
             }
         }
 
@@ -161,7 +166,7 @@ namespace PostgreSQL.Embedding.LlmServices
 
                 subTasks.ForEach(async (subTask) => await EmitTracesAsync(subTask.AsStepTrace(), cancellationToken));
 
-                var planner = new StepwisePlanner(_kernel, _promptTemplateService,new StepwisePlannerConfig() { MaxIterations = 10});
+                var planner = new StepwisePlanner(_kernel, _promptTemplateService, new StepwisePlannerConfig() { MaxIterations = 10 });
                 planner.AddVariable("appId", _app.Id);
                 planner.AddVariable("conversationId", _conversationId);
                 planner.AddVariable("userId", currentUser.Id);

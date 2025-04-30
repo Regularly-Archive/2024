@@ -1,4 +1,6 @@
-﻿using Microsoft.SemanticKernel;
+﻿using Google.Protobuf.WellKnownTypes;
+using LLama.Batched;
+using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common;
@@ -26,7 +28,7 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly IMemoryService _memoryService;
         private readonly IChatHistoriesService _chatHistoriesService;
         private readonly PromptTemplateService _promptTemplateService;
-        private readonly ILogger<RAGConversationService> _logger;
+        private readonly ILogger<RAGFlowService> _logger;
         private readonly CallablePromptTemplate _promptTemplate;
         private Regex _regexCitations = new Regex(@"\^(\d+)");
         public RAGFlowService(Kernel kernel,
@@ -44,7 +46,7 @@ namespace PostgreSQL.Embedding.LlmServices
             _llmAppKnowledgeRepository = serviceProvider.GetService<IRepository<LlmAppKnowledge>>();
             _promptTemplateService = serviceProvider.GetService<PromptTemplateService>();
             _promptTemplate = _promptTemplateService.LoadTemplate("RAGPrompt.txt");
-            _logger = _serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<RAGConversationService>();
+            _logger = _serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<RAGFlowService>();
         }
 
         /// <summary>
@@ -77,6 +79,41 @@ namespace PostgreSQL.Embedding.LlmServices
             _promptTemplate.AddVariable("empty_answer", Common.Constants.DefaultEmptyAnswer);
             _promptTemplate.AddVariable("histories", histories);
             var chatResult = await _promptTemplate.InvokeAsync(_kernel, executionSettings);
+
+            var answer = chatResult.GetValue<string>();
+            if (!string.IsNullOrEmpty(answer))
+            {
+                if (answer.IndexOf(Common.Constants.DefaultEmptyAnswer) != -1)
+                {
+                    return $"<RAG>{Common.Constants.DefaultEmptyAnswer}</RAG>";
+                }
+                else
+                {
+                    // 匹配引用信息，对引用信息的索引进行重排
+                    var newAnswer = ReorderReferences(citations, answer);
+                    return $"<RAG>{newAnswer}</RAG>";
+                }
+            }
+
+            return Common.Constants.DefaultEmptyAnswer;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="input"></param>
+        /// <param name="citations"></param>
+        /// <returns></returns>
+        public async Task<string> GenerateAnswerAsync(string input, List<LlmCitationModel> citations)
+        {
+            var context = JsonConvert.SerializeObject(citations);
+
+            _promptTemplate.AddVariable("name", "ChatGPT");
+            _promptTemplate.AddVariable("context", context);
+            _promptTemplate.AddVariable("question", input);
+            _promptTemplate.AddVariable("empty_answer", Common.Constants.DefaultEmptyAnswer);
+            _promptTemplate.AddVariable("histories", string.Empty);
+            var chatResult = await _promptTemplate.InvokeAsync(_kernel);
 
             var answer = chatResult.GetValue<string>();
             if (!string.IsNullOrEmpty(answer))

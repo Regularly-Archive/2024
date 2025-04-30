@@ -43,9 +43,16 @@ namespace PostgreSQL.Embedding.Planners
 
         private async Task ExecuteSubTask(string query, SubTask subTask)
         {
+            AgentExecutionContextExtensions.SetStepId(subTask.Id.ToString());
+
             var plan = subTask.AvailableTools.Any()
                 ? await _stepwisePlanner.CreatePlanAsync(null, subTask.AvailableTools)
                 : await _stepwisePlanner.CreatePlanAsync();
+
+            plan.OnStepExecute = (stepTrace) =>
+            {
+                OnStepChanged?.Invoke(stepTrace);
+            };
 
             subTask.Status = Common.Models.Planners.TaskStatus.InProgress;
             OnStepChanged?.Invoke(subTask.AsStepTrace());

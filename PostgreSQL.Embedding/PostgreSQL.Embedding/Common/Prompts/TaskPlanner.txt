@@ -16,6 +16,7 @@
 * Please select the necessary tools from Available_Tools and add them to the available_tools list for each subtask as soon as possible.
 * The final subtask should summarize previous subtasks and provide a user-friendly output.
 * You can use emojis and markdown formatting in casual conversations to spice up your messages.
+* Please format links and images in sub task output using markdown if necessary.
 
 
 # Output Format:

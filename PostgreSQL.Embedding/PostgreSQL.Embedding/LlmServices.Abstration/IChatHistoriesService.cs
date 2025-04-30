@@ -7,6 +7,7 @@ namespace PostgreSQL.Embedding.LlmServices.Abstration
     {
         Task<long> AddUserMessageAsync(long appId, string conversationId, string content);
         Task<long> AddSystemMessageAsync(long appId, string conversationId, string content);
+        Task UpdateSystemMessageAsync(long messageId, string content);
         Task AddConversationAsync(long appId, string conversationId, string conversationName);
         Task<List<AppConversation>> GetAppConversationsAsync(long appId);
         Task<List<ChatMessage>> GetConversationMessagesAsync(long appId, string conversationId);

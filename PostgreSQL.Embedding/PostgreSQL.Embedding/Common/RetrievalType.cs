@@ -6,6 +6,7 @@ namespace PostgreSQL.Embedding.Common
     {
         [Description("向量检索")] Vectors = 0,
         [Description("全文检索")] FullText = 1,
-        [Description("混合检索")] Mixed = 2
+        [Description("混合检索")] Mixed = 2,
+        [Description("网络检索")] WebSearch = 3
     }
 }
