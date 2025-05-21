@@ -4,28 +4,32 @@ LANGUAGE_CONFIG = {
         'image': 'code_runner/python2',
         'command': 'python code.py',
         'commandRedirect': "sh -c 'python code.py > output.txt'",
-        'extension': 'py'
+        'extension': 'py',
+        'install': 'pip install {deps}'
     },
     'python3': {
         'env': 'python3',
         'image': 'code_runner/python3',
         'command': 'python code.py',
         'commandRedirect': "sh -c 'python code.py > output.txt'",
-        'extension': 'py'
+        'extension': 'py',
+        'install': 'pip install {deps}'
     },
     'javascript': {
         'env': 'javascript',
         'image': 'code_runner/nodejs',
         'command': 'node code.js',
         'commandRedirect': "sh -c 'node code.js > output.txt'",
-        'extension': 'js'
+        'extension': 'js',
+        'install': 'npm install {deps}'
     },
     'typescript': {
         'env': 'typescript',
         'image': 'code_runner/nodejs',
         'command': 'tsc code.ts && node code.js',
         'commandRedirect': "sh -c 'tsc code.ts && node code.js > output.txt'",
-        'extension': 'ts'
+        'extension': 'ts',
+        'install': 'npm install {deps}'
     },
     'csharp': {
         'env' : 'dotnet',
@@ -58,8 +62,8 @@ LANGUAGE_CONFIG = {
     'java': {
         'env': 'java',
         'image': 'code_runner/java',
-        'command': "sh -c 'javac -encoding utf-8 code.java && java code'",
-        'commandRedirect': "sh -c 'javac -encoding utf-8 code.java && java code > output.txt'",
+        'command': 'jbang code.java',
+        'commandRedirect': "sh -c 'jbang code.java > output.txt'",
         'extension': 'java'
     },
     'jupyter-csharp': {
@@ -76,7 +80,7 @@ LANGUAGE_CONFIG = {
         'commandRedirect': "python /nbconvert/convert.py /home/jovyan/code.ipynb /home/jovyan/output.txt --kernel .net-fsharp",
         'extension': 'ipynb'
     },
-    'jupyter-python3': {
+    'jupyter-python': {
         'env': 'jupyter',
         'image': 'code_runner/jupyterlab',
         'command': "python /nbconvert/convert.py /home/jovyan/code.ipynb /home/jovyan/output.txt --kernel python3",
