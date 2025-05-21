@@ -94,4 +94,11 @@ LANGUAGE_CONFIG = {
         'commandRedirect': "python /nbconvert/convert.py /home/jovyan/code.ipynb /home/jovyan/output.txt --kernel ir",
         'extension': 'ipynb'
     },
+    'lua': {
+        'env': 'lua',
+        'image': 'code_runner/lua',
+        'command': 'lua code.lua',
+        'commandRedirect': "sh -c 'lua code.lua > output.txt'",
+        'extension': 'lua',
+    },
 }

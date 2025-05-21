@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 import time
 from config import LANGUAGE_CONFIG
-from utils import code_to_ipynb, code_to_file, prepare_code_dir, create_container, install_dependencies, run_code_in_container, read_output, cleanup_container, remove_ansi_sequences
+from utils import code_to_ipynb, code_to_file, prepare_code_dir, create_container, install_dependencies, run_command, read_output, cleanup_container, remove_ansi_sequences
 from models import RunCodeRequest, RunJupyterCellRequest, RunCodeResponse
 
 app = FastAPI()
@@ -30,7 +30,7 @@ async def run_code(request: RunCodeRequest = Body(...)):
     try:
         container = create_container(config, temp_dir, user, '')
         install_dependencies(container, request.language, request.dependencies, user, config)
-        exec_result = run_code_in_container(container, config['commandRedirect'], user)
+        exec_result = run_command(container, config['commandRedirect'], user)
         output = exec_result.output.decode('utf-8')
         output = remove_ansi_sequences(output)
         output = read_output(temp_dir, output)
@@ -57,7 +57,7 @@ async def run_jupyter(request: RunJupyterCellRequest = Body(...)):
     try:
         container = create_container(config, temp_dir, user, request.format)
         install_dependencies(container, request.language, request.dependencies, user, config)
-        exec_result = run_code_in_container(container, config['commandRedirect'], user)
+        exec_result = run_command(container, config['commandRedirect'], user)
         output = exec_result.output.decode('utf-8')
         output = remove_ansi_sequences(output)
         output = read_output(temp_dir, output)
