@@ -1,12 +1,10 @@
 ﻿using Masuit.Tools;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.SemanticKernel;
 using ModelContextProtocol.Client;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using UglyToad.PdfPig.Tokens;
 
 namespace PostgreSQL.Embedding.LLmServices.Extensions
 {

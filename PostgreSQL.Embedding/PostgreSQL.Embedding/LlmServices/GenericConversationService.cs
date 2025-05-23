@@ -62,9 +62,17 @@ namespace PostgreSQL.Embedding.LlmServices
             if (!conversationFlag)
             {
                 _messageReferenceId = await _chatHistoriesService.AddUserMessageAsync(_app.Id, _conversationId, input);
-                await _chatHistoriesService.AddConversationAsync(_app.Id, _conversationId, conversationName);
                 _httpContext.Response.Headers[Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
                 AgentExecutionContextExtensions.SetReferenceMessageId(_messageReferenceId);
+
+                var conversation = await _chatHistoriesService.GetAppConversationAsync(_app.Id, _conversationId);
+                if (conversation == null)
+                {
+                    var conversationSummary = await GenerateConversationSummary(input);
+                    await _chatHistoriesService.AddConversationAsync(_app.Id, _conversationId, conversationSummary);
+                    await EmitConversationTitleAsync(_messageReferenceId, conversationSummary);
+                    await _chatHistoriesService.UpdateConversationAsync(_app.Id, _conversationId, conversationSummary);
+                }
             }
             else
             {
@@ -78,6 +86,7 @@ namespace PostgreSQL.Embedding.LlmServices
                 : InvokeChat(_httpContext, input, cancellationToken);
 
             await conversationTask;
+
         }
 
         /// <summary>
@@ -157,12 +166,14 @@ namespace PostgreSQL.Embedding.LlmServices
             try
             {
                 var currentUser = await _userInfoService.GetCurrentUserAsync();
-                var chatHistory = new ChatHistory();
+                //var chatHistory = await GetHistoricalMessagesAsync(_app.Id, _conversationId, _app.MaxMessageRounds);
 
                 var taskPlanner = new TaskPlanner(kernel);
                 var subTasks = _app.AppType == (int)LlmAppType.Chat
                     ? await taskPlanner.GetSubTasksAsync(input, limit: 3)
                     : await taskPlanner.GetRAGTasks(input);
+
+                if (!subTasks.Any()) return Constants.DefaultErrorAnswer.AsStreaming();
 
                 subTasks.ForEach(async (subTask) => await EmitTracesAsync(subTask.AsStepTrace(), cancellationToken));
 
@@ -226,7 +237,10 @@ namespace PostgreSQL.Embedding.LlmServices
             var messageList = await _chatHistoriesService.GetConversationMessagesAsync(appId, conversationId);
             messageList = messageList.OrderBy(x => x.CreatedAt).ToList();
 
-            _messageReferenceId = messageList.LastOrDefault(x => x.IsUserMessage).Id;
+            var referenceMessage = messageList.LastOrDefault(x => x.IsUserMessage);
+            if (referenceMessage == null) return;
+
+            _messageReferenceId = referenceMessage.Id;
 
             var lastMessage = messageList.LastOrDefault();
             if (lastMessage != null && !lastMessage.IsUserMessage)
@@ -243,6 +257,18 @@ namespace PostgreSQL.Embedding.LlmServices
         {
             var result = new OpenAIStreamResult() { id = Guid.NewGuid().ToString("N"), obj = "chat.traces" };
             result.choices.Add(new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant", content = JsonConvert.SerializeObject(stepTrace) } });
+            await _sseEmitter.EmitAsync(result, cancellationToken);
+        }
+
+        private async Task EmitConversationTitleAsync(long? messageId, string conversationTitle, CancellationToken cancellationToken = default)
+        {
+            var result = new OpenAIStreamResult() { id = messageId.HasValue ? messageId.ToString() : Guid.NewGuid().ToString(), obj = "conversation.title" };
+            result.choices = new List<StreamChoicesModel>()
+            {
+                new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant" } }
+            };
+
+            result.choices[0].delta.content = conversationTitle;
             await _sseEmitter.EmitAsync(result, cancellationToken);
         }
     }

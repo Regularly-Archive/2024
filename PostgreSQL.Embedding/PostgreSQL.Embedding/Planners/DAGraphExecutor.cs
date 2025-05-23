@@ -47,7 +47,7 @@ namespace PostgreSQL.Embedding.Planners
 
             var plan = subTask.AvailableTools.Any()
                 ? await _stepwisePlanner.CreatePlanAsync(null, subTask.AvailableTools)
-                : await _stepwisePlanner.CreatePlanAsync();
+                : await _stepwisePlanner.CreatePlanAsync(null, ["UseMCPPlugin.ChooseMCPServer", "UseMCPPlugin.ListTools", "UseMCPPlugin.CallTool"]);
 
             plan.OnStepExecute = (stepTrace) =>
             {
@@ -134,7 +134,6 @@ namespace PostgreSQL.Embedding.Planners
             if (Value == null || other == null) return false;
             return Value.Equals(other);
         }
-
     }
 
     public class DAGraph<T>

@@ -8,22 +8,23 @@ Answer the following questions as accurately as possible using the provided func
 [END GLOBAL VARIABLES]
 
 [USAGE INSTRUCTIONS]
-To use the functions, variables and histories, specify a JSON blob representing an action. The JSON blob should contain an "action" key with the name of the function to use, and an "action_variables" key with a JSON object of string values to use when calling the function.
-Do not call functions directly; they must be invoked through an action.
-The keys in "action_variables" value should match the defined [PARAMETERS] of the named "action" in [AVAILABLE FUNCTIONS].
-The values in "action_variables" must be of type string and represent the actual values to be passed to the function. Do not attempt to pass a variable name or other reference to a function.
-If a function has no parameters, the "action_variables" key may be omitted.
-Ensure that the $JSON_BLOB contains only a SINGLE action; do NOT return multiple actions.
-If you don't need to call an action, please returning an answer with prefix [FINAL_ANSWER] directly.
+* To use the functions, variables and histories, specify a JSON blob representing an action. The JSON blob should contain an "action" key with the name of the function to use, and an "action_variables" key with a JSON object of string values to use when calling the function.
+* Do not call functions directly; they must be invoked through an action.
+* The keys in "action_variables" value should match the defined [PARAMETERS] of the named "action" in [AVAILABLE FUNCTIONS].
+* The values in "action_variables" must be of type string and represent the actual values to be passed to the function. Do not attempt to pass a variable name or other reference to a function.
+* If a function has no parameters, the "action_variables" key may be omitted.
+* Ensure that the $JSON_BLOB contains only a SINGLE action; do NOT return multiple actions.
+* If you don't need to call an action, please returning an answer with prefix [FINAL_ANSWER] directly.
+* You can use `UseMCPPlugin.ChooseMCPServer`, `UseMCPPlugin.ListTools`, `UseMCPPlugin.CallTool` to discover the MCP tools dynamically when no matches are found in [AVAILABLE FUNCTIONS]
 IMPORTANT: Use only the available functions listed in the [AVAILABLE FUNCTIONS] section. Do not attempt to use any other functions that are not specified.
 
-Here is an example of a valid $JSON_BLOB:
+Here is an example of a valid $JSON_BLOB with parameters:
 {
   "action": "FUNCTION.NAME",
   "action_variables": {"PARAMETER_NAME": "some value", "PARAMETER_NAME_2": "42"}
 }
 
-Here is an example of a valid $JSON_BLOB with no parameters:
+Here is an example of a valid $JSON_BLOB without parameters:
 {
   "action": "FUNCTION.NAME"
 }
@@ -44,6 +45,5 @@ Every Thought should be followed by an Action or Final Answer.
 Every Action should be followed by an Observation.
 Every Observation should be followed by a Thought or Final Answer.
 Produce Thoughts and Actions as necessary until you have a Final Answer.
-
 
 {{$suffix}}

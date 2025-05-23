@@ -15,5 +15,6 @@ namespace PostgreSQL.Embedding.LlmServices.Abstration
         Task UpdateConversationAsync(long appId, string conversationId, string summary);
         Task DeleteConversationMessageAsync(long messageId);
         Task<List<ChatMessage>> SearchConversationMessagesAsync(long appId, string conversationId, string query, double? minRelevance = 0.5, int? limit = 5);
+        Task<AppConversation> GetAppConversationAsync(long appId, string conversationId);
     }
 }

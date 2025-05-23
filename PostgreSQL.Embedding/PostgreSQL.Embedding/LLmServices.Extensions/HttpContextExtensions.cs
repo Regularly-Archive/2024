@@ -98,9 +98,9 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
             await context.Response.CompleteAsync();
         }
 
-        public static async Task WriteStreamingChatCompletion(this Microsoft.AspNetCore.Http.HttpContext context, IAsyncEnumerable<StreamingChatMessageContent> texts, long? mesageId = null, CancellationToken cancellationToken = default)
+        public static async Task WriteStreamingChatCompletion(this Microsoft.AspNetCore.Http.HttpContext context, IAsyncEnumerable<StreamingChatMessageContent> texts, long? messageId = null, CancellationToken cancellationToken = default)
         {
-            var result = new OpenAIStreamResult() { id = mesageId.HasValue ? mesageId.ToString() : Guid.NewGuid().ToString() };
+            var result = new OpenAIStreamResult() { id = messageId.HasValue ? messageId.ToString() : Guid.NewGuid().ToString() };
             result.choices = new List<StreamChoicesModel>()
             {
                 new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant" } }
@@ -123,11 +123,11 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
             await context.Response.CompleteAsync();
         }
 
-        public static async Task WriteStreamingChatCompletion(this Microsoft.AspNetCore.Http.HttpContext context, string data, long? mesageId = null, CancellationToken cancellationToken = default)
+        public static async Task WriteStreamingChatCompletion(this Microsoft.AspNetCore.Http.HttpContext context, string data, long? messageId = null, CancellationToken cancellationToken = default)
         {
             var texts = data.ToArray().Select(x => x.ToString()).ToAsyncEnumerable();
 
-            var result = new OpenAIStreamResult() { id = mesageId.HasValue ? mesageId.ToString() : Guid.NewGuid().ToString() };
+            var result = new OpenAIStreamResult() { id = messageId.HasValue ? messageId.ToString() : Guid.NewGuid().ToString() };
             result.choices = new List<StreamChoicesModel>()
             {
                 new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant" } }
