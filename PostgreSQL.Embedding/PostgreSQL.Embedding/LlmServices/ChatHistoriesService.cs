@@ -233,5 +233,10 @@ namespace PostgreSQL.Embedding.LlmServices
             chatMessage.UpdatedBy = reader["updated_by"].ToString();
             return chatMessage;
         }
+
+        public Task<AppConversation> GetAppConversationAsync(long appId, string conversationId)
+        {
+            return _appConversationRepository.FindAsync(x => x.AppId == appId && x.ConversationId == conversationId);
+        }
     }
 }

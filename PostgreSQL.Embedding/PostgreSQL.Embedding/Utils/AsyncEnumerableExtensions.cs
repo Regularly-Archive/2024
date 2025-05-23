@@ -1,7 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore.Storage;
-using Microsoft.SemanticKernel;
+﻿using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
-using PostgreSQL.Embedding.Common.Models;
 
 namespace PostgreSQL.Embedding.Utils
 {
@@ -27,24 +25,37 @@ namespace PostgreSQL.Embedding.Utils
 
         public static FunctionResult AsFunctionResult(this string content) => new FunctionResult(null, content);
 
-        private static string[] SplitString(string s, int minLength, int MaxLength)
+        private static string[] SplitString(string s, int minLength, int maxLength)
         {
             var rand = new Random();
 
             if (string.IsNullOrEmpty(s))
-                return new string[] { s }; 
+                return new string[] { s };
 
-            string[] subStrings = new string[0];
+            List<string> subStrings = new List<string>();
             int start = 0;
 
             while (start < s.Length)
             {
-                int end = start + rand.Next(minLength, Math.Min(MaxLength, s.Length - start) + 1);
-                subStrings = AddToSubStringsArray(subStrings, s.Substring(start, end - start));
+                int baseEnd = start + rand.Next(minLength, Math.Min(maxLength, s.Length - start) + 1);
+                int end = baseEnd;
+
+                if (end < s.Length && char.IsHighSurrogate(s[end - 1]))
+                {
+                    end++;
+                }
+
+                while (end < s.Length && char.IsLowSurrogate(s[end]) ||
+                      (end < s.Length && char.GetUnicodeCategory(s[end]) == System.Globalization.UnicodeCategory.NonSpacingMark))
+                {
+                    end++;
+                }
+
+                subStrings.Add(s.Substring(start, end - start));
                 start = end;
             }
 
-            return subStrings;
+            return subStrings.ToArray();
         }
 
         private static string[] AddToSubStringsArray(string[] subStrings, string newSubString)

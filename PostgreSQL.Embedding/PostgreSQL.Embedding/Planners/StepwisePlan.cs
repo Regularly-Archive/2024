@@ -2,6 +2,7 @@
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Services;
 using Microsoft.SemanticKernel.TextGeneration;
+using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Json;
 using PostgreSQL.Embedding.Common.Models.Planners;
 using PostgreSQL.Embedding.LLmServices.Extensions;
@@ -173,7 +174,7 @@ namespace PostgreSQL.Embedding.Planners
             catch (Exception e)
             {
                 _stopwatch.Stop();
-                OnStepExecute?.Invoke(StepTrace.Action(actionName, actionVariables, string.Empty, _stopwatch.Elapsed.TotalSeconds, false));
+                OnStepExecute?.Invoke(StepTrace.Action(actionName, actionVariables, e.Message, _stopwatch.Elapsed.TotalSeconds, false));
                 this._logger?.LogError(e, "Something went wrong in system step: {Plugin}.{Function}. Error: {Error}", targetFunction.PluginName, targetFunction.Name, e.Message);
                 throw;
             }
@@ -312,7 +313,7 @@ namespace PostgreSQL.Embedding.Planners
         private void AddExecutionStatsToContext(List<SystemStep> stepsTaken, int iterations)
         {
             _variables["stepCount"] = stepsTaken.Count.ToString(CultureInfo.InvariantCulture);
-            _variables["stepsTaken"] = JsonSerializer.Serialize(stepsTaken);
+            _variables["stepsTaken"] = System.Text.Json.JsonSerializer.Serialize(stepsTaken);
             _variables["iterations"] = iterations.ToString(CultureInfo.InvariantCulture);
 
             var actionCounts = new Dictionary<string, int>();
@@ -436,7 +437,9 @@ namespace PostgreSQL.Embedding.Planners
             // object
             if (returnType.BaseType != typeof(ValueType))
             {
-                return JsonObject.Parse(element.ToString());
+                return element;
+                //return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(element.ToString());
+                //return JsonObject.Parse(element.ToString());
                 //return JsonSerializer.Deserialize(element.ToString(), returnType);
             }
 
@@ -460,7 +463,7 @@ namespace PostgreSQL.Embedding.Planners
             // array
             if (element.ValueKind == JsonValueKind.Array)
             {
-                return JsonSerializer.Deserialize(element.ToString(), returnType);
+                return System.Text.Json.JsonSerializer.Deserialize(element.ToString(), returnType);
             }
 
             return null;

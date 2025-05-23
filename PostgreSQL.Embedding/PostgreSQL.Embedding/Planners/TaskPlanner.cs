@@ -1,6 +1,6 @@
-﻿using DocumentFormat.OpenXml.Math;
-using Microsoft.SemanticKernel;
+﻿using Microsoft.SemanticKernel;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.Common.Models.Planners;
 using PostgreSQL.Embedding.LlmServices;
@@ -17,50 +17,64 @@ namespace PostgreSQL.Embedding.Planners
         private readonly ILogger<TaskPlanner> _logger;
         private readonly CallablePromptTemplate _promptTemplate;
         private readonly PromptTemplateService _promptTemplateService = new PromptTemplateService();
-        public TaskPlanner(Kernel kernel) 
+        public TaskPlanner(Kernel kernel)
         {
             _kernel = kernel;
             _logger = _kernel.LoggerFactory.CreateLogger<TaskPlanner>();
             _promptTemplate = _promptTemplateService.LoadTemplate("TaskPlanner.txt");
         }
 
-        public async Task<List<SubTask>> GetSubTasksAsync(string query, int limit = 5)
+        public async Task<List<SubTask>> GetSubTasksAsync(string query, string history = null, int limit = 5)
         {
             _promptTemplate.AddVariable("input", query);
             _promptTemplate.AddVariable("language", "chinese");
             _promptTemplate.AddVariable("limit", limit);
+            _promptTemplate.AddVariable("history", history);
 
             var functions = await CreateFunctionDescriptions(_kernel);
             _promptTemplate.AddVariable("functions", functions);
 
-            var kernelResult = await _promptTemplate.InvokeAsync<string>(_kernel);
+            var functionResult = string.Empty;
+            await foreach (var content in _promptTemplate.InvokeStreamingAsync(_kernel))
+            {
+                functionResult += content.Content;
+            }
+
             try
             {
-                kernelResult = kernelResult.Replace("```json", "").Replace("```", "");
-                var planResult = JsonConvert.DeserializeObject<PlanResult>(kernelResult);
+                functionResult = functionResult.Replace("```json", "").Replace("```", "");
+                functionResult = PreprocessJsonData(functionResult);
+                var planResult = JsonConvert.DeserializeObject<PlanResult>(functionResult);
                 return planResult.Tasks;
             }
-            catch (Exception ex) 
+            catch (Exception ex)
             {
                 _logger.LogError(ex, $"Unable to create tasks for query '{query}'");
                 return [];
             }
         }
 
-        public async Task<List<SubTask>> GetRAGTasks(string query)
+        public async Task<List<SubTask>> GetRAGTasks(string query, string history = null)
         {
             _promptTemplate.AddVariable("input", query);
             _promptTemplate.AddVariable("language", "chinese");
             _promptTemplate.AddVariable("limit", 1);
+            _promptTemplate.AddVariable("history", history);
 
             var functions = await CreateFunctionDescriptions(_kernel, x => x.PluginName == nameof(RAGFlowPlugin));
             _promptTemplate.AddVariable("functions", functions);
 
-            var kernelResult = await _promptTemplate.InvokeAsync<string>(_kernel);
+            var functionResult = string.Empty;
+            await foreach (var content in _promptTemplate.InvokeStreamingAsync(_kernel))
+            {
+                functionResult += content.Content;
+            }
+
             try
             {
-                kernelResult = kernelResult.Replace("```json", "").Replace("```", "");
-                var planResult = JsonConvert.DeserializeObject<PlanResult>(kernelResult);
+                functionResult = functionResult.Replace("```json", "").Replace("```", "");
+                functionResult = PreprocessJsonData(functionResult);
+                var planResult = JsonConvert.DeserializeObject<PlanResult>(functionResult);
                 return planResult.Tasks;
             }
             catch (Exception ex)
@@ -92,6 +106,32 @@ namespace PostgreSQL.Embedding.Planners
             }
 
             return stringBuilder.ToString();
+        }
+
+        private string PreprocessJsonData(string jsonText)
+        {
+            var jsonObj = JObject.Parse(jsonText);
+            var tasks = (JArray)jsonObj["tasks"];
+
+            foreach (JObject task in tasks)
+            {
+                if (task.ContainsKey("execute_result"))
+                {
+                    var executeResult = task["execute_result"];
+
+                    if (executeResult.Type == JTokenType.Object)
+                    {
+                        string serialized = executeResult.ToString(Formatting.Indented);
+                        task["execute_result"] = serialized;
+                    }
+                    else
+                    {
+                        task["execute_result"] = executeResult.ToString();
+                    }
+                }
+            }
+
+            return jsonObj.ToString(Formatting.Indented);
         }
     }
 }

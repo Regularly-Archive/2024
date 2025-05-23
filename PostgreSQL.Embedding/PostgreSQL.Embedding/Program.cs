@@ -172,6 +172,7 @@ builder.Services.AddSingleton<IRerankService, BgeRerankService>();
 builder.Services.AddScoped<ILlmPluginService, LlmPluginService>();
 builder.Services.AddScoped<IKnowledgeRetrievalService, VectorsRetrievalService>();
 builder.Services.AddScoped<IKnowledgeRetrievalService, FullTextRetrievalService>();
+builder.Services.AddSingleton<CacheableMcpClientFactory>();
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(builder =>

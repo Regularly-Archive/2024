@@ -16,7 +16,6 @@ namespace PostgreSQL.Embedding.LlmServices
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly IRepository<LlmModel> _llmModelRepository;
-        private readonly Dictionary<string,IMcpClient> _mcpClientsPool = new Dictionary<string,IMcpClient>();
 
         public KernalService(IServiceProvider serviceProvider)
         {
@@ -51,7 +50,7 @@ namespace PostgreSQL.Embedding.LlmServices
             kernel.Plugins.AddFromType<TimePlugin>();
             kernel.Plugins.AddFromType<MathPlugin>();
             kernel = kernel.ImportLlmPlugins(_serviceProvider, appId);
-            kernel = await kernel.ImportMCPServer(_serviceProvider, appId, _mcpClientsPool);
+            //kernel = await kernel.ImportMCPServer(_serviceProvider, appId);
             return kernel;
         }
     }

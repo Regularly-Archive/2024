@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Attributes;
@@ -27,7 +28,11 @@ namespace PostgreSQL.Embedding.Plugins
 
         [KernelFunction]
         [Description("加载 JSON 数据并完成数据分析与可视化")]
-        public async Task<string> AnalyseFromJson([Description("输入的 JSON 数据，通常为数组形式")]string json, [Description("当前执行的数据分析任务")] string task, Kernel kernel)
+        public async Task<string> AnalyseFromJson(
+            [Description("输入的 JSON 数据，通常为数组形式")]string json, 
+            [Description("当前执行的数据分析任务")] string task, 
+            Kernel kernel
+        )
         {
             var promptTemplate = _promptTemplateService.LoadTemplate("DataAnalysis.txt");
             promptTemplate.AddVariable("json_input", json);
@@ -38,27 +43,25 @@ namespace PostgreSQL.Embedding.Plugins
             var sourceCode = await promptTemplate.InvokeAsync<string>(clonedKernel);
             sourceCode = sourceCode.Replace("```python", "").Replace("```", "").Trim();
 
-            var result = await RunCodeAsync("jupyter-python3", sourceCode);
-            var previewCode = JObject.Parse(result)["output"].Value<string>();
-            var previewType = JObject.Parse(result)["type"].Value<string>();
-            await SendArtifacts(sourceCode, previewCode, previewType);
+            var result = await RunCodeAsync("python", sourceCode, []);
+            await SendArtifacts(sourceCode, result.Output, result.ContentType);
 
             return sourceCode;
         }
 
-        private async Task<string> RunCodeAsync(string language, string code)
+        private async Task<RunCodeResponse> RunCodeAsync(string language, string code, string[] dependencies)
         {
             using var httpClient = _httpClientFactory.CreateClient();
             httpClient.BaseAddress = new Uri(_codeInterpreterConfig.BaseUrl);
 
-            var payload = new { language = language, code = code, notebook = true };
+            var payload = new { language = language, code = code, dependencies = dependencies, format = "html" };
             var content = JsonContent.Create<dynamic>(payload);
 
-            var response = await httpClient.PostAsync("/api/run?format=html", content);
+            var response = await httpClient.PostAsync($"/api/jupyter/run", content);
             response.EnsureSuccessStatusCode();
 
             var body = await response.Content.ReadAsStringAsync();
-            return body;
+            return JsonConvert.DeserializeObject<RunCodeResponse>(body);
         }
 
         private async Task SendArtifacts(string sourceCode, string previewCode, string previewType)

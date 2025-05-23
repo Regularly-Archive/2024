@@ -137,6 +137,12 @@
     <None Update="Common\Prompts\Text2SQL.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="Common\Prompts\UseMcpTool.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Common\Prompts\UseMcp.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="Common\Prompts\VueComponent.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

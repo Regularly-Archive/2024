@@ -13,16 +13,25 @@
 
 # Rules
 * The number of subtasks is limited a maximum of {{$limit}}.
-* Please select the necessary tools from Available_Tools and add them to the available_tools list for each subtask as soon as possible.
+* Please select the required tools from Available_Tools and add them to the `available_tools`` field for each subtask as soon as possible
 * The final subtask should summarize previous subtasks and provide a user-friendly output.
 * You can use emojis and markdown formatting in casual conversations to spice up your messages.
-* Please format links and images in sub task output using markdown if necessary.
-* For simple tasks or tasks where a conclusion can be directly drawn, create a subtask and output the result in its execute_result field
+* Use markdown to format links and images in subtask output as needed. eg.
+	- For link `https://blog.yuanpei.me`, it should be formated like: [https://blog.yuanpei.me](https://blog.yuanpei.me)
+	- For image `https://blog.yuanpei.me/images/avatar.jpg`, it should be formated like: ![https://blog.yuanpei.me/images/avatar.jpg](https://blog.yuanpei.me/images/avatar.jpg) This is a image of markdown format
+* For link and image, please ensure they will never be wrapped by any code blocks like '```' or '`' in markdown.
+* For straightforward tasks where a conclusion can be easily drawn, create a subtask and include the result as a `string` or `JSON` string in the `execute_result` field.
+* You can use `ConversationHistoriesPlugin` to retrieve or get the context and historical conversation messages of the current conversation if necessary.
+* You can use `UseMCPPlugin.ChooseMCPServer`, `UseMCPPlugin.ListTools`, `UseMCPPlugin.CallTool` to discover the MCP tools dynamically when no matches are found in Available_Tools
 
 
-# Output Format:
+
+# Output Format
 ```json
 {"tasks": [{"id": 0, "name": "Task 1", "desc": "This is task 1", "depends_on": [0], "available_tools": ["WebSearchPlugin.Run"]}, ...]}
 ```
+
+# Chat History
+{{$history}}
 
 User Request: {{$input}}
