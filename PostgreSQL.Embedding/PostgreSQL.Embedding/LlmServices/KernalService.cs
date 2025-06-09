@@ -8,6 +8,8 @@ using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.LlmServices.Routers;
+using PostgreSQL.Embedding.Planners;
+using PostgreSQL.Embedding.Plugins;
 using PostgreSQL.Embedding.Utils;
 
 namespace PostgreSQL.Embedding.LlmServices
@@ -23,16 +25,16 @@ namespace PostgreSQL.Embedding.LlmServices
             _llmModelRepository = _serviceProvider.GetService<IRepository<LlmModel>>();
         }
 
-        public async Task<Kernel> GetKernel(LlmApp app)
+        public async Task<Kernel> GetKernel(LlmApp app, bool initializeTools = true)
         {
             var llmModel = await _llmModelRepository.FindAsync(
                 x => x.ModelType == (int)ModelType.TextGeneration && x.ModelName == app.TextModel
             );
 
-            return (await GetKernel(llmModel, app.Id));
+            return (await GetKernel(llmModel, app.Id, initializeTools));
         }
 
-        public async Task<Kernel> GetKernel(LlmModel llmModel, long? appId)
+        public async Task<Kernel> GetKernel(LlmModel llmModel, long? appId, bool initializeTools = true)
         {
             var options = _serviceProvider.GetRequiredService<IOptions<LlmConfig>>();
 
@@ -41,6 +43,7 @@ namespace PostgreSQL.Embedding.LlmServices
 
             var kernelBuilder = Kernel.CreateBuilder();
             kernelBuilder.Services.AddLogging(loggingBuilder => loggingBuilder.AddConsole().SetMinimumLevel(LogLevel.Information));
+            kernelBuilder.Services.AddScoped<AgentExecutionContext>();
 
             var kernel = kernelBuilder
                 .AddOpenAIChatCompletion(modelId: llmModel.ModelName, apiKey: llmModel.ApiKey ?? Guid.NewGuid().ToString(), httpClient: httpClient)
@@ -49,8 +52,13 @@ namespace PostgreSQL.Embedding.LlmServices
             kernel.Plugins.AddFromType<ConversationSummaryPlugin>();
             kernel.Plugins.AddFromType<TimePlugin>();
             kernel.Plugins.AddFromType<MathPlugin>();
-            kernel = kernel.ImportLlmPlugins(_serviceProvider, appId);
-            //kernel = await kernel.ImportMCPServer(_serviceProvider, appId);
+
+            if (initializeTools)
+            {
+                kernel = kernel.ImportLlmPlugins(_serviceProvider, appId);
+                kernel = await kernel.ImportMCPServer(_serviceProvider, appId);
+            }
+
             return kernel;
         }
     }

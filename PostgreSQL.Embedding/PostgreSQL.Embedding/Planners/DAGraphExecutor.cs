@@ -1,6 +1,7 @@
-﻿using Microsoft.SemanticKernel.ChatCompletion;
-using Newtonsoft.Json;
+﻿using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.ChatCompletion;
 using PostgreSQL.Embedding.Common.Models.Planners;
+using PostgreSQL.Embedding.LLmServices.Extensions;
 
 namespace PostgreSQL.Embedding.Planners
 {
@@ -9,16 +10,18 @@ namespace PostgreSQL.Embedding.Planners
         private readonly string _query;
         private readonly DAGraph<int> _graph;
         private readonly StepwisePlanner _stepwisePlanner;
+        private readonly AgentExecutionContext _agentExecutionContext;
         private readonly List<SubTask> _subTasks = new List<SubTask>();
-        
+
         public Action<StepTrace> OnStepChanged { get; set; }
 
-        public DAGraphExecutor(string query, List<SubTask> subTasks, StepwisePlanner stepwisePlanner)
+        public DAGraphExecutor(string query, List<SubTask> subTasks, StepwisePlanner stepwisePlanner, Kernel kernel)
         {
             _query = query;
             _subTasks = subTasks;
             _graph = BuildDAGraph(subTasks);
             _stepwisePlanner = stepwisePlanner;
+            _agentExecutionContext = kernel.GetAgentExecutionContext();
         }
 
         public async Task ExecuteAsync()
@@ -29,8 +32,7 @@ namespace PostgreSQL.Embedding.Planners
             {
                 var subTask = _subTasks.FirstOrDefault(x => x.Id == taskId);
                 await ExecuteSubTask(_query, subTask);
-            })
-            .ToList();
+            });
             await Task.WhenAll(paralleTasks);
 
             var serialTasks = sortedTaskIds.FindAll(taskId => _graph[taskId].Indegress > 0).OrderBy(taskId => taskId).ToList();
@@ -43,11 +45,11 @@ namespace PostgreSQL.Embedding.Planners
 
         private async Task ExecuteSubTask(string query, SubTask subTask)
         {
-            AgentExecutionContextExtensions.SetStepId(subTask.Id.ToString());
+            _agentExecutionContext.SetStepId(subTask.Id.ToString());
 
             var plan = subTask.AvailableTools.Any()
                 ? await _stepwisePlanner.CreatePlanAsync(null, subTask.AvailableTools)
-                : await _stepwisePlanner.CreatePlanAsync(null, ["UseMCPPlugin.ChooseMCPServer", "UseMCPPlugin.ListTools", "UseMCPPlugin.CallTool"]);
+                : await _stepwisePlanner.CreatePlanAsync();
 
             plan.OnStepExecute = (stepTrace) =>
             {
@@ -55,17 +57,12 @@ namespace PostgreSQL.Embedding.Planners
             };
 
             subTask.Status = Common.Models.Planners.TaskStatus.InProgress;
-            OnStepChanged?.Invoke(subTask.AsStepTrace());
+            OnStepChanged?.Invoke(subTask.AsStepTrace(_agentExecutionContext.GetMessageId()));
 
             if (!subTask.DependsOn.Any())
             {
                 var chatHistory = new ChatHistory();
-                chatHistory.AddAssistantMessage($"""
-                    [OBSERVATION]
-                    用户请求：{query}
-                    当前任务: {subTask.Description}
-                    """
-                );
+                chatHistory.AddAssistantMessage(CreateObservation(query, subTask));
 
                 var result = await plan.ExecuteAsync(subTask.Description, chatHistory);
                 subTask.ExecuteResult = result;
@@ -77,14 +74,7 @@ namespace PostgreSQL.Embedding.Planners
                 if (dependencies.All(x => x.Status == Common.Models.Planners.TaskStatus.Completed))
                 {
                     var chatHistory = new ChatHistory();
-                    chatHistory.AddAssistantMessage($"""
-                        [OBSERVATION]
-                        用户请求：{query}
-                        当前任务：{subTask.Description}
-                        依赖项：
-                        {JsonConvert.SerializeObject(dependencies)}
-                        """
-                    );
+                    chatHistory.AddAssistantMessage(CreateObservationWithDependencies(query, subTask, dependencies));
 
                     var result = await plan.ExecuteAsync(subTask.Description, chatHistory);
                     subTask.ExecuteResult = result;
@@ -92,7 +82,7 @@ namespace PostgreSQL.Embedding.Planners
                 }
             }
 
-            OnStepChanged?.Invoke(subTask.AsStepTrace());
+            OnStepChanged?.Invoke(subTask.AsStepTrace(_agentExecutionContext.GetMessageId()));
         }
 
         private DAGraph<int> BuildDAGraph(List<SubTask> subTasks)
@@ -113,6 +103,40 @@ namespace PostgreSQL.Embedding.Planners
             }
 
             return graph;
+        }
+
+        private string CreateObservation(string query, SubTask subTask)
+        {
+            return $"""
+                    [OBSERVATION]
+                    # 用户请求：{query}
+                    # 当前任务: {subTask.Description}
+                    """;
+        }
+
+        private string CreateObservationWithDependencies(string query, SubTask subTask, List<SubTask> dependencies)
+        {
+            var formattedDependencies = dependencies.Select(dependency =>
+            {
+                return $"""
+                        任务编号：{dependency.Id}
+                        任务名称： {dependency.Name}
+                        任务描述：{dependency.Description}
+                        执行结果：
+                        {dependency.ExecuteResult}
+                        """;
+            });
+
+            return $"""
+                    [OBSERVATION]
+                    # 用户请求：{query}
+                    # 当前任务：{subTask.Description}
+                    # 依赖项：
+                    {string.Join("\r\n", formattedDependencies)}
+
+                    请根据依赖项中的执行结果，判断是否需要执行进一步的动作；如果不需要，请返回符合当前任务预期的内容。
+                    如对依赖项中的内容真实性存疑，请使用合适的工具进行交叉验证，确保结果的客观、公正以及准确性。
+                    """;
         }
     }
 
@@ -142,7 +166,7 @@ namespace PostgreSQL.Embedding.Planners
 
         public Node<T> this[T key]
         {
-            get => _nodes [key];
+            get => _nodes[key];
         }
 
         public List<T> TopologicalSort()

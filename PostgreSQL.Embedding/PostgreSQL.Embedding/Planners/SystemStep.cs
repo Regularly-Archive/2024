@@ -13,8 +13,11 @@ namespace PostgreSQL.Embedding.Planners
         private static readonly Regex s_finalAnswerRegex =
             new(@"\[FINAL[_\s\-]?ANSWER\](?<final_answer>.+)", RegexOptions.Singleline | RegexOptions.IgnoreCase);
 
-        private static readonly Regex s_actionRegex =
+        private static readonly Regex s_actionAndActionVariablesRegex =
             new(@"\{[^{}]*""action""\s*:\s*""[^""]*"".*?""action_variables""\s*:\s*\{.*?\}.*?\}", RegexOptions.Singleline | RegexOptions.IgnoreCase);
+
+        private static readonly Regex s_actionOnlyRegex =
+            new(@"\{[^{}]*""action""\s*:\s*""[^""]*"".*?\}", RegexOptions.Singleline | RegexOptions.IgnoreCase);
 
         private const string ActionTag = "[ACTION]";
 
@@ -53,6 +56,7 @@ namespace PostgreSQL.Embedding.Planners
             if (thoughtMatch.Success && !thoughtMatch.Value.Contains(ActionTag))
             {
                 result.Thought = thoughtMatch.Value.Trim();
+
             }
 
             result.Thought = result.Thought?.Replace(ThoughtTag, string.Empty).Trim();
@@ -97,8 +101,11 @@ namespace PostgreSQL.Embedding.Planners
             }
             else
             {
-                var actionMatch = s_actionRegex.Match(input);
-                if (actionMatch.Success)
+                var actionMatches = new List<Match>() { s_actionAndActionVariablesRegex.Match(input), s_actionOnlyRegex.Match(input) };
+
+                var actionMatch = actionMatches.FirstOrDefault(x => x.Success == true);
+
+                if (actionMatch != null)
                 {
                     var json = actionMatch.Value.Trim();
                     try

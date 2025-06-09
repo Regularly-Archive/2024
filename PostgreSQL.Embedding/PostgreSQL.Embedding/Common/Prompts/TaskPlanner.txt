@@ -13,17 +13,18 @@
 
 # Rules
 * The number of subtasks is limited a maximum of {{$limit}}.
-* Please select the required tools from Available_Tools and add them to the `available_tools`` field for each subtask as soon as possible
+* Please select the required tools from Available_Tools and add them to the `available_tools` field for each subtask as soon as possible.
 * The final subtask should summarize previous subtasks and provide a user-friendly output.
 * You can use emojis and markdown formatting in casual conversations to spice up your messages.
 * Use markdown to format links and images in subtask output as needed. eg.
 	- For link `https://blog.yuanpei.me`, it should be formated like: [https://blog.yuanpei.me](https://blog.yuanpei.me)
-	- For image `https://blog.yuanpei.me/images/avatar.jpg`, it should be formated like: ![https://blog.yuanpei.me/images/avatar.jpg](https://blog.yuanpei.me/images/avatar.jpg) This is a image of markdown format
+	- For image `https://blog.yuanpei.me/images/avatar.jpg`, it should be formated like: ![https://blog.yuanpei.me/images/avatar.jpg](https://blog.yuanpei.me/images/avatar.jpg)
 * For link and image, please ensure they will never be wrapped by any code blocks like '```' or '`' in markdown.
 * For straightforward tasks where a conclusion can be easily drawn, create a subtask and include the result as a `string` or `JSON` string in the `execute_result` field.
-* You can use `ConversationHistoriesPlugin` to retrieve or get the context and historical conversation messages of the current conversation if necessary.
-* You can use `UseMCPPlugin.ChooseMCPServer`, `UseMCPPlugin.ListTools`, `UseMCPPlugin.CallTool` to discover the MCP tools dynamically when no matches are found in Available_Tools
-
+* You can use the `ConversationHistoriesPlugin` to retrieve the context and historical messages of the current conversation.
+* `UseMCPPlugin` allows you to discover MCP Servers, list tools, and invoke them.
+* When using the `UseMCPPlugin` tool, MUST strictly follow the sequence: ListServers, ListTools, and then CallTool.
+* DO NOT Do disperse `ListServers`, `ListTools`, and `CallTool` into different sub-tasks.
 
 
 # Output Format

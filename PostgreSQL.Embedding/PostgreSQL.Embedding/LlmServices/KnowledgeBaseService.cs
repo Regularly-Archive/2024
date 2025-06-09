@@ -302,12 +302,13 @@ namespace PostgreSQL.Embedding.LlmServices
             if (retrievalType == RetrievalType.Vectors)
                 return await AskByVectorsAsync(knowledgeBaseId, question, minRelevance, limit);
 
+            // 这里的职责与 RAGFlowService 重合了，需要重构
             var llmModelRepository = _serviceProvider.GetService<IRepository<LlmModel>>();
             var kernelService = _serviceProvider.GetService<IKernelService>();
             var promptTemplateService = _serviceProvider.GetService<PromptTemplateService>();
 
             var textModel = await llmModelRepository.FindAsync(x => x.ModelType == (int)ModelType.TextGeneration && x.IsDefaultModel == true);
-            var kernel = await kernelService.GetKernel(textModel);
+            var kernel = await kernelService.GetKernel(textModel, null, false);
 
             var result = new KMAskResult();
             result.Question = question;

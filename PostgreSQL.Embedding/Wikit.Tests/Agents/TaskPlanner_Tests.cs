@@ -51,6 +51,7 @@ namespace Wikit.Tests.Agents
             kernelBuilder.Services.AddScoped<IRepository<LlmPlugin>>(_ => new Mock<IRepository<LlmPlugin>>().Object);
             kernelBuilder.Services.RegisterLlmPlugins(assemblies);
             kernelBuilder.Services.AddHttpClient();
+            kernelBuilder.Services.AddScoped<AgentExecutionContext>();
             kernelBuilder.Services.AddSingleton<IHttpContextAccessor>(_ =>
             {
                 var httpContextAccessor = new Mock<IHttpContextAccessor>();
@@ -129,13 +130,13 @@ namespace Wikit.Tests.Agents
             var input = "总结一下以下页面的主要内容：https://blog.yuanpei.me/posts/container-technology-driven-code-sandbox-practice-and-reflection/";
 
             var taskPlanner = new TaskPlanner(_kernel);
-            var subTasks = await taskPlanner.GetSubTasksAsync(input, 3);
+            var subTasks = await taskPlanner.GetSubTasksAsync(input, null, 3);
             var graph = subTasks.ToDictionary(x => x.Id, x => x.DependsOn);
 
             var planner = new StepwisePlanner(_kernel, _promptTemplateService, new StepwisePlannerConfig() { MaxIterations = 10 });
             planner.AddVariable("currentTime", DateTime.Now);
 
-            var graphExecutor = new DAGraphExecutor(input, subTasks, planner);
+            var graphExecutor = new DAGraphExecutor(input, subTasks, planner, _kernel);
             await graphExecutor.ExecuteAsync();
 
             this.ShouldSatisfyAllConditions(

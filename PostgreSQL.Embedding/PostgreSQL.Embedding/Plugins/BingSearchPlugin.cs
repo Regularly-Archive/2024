@@ -115,6 +115,7 @@ namespace PostgreSQL.Embedding.Plugins
                     Snippet = x.QuerySelector(SELECTOR_TAG_ITEM_DESC)?.TextContent ?? string.Empty
                 };
             })
+            .Where(x => !string.IsNullOrEmpty(x.Title) && !string.IsNullOrEmpty(x.Snippet))
             .ToList();
 
             return seachResult;

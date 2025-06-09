@@ -1,5 +1,6 @@
 ﻿using DocumentFormat.OpenXml.Spreadsheet;
 using Microsoft.SemanticKernel;
+using PostgreSQL.Embedding.Planners;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 
@@ -11,6 +12,7 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
         {
             if (expression == null) expression = f => true;
             var predicate = expression.Compile();
+
             return kernel.Plugins.GetFunctionsMetadata().Where(predicate).ToList();
         }
 
@@ -38,5 +40,12 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
 
             return kernelArguments;
         }
+
+        public static AgentExecutionContext GetAgentExecutionContext(this Kernel kernel)
+        {
+            return kernel.Services.GetRequiredService<AgentExecutionContext>();
+        }
+
+
     }
 }

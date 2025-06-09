@@ -21,6 +21,7 @@ namespace PostgreSQL.Embedding.Planners
         private readonly StepwisePlannerConfig _config;
         private readonly ILogger<StepwisePlan> _logger;
         private readonly Kernel _kernel;
+        private readonly AgentExecutionContext _agentExecutionContext;
         public string PlanId { get; private set; }
 
         private const string ObservationTag = "[OBSERVATION]";
@@ -46,6 +47,7 @@ namespace PostgreSQL.Embedding.Planners
             _logger = logger;
             PlanId = Guid.NewGuid().ToString("N");
             _kernel = kernel;
+            _agentExecutionContext = _kernel.GetAgentExecutionContext();
         }
 
         public async Task<string> ExecuteAsync(string goal, ChatHistory chatHistory = null, CancellationToken cancellationToken = default)
@@ -80,7 +82,7 @@ namespace PostgreSQL.Embedding.Planners
 
                 if (!string.IsNullOrEmpty(finalAnswer) && string.IsNullOrEmpty(nextStep.Action))
                 {
-                    OnStepExecute?.Invoke(StepTrace.Done());
+                    OnStepExecute?.Invoke(StepTrace.Done(_agentExecutionContext.GetMessageId()));
                     return finalAnswer;
                 }
 
@@ -97,7 +99,7 @@ namespace PostgreSQL.Embedding.Planners
                 // Check FinalAnswer Again
                 if (!string.IsNullOrEmpty(nextStep.FinalAnswer))
                 {
-                    OnStepExecute?.Invoke(StepTrace.Done());
+                    OnStepExecute?.Invoke(StepTrace.Done(_agentExecutionContext.GetMessageId()));
                     return nextStep.FinalAnswer;
                 }
 
@@ -124,12 +126,12 @@ namespace PostgreSQL.Embedding.Planners
                     var question = step.Thought.Split("\n\n")[0].Replace(QuestionTag, "").Replace("-", "").Trim();
                     var thought = step.Thought.Split("\n\n")[1].Replace("-", "").Trim();
 
-                    OnStepExecute?.Invoke(StepTrace.Thought(question, thought));
+                    OnStepExecute?.Invoke(StepTrace.Thought(question, thought, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
                 }
                 else
                 {
                     var trimedThought = step.Thought.Replace("-", "").Trim();
-                    OnStepExecute?.Invoke(StepTrace.Thought("", trimedThought));
+                    OnStepExecute?.Invoke(StepTrace.Thought("", trimedThought, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
                 }
             }
 
@@ -168,13 +170,13 @@ namespace PostgreSQL.Embedding.Planners
 
                 _stopwatch.Stop();
                 this._logger?.LogTrace($"Invoked {actionName}. Result: {result}");
-                OnStepExecute?.Invoke(StepTrace.Action(actionName, actionVariables, result, _stopwatch.Elapsed.TotalSeconds, true));
+                OnStepExecute?.Invoke(StepTrace.Action(actionName, actionVariables, result, _stopwatch.Elapsed.TotalSeconds, true, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
                 return result;
             }
             catch (Exception e)
             {
                 _stopwatch.Stop();
-                OnStepExecute?.Invoke(StepTrace.Action(actionName, actionVariables, e.Message, _stopwatch.Elapsed.TotalSeconds, false));
+                OnStepExecute?.Invoke(StepTrace.Action(actionName, actionVariables, e.Message, _stopwatch.Elapsed.TotalSeconds, false, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
                 this._logger?.LogError(e, "Something went wrong in system step: {Plugin}.{Function}. Error: {Error}", targetFunction.PluginName, targetFunction.Name, e.Message);
                 throw;
             }
@@ -260,12 +262,12 @@ namespace PostgreSQL.Embedding.Planners
                     var question = step.Thought?.Split("\n", StringSplitOptions.RemoveEmptyEntries)[0]?.Replace(QuestionTag, "").Replace("-", "").Trim();
                     var thought = step.Thought?.Split("\n", StringSplitOptions.RemoveEmptyEntries)[1]?.Replace("-", "").Trim();
 
-                    OnStepExecute?.Invoke(StepTrace.Thought(question, thought));
+                    OnStepExecute?.Invoke(StepTrace.Thought(question, thought, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
                 }
                 else
                 {
                     var trimedThought = step.Thought?.Replace("-", "").Trim();
-                    OnStepExecute?.Invoke(StepTrace.Thought("", trimedThought));
+                    OnStepExecute?.Invoke(StepTrace.Thought("", trimedThought, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
                 }
 
                 stepsTaken.Add(step);
@@ -437,8 +439,8 @@ namespace PostgreSQL.Embedding.Planners
             // object
             if (returnType.BaseType != typeof(ValueType))
             {
-                return element;
-                //return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(element.ToString());
+                //return element;
+                return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(element.ToString());
                 //return JsonObject.Parse(element.ToString());
                 //return JsonSerializer.Deserialize(element.ToString(), returnType);
             }
@@ -474,11 +476,9 @@ namespace PostgreSQL.Embedding.Planners
             foreach (var parameter in kernelFunction.Metadata.Parameters)
             {
                 if (actionVariables.ContainsKey(parameter.Name) && actionVariables[parameter.Name] is JsonElement)
-                {
                     actionVariables[parameter.Name] = GetValue((JsonElement)actionVariables[parameter.Name], parameter.ParameterType);
-                }
             }
-
+            
             return actionVariables;
         }
     }

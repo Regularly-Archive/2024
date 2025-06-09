@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Options;
+﻿using DocumentFormat.OpenXml.Spreadsheet;
+using Microsoft.Extensions.Options;
 using Microsoft.KernelMemory;
 using Microsoft.KernelMemory.Configuration;
 using PostgreSQL.Embedding.Common;

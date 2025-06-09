@@ -9,7 +9,7 @@ namespace PostgreSQL.Embedding.Common.Models.WebApi.QuerableFilters
 
         public ISugarQueryable<MCPServer> Apply(ISugarQueryable<MCPServer> queryable)
         {
-            if (!AppId.HasValue)
+            if (AppId.HasValue)
                 queryable = queryable.Where(x => x.AppId == AppId.Value);
 
             return queryable;

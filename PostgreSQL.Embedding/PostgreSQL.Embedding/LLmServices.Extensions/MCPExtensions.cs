@@ -1,8 +1,9 @@
 ﻿using Masuit.Tools;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.SemanticKernel;
 using ModelContextProtocol.Client;
+using PostgreSQL.Embedding.DataAccess;
+using PostgreSQL.Embedding.DataAccess.Entities;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -10,31 +11,36 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
 {
     public static class MCPExtensions
     {
-        private static MemoryCache _memoryCache = new MemoryCache(new MemoryCacheOptions());
-        public static async Task<IEnumerable<KernelFunction>> GetKernelFunctionsAsync(this IMcpClient client, ILoggerFactory loggerFactory, bool cacheToolsList = true)
+        public static async Task<IEnumerable<KernelFunction>> GetKernelFunctionsAsync(this IMcpClient client, ILoggerFactory loggerFactory, IServiceProvider serviceProvider, bool cacheToolsList = true)
         {
+            var mcpToolResository = serviceProvider.GetRequiredService<IRepository<MCPTool>>();
+
             if (!cacheToolsList)
             {
                 var toolsList = await client.ListToolsAsync().ConfigureAwait(false);
+                return toolsList.Select(tool => ToKernelFunction(new McpClientToolWrapper(tool), client, loggerFactory)).ToList();
+            }
+
+            var serverName = client.ServerInfo.Name;
+            var serverVersion = client.ServerInfo.Version;
+            var cachedMcpTools = await mcpToolResository.FindListAsync(x => x.ServerName == serverName && x.ServerVersion == serverVersion);
+            if (cachedMcpTools.Any())
+            {
+                var toolsList = cachedMcpTools.Select(x => new McpClientToolWrapper(x)).ToList();
                 return toolsList.Select(tool => ToKernelFunction(tool, client, loggerFactory)).ToList();
             }
 
-            var cacheKey = client.ServerInfo.Name;
-            if (_memoryCache.TryGetValue(cacheKey, out List<McpClientTool> tools))
-                return tools.Select(tool => ToKernelFunction(tool, client, loggerFactory)).ToList();
-
-
-            tools = (await client.ListToolsAsync().ConfigureAwait(false)).ToList();
-            var cacheEntryOptions = new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1) };
-            _memoryCache.Set(cacheKey, tools, cacheEntryOptions);
-            return tools.Select(tool => ToKernelFunction(tool, client, loggerFactory)).ToList();
+            var tools = await client.ListToolsAsync().ConfigureAwait(false);
+            await PersistMcpClientTools(serverName, serverVersion, tools, mcpToolResository);
+            return tools.Select(tool => ToKernelFunction(new McpClientToolWrapper(tool), client, loggerFactory)).ToList();
         }
 
-        private static KernelFunction ToKernelFunction(this McpClientTool tool, IMcpClient client, ILoggerFactory loggerFactory)
+        private static KernelFunction ToKernelFunction(this McpClientToolWrapper tool, IMcpClient client, ILoggerFactory loggerFactory)
         {
             async Task<string> InvokeToolAsync(Kernel kernel, KernelFunction function, KernelArguments arguments, CancellationToken cancellationToken)
             {
                 var logger = loggerFactory.CreateLogger<KernelFunction>();
+
                 try
                 {
                     var mcpArguments = new Dictionary<string, object>();
@@ -43,15 +49,9 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
                         if (arg.Value is not null) mcpArguments[arg.Key] = function.ToArgumentValue(arg.Key, arg.Value);
                     }
 
-                    var result = await client.CallToolAsync(
-                        tool.Name,
-                        mcpArguments,
-                        cancellationToken: cancellationToken
-                    ).ConfigureAwait(false);
+                    var result = await client.CallToolAsync(tool.Name, mcpArguments, cancellationToken: cancellationToken).ConfigureAwait(false);
 
-                    return string.Join("\n", result.Content
-                        .Where(c => c.Type == "text")
-                        .Select(c => c.Text));
+                    return string.Join("\n", result.Content.Where(c => c.Type == "text").Select(c => c.Text));
                 }
                 catch (Exception ex)
                 {
@@ -70,13 +70,13 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
             );
         }
 
-        private static List<KernelParameterMetadata> ToKernelParameters(McpClientTool tool)
+        private static List<KernelParameterMetadata> ToKernelParameters(McpClientToolWrapper tool)
         {
-            var inputSchema = tool.JsonSchema.Deserialize<JsonSchema>();
+            var inputSchema = tool.InputSchema;
             var properties = inputSchema?.Properties;
             if (properties == null) return [];
 
-            HashSet<string> requiredProperties = new(inputSchema!.Required ?? []);
+            var requiredProperties = new HashSet<string>(inputSchema!.Required ?? []);
             return properties.Select(kvp => new KernelParameterMetadata(kvp.Key)
             {
                 Description = kvp.Value.Description,
@@ -112,9 +112,13 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
 
         private static object ToArgumentValue(this KernelFunction function, string name, object value)
         {
+            if (value.GetType() == typeof(JsonElement))
+                value = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>((JsonElement)value);
+
             var parameter = function.Metadata.Parameters.FirstOrDefault(p => p.Name == name);
             return parameter?.ParameterType switch
             {
+                Type t when Nullable.GetUnderlyingType(t) == typeof(decimal) => Convert.ToDecimal(value),
                 Type t when Nullable.GetUnderlyingType(t) == typeof(int) => Convert.ToInt32(value),
                 Type t when Nullable.GetUnderlyingType(t) == typeof(double) => Convert.ToDouble(value),
                 Type t when Nullable.GetUnderlyingType(t) == typeof(bool) => Convert.ToBoolean(value),
@@ -122,6 +126,22 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
                 Type t when t == typeof(Dictionary<string, object>) => (value as Dictionary<string, object>)?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
                 _ => value,
             } ?? value;
+        }
+
+        private static async Task PersistMcpClientTools(string serverName, string serverVersion, IList<McpClientTool> tools, IRepository<MCPTool> mcpToolResository)
+        {
+            await mcpToolResository.DeleteAsync(x => x.ServerName == serverName);
+
+            var mcpTools = tools.Select(x => new MCPTool()
+            {
+                ServerName = serverName,
+                ServerVersion = serverVersion,
+                ToolName = x.Name,
+                ToolDescription = x.Description,
+                ToolInputSchema = JsonSerializer.Serialize(x.JsonSchema)
+            });
+
+            await mcpToolResository.AddAsync(mcpTools.ToArray());
         }
     }
 
@@ -159,5 +179,28 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
         /// </summary>
         [JsonPropertyName("description")]
         public string? Description { get; set; } = string.Empty;
+    }
+
+    internal class McpClientToolWrapper
+    {
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public JsonSchema InputSchema { get; set; }
+
+        public McpClientToolWrapper(McpClientTool tool)
+        {
+            Name = tool.Name;
+            Description = tool.Description;
+            InputSchema = tool.JsonSchema.Deserialize<JsonSchema>();
+        }
+
+        public McpClientToolWrapper(MCPTool tool)
+        {
+            Name = tool.ToolName;
+            Description = tool.ToolDescription;
+
+            var jsonElement = JsonDocument.Parse(tool.ToolInputSchema).RootElement;
+            InputSchema = jsonElement.Deserialize<JsonSchema>();
+        }
     }
 }

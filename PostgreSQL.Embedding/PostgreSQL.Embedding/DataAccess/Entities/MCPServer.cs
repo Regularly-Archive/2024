@@ -8,7 +8,7 @@ namespace PostgreSQL.Embedding.DataAccess.Entities
         [SugarColumn(ColumnName = "name", IsNullable = true)]
         public string Name { get; set; }
 
-        [SugarColumn(ColumnName = "intro", IsNullable = true)]
+        [SugarColumn(ColumnName = "intro", IsNullable = true, ColumnDataType = "text")]
         public string Intro { get; set; }
 
         [SugarColumn(ColumnName = "transport_type", IsNullable = true)]

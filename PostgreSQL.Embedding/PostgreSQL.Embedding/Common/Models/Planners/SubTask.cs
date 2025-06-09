@@ -26,9 +26,9 @@ namespace PostgreSQL.Embedding.Common.Models.Planners
         [JsonProperty("execute_result")]
         public string ExecuteResult { get; set; }
 
-        public StepTrace AsStepTrace()
+        public StepTrace AsStepTrace(long messageId)
         {
-            return StepTrace.Plan(Id.ToString(), Name, Description, ExecuteResult, Status.ToString().ToLower());
+            return StepTrace.Plan(Id.ToString(), Name, Description, ExecuteResult, Status.ToString().ToLower(), messageId);
         }
     }
 
