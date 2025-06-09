@@ -29,7 +29,7 @@ namespace PostgreSQL.Embedding.Common.Models.Planners
         [JsonProperty("type")]
         public string Type { get; set; }
 
-        public static StepTrace Thought(string question, string content) =>
+        public static StepTrace Thought(string question, string content, string stepId, long messageId) =>
             new StepTrace
             {
                 Id = Guid.NewGuid().ToString("N"),
@@ -37,49 +37,49 @@ namespace PostgreSQL.Embedding.Common.Models.Planners
                 Description = question,
                 Content = content,
                 Status = "success",
-                ParentId = AgentExecutionContextExtensions.GetStepId(),
-                MessageId = AgentExecutionContextExtensions.GetMessageId(),
+                ParentId = stepId,
+                MessageId = messageId,
                 Type = "Thought"
             };
 
-        public static StepTrace Action(string actionName, Dictionary<string, object> actionVariables, string result, double duration, bool successful)
+        public static StepTrace Action(string actionName, Dictionary<string, object> actionVariables, string result, double duration, bool successful, string stepId, long messageId)
         {
             return new StepTrace()
             {
                 Id = Guid.NewGuid().ToString("N"),
-                ParentId = AgentExecutionContextExtensions.GetStepId(),
+                ParentId = stepId,
                 Title = "使用工具",
                 Description = $"使用工具 {actionName}, 耗时 {duration} 秒",
                 Content = System.Text.Json.JsonSerializer.Serialize(new { input = actionVariables, output = result }),
                 Status = successful ? "success" : "failed",
-                MessageId = AgentExecutionContextExtensions.GetMessageId(),
+                MessageId = messageId,
                 Type = "Action"
             };
         }
 
-        public static StepTrace Plan(string planId, string planName, string planDescription, string executeResult, string status)
+        public static StepTrace Plan(string planId, string planName, string planDescription, string executeResult, string status, long messageId)
         {
             return new StepTrace()
             {
                 Id = planId,
-                ParentId = AgentExecutionContextExtensions.GetMessageId().ToString(),
+                ParentId = messageId.ToString(),
                 Title = planName,
                 Description = planDescription,
                 Content = executeResult,
                 Status = status,
-                MessageId = AgentExecutionContextExtensions.GetMessageId(),
+                MessageId = messageId,
                 Type = "Plan"
             };
         }
 
-        public static StepTrace Done() =>
+        public static StepTrace Done(long messageId) =>
             new StepTrace()
             {
                 Id = Guid.NewGuid().ToString("N"),
                 Title = "[THINK_DONE]",
                 Content = "[THINK_DONE]",
                 Status = "success",
-                MessageId = AgentExecutionContextExtensions.GetMessageId(),
+                MessageId = messageId,
                 Type = "MessageStatus"
             };
     }

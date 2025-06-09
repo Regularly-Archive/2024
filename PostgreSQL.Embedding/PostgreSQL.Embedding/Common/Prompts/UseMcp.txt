@@ -6,7 +6,7 @@
                 
 # Output Format
 ```json
-{"server_name": "minimax-mcp", "confidence": 0.85}
+{"serverName": "minimax-mcp", "confidence": 0.85}
 ```
                 
 The user's current request is: {{$query}}

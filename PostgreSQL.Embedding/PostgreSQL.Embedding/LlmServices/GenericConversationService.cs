@@ -34,6 +34,7 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly HttpContext _httpContext;
         private readonly SSEEmitter _sseEmitter;
         private readonly ILogger<GenericConversationService> _logger;
+        private readonly AgentExecutionContext _agentExecutionContext;
         public GenericConversationService(Kernel kernel, LlmApp app, IServiceProvider serviceProvider, IChatHistoriesService chatHistoriesService, HttpContext httpContext)
             : base(kernel, chatHistoriesService)
         {
@@ -47,6 +48,7 @@ namespace PostgreSQL.Embedding.LlmServices
             _logger = _serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<GenericConversationService>();
             _httpContext = httpContext;
             _sseEmitter = new SSEEmitter(_httpContext);
+            _agentExecutionContext = _kernel.GetAgentExecutionContext();
         }
 
         public async Task InvokeAsync(ConversationRequestModel model, string input, CancellationToken cancellationToken = default)
@@ -54,8 +56,8 @@ namespace PostgreSQL.Embedding.LlmServices
             _conversationId = !string.IsNullOrEmpty(model.ConversationId) ? model.ConversationId : Guid.NewGuid().ToString("N");
             var conversationName = _httpContext.GetConversationName();
 
-            AgentExecutionContextExtensions.SetAppId(_app.Id);
-            AgentExecutionContextExtensions.SetConversationId(_conversationId);
+            _agentExecutionContext.SetAppId(_app.Id);
+            _agentExecutionContext.SetConversationId(_conversationId);
 
             // 如果是重新生成，则删除最后一条 AI 消息
             var conversationFlag = _httpContext.GetConversationFlag();
@@ -63,7 +65,7 @@ namespace PostgreSQL.Embedding.LlmServices
             {
                 _messageReferenceId = await _chatHistoriesService.AddUserMessageAsync(_app.Id, _conversationId, input);
                 _httpContext.Response.Headers[Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
-                AgentExecutionContextExtensions.SetReferenceMessageId(_messageReferenceId);
+                _agentExecutionContext.SetReferenceMessageId(_messageReferenceId);
 
                 var conversation = await _chatHistoriesService.GetAppConversationAsync(_app.Id, _conversationId);
                 if (conversation == null)
@@ -99,7 +101,7 @@ namespace PostgreSQL.Embedding.LlmServices
         private async Task InvokeStreamingChat(ConversationRequestModel model, string input, CancellationToken cancellationToken = default)
         {
             var messageId = await _chatHistoriesService.AddSystemMessageAsync(_app.Id, _conversationId, string.Empty);
-            AgentExecutionContextExtensions.SetMessageId(messageId);
+            _agentExecutionContext.SetMessageId(messageId);
 
             var chatResult = model.AgenticMode
                 ? await InvokeStreamingByStepwisePlannerAsync(_kernel, input, cancellationToken)
@@ -175,19 +177,19 @@ namespace PostgreSQL.Embedding.LlmServices
 
                 if (!subTasks.Any()) return Constants.DefaultErrorAnswer.AsStreaming();
 
-                subTasks.ForEach(async (subTask) => await EmitTracesAsync(subTask.AsStepTrace(), cancellationToken));
+                subTasks.ForEach(async (subTask) => await EmitTracesAsync(subTask.AsStepTrace(_agentExecutionContext.GetMessageId()), cancellationToken));
 
-                var planner = new StepwisePlanner(_kernel, _promptTemplateService, new StepwisePlannerConfig() { MaxIterations = 10 });
+                var planner = new StepwisePlanner(_kernel, _promptTemplateService, new StepwisePlannerConfig() { MaxIterations = 30 });
                 planner.AddVariable("appId", _app.Id);
                 planner.AddVariable("conversationId", _conversationId);
                 planner.AddVariable("userId", currentUser.Id);
                 planner.AddVariable("currentTime", DateTime.Now);
 
-                var graphExecutor = new DAGraphExecutor(input, subTasks, planner);
+                var graphExecutor = new DAGraphExecutor(input, subTasks, planner, kernel);
                 graphExecutor.OnStepChanged = async (stepTrace) => await EmitTracesAsync(stepTrace);
                 await graphExecutor.ExecuteAsync();
 
-                await EmitTracesAsync(StepTrace.Done());
+                await EmitTracesAsync(StepTrace.Done(_agentExecutionContext.GetMessageId()));
                 return subTasks.OrderByDescending(x => x.Id).FirstOrDefault().ExecuteResult.AsStreaming();
             }
             catch (Exception ex)

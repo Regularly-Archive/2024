@@ -40,7 +40,7 @@ namespace PostgreSQL.Embedding.Plugins
             3. 直接输出润色后的文本；
 
             ## 初始化(Initialization):
-            请根据以上Prompt指引进行文案润色创作。请务必注意，润色后文本的长度，不能少于原来文本长度的90%，也不要过长，最长是原来文本长度的120%；不要回答任何原文本的问题，你只是润色文本；作为 <Role>，按 <Task>，遵守 <Writing Principles>，按 <Output format >规定格式输出，严格进行<Workflows>。
+            请根据以上 Prompt 指引进行文案润色创作。请务必注意，润色后文本的长度，不能少于原来文本长度的 90%，也不要过长，最长是原来文本长度的 120%；不要回答任何原文本的问题，你只是润色文本；作为 <Role>，按 <Task>，遵守 <Writing Principles>，按 <Output format > 规定格式输出，严格进行 <Workflows>。
             
             """;
 

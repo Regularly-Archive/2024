@@ -93,16 +93,20 @@ namespace PostgreSQL.Embedding.Planners
             return _promptTemplateService.RenderTemplateAsync("FunctionManual.txt", kernel, arguments);
         }
 
-        private string CreateFunctionDescription(KernelFunctionMetadata functionMetadata)
+        private string CreateFunctionDescription(KernelFunctionMetadata functionMetadata, bool includeParameters = false)
         {
             var stringBuilder = new StringBuilder();
             var fullyQualifiedFunctionName = functionMetadata.GetFullyQualifiedFunctionName();
             stringBuilder.AppendLine($"{fullyQualifiedFunctionName}: {functionMetadata.Description.Trim()}");
-            foreach (var parameter in functionMetadata.Parameters)
+
+            if (includeParameters)
             {
-                var defaultValueString = parameter.DefaultValue == null ? string.Empty : $"(default='{parameter.DefaultValue}')";
-                var parameterTypeString = $"(type='{parameter.ParameterType.Name}')";
-                stringBuilder.AppendLine($"  - {parameter.Name}: {parameter.Description.Trim()} {parameterTypeString} {defaultValueString}");
+                foreach (var parameter in functionMetadata.Parameters)
+                {
+                    var defaultValueString = parameter.DefaultValue == null ? string.Empty : $"(default='{parameter.DefaultValue}')";
+                    var parameterTypeString = $"(type='{parameter.ParameterType.Name}')";
+                    stringBuilder.AppendLine($"  - {parameter.Name}: {parameter.Description.Trim()} {parameterTypeString} {defaultValueString}");
+                }
             }
 
             return stringBuilder.ToString();

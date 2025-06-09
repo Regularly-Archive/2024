@@ -9,14 +9,24 @@ Answer the following questions as accurately as possible using the provided func
 
 [USAGE INSTRUCTIONS]
 * To use the functions, variables and histories, specify a JSON blob representing an action. The JSON blob should contain an "action" key with the name of the function to use, and an "action_variables" key with a JSON object of string values to use when calling the function.
-* Do not call functions directly; they must be invoked through an action.
+* DO NOT call functions directly; they must be invoked through an action.
 * The keys in "action_variables" value should match the defined [PARAMETERS] of the named "action" in [AVAILABLE FUNCTIONS].
 * The values in "action_variables" must be of type string and represent the actual values to be passed to the function. Do not attempt to pass a variable name or other reference to a function.
 * If a function has no parameters, the "action_variables" key may be omitted.
 * Ensure that the $JSON_BLOB contains only a SINGLE action; do NOT return multiple actions.
 * If you don't need to call an action, please returning an answer with prefix [FINAL_ANSWER] directly.
-* You can use `UseMCPPlugin.ChooseMCPServer`, `UseMCPPlugin.ListTools`, `UseMCPPlugin.CallTool` to discover the MCP tools dynamically when no matches are found in [AVAILABLE FUNCTIONS]
-IMPORTANT: Use only the available functions listed in the [AVAILABLE FUNCTIONS] section. Do not attempt to use any other functions that are not specified.
+IMPORTANT: 
+* Use only the available functions listed in the [AVAILABLE FUNCTIONS] section. 
+* DO NOT attempt to use any other functions that are not specified.
+* `UseMCPPlugin` allows you to discover MCP Servers, list tools, and invoke them.
+* When using the `UseMCPPlugin` to call a MCP tool, MUST strictly follow the sequence: ListServers, ListTools, and then CallTool.
+* DO NOT ignore any query parameters appended to the URL address, as they may contain relevant information.
+* Use markdown to format links and images if needed. eg.
+	- For link `https://blog.yuanpei.me`, it should be formated like: [https://blog.yuanpei.me](https://blog.yuanpei.me)
+	- For image `https://blog.yuanpei.me/images/avatar.jpg`, it should be formated like: ![https://blog.yuanpei.me/images/avatar.jpg](https://blog.yuanpei.me/images/avatar.jpg)
+* DO NOT convert images to BASE64 format.
+* You MUST verify whether the answer is valid arefully and extract the answer you truly need.
+* DO NOT forge nonexistent links, server_name, tool_name.
 
 Here is an example of a valid $JSON_BLOB with parameters:
 {
@@ -34,9 +44,9 @@ Here is an example of a valid $JSON_BLOB without parameters:
 
 [VALID STEP LIST]
 [QUESTION] - The input question I must answer
-[THOUGHT] - A thought I have about the question and how to answer it step by step.
-[ACTION] - A single $JSON_BLOB representing a single action to be performed
-[OBSERVATION] - The result of the action will be provided here
+[THOUGHT] - A thought I have about the question and how to answer it step by step. If built-in tools are insufficient or difficult to decide, consider using the UseMCPPlugin with the sequence: ListServers, ListTools, and CallTool when you need to call a MCP tool.
+[ACTION] - A single $JSON_BLOB representing a single action to be performed.
+[OBSERVATION] - The result of the action will be provided here.
 [FINAL_ANSWER] - Once I have gathered all the necessary observations through producing thoughts and actions, I can provide the final answer in a clear and human-readable format.
 [END VALID STEP LIST]
 

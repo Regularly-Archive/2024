@@ -2,39 +2,39 @@
 {
     public static class AgentExecutionContextExtensions
     {
-        public static void SetReferenceMessageId(long value)
+        public static void SetReferenceMessageId(this AgentExecutionContext context, long value)
         {
-            AgentExecutionContext.SetGlobalData("ReferenceMessageId", value);
+            context.SetGlobalData("ReferenceMessageId", value);
         }
 
-        public static long GetReferenceMessageId() => AgentExecutionContext.GetData<long>("ReferenceMessageId");
+        public static long GetReferenceMessageId(this AgentExecutionContext context) => context.GetData<long>("ReferenceMessageId");
 
-        public static void SetMessageId(long value)
+        public static void SetMessageId(this AgentExecutionContext context, long value)
         {
-            AgentExecutionContext.SetGlobalData("MessageId", value);
+            context.SetGlobalData("MessageId", value);
         }
 
-        public static long GetMessageId() => AgentExecutionContext.GetData<long>("MessageId");
+        public static long GetMessageId(this AgentExecutionContext context) => context.GetData<long>("MessageId");
 
-        public static void SetConversationId(string value)
+        public static void SetConversationId(this AgentExecutionContext context, string value)
         {
-            AgentExecutionContext.SetGlobalData("ConversationId", value);
+            context.SetGlobalData("ConversationId", value);
         }
 
-        public static string GetConversationId() => AgentExecutionContext.GetData<string>("ConversationId");
+        public static string GetConversationId(this AgentExecutionContext context) => context.GetData<string>("ConversationId");
 
-        public static void SetAppId(long value)
+        public static void SetAppId(this AgentExecutionContext context, long value)
         {
-            AgentExecutionContext.SetGlobalData("AppId", value);
+            context.SetGlobalData("AppId", value);
         }
 
-        public static long GetAppId() => AgentExecutionContext.GetData<long>("AppId");
+        public static long GetAppId(this AgentExecutionContext context) => context.GetData<long>("AppId");
 
-        public static void SetStepId(string value)
+        public static void SetStepId(this AgentExecutionContext context, string value)
         {
-            AgentExecutionContext.SetData("StepId", value);
+            context.SetData("StepId", value);
         }
 
-        public static string GetStepId() => AgentExecutionContext.GetData<string>("StepId");
+        public static string GetStepId(this AgentExecutionContext context) => context.GetData<string>("StepId");
     }
 }
