@@ -6,6 +6,8 @@ import os, gc, asyncio
 from utils import timer, createLogger, LRUCache
 from concurrent.futures import ThreadPoolExecutor
 from transformers import AutoTokenizer
+import struct, base64
+from array import array
 
 cached_models = LRUCache(5)
 cached_tokenizers = LRUCache(5)
@@ -25,14 +27,16 @@ def get_embeddings(request: EmbeddingsRequest) -> Tuple[List[EmbeddingsObjectRes
         tokens = tokenizer(request.input, add_special_tokens=True)
         total_tokens = len(tokens['input_ids'])
         vectors = model.encode(request.input)
-        embeddings = [EmbeddingsObjectResponse(embedding=vectors, index=0, object="embedding")]
+        embedding = vectors if request.encoding_format == "float" else float_list_to_base64(vectors)
+        embeddings = [EmbeddingsObjectResponse(embedding=embedding, index=0, object="embedding")]
     elif isinstance(request.input, list):
         embeddings = []
         for index, text_input in enumerate(request.input):
             tokens = tokenizer(text_input, add_special_tokens=True)
             total_tokens += len(tokens['input_ids'])
             vectors = model.encode(text_input)
-            embeddings.append(EmbeddingsObjectResponse(embedding=vectors, index=index, object="embedding"))
+            embedding = vectors if request.encoding_format == "float" else float_list_to_base64(vectors)
+            embeddings.append(EmbeddingsObjectResponse(embedding=embedding, index=index, object="embedding"))
     
     usage = Usage(
         prompt_tokens=total_tokens,
@@ -59,4 +63,11 @@ def get_cached_model(model_name: str, cache_dir: str):
     
 def release_embedding_models():
     gc.collect()
+
+def float_list_to_base64(float_list):
+    float_array = array('f', float_list)
+    bytes_data = float_array.tobytes()
+    base64_str = base64.b64encode(bytes_data).decode('utf-8')
+    return base64_str
+
 

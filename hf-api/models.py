@@ -110,13 +110,14 @@ class CompletionStreamResponse(BaseModel):
 class EmbeddingsRequest(BaseModel):
     model: Optional[str] = Field(default="google-bert/bert-base-chinese")
     input: Union[str, List[Any]] = Field(default=["人生若只如初见，何事秋风悲画扇"])
+    encoding_format: str = Field(default="float")
     user: Optional[str] = Field(default='')
 
 
 class EmbeddingsObjectResponse(BaseModel):
     index: int
     object: str = "embedding"
-    embedding: List[float]
+    embedding: Union[List[float], str]
 
 
 class EmbeddingsResponse(BaseModel):
