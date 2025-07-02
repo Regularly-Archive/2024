@@ -23,9 +23,13 @@
             <div v-if="executionTime" class="ml-4 text-gray-600">本次运行耗时: {{ executionTime }} s</div>
         </div>
         <div class="flex flex-1">
-            <div class="flex-1 border rounded p-2 mr-5">
+            <div class="flex-1 border rounded p-2 mr-5 flex flex-col">
                 <Codemirror v-model:value="codeContent" :options="editorOptions" ref="cmRef" height="100%" width="100%"
                     @change="handleChange" @input="handleInput" @ready="handleReady"></Codemirror>
+                <div class="mt-4">
+                    <label class="block mb-1">依赖项管理：</label>
+                    <textarea v-model="dependencies" rows="4" placeholder="" class="w-full border rounded p-2 resize-y"></textarea>
+                </div>
             </div>
             <div class="flex-1 border rounded p-2 bg-gray-50">
                 <pre class="h-full bg-black text-white" v-if="!isNotebook">{{ executionOutput }}</pre>
@@ -60,11 +64,13 @@ export default {
                 lineNumbers: true,
                 lineWrapping: true,
             },
+            dependencies: ''
         };
     },
     watch: {
         selectedLanguage(newLang) {
             this.updateCodeContent(newLang);
+            this.dependencies = '';
         },
     },
     mounted() {
@@ -93,6 +99,7 @@ export default {
                 { value: 'java', label: 'Java', code: 'public class code {\n    public static void main(String[] args) {\n        System.out.println("Hello, World!");\n    }\n}' },
                 { value: 'go', label: 'Go', code: 'package main\nimport "fmt"\nfunc main() {\n    fmt.Println("Hello, World!")\n}' },
                 { value: 'csharp', label: 'C#/.NET', code: 'Console.WriteLine("Hello, World!");' },
+                { value: 'csharp-sfa', label: 'C#/.NET 单文件', code: 'Console.WriteLine("Hello, World!");' },
                 { value: 'csharp-mono', label: 'C#/Mono', code: 'using System;\n\nnamespace HelloWorld\n{\n    class Program\n    {\n        static void Main(string[] args)\n        {\n            Console.WriteLine("Hello, World!");\n        }\n    }\n}' },
                 { value: 'javascript', label: 'JavaScript', code: 'console.log("Hello, World!");' },
                 { value: 'typescript', label: 'TypeScript', code: 'console.log("Hello, World!");' },
@@ -115,7 +122,7 @@ export default {
             this.reset()
 
             try {
-                const response = await fetch('http://localhost:8001/api/run?format=notebook', {
+                const response = await fetch('http://localhost:8001/api/code/run', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -123,14 +130,17 @@ export default {
                     body: JSON.stringify({
                         code: this.codeContent,
                         language: this.selectedLanguage,
-                        notebook: this.isNotebook
+                        dependencies: this.dependencies
+                            .split('\n')
+                            .map(dep => dep.trim())
+                            .filter(dep => dep.length > 0)
                     })
                 });
 
                 const data = await response.json();
                 this.executionOutput = data.output;
-                this.executionTime = data.time;
-                this.outputType = data.type
+                this.executionTime = data.duration;
+                this.outputType = data.contentType
                 this.$nextTick(async () => {
                     hljs.highlightAll();
                     if (this.showJupyter) {
