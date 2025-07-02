@@ -38,11 +38,18 @@ LANGUAGE_CONFIG = {
         'commandRedirect': "sh -c 'dotnet script code.csx > output.txt'",
         'extension': 'csx'
     },
+    'csharp-sfa': {
+        'env' :'dotnet',
+        'image': 'code_runner/dotnet',
+        'command': "dotnet run code.cs",
+        'commandRedirect': "sh -c 'dotnet run code.cs > output.txt'",
+        'extension': 'cs'
+    },
     'csharp-mono': {
         'env' :'mono',
         'image': 'code_runner/mono',
         'command': "sh -c 'mcs -out:code -codepage:utf8 code.cs && mono code --encoding=utf8'",
-        'commandRedirect': "sh -c 'mcs -out:code -codepage:utf8 code.cs && mono code --encoding=utf8> output.txt'",
+        'commandRedirect': "sh -c 'mcs -out:code -codepage:utf8 code.cs && mono code --encoding=utf8 > output.txt'",
         'extension': 'cs'
     },
     'cpp': {
