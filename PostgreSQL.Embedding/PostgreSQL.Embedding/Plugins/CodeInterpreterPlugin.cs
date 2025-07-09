@@ -56,7 +56,7 @@ public class CodeInterpreterPlugin : BasePlugin
     public async Task<string> RunCSharp(
         [Description("脚本内容")] string code, 
         [Description("一个或多个依赖项, 使用英文逗号隔开，例如：Newtonsoft.Json")] string dependencies = "", 
-        [Description("语言，可选值为：csharp、csharp-mono")] string language = "csharp")
+        [Description("语言，可选值为：csharp、csharp-mono、csharp-sfa")] string language = "csharp-sfa")
     {
         var response = await RunCodeAsync("csharp", code, dependencies.Split(',', StringSplitOptions.TrimEntries));
         await SendArtifacts(code, response.Output, response.Language, response.ContentType);
@@ -87,6 +87,7 @@ public class CodeInterpreterPlugin : BasePlugin
     {
         using var httpClient = _httpClientFactory.CreateClient();
         httpClient.BaseAddress = new Uri(_codeInterpreterConfig.BaseUrl);
+        httpClient.Timeout = Timeout.InfiniteTimeSpan;
 
         var payload = new { language = language, code = code, dependencies = dependencies  };
         var content = JsonContent.Create<dynamic>(payload);
@@ -110,6 +111,7 @@ public class CodeInterpreterPlugin : BasePlugin
     {
         using var httpClient = _httpClientFactory.CreateClient();
         httpClient.BaseAddress = new Uri(_codeInterpreterConfig.BaseUrl);
+        httpClient.Timeout = Timeout.InfiniteTimeSpan;
 
         var payload = new { language = language, code = code, dependencies = dependencies, format = format };
         var content = JsonContent.Create<dynamic>(payload);
