@@ -1,0 +1,7 @@
+[project]
+name = "hf-api"
+version = "0.1.0"
+description = "A OpenAI Compatible API for HuggingFace"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
