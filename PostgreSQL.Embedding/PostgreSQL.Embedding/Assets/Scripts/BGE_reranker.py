@@ -9,6 +9,6 @@ model_dir = modelscope.snapshot_download(model_name, revision='master')
 reranker = FlagAutoReranker.from_finetuned(model_dir, use_fp16=True)
 
 def compute_scores(query: str, docs: list[str]) -> list[float]:
-    pairs = list(map(lambda x:[query, x], docs))
+	pairs = list(map(lambda x:[query, x], docs))
 	return reranker.compute_score(pairs, normalize=True)
 

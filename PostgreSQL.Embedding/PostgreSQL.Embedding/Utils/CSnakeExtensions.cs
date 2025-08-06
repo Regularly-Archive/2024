@@ -1,23 +1,35 @@
 ﻿using CSnakes.Runtime;
 using PostgreSQL.Embedding.Common.Confirguration;
 
-namespace PostgreSQL.Embedding.Utils
+namespace PostgreSQL.Embedding.Utils;
+
+public static class CSnakeExtensions
 {
-    public static class CSnakeExtensions
+    public static string HomePath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Scripts");
+    public static string VenvPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Scripts", ".venv");
+
+    public static IServiceCollection AddPythonRuntime(this IServiceCollection services, IConfiguration configuration)
     {
-        public static string HomePath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Scripts");
-        public static string VenvPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Scripts", ".venv");
+        var config = new PythonConfig();
+        configuration.GetSection(nameof(PythonConfig)).Bind(config);
 
-        public static void AddPythonRuntime(this IServiceCollection services, IConfiguration configuration)
-        {
-            var config = new PythonConfig();
-            configuration.GetSection(nameof(PythonConfig)).Bind(config);
+        services.WithPython()
+            .WithHome(HomePath)
+            .WithVirtualEnvironment(VenvPath)
+            .FromFolder(config.PythonExecute, config.PythonVersion)
+            .WithPipInstaller();
 
-            services.WithPython()
-                .WithHome(HomePath)
-                .WithVirtualEnvironment(VenvPath)
-                .FromFolder(config.PythonExecute, config.PythonVersion)
-                .WithPipInstaller();
-        }
+        return services;
+    }
+
+    public static IServiceCollection AddPythonRuntime(this IServiceCollection services, PythonConfig config)
+    {
+        services.WithPython()
+            .WithHome(HomePath)
+            .WithVirtualEnvironment(VenvPath)
+            .FromFolder(config.PythonExecute, config.PythonVersion)
+            .WithPipInstaller();
+
+        return services;
     }
 }

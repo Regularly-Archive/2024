@@ -41,12 +41,11 @@ namespace PostgreSQL.Embedding.Plugins
             [Description("是否只需要最终答案, 默认为 false")] bool onlyReturnAnswer = false
         )
         {
-            var clonedKernel = kernel.Clone();
+            var clonedKernel = kernel?.Clone();
 
             using var serviceScope = _serviceProvider.CreateScope();
             var serviceEngine = GetSearchEngine(serviceScope.ServiceProvider, searchEngine);
             var searchResult = await serviceEngine.SearchAsync(query);
-
 
             if (showSearchResult) await SendArtifacts(searchResult);
             if (onlyReturnAnswer)
@@ -55,12 +54,22 @@ namespace PostgreSQL.Embedding.Plugins
                 var chatHistoryService = _serviceProvider.GetService<IChatHistoriesService>();
 
 
-                var ragFlowService = new RAGFlowService(kernel, _serviceProvider, memoryService, chatHistoryService);
+                var ragFlowService = new RAGFlowService(clonedKernel, _serviceProvider, memoryService, chatHistoryService);
                 var citations = GetCitationsFromSearchEngine(searchResult);
                 return await ragFlowService.GenerateAnswerAsync(query, citations);
             }
 
             return JsonConvert.SerializeObject(searchResult);
+        }
+
+        public async Task<SearchResult> SearchAsync(string query, string searchEngine = "Bing", bool showSearchResult = false)
+        {
+            using var serviceScope = _serviceProvider.CreateScope();
+            var serviceEngine = GetSearchEngine(serviceScope.ServiceProvider, searchEngine);
+            var searchResult = await serviceEngine.SearchAsync(query);
+
+            if (showSearchResult) await SendArtifacts(searchResult);
+            return searchResult;
         }
 
         private ISearchEngine GetSearchEngine(IServiceProvider serviceProvider, string searchEngine = "Brave")
@@ -84,7 +93,7 @@ namespace PostgreSQL.Embedding.Plugins
 
         private List<LlmCitationModel> GetCitationsFromSearchEngine(SearchResult searchResult)
         {
-            return searchResult.Entries.Select((x, i) => LlmCitationModel.FromSearchEngine(i + 1, x.Url, x.Title, x.Snippet)).ToList();
+            return searchResult.Entries.Select((x, i) => LlmCitationModel.FromSearchEngine(i + 1, x)).ToList();
         }
 
         private async Task SendArtifacts(SearchResult searchResult)

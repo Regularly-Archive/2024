@@ -30,5 +30,6 @@ namespace PostgreSQL.Embedding.Common.Models.Search
         public string Url { get; set; }
         public string Title { get; set; }
         public string Snippet { get; set; }
+        public float Relevance { get; set; }
     }
 }

@@ -2,6 +2,7 @@
 using Microsoft.SemanticKernel.ChatCompletion;
 using PostgreSQL.Embedding.Common.Models.Planners;
 using PostgreSQL.Embedding.LLmServices.Extensions;
+using System.Collections.Concurrent;
 
 namespace PostgreSQL.Embedding.Planners
 {
@@ -51,9 +52,22 @@ namespace PostgreSQL.Embedding.Planners
                 ? await _stepwisePlanner.CreatePlanAsync(null, subTask.AvailableTools)
                 : await _stepwisePlanner.CreatePlanAsync();
 
-            plan.OnStepExecute = (stepTrace) =>
+            plan.OnStepExecute = async (stepTrace) =>
             {
-                OnStepChanged?.Invoke(stepTrace);
+                if (stepTrace.Type == "Thought")
+                {
+                    var streamingStepTraces = stepTrace.AsStreamingThought();
+                    foreach (var streamingStepTrace in streamingStepTraces)
+                    {
+                        await Task.Delay(100);
+                        OnStepChanged?.Invoke(streamingStepTrace);
+                    }
+                }
+                else
+                {
+                    OnStepChanged?.Invoke(stepTrace);
+                }
+                
             };
 
             subTask.Status = Common.Models.Planners.TaskStatus.InProgress;

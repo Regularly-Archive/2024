@@ -51,7 +51,7 @@ namespace PostgreSQL.Embedding.Plugins
             while (searchResult.Entries.Count < limit && searchResult.HasNextPage)
             {
                 var newSearchResult = await GetAsync(httpClient, query, searchResult.NextPage);
-                if (searchResult.Entries.Any())
+                if (newSearchResult.Entries.Any())
                 {
                     searchResult.Entries.AddRange(newSearchResult.Entries);
                     searchResult.NextPage = newSearchResult.NextPage;
@@ -111,7 +111,7 @@ namespace PostgreSQL.Embedding.Plugins
                 return new Entry()
                 {
                     Title = eleTitle.TextContent,
-                    Url = eleTitle.QuerySelector(SELECTOR_TAG_LINK).Attributes[SELECTOR_TAG_HREF].Value,
+                    Url = eleTitle.QuerySelector(SELECTOR_TAG_LINK)?.Attributes[SELECTOR_TAG_HREF].Value,
                     Snippet = x.QuerySelector(SELECTOR_TAG_ITEM_DESC)?.TextContent ?? string.Empty
                 };
             })

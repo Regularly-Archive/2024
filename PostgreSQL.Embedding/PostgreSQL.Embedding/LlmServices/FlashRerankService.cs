@@ -1,5 +1,4 @@
 ﻿using CSnakes.Runtime;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using PostgreSQL.Embedding.Common.Confirguration;
 using PostgreSQL.Embedding.LlmServices.Abstration;
@@ -8,12 +7,11 @@ using System.Linq.Expressions;
 
 namespace PostgreSQL.Embedding.LlmServices;
 
-public class BgeRerankService : BaseRerankService, IRerankService
+public class FlashRerankService : BaseRerankService, IRerankService
 {
-    // BAAI/bge-reranker-v2-m3
-    private readonly string _modelName = "BAAI/bge-reranker-v2-m3";
-    private IBGEReranker _bgeReranker;
-    public BgeRerankService(IServiceProvider serviceProvider, IOptions<PythonConfig> options)
+    private IFlashReranker _flashReranker;
+
+    public FlashRerankService(IServiceProvider serviceProvider, IOptions<PythonConfig> options)
         : base(serviceProvider, options)
     {
 
@@ -21,22 +19,22 @@ public class BgeRerankService : BaseRerankService, IRerankService
 
     protected override void InitModel(IPythonEnvironment environment)
     {
-        _logger.LogInformation($"The BGEReranker with model '{_modelName}' is initializing...");
+        _logger.LogInformation($"The FlashReranker is initializing...");
 
         var envfile = Path.Combine(CSnakeExtensions.HomePath, ".env");
         if (File.Exists(envfile)) File.Delete(envfile);
-        File.WriteAllText(envfile, $"RERANKER_MODEL_NAME={_modelName}");
+        File.WriteAllText(envfile, $"MODEL_CACHE_DIR=C:\\Users\\Administrator\\Downloads");
 
-        _bgeReranker = environment.BGEReranker();
+        _flashReranker = environment.FlashReranker();
 
-        _logger.LogInformation($"The BGEReranker with model '{_modelName}' has been initialized.");
+        _logger.LogInformation($"The FlashReranker has been initialized.");
     }
 
     public override IEnumerable<RerankResult<T>> Sort<T>(string question, List<T> documents, Expression<Func<T, string>> keyExps)
     {
         var keyFunc = keyExps.Compile();
         var keyedDocuments = documents.Select(x => keyFunc(x)).ToList();
-        var scores = _bgeReranker.ComputeScores(question, keyedDocuments);
+        var scores = _flashReranker.ComputeScores(question, keyedDocuments);
 
         for (var i = 0; i < documents.Count; i++)
         {

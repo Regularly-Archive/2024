@@ -39,6 +39,9 @@ def code_to_file(code_string, file_path, language=None, dependencies=None):
     生成代码文件，并按语言类型在文件头注入依赖声明。
     """
     if language == 'csharp' and dependencies:
+        nuget_lines = [f'#:package {dep}' for dep in dependencies]
+        code_string = '\n'.join(nuget_lines) + '\n' + code_string
+    if language == 'csharp-sfa' and dependencies:
         nuget_lines = [f'#r "nuget: {dep}"' for dep in dependencies]
         code_string = '\n'.join(nuget_lines) + '\n' + code_string
     if language == 'java' and dependencies:

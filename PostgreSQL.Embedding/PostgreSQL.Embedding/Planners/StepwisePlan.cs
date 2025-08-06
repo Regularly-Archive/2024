@@ -1,4 +1,5 @@
-﻿using Microsoft.SemanticKernel;
+﻿using DocumentFormat.OpenXml.Office.SpreadSheetML.Y2023.MsForms;
+using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Services;
 using Microsoft.SemanticKernel.TextGeneration;
@@ -73,7 +74,7 @@ namespace PostgreSQL.Embedding.Planners
                     return output;
                 }
 
-                if (i > 0) await Task.Delay(_config.MinIterationTimeMs, cancellationToken).ConfigureAwait(false);
+                if (i > 0) await Task.Delay(_config.MinIterationTimeSpan, cancellationToken).ConfigureAwait(false);
 
                 var nextStep = await GetNextStepAsync(stepsTaken, chatHistory, aiService, startingMessageCount, cancellationToken);
                 _logger.LogTrace($"Step {i + 1}: {nextStep.ToString()}");
@@ -82,7 +83,7 @@ namespace PostgreSQL.Embedding.Planners
 
                 if (!string.IsNullOrEmpty(finalAnswer) && string.IsNullOrEmpty(nextStep.Action))
                 {
-                    OnStepExecute?.Invoke(StepTrace.Done(_agentExecutionContext.GetMessageId()));
+                    OnStepExecute?.Invoke(StepTrace.StepDone(_agentExecutionContext.GetMessageId()));
                     return finalAnswer;
                 }
 
@@ -99,7 +100,7 @@ namespace PostgreSQL.Embedding.Planners
                 // Check FinalAnswer Again
                 if (!string.IsNullOrEmpty(nextStep.FinalAnswer))
                 {
-                    OnStepExecute?.Invoke(StepTrace.Done(_agentExecutionContext.GetMessageId()));
+                    OnStepExecute?.Invoke(StepTrace.StepDone(_agentExecutionContext.GetMessageId()));
                     return nextStep.FinalAnswer;
                 }
 
@@ -125,13 +126,14 @@ namespace PostgreSQL.Embedding.Planners
                 {
                     var question = step.Thought.Split("\n\n")[0].Replace(QuestionTag, "").Replace("-", "").Trim();
                     var thought = step.Thought.Split("\n\n")[1].Replace("-", "").Trim();
-
-                    OnStepExecute?.Invoke(StepTrace.Thought(question, thought, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
+                    if (!string.IsNullOrEmpty(thought))
+                        OnStepExecute?.Invoke(StepTrace.Thought(question, thought, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
                 }
                 else
                 {
                     var trimedThought = step.Thought.Replace("-", "").Trim();
-                    OnStepExecute?.Invoke(StepTrace.Thought("", trimedThought, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
+                    if (!string.IsNullOrEmpty (trimedThought))
+                        OnStepExecute?.Invoke(StepTrace.Thought("", trimedThought, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
                 }
             }
 
@@ -144,8 +146,8 @@ namespace PostgreSQL.Embedding.Planners
             var targetFunction = availableFunctions.FirstOrDefault(f => f.GetFullyQualifiedFunctionName() == actionName);
             if (targetFunction == null)
             {
-                this._logger?.LogDebug("Attempt to invoke action {Action} failed", actionName);
-                return $"{actionName} is not in [AVAILABLE FUNCTIONS]. Please try again using one of the [AVAILABLE FUNCTIONS].";
+                this._logger?.LogDebug("Attempt to invoke action '{Action}' failed", actionName);
+                return $"The tool '{actionName}' is not in [AVAILABLE FUNCTIONS]. Please try again using one of the [AVAILABLE FUNCTIONS].";
             }
 
             try
@@ -162,7 +164,7 @@ namespace PostgreSQL.Embedding.Planners
                 if (kernelResult.ValueType == typeof(string))
                 {
                     result = kernelResult.GetValue<string>();
-                } 
+                }
                 else
                 {
                     result = Newtonsoft.Json.JsonConvert.SerializeObject(kernelResult.GetValue<object>());
@@ -203,7 +205,7 @@ namespace PostgreSQL.Embedding.Planners
                 // Invoke the action
                 try
                 {
-                  var result = await InvokeActionAsync(kernel, step.Action, step.ActionVariables, cancellationToken).ConfigureAwait(false);
+                    var result = await InvokeActionAsync(kernel, step.Action, step.ActionVariables, cancellationToken).ConfigureAwait(false);
 
                     // Set FinalAnswer if result starts with [FINAL_WANSWER] tag.
                     // Return false to break loop.
@@ -221,7 +223,7 @@ namespace PostgreSQL.Embedding.Planners
                         step.FinalAnswer = ragMatch.Groups[1].Value.Trim();
                         return false;
                     }
-                    
+
                 }
                 catch (Exception ex)
                 {
@@ -256,18 +258,20 @@ namespace PostgreSQL.Embedding.Planners
             else
             {
                 _logger?.LogInformation("Thought: {Thought}", step.Thought);
-                
+
                 if (!string.IsNullOrEmpty(step.Thought) && step.Thought.IndexOf(QuestionTag) != -1)
                 {
                     var question = step.Thought?.Split("\n", StringSplitOptions.RemoveEmptyEntries)[0]?.Replace(QuestionTag, "").Replace("-", "").Trim();
                     var thought = step.Thought?.Split("\n", StringSplitOptions.RemoveEmptyEntries)[1]?.Replace("-", "").Trim();
 
-                    OnStepExecute?.Invoke(StepTrace.Thought(question, thought, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
+                    if (!string.IsNullOrEmpty(thought))
+                        OnStepExecute?.Invoke(StepTrace.Thought(question, thought, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
                 }
                 else
                 {
                     var trimedThought = step.Thought?.Replace("-", "").Trim();
-                    OnStepExecute?.Invoke(StepTrace.Thought("", trimedThought, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
+                    if (!string.IsNullOrEmpty(trimedThought))
+                        OnStepExecute?.Invoke(StepTrace.Thought("", trimedThought, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
                 }
 
                 stepsTaken.Add(step);
@@ -478,7 +482,7 @@ namespace PostgreSQL.Embedding.Planners
                 if (actionVariables.ContainsKey(parameter.Name) && actionVariables[parameter.Name] is JsonElement)
                     actionVariables[parameter.Name] = GetValue((JsonElement)actionVariables[parameter.Name], parameter.ParameterType);
             }
-            
+
             return actionVariables;
         }
     }

@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Models;
+using PostgreSQL.Embedding.Common.Models.KernelMemory;
 using PostgreSQL.Embedding.Common.Models.WebApi;
 using PostgreSQL.Embedding.Common.Models.WebApi.QuerableFilters;
 using PostgreSQL.Embedding.DataAccess;
@@ -128,9 +129,11 @@ namespace PostgreSQL.Embedding.Controllers
         }
 
         [HttpGet("{knowledgeBaseId}/chunks/{fileId}/{partId}")]
-        public async Task<JsonResult> GetKnowledgeBaseChunk(long knowledgeBaseId, string fileId, string partId)
+        public async Task<JsonResult> GetKnowledgeBaseChunk(long knowledgeBaseId, string fileId, string partId, [FromQuery] float? relevance)
         {
             var chunk = await _knowledgeBaseService.GetKnowledgeBaseChunk(knowledgeBaseId, fileId, partId);
+            if (relevance.HasValue) chunk.SetRelevance(relevance.Value);
+
             return ApiResult.Success(chunk);
         }
 
