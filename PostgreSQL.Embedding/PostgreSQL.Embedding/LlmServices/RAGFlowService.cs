@@ -1,16 +1,24 @@
-﻿using Google.Protobuf.WellKnownTypes;
+﻿using DocumentFormat.OpenXml.Math;
+using DocumentFormat.OpenXml.Office.SpreadSheetML.Y2023.MsForms;
+using Google.Protobuf.WellKnownTypes;
 using LLama.Batched;
+using MailKit.Search;
+using Microsoft.KernelMemory.DataFormats;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.Common.Models.KernelMemory;
+using PostgreSQL.Embedding.Common.Models.Planners;
 using PostgreSQL.Embedding.Common.Models.RAG;
+using PostgreSQL.Embedding.Common.Models.Search;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.LLmServices.Extensions;
+using PostgreSQL.Embedding.Planners;
+using PostgreSQL.Embedding.Plugins;
 using SqlSugar;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -31,6 +39,7 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly ILogger<RAGFlowService> _logger;
         private readonly CallablePromptTemplate _promptTemplate;
         private Regex _regexCitations = new Regex(@"\^(\d+)");
+        private SSEEmitter _sseEmitter;
         public RAGFlowService(Kernel kernel,
             IServiceProvider serviceProvider,
             IMemoryService memoryService,
@@ -47,6 +56,8 @@ namespace PostgreSQL.Embedding.LlmServices
             _promptTemplateService = serviceProvider.GetService<PromptTemplateService>();
             _promptTemplate = _promptTemplateService.LoadTemplate("RAGPrompt.txt");
             _logger = _serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<RAGFlowService>();
+            var httpContext = _serviceProvider.GetRequiredService<IHttpContextAccessor>()?.HttpContext;
+            _sseEmitter = new SSEEmitter(httpContext);
         }
 
         /// <summary>
@@ -99,7 +110,7 @@ namespace PostgreSQL.Embedding.LlmServices
         }
 
         /// <summary>
-        /// 
+        /// 生成答案（适用于非应用场景下）
         /// </summary>
         /// <param name="input"></param>
         /// <param name="citations"></param>
@@ -139,10 +150,13 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <param name="appId"></param>
         /// <param name="question"></param>
         /// <returns></returns>
-        public async Task<List<LlmCitationModel>> GenerateCitationsAsync(long appId, string question)
+        public async Task<List<LlmCitationModel>> GenerateCitationsAsync(long appId, string question, bool enableWebSearch = false)
         {
             var app = await _llmAppRepository.GetAsync(appId);
             if (app == null) return [];
+
+
+            var llmCitations = new List<LlmCitationModel>();
 
 
             var llmKappKnowledges = await _llmAppKnowledgeRepository.FindListAsync(x => x.AppId == app.Id);
@@ -151,55 +165,26 @@ namespace PostgreSQL.Embedding.LlmServices
             var searchResults = new List<KMCitation>();
             var inputs = new List<string> { question };
 
-            // 查询重写
             if (app.EnableRewrite)
             {
-                var similarQuestions = await RewriteQueryAsync(question, _kernel);
-                _logger.LogInformation($"查询重写，共生成 {similarQuestions.Count} 个相似问题：{JsonConvert.SerializeObject(similarQuestions)}.");
-                //await EmitTracesAsync($"查询重写，共生成 {similarQuestions.Count} 个相似问题", cancellationToken);
+                var similarQuestions = await RewriteQueryAsync(question, app.RewriteQueryCount, _kernel);
 
-                //similarQuestions.ForEach(async similarQuestion => await EmitTracesAsync(similarQuestion, cancellationToken));
+                await EmitTracesAsync(StepTrace.Thought(question, $" 开始重写查询，共生成 {similarQuestions.Count} 个相似问题：{JsonConvert.SerializeObject(similarQuestions)}。", "", -1));
+                _logger.LogInformation($" 开始重写查询，共生成 {similarQuestions.Count} 个相似问题：{JsonConvert.SerializeObject(similarQuestions)}。");
+
                 if (similarQuestions.Any()) { inputs.AddRange(similarQuestions); }
             }
 
-            foreach (var appKnowledge in llmKappKnowledges)
-            {
-                var knowledgeBase = await _knowledgeBaseRepository.GetAsync(appKnowledge.KnowledgeBaseId);
-                if (knowledgeBase == null) continue;
+            var docCitations = await GenerateCitationsByDocuments(app, question, inputs, 10);
+            llmCitations.AddRange(docCitations);
 
-                foreach (var input in inputs)
-                {
-                    var retrieveResult = await RetrieveDocumentsAsync(knowledgeBase, input);
-                    if (retrieveResult != null && retrieveResult.Any()) searchResults.AddRange(retrieveResult);
-                }
+            if (enableWebSearch)
+            {
+                var webCitations = await GenerateCitationsByWebSearch(app, question, inputs, 10);
+                llmCitations.AddRange(webCitations);
             }
 
-            var partitions = searchResults.SelectMany(x => x.Partitions).ToList();
-
-            // 结果重排
-            if (app.EnableRerank) partitions = RerankDocuments(question, partitions);
-
-            // 构建上下文
-            var chunks = partitions.Select((x, i) => LlmCitationModel.FromKnowledgeBase(i + 1, x))
-            .OrderByDescending(x => x.Relevance)
-            .Take(10)
-            .ToList();
-
-            if (chunks.Any())
-            {
-                var maxRelevance = chunks.Max(x => x.Relevance);
-                var minRelevance = chunks.Min(x => x.Relevance);
-
-                //_logger.LogInformation($"共检索到 {chunks.Count} 个文档块，相似度区间为 {minRelevance} ~ {maxRelevance}");
-                //await EmitTracesAsync($"共检索到 {chunks.Count} 个文档块，相似度区间为 {minRelevance} ~ {maxRelevance}", cancellationToken);
-            }
-            else
-            {
-                _logger.LogInformation($"未检索到符合条件的文档块");
-                //await EmitTracesAsync($"未检索到符合条件的文档块", cancellationToken);
-            }
-
-            return chunks;
+            return llmCitations;
         }
 
         /// <summary>
@@ -208,33 +193,27 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <param name="knowledgeBase"></param>
         /// <param name="question"></param>
         /// <returns></returns>
-        private async Task<List<KMCitation>> RetrieveDocumentsAsync(KnowledgeBase knowledgeBase, string question)
+        private async Task<List<KMCitation>> RetrieveDocumentsAsync(KnowledgeBase knowledgeBase, string question, int limit, double minRelevance)
         {
-            var limit = knowledgeBase.RetrievalLimit.HasValue ?
-                knowledgeBase.RetrievalLimit.Value : PostgreSQL.Embedding.Common.Constants.DefaultRetrievalLimit;
-
-            var minRelevance = knowledgeBase.RetrievalRelevance.HasValue
-                ? knowledgeBase.RetrievalRelevance.Value / 100 : PostgreSQL.Embedding.Common.Constants.DefaultRetrievalRelevance;
-
             using var serviceScope = _serviceProvider.CreateScope();
             var knowledgeBaseService = _memoryService.AsKnowledgeBaseService(serviceScope.ServiceProvider);
             if (knowledgeBase.RetrievalType == (int)RetrievalType.Vectors)
             {
                 // 向量检索
-                var searchResult = await knowledgeBaseService.SearchAsync(knowledgeBase.Id, question, RetrievalType.Vectors, (double)minRelevance, limit);
+                var searchResult = await knowledgeBaseService.SearchAsync(knowledgeBase.Id, question, RetrievalType.Vectors, minRelevance, limit);
                 return searchResult.RelevantSources;
 
             }
             else if (knowledgeBase.RetrievalType == (int)RetrievalType.FullText)
             {
                 // 全文检索
-                var searchResult = await knowledgeBaseService.SearchAsync(knowledgeBase.Id, question, RetrievalType.FullText, (double)minRelevance, limit);
+                var searchResult = await knowledgeBaseService.SearchAsync(knowledgeBase.Id, question, RetrievalType.FullText, minRelevance, limit);
                 return searchResult.RelevantSources;
             }
             else
             {
                 // 混合检索
-                var searchResult = await knowledgeBaseService.SearchAsync(knowledgeBase.Id, question, RetrievalType.Mixed, (double)minRelevance, limit);
+                var searchResult = await knowledgeBaseService.SearchAsync(knowledgeBase.Id, question, RetrievalType.Mixed, minRelevance, limit);
                 return searchResult.RelevantSources;
             }
         }
@@ -245,7 +224,7 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <param name="question"></param>
         /// <param name="kernel"></param>
         /// <returns></returns>
-        private async Task<List<string>> RewriteQueryAsync(string question, Kernel kernel)
+        public async Task<List<string>> RewriteQueryAsync(string question, int limit, Kernel kernel)
         {
 
             try
@@ -254,6 +233,7 @@ namespace PostgreSQL.Embedding.LlmServices
                 var executionSettings = new OpenAIPromptExecutionSettings() { Temperature = 0f };
 
                 rewritePromptTemplate.AddVariable("question", question);
+                rewritePromptTemplate.AddVariable("limit", limit);
                 var invokeResult = await rewritePromptTemplate.InvokeAsync(kernel, executionSettings);
 
                 var payload = invokeResult.GetValue<string>();
@@ -277,10 +257,10 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <param name="question"></param>
         /// <param name="partitions"></param>
         /// <returns></returns>
-        private List<KMPartition> RerankDocuments(string question, List<KMPartition> partitions)
+        public List<KMPartition> RerankDocuments(string question, List<KMPartition> partitions, RerankerType rerankerType = RerankerType.BM25)
         {
             using var serviceScope = _serviceProvider.CreateScope();
-            var rerankService = serviceScope.ServiceProvider.GetRequiredService<IRerankService>();
+            var rerankService = serviceScope.ServiceProvider.GetKeyedService<IRerankService>(rerankerType.ToString());
             if (!partitions.Any()) return partitions;
 
             try
@@ -303,7 +283,134 @@ namespace PostgreSQL.Embedding.LlmServices
         }
 
         /// <summary>
-        /// 引用重排
+        /// 网页重排
+        /// </summary>
+        /// <param name="question"></param>
+        /// <param name="entries"></param>
+        /// <param name="rerankerType"></param>
+        /// <returns></returns>
+        private List<Entry> RerankEntries(string question, List<Entry> entries, RerankerType rerankerType = RerankerType.BM25)
+        {
+            using var serviceScope = _serviceProvider.CreateScope();
+            var rerankService = serviceScope.ServiceProvider.GetKeyedService<IRerankService>(rerankerType.ToString());
+            if (!entries.Any()) return entries;
+
+            try
+            {
+                var rerankResult = rerankService.Sort(question, entries, x => $"{x.Title} {x.Snippet}").ToList();
+                foreach (var item in rerankResult)
+                {
+                    var score = item.Score;
+                    item.Document.Relevance = (float)score;
+                }
+
+                return rerankResult.Select(x => x.Document).ToList();
+            }
+            catch (Exception ex)
+            {
+                // Todo
+                _logger.LogError(ex, "");
+                return entries;
+            }
+        }
+
+        /// <summary>
+        /// 从文档中生成引用信息
+        /// </summary>
+        /// <param name="app"></param>
+        /// <param name="question"></param>
+        /// <param name="inputs"></param>
+        /// <param name="topN"></param>
+        /// <returns></returns>
+        private async Task<List<LlmCitationModel>> GenerateCitationsByDocuments(LlmApp app, string question, List<string> inputs, int topN = 10)
+        {
+            var searchResults = new List<KMCitation>();
+
+            var llmKappKnowledges = await _llmAppKnowledgeRepository.FindListAsync(x => x.AppId == app.Id);
+            if (!llmKappKnowledges.Any()) return [];
+
+            foreach (var appKnowledge in llmKappKnowledges)
+            {
+                var knowledgeBase = await _knowledgeBaseRepository.GetAsync(appKnowledge.KnowledgeBaseId);
+                if (knowledgeBase == null) continue;
+
+                var limit = knowledgeBase.RetrievalLimit.HasValue ?
+                    knowledgeBase.RetrievalLimit.Value : PostgreSQL.Embedding.Common.Constants.DefaultRetrievalLimit;
+
+                var minRelevance = knowledgeBase.RetrievalRelevance.HasValue ?
+                    knowledgeBase.RetrievalRelevance.Value / 100 : PostgreSQL.Embedding.Common.Constants.DefaultRetrievalRelevance;
+
+                foreach (var input in inputs)
+                {
+                    var retrieveResult = await RetrieveDocumentsAsync(knowledgeBase, input, limit, (double)minRelevance);
+                    if (!retrieveResult.Any()) continue;
+
+                    searchResults.AddRange(retrieveResult);
+                }
+            }
+
+            var partitions = searchResults.SelectMany(x => x.Partitions).ToList();
+            partitions = partitions.DistinctBy(x => new { x.KnowledgeBaseId, x.FileId, x.PartId }).ToList();
+
+            if (app.EnableRerank) partitions = RerankDocuments(question, partitions, (RerankerType)app.RerankerType);
+
+            var citations = partitions.Select((x, i) => LlmCitationModel.FromKnowledgeBase(i + 1, x))
+                .OrderByDescending(x => x.Relevance)
+                .Take(topN)
+                .ToList();
+
+            if (citations.Any())
+            {
+                await EmitTracesAsync(StepTrace.Thought(question, $"共检索到 {partitions.Count} 个文档块，即将生成答案。", "", -1));
+                _logger.LogInformation($"已检索到 {partitions.Count} 个文档块，即将生成答案。");
+            }
+
+            return citations;
+        }
+
+        /// <summary>
+        /// 从网络搜索中生成引用信息
+        /// </summary>
+        /// <param name="app"></param>
+        /// <param name="question"></param>
+        /// <param name="inputs"></param>
+        /// <param name="topN"></param>
+        /// <returns></returns>
+        private async Task<List<LlmCitationModel>> GenerateCitationsByWebSearch(LlmApp app, string question, List<string> inputs, int topN = 10)
+        {
+            var webSearchPlugin = _serviceProvider.GetRequiredService<WebSearchPlugin>();
+            var webSearchResults = new List<SearchResult>();
+
+            foreach (var input in inputs)
+            {
+                var searchResult = await webSearchPlugin.SearchAsync(input);
+                if (!searchResult.Entries.Any()) continue;
+
+                webSearchResults.Add(searchResult);
+            }
+
+            var searchEntries = webSearchResults.SelectMany(x => x.Entries).ToList();
+            if (app.EnableRerank) searchEntries = RerankEntries(question, searchEntries, (RerankerType)app.RerankerType);
+
+            var citatios = searchEntries
+                .DistinctBy(x => x.Url)
+                .OrderByDescending(x => x.Relevance)
+                .Take(topN)
+                .Select((x, i) => LlmCitationModel.FromSearchEngine(i + 1, x))
+                .ToList();
+
+            if (citatios.Any())
+            {
+                await EmitTracesAsync(StepTrace.Thought(question, $"已阅读 {searchEntries.Count} 个网页，即将生成答案。", "", -1));
+                _logger.LogInformation($"已阅读 {searchEntries.Count} 个网页，即将生成答案。");
+            }
+
+            return citatios;
+        }
+
+
+        /// <summary>
+        /// 重新为引用项编号
         /// </summary>
         /// <param name="text"></param>
         /// <returns></returns>
@@ -322,9 +429,7 @@ namespace PostgreSQL.Embedding.LlmServices
                 usedReferences.Add(referenceNumber);
 
                 if (!referenceOrder.Contains(referenceNumber))
-                {
                     referenceOrder.Add(referenceNumber);
-                }
             }
 
             var referenceMapping = new Dictionary<int, int>();
@@ -342,6 +447,11 @@ namespace PostgreSQL.Embedding.LlmServices
                 return $"<sup>[{newNumber}]</sup>";
             });
 
+            result = result.Replace("^", "")
+                .Replace("（<sup>", "<sup>")
+                .Replace("(<sup>", "<sup>")
+                .Replace("</sup>）", "</sup>")
+                .Replace("</sup>)", "</sup>");
 
             var stringBuilder = new StringBuilder();
             stringBuilder.AppendLine(result);
@@ -349,6 +459,13 @@ namespace PostgreSQL.Embedding.LlmServices
             stringBuilder.AppendLine(string.Join("\r\n", markdownCitations));
 
             return stringBuilder.ToString();
+        }
+
+        private async Task EmitTracesAsync(StepTrace stepTrace, CancellationToken cancellationToken = default)
+        {
+            var result = new OpenAIStreamResult() { id = Guid.NewGuid().ToString("N"), obj = "chat.traces" };
+            result.choices.Add(new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant", content = JsonConvert.SerializeObject(stepTrace) } });
+            await _sseEmitter.EmitAsync(result, cancellationToken);
         }
     }
 }

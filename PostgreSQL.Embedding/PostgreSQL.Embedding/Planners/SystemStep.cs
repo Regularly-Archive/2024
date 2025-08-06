@@ -64,6 +64,11 @@ namespace PostgreSQL.Embedding.Planners
 
             ExtractAction(input, result);
 
+            if (!string.IsNullOrEmpty(result.Action) || !string.IsNullOrEmpty(result.Observation) || !string.IsNullOrEmpty(result.FinalAnswer))
+            {
+                result.Thought = null;
+            }
+
             return result;
         }
 

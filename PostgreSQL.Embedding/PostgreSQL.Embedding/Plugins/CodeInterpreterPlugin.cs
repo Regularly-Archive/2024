@@ -29,7 +29,7 @@ public class CodeInterpreterPlugin : BasePlugin
 
     [KernelFunction]
     [Description("运行 Python 代码并输出结果")]
-    public async Task<string> RunPythonCode(
+    public async Task<string> RunPython(
         [Description("脚本内容")] string code, 
         [Description("一个或多个依赖项, 使用英文逗号隔开，例如：pandas,numpy")] string dependencies = ""
     )
@@ -41,7 +41,7 @@ public class CodeInterpreterPlugin : BasePlugin
 
     [KernelFunction()]
     [Description("运行 JavaScript 代码并输出结果")]
-    public async Task<string> RunJavaScriptCode(
+    public async Task<string> RunJavaScript(
         [Description("脚本内容")] string code, 
         [Description("一个或多个依赖项, 使用英文逗号隔开，例如：axios,lodash")] string dependencies = ""
     )
@@ -52,13 +52,24 @@ public class CodeInterpreterPlugin : BasePlugin
     }
 
     [KernelFunction()]
-    [Description("运行 C# 代码并输出结果, 你可以使用 csharp 和 csharp-mono 两种后端，对于前者，请使用顶级语句；对于后者，请使用常规语法")]
+    [Description("运行 C# 代码并输出结果, 你可以使用 csharp、csharp-mono、csharp-sfa 三种后端，对于前者，请使用顶级语句；对于后者，请使用常规语法")]
     public async Task<string> RunCSharp(
         [Description("脚本内容")] string code, 
         [Description("一个或多个依赖项, 使用英文逗号隔开，例如：Newtonsoft.Json")] string dependencies = "", 
         [Description("语言，可选值为：csharp、csharp-mono、csharp-sfa")] string language = "csharp-sfa")
     {
         var response = await RunCodeAsync("csharp", code, dependencies.Split(',', StringSplitOptions.TrimEntries));
+        await SendArtifacts(code, response.Output, response.Language, response.ContentType);
+        return response.Output;
+    }
+
+    [KernelFunction()]
+    [Description("运行 Java 代码并输出结果")]
+    public async Task<string> RunJava(
+    [Description("脚本内容")] string code,
+    [Description("一个或多个依赖项, 使用英文逗号隔开，例如：Newtonsoft.Json")] string dependencies = "")
+    {
+        var response = await RunCodeAsync("java", code, dependencies.Split(',', StringSplitOptions.TrimEntries));
         await SendArtifacts(code, response.Output, response.Language, response.ContentType);
         return response.Output;
     }

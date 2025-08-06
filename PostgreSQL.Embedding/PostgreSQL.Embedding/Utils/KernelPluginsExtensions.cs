@@ -172,7 +172,7 @@ namespace PostgreSQL.Embedding.Utils
             var cacheableMcpClientFactory = serviceProvider.GetService<CacheableMcpClientFactory>();
             var mcpServerRepository = serviceProvider.GetService<IRepository<MCPServer>>();
             var mcpServers = appId.HasValue
-                ? await mcpServerRepository.FindListAsync(x => x.AppId == appId.Value)
+                ? await mcpServerRepository.FindListAsync(x => x.AppId == appId.Value && x.Enabled == true)
                 : await mcpServerRepository.GetAllAsync();
 
             foreach (var mcpServer in mcpServers)

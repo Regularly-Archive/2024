@@ -99,7 +99,7 @@ export default {
                 { value: 'java', label: 'Java', code: 'public class code {\n    public static void main(String[] args) {\n        System.out.println("Hello, World!");\n    }\n}' },
                 { value: 'go', label: 'Go', code: 'package main\nimport "fmt"\nfunc main() {\n    fmt.Println("Hello, World!")\n}' },
                 { value: 'csharp', label: 'C#/.NET', code: 'Console.WriteLine("Hello, World!");' },
-                { value: 'csharp-sfa', label: 'C#/.NET 单文件', code: 'Console.WriteLine("Hello, World!");' },
+                { value: 'csharp-sfa', label: 'C#/.NET 单文件', code: '#!/usr/bin/dotnet run\nConsole.WriteLine("Hello from a C# script!");' },
                 { value: 'csharp-mono', label: 'C#/Mono', code: 'using System;\n\nnamespace HelloWorld\n{\n    class Program\n    {\n        static void Main(string[] args)\n        {\n            Console.WriteLine("Hello, World!");\n        }\n    }\n}' },
                 { value: 'javascript', label: 'JavaScript', code: 'console.log("Hello, World!");' },
                 { value: 'typescript', label: 'TypeScript', code: 'console.log("Hello, World!");' },

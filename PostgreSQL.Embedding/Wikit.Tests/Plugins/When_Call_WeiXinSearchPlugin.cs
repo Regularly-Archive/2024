@@ -4,12 +4,12 @@ using Shouldly;
 
 namespace Wikit.Tests.Plugins
 {
-    public class When_Call_BraveSearchPlugin
+    public class When_Call_WeiXinSearchPlugin
     {
-        private BraveSearchPlugin _braveSearchPlugin;
+        private WeiXinSearchPlugin _weixinSearchPlugin;
         private IHttpClientFactory _httpClientFactory;
 
-        public When_Call_BraveSearchPlugin()
+        public When_Call_WeiXinSearchPlugin()
         {
             var serviceProvider = new ServiceCollection()
                 .AddHttpClient()
@@ -17,16 +17,16 @@ namespace Wikit.Tests.Plugins
                 .BuildServiceProvider();
 
             _httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
-            _braveSearchPlugin = new BraveSearchPlugin(serviceProvider, _httpClientFactory);
+            _weixinSearchPlugin = new WeiXinSearchPlugin(serviceProvider, _httpClientFactory);
         }
 
 
         [Fact]
         public async Task It_Should_Search_By_Keywords_Successfully()
         {
-            var searchResult = await _braveSearchPlugin.SearchAsync("blog.yuanpei.me", 15);
+            var searchResult = await _weixinSearchPlugin.SearchAsync("张鲁一", 15);
             this.ShouldSatisfyAllConditions(
-                () => searchResult.Entries.ShouldNotBeEmpty()
+                () => searchResult.Entries.Count.ShouldBeGreaterThan(15)
             );
         }
     }

@@ -1,28 +1,26 @@
 ﻿using PostgreSQL.Embedding.Common;
-using PostgreSQL.Embedding.Common.Models.KernelMemory;
 using PostgreSQL.Embedding.Common.Models.RAG;
-using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.Plugins;
 
-namespace PostgreSQL.Embedding.LlmServices
-{
-    public class WebSearchRetrievalService
+namespace PostgreSQL.Embedding.LlmServices;
+
+public class WebSearchRetrievalService 
+{ 
+    public RetrievalType RetrievalType => RetrievalType.WebSearch;
+    public string SearchEngine { get; set; } = "Bing";
+
+    private WebSearchPlugin _webSearchPlugin;
+    public WebSearchRetrievalService(IServiceProvider serviceProvider, IHttpClientFactory httpClientFactory)
     {
-        public RetrievalType RetrievalType => RetrievalType.WebSearch;
+        _webSearchPlugin = new WebSearchPlugin(serviceProvider, httpClientFactory);
+    }
 
-        private BingSearchPlugin _bingSearchPlugin;
-        public WebSearchRetrievalService(IServiceProvider serviceProvider, IHttpClientFactory httpClientFactory)
-        {
-            _bingSearchPlugin = new BingSearchPlugin(serviceProvider, httpClientFactory);
-        }
+    public async Task<List<LlmCitationModel>> SearchAsync(long knowledgeBaseId, string question, double minRelevance, int limit)
+    {
+        var searchResult = await _webSearchPlugin.SearchAsync(question, SearchEngine, showSearchResult: true);
 
-        public async Task<List<LlmCitationModel>> SearchAsync(string question, int limit = 5)
-        {
-            var searchResult = await _bingSearchPlugin.SearchAsync(question, limit);
-
-            return searchResult.Entries.Select((x, i) => 
-                LlmCitationModel.FromSearchEngine(i + 1, x.Url, x.Title, x.Snippet)
-            ).ToList();
-        }
+        return searchResult.Entries.Select((x, i) =>
+            LlmCitationModel.FromSearchEngine(i + 1, x)
+        ).ToList();
     }
 }

@@ -24,7 +24,7 @@ namespace PostgreSQL.Embedding.Planners
             _promptTemplate = _promptTemplateService.LoadTemplate("TaskPlanner.txt");
         }
 
-        public async Task<List<SubTask>> GetSubTasksAsync(string query, string history = null, int limit = 5)
+        public async Task<PlanResult> GetSubTasksAsync(string query, string history = null, int limit = 5)
         {
             _promptTemplate.AddVariable("input", query);
             _promptTemplate.AddVariable("language", "chinese");
@@ -45,16 +45,16 @@ namespace PostgreSQL.Embedding.Planners
                 functionResult = functionResult.Replace("```json", "").Replace("```", "");
                 functionResult = PreprocessJsonData(functionResult);
                 var planResult = JsonConvert.DeserializeObject<PlanResult>(functionResult);
-                return planResult.Tasks;
+                return planResult;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Unable to create tasks for query '{query}'");
-                return [];
+                return new PlanResult() {  };
             }
         }
 
-        public async Task<List<SubTask>> GetRAGTasks(string query, string history = null)
+        public async Task<PlanResult> GetRAGTasks(string query, string history = null)
         {
             _promptTemplate.AddVariable("input", query);
             _promptTemplate.AddVariable("language", "chinese");
@@ -75,12 +75,12 @@ namespace PostgreSQL.Embedding.Planners
                 functionResult = functionResult.Replace("```json", "").Replace("```", "");
                 functionResult = PreprocessJsonData(functionResult);
                 var planResult = JsonConvert.DeserializeObject<PlanResult>(functionResult);
-                return planResult.Tasks;
+                return planResult;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Unable to create tasks for query '{query}'");
-                return [];
+                return new PlanResult() { }; 
             }
         }
 

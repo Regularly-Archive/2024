@@ -1,6 +1,5 @@
 ﻿using AngleSharp;
 using Microsoft.SemanticKernel;
-using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Models.Search;
 using PostgreSQL.Embedding.Plugins.Abstration;
@@ -9,18 +8,18 @@ using System.Net;
 
 namespace PostgreSQL.Embedding.Plugins
 {
-    [KernelPlugin(Description = "Brave 搜索插件")]
-    public class BraveSearchPlugin : BasePlugin, ISearchEngine
+    [KernelPlugin(Description = "微信搜索插件")]
+    public class WeiXinSearchPlugin : BasePlugin, ISearchEngine
     {
-        private const string SELECTOR_RESULTS = "#results";
-        private const string SELECTOR_RESULTS_ITEM = ".snippet";
-        private const string SELECTOR_RESULTS_ITEM_DESCRIPTION = ".snippet-description";
-        private const string SELECTOR_RESULTS_ITEM_Title = ".title";
+        private const string SELECTOR_RESULTS = ".news-list";
+        private const string SELECTOR_RESULTS_ITEM = "li";
+        private const string SELECTOR_RESULTS_ITEM_DESCRIPTION = "p";
+        private const string SELECTOR_RESULTS_ITEM_Title = "h3";
 
         private readonly IServiceProvider _serviceProvider;
         private readonly IHttpClientFactory _httpClientFactory;
 
-        public BraveSearchPlugin(IServiceProvider serviceProvider, IHttpClientFactory httpClientFactory)
+        public WeiXinSearchPlugin(IServiceProvider serviceProvider, IHttpClientFactory httpClientFactory)
             : base(serviceProvider)
         {
             _serviceProvider = serviceProvider;
@@ -33,9 +32,9 @@ namespace PostgreSQL.Embedding.Plugins
         {
             using var httpClient = _httpClientFactory.CreateClient();
             httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0");
-            httpClient.DefaultRequestHeaders.Referrer = new Uri("https://search.brave.com");
+            httpClient.DefaultRequestHeaders.Referrer = new Uri("https://weixin.sogou.com");
 
-            var searchResult = await GetAsync(httpClient, query, $"https://search.brave.com/search?q={WebUtility.UrlEncode(query)}&source=web");
+            var searchResult = await GetAsync(httpClient, query, $"https://weixin.sogou.com/weixin?ie=utf8&s_from=input&_sug_=y&_sug_type_=&type=2&query={WebUtility.UrlEncode(query)}");
             while (searchResult.HasNextPage && searchResult.Entries.Count < limit)
             {
                 var newSearchResult = await GetAsync(httpClient, query, searchResult.NextPage);
@@ -46,7 +45,8 @@ namespace PostgreSQL.Embedding.Plugins
                     searchResult.HasNextPage = newSearchResult.HasNextPage;
                 }
             }
-
+            
+            // Todo: 需要对 URL 进行解码
             return searchResult;
         }
 
@@ -82,29 +82,28 @@ namespace PostgreSQL.Embedding.Plugins
             var eleItems = eleMain.QuerySelectorAll(SELECTOR_RESULTS_ITEM);
             if (eleItems == null || !eleItems.Any()) return seachResult;
 
-            var elePag = eleMain.QuerySelector("#pagination");
+            var elePag = document.QuerySelector("#pagebar_container");
             if (elePag != null)
             {
-                var nextPage = elePag.QuerySelector("a");
+                var nextPage = elePag.QuerySelector("#sogou_next");
                 if (nextPage != null)
                 {
                     seachResult.HasNextPage = true;
-                    seachResult.NextPage = "https://search.brave.com" + nextPage.Attributes["href"].Value;
+                    seachResult.NextPage = "https://weixin.sogou.com/weixin" + nextPage.Attributes["href"].Value;
                 }
             }
 
             seachResult.Entries = eleItems.Select(x =>
             {
-                if (x.Id == "pagination-snippet") return null;
-
+                var eleTextBox = x.QuerySelector(".txt-box");
                 return new Entry()
                 {
-                    Title = x.QuerySelector("a")?.QuerySelector(SELECTOR_RESULTS_ITEM_Title)?.TextContent,
-                    Url = x.QuerySelector("a")?.Attributes["href"]?.Value,
-                    Snippet = x.QuerySelector(SELECTOR_RESULTS_ITEM_DESCRIPTION)?.TextContent
+                    Title = eleTextBox?.QuerySelector(SELECTOR_RESULTS_ITEM_Title)?.TextContent,
+                    Url = eleTextBox?.QuerySelector(SELECTOR_RESULTS_ITEM_Title).QuerySelector("a")?.Attributes["href"]?.Value,
+                    Snippet = eleTextBox.QuerySelector(SELECTOR_RESULTS_ITEM_DESCRIPTION)?.TextContent
                 };
             })
-            .Where(x => x != null && !string.IsNullOrEmpty(x.Title ) && !string.IsNullOrEmpty(x.Snippet))
+            .Where(x => x != null && !string.IsNullOrEmpty(x.Title) && !string.IsNullOrEmpty(x.Snippet))
             .ToList();
 
             return seachResult;

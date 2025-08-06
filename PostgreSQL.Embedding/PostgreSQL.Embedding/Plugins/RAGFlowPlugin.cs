@@ -1,8 +1,5 @@
-﻿using DocumentFormat.OpenXml.Office.SpreadSheetML.Y2023.MsForms;
-using Microsoft.KernelMemory;
-using Microsoft.SemanticKernel;
+﻿using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
-using PostgreSQL.Embedding.Common.Models.RAG;
 using PostgreSQL.Embedding.LlmServices;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.Plugins.Abstration;
@@ -20,15 +17,20 @@ namespace PostgreSQL.Embedding.Plugins
         }
 
         [KernelFunction]
-        [Description("从知识库中检索信息并生成答案")]
-        private async Task<string> RetrieveAndGenerateAnswerAsync([Description("应用ID")] long appId, [Description("会话ID")] string conversationId, [Description("用户输入")] string question, Kernel kernel)
+        [Description("检索信息并生成答案")]
+        private async Task<string> RetrieveAndGenerateAnswerAsync(
+            [Description("应用ID")] long appId, 
+            [Description("会话ID")] string conversationId, 
+            [Description("用户输入")] string question,
+            [Description("允许联网搜索")] bool enableWebSearch,
+            Kernel kernel
+        )
         {
             var memoryService = _serviceProvider.GetService<IMemoryService>();
             var chatHistoryService = _serviceProvider.GetService<IChatHistoriesService>();
 
-
             var ragFlowService = new RAGFlowService(kernel, _serviceProvider, memoryService, chatHistoryService);
-            var citations = await ragFlowService.GenerateCitationsAsync(appId, question);
+            var citations = await ragFlowService.GenerateCitationsAsync(appId, question, enableWebSearch);
             var answer = await ragFlowService.GenerateAnswerAsync(appId, conversationId, question, citations);
             return answer;
         }

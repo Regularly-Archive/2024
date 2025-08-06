@@ -35,7 +35,10 @@ namespace PostgreSQL.Embedding.Common.Models.Planners
     public class PlanResult
     {
         [JsonProperty("tasks")]
-        public List<SubTask> Tasks { get; set; }
+        public List<SubTask> Tasks { get; set; } = [];
+
+        [JsonProperty("thought")]
+        public string Thought {  get; set; }
     }
 
     public enum TaskStatus

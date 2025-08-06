@@ -31,5 +31,8 @@ namespace PostgreSQL.Embedding.DataAccess.Entities
 
         [SugarColumn(ColumnName = "app_id")]
         public long AppId { get; set; }
+
+        [SugarColumn(ColumnName = "anabled", DefaultValue = "TRUE")]
+        public bool Enabled { get; set; }
     }
 }

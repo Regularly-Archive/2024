@@ -8,7 +8,7 @@ namespace PostgreSQL.Embedding.Planners
 
         public int MaxIterations { get; set; } = 15;
 
-        public int MinIterationTimeMs { get; set; } = 2000;
+        public TimeSpan MinIterationTimeSpan { get; set; } = TimeSpan.FromSeconds(5);
 
         public List<string> ExcludedPlugins { get; set; } = new List<string>() { 
             nameof(BingSearchPlugin), 

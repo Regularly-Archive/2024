@@ -1,5 +1,6 @@
 ﻿using DocumentFormat.OpenXml.Math;
 using Microsoft.KernelMemory;
+using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Newtonsoft.Json;
 using Npgsql;
@@ -10,8 +11,10 @@ using PostgreSQL.Embedding.Common.Models.WebApi;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
+using PostgreSQL.Embedding.LLmServices.Extensions;
 using PostgreSQL.Embedding.Utils;
 using SqlSugar;
+using System.Net;
 using DocumentType = PostgreSQL.Embedding.Common.DocumentType;
 
 namespace PostgreSQL.Embedding.LlmServices
@@ -299,41 +302,50 @@ namespace PostgreSQL.Embedding.LlmServices
 
         public async Task<KMAskResult> AskAsync(long knowledgeBaseId, string question, RetrievalType retrievalType = RetrievalType.Mixed, double minRelevance = 0, int limit = 5)
         {
-            if (retrievalType == RetrievalType.Vectors)
-                return await AskByVectorsAsync(knowledgeBaseId, question, minRelevance, limit);
+            var result = new KMAskResult() { Question = question };
 
-            // 这里的职责与 RAGFlowService 重合了，需要重构
-            var llmModelRepository = _serviceProvider.GetService<IRepository<LlmModel>>();
-            var kernelService = _serviceProvider.GetService<IKernelService>();
-            var promptTemplateService = _serviceProvider.GetService<PromptTemplateService>();
+            var kernelService = _serviceProvider.GetRequiredService<IKernelService>();
+            var llmModelsRepository = _serviceProvider.GetRequiredService<IRepository<LlmModel>>();
+            var textModel = await llmModelsRepository.FindAsync(x => x.ModelType == (int)ModelType.TextGeneration && x.IsDefaultModel == true);
+            var kernel = await kernelService.GetKernel(textModel, initializeTools: false);
 
-            var textModel = await llmModelRepository.FindAsync(x => x.ModelType == (int)ModelType.TextGeneration && x.IsDefaultModel == true);
-            var kernel = await kernelService.GetKernel(textModel, null, false);
+            var ragFlowService = new RAGFlowService(
+                kernel, 
+                _serviceProvider, 
+                _serviceProvider.GetRequiredService<IMemoryService>(), 
+                _serviceProvider.GetRequiredService<IChatHistoriesService>()
+            );
 
-            var result = new KMAskResult();
-            result.Question = question;
+            //问题重写
+            var inputs = new List<string> { question };
+            var similarQuestions = await ragFlowService.RewriteQueryAsync(question, 5, kernel);
+            _logger.LogInformation($"查询重写，共生成 {similarQuestions.Count} 个相似问题：{JsonConvert.SerializeObject(similarQuestions)}.");
 
-            var searchResult = await SearchAsync(knowledgeBaseId, question, retrievalType, minRelevance, limit);
-            if (!searchResult.RelevantSources.Any())
+            if (similarQuestions.Any()) { inputs.AddRange(similarQuestions); }
+
+            // 查询知识库
+            using var serviceScope = _serviceProvider.CreateScope();
+            var knowledgeBaseService = _memoryService.AsKnowledgeBaseService(serviceScope.ServiceProvider);
+            foreach (var input  in inputs)
             {
-                result.Answer = "抱歉，我无法回答你的问题";
-                return result;
+                var searchResult = await knowledgeBaseService.SearchAsync(knowledgeBaseId, question, retrievalType, minRelevance, limit);
+                if (!searchResult.RelevantSources.Any()) continue;
+
+                result.RelevantSources.AddRange(searchResult.RelevantSources);
             }
 
-            result.RelevantSources = searchResult.RelevantSources;
-            var context = BuildKnowledgeContext(searchResult, limit);
+            // 生成引用
+            var partitions = result.RelevantSources.SelectMany(x => x.Partitions).ToList();
+            partitions = ragFlowService.RerankDocuments(question, partitions);
+            var citations = partitions.Select((x, i) => LlmCitationModel.FromKnowledgeBase(i + 1, x))
+            .OrderByDescending(x => x.Relevance)
+            .Take(limit)
+            .ToList();
 
-            var promptTemplate = promptTemplateService.LoadTemplate("RAGPrompt.txt");
-            promptTemplate.AddVariable("name", "ChatGPT");
-            promptTemplate.AddVariable("context", context);
-            promptTemplate.AddVariable("question", question);
-            promptTemplate.AddVariable("histories", string.Empty);
-            promptTemplate.AddVariable("empty_answer", Common.Constants.DefaultEmptyAnswer);
+            // 生成答案
+            var answer = await ragFlowService.GenerateAnswerAsync(question, citations);
+            result.Answer = answer;
 
-            var executionSettings = new OpenAIPromptExecutionSettings() { Temperature = 0.75 };
-            var chatResult = await promptTemplate.InvokeAsync<string>(kernel, executionSettings);
-
-            result.Answer = chatResult;
             return result;
         }
 
@@ -375,7 +387,7 @@ namespace PostgreSQL.Embedding.LlmServices
                 FileName = x.FileName,
                 Relevance = x.Relevance,
                 Text = $"[^{i + 1}]: {x.Text}",
-                Url = $"/api/KnowledgeBase/{x.KnowledgeBaseId}/chunks/{x.FileId}/{x.PartId}"
+                Url = $"/api/KnowledgeBase/{x.KnowledgeBaseId}/chunks/{x.FileId}/{x.PartId}?query={WebUtility.UrlEncode(searchResult.Question)}"
             })
             .OrderByDescending(x => x.Relevance)
             .Take(limit)

@@ -78,7 +78,7 @@ namespace Wikit.Tests.Agents
             var subTaks = await _taskPlanner.GetSubTasksAsync(input);
             this.ShouldSatisfyAllConditions(
                 () => subTaks.ShouldNotBeNull(),
-                () => subTaks.ShouldNotBeEmpty()
+                () => subTaks.Tasks.ShouldNotBeEmpty()
             );
         }
 
@@ -88,12 +88,12 @@ namespace Wikit.Tests.Agents
             var input = "搜索西安和洛阳两个城市的信息，并从地理、历史、文化、政治四个维度进行对比";
             var subTasks = await _taskPlanner.GetSubTasksAsync(input);
 
-            foreach (var subTask in subTasks)
+            foreach (var subTask in subTasks.Tasks)
             {
                 var suffix = string.Empty;
                 if (subTask.DependsOn.Any())
                 {
-                    var dependencies = subTasks.Where(x => subTask.DependsOn.Contains(x.Id)).ToList();
+                    var dependencies = subTasks.Tasks.Where(x => subTask.DependsOn.Contains(x.Id)).ToList();
                     suffix = $"{JsonConvert.SerializeObject(dependencies)}";
                 }
 
@@ -131,16 +131,15 @@ namespace Wikit.Tests.Agents
 
             var taskPlanner = new TaskPlanner(_kernel);
             var subTasks = await taskPlanner.GetSubTasksAsync(input, null, 3);
-            var graph = subTasks.ToDictionary(x => x.Id, x => x.DependsOn);
 
             var planner = new StepwisePlanner(_kernel, _promptTemplateService, new StepwisePlannerConfig() { MaxIterations = 10 });
             planner.AddVariable("currentTime", DateTime.Now);
 
-            var graphExecutor = new DAGraphExecutor(input, subTasks, planner, _kernel);
+            var graphExecutor = new DAGraphExecutor(input, subTasks.Tasks, planner, _kernel);
             await graphExecutor.ExecuteAsync();
 
             this.ShouldSatisfyAllConditions(
-                () => subTasks.All(x => x.Status == PostgreSQL.Embedding.Common.Models.Planners.TaskStatus.Completed).ShouldBeTrue()
+                () => subTasks.Tasks.All(x => x.Status == PostgreSQL.Embedding.Common.Models.Planners.TaskStatus.Completed).ShouldBeTrue()
             );
         }
 

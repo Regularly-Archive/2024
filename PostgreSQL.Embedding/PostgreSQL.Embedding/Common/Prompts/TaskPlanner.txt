@@ -24,12 +24,13 @@
 * You can use the `ConversationHistoriesPlugin` to retrieve the context and historical messages of the current conversation.
 * `UseMCPPlugin` allows you to discover MCP Servers, list tools, and invoke them.
 * When using the `UseMCPPlugin` tool, MUST strictly follow the sequence: ListServers, ListTools, and then CallTool.
-* DO NOT Do disperse `ListServers`, `ListTools`, and `CallTool` into different sub-tasks.
+* DO NOT disperse `ListServers`, `ListTools`, and `CallTool` into different sub-tasks.
+* You can put your reasonning process in this `thought` field.
 
 
 # Output Format
 ```json
-{"tasks": [{"id": 0, "name": "Task 1", "desc": "This is task 1", "depends_on": [0], "available_tools": ["WebSearchPlugin.Run"]}, ...]}
+{"tasks": [{"id": 0, "name": "Task 1", "desc": "This is task 1", "depends_on": [0], "available_tools": ["WebSearchPlugin.Run"]}, ...], "thought": ""}
 ```
 
 # Chat History

@@ -4,6 +4,7 @@ using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.Common.Models.Plugin;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
+using PostgreSQL.Embedding.Services;
 using System.Reflection;
 
 namespace PostgreSQL.Embedding.Plugins.Abstration
@@ -82,6 +83,36 @@ namespace PostgreSQL.Embedding.Plugins.Abstration
             var @event = new OpenAIStreamResult() { id = Guid.NewGuid().ToString("N"), obj = "chat.artifacts" };
             @event.choices.Add(new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant", content = JsonConvert.SerializeObject(data) } });
             await _sseEmitter.EmitAsync(@event);
+        }
+
+        protected async Task<LlmArtifactResponseModel> CreateArtifactAsync(string fileName, string artifactContent, Func<string, LlmArtifactResponseModel> artifactFactory)
+        {
+            using var serviceScope = _serviceProvider.CreateScope();
+            var serviceProvider = serviceScope.ServiceProvider;
+
+            var filePath = Path.Combine(Path.GetTempPath(), fileName);
+            await File.WriteAllTextAsync(filePath, artifactContent);
+
+            var fileStorageService = serviceProvider.GetRequiredService<IFileStorageService>();
+            var storageResult = await fileStorageService.PutFileAsync("artifacts", filePath);
+            File.Delete(filePath);
+
+            return artifactFactory(storageResult.FileId);
+        }
+
+        protected async Task<LlmArtifactResponseModel> CreateArtifactsAsync(string fileName, byte[] artifactContent, Func<string, LlmArtifactResponseModel> artifactFactory)
+        {
+            using var serviceScope = _serviceProvider.CreateScope();
+            var serviceProvider = serviceScope.ServiceProvider;
+
+            var filePath = Path.Combine(Path.GetTempPath(), fileName);
+            await File.WriteAllBytesAsync(filePath, artifactContent);
+
+            var fileStorageService = serviceProvider.GetRequiredService<IFileStorageService>();
+            var storageResult = await fileStorageService.PutFileAsync("artifacts", filePath);
+            File.Delete(filePath);
+
+            return artifactFactory(storageResult.FileId);
         }
 
         /// <summary>

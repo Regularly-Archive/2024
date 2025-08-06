@@ -25,15 +25,15 @@ namespace PostgreSQL.Embedding.Utils
 
         public static FunctionResult AsFunctionResult(this string content) => new FunctionResult(null, content);
 
-        private static string[] SplitString(string s, int minLength, int maxLength)
+        public static string[] SplitString(this string s, int minLength, int maxLength)
         {
             var rand = new Random();
 
             if (string.IsNullOrEmpty(s))
                 return new string[] { s };
 
-            List<string> subStrings = new List<string>();
-            int start = 0;
+            var subStrings = new List<string>();
+            var start = 0;
 
             while (start < s.Length)
             {

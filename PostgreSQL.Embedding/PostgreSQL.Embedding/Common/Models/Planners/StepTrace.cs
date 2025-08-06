@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
 using PostgreSQL.Embedding.Planners;
+using PostgreSQL.Embedding.Utils;
 
 namespace PostgreSQL.Embedding.Common.Models.Planners
 {
@@ -72,7 +73,18 @@ namespace PostgreSQL.Embedding.Common.Models.Planners
             };
         }
 
-        public static StepTrace Done(long messageId) =>
+        public static StepTrace StepDone(long messageId) =>
+            new StepTrace()
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Title = "[STEP_DONE]",
+                Content = "[STEP_DONE]",
+                Status = "success",
+                MessageId = messageId,
+                Type = "MessageStatus"
+            };
+
+        public static StepTrace ThinkDone(long messageId) =>
             new StepTrace()
             {
                 Id = Guid.NewGuid().ToString("N"),
@@ -82,5 +94,23 @@ namespace PostgreSQL.Embedding.Common.Models.Planners
                 MessageId = messageId,
                 Type = "MessageStatus"
             };
+
+        public static StepTrace PlanningDone(long messageId) =>
+            new StepTrace()
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Title = "[PLANNING_DONE]",
+                Content = "[PLANNING_DONE]",
+                Status = "success",
+                MessageId = messageId,
+                Type = "MessageStatus"
+            };
+
+        public IEnumerable<StepTrace> AsStreamingThought() => this.Type == "Thought"
+            ? this.Content.SplitString(1, 4).Select(x => StepTrace.Thought(this.Description, x, this.ParentId, this.MessageId))
+            : new List<StepTrace> { this };
+
+        public static IEnumerable<StepTrace> AsStreamingThought(string question, string content, string stepId, long messageId) =>
+            content.SplitString(1, 5).Select(x => StepTrace.Thought(question, x, stepId, messageId));
     }
 }

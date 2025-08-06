@@ -1,5 +1,4 @@
 ﻿using CSnakes.Runtime;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using PostgreSQL.Embedding.Common.Confirguration;
 using PostgreSQL.Embedding.LlmServices.Abstration;
@@ -7,31 +6,17 @@ using System.Linq.Expressions;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
-    public class BM25RerankerService : IRerankService
+    public class BM25RerankerService : BaseRerankService, IRerankService
     {
         private IBM25Reranker _bm25Reranker;
 
-        private readonly ILogger<BM25RerankerService> _logger;
-        public BM25RerankerService(IServiceProvider serviceProvider, IOptions<PythonConfig> options, ILogger<BM25RerankerService> logger)
+        public BM25RerankerService(IServiceProvider serviceProvider, IOptions<PythonConfig> options)
+            : base(serviceProvider, options)
         {
-            _logger = logger;
 
-            var environment = InitPython(serviceProvider, options.Value);
-            InitModel(environment);
         }
 
-        private IPythonEnvironment InitPython(IServiceProvider serviceProvider, PythonConfig config)
-        {
-            _logger.LogInformation($"Python Runtime is initializing: {config.PythonExecute}, Version={config.PythonVersion}...");
-
-            var environment = serviceProvider.GetRequiredService<IPythonEnvironment>();
-
-            _logger.LogInformation($"Python Runtime has been initialized.");
-
-            return environment;
-        }
-
-        private void InitModel(IPythonEnvironment environment)
+        protected override void InitModel(IPythonEnvironment environment)
         {
             _logger.LogInformation($"The BM25Reranker is initializing...");
 
@@ -40,7 +25,7 @@ namespace PostgreSQL.Embedding.LlmServices
             _logger.LogInformation($"The BM25Reranker has been initialized.");
         }
 
-        public IEnumerable<RerankResult<T>> Sort<T>(string question, List<T> documents, Expression<Func<T, string>> keyExps)
+        public override IEnumerable<RerankResult<T>> Sort<T>(string question, List<T> documents, Expression<Func<T, string>> keyExps)
         {
             var keyFunc = keyExps.Compile();
             var keyedDocuments = documents.Select(x => keyFunc(x)).ToList();

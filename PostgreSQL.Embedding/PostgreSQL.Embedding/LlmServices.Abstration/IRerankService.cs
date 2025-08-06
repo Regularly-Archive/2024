@@ -5,6 +5,7 @@ namespace PostgreSQL.Embedding.LlmServices.Abstration
     public interface IRerankService
     {
         IEnumerable<RerankResult<T>> Sort<T>(string question, List<T> documents, Expression<Func<T,string>> keySelector);
+        IEnumerable<RerankResult<T>> GetTopN<T>(string question, List<T> documents, Expression<Func<T, string>> keySelector, int? topN);
     }
 
     public class RerankResult<TDocument>

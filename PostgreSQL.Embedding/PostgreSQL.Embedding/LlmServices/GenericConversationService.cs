@@ -171,11 +171,20 @@ namespace PostgreSQL.Embedding.LlmServices
                 //var chatHistory = await GetHistoricalMessagesAsync(_app.Id, _conversationId, _app.MaxMessageRounds);
 
                 var taskPlanner = new TaskPlanner(kernel);
-                var subTasks = _app.AppType == (int)LlmAppType.Chat
+                var planResult = _app.AppType == (int)LlmAppType.Chat
                     ? await taskPlanner.GetSubTasksAsync(input, limit: 3)
                     : await taskPlanner.GetRAGTasks(input);
 
+                //await EmitTracesAsync(StepTrace.PlanningDone(_agentExecutionContext.GetMessageId()));
+
+                var subTasks = planResult.Tasks;
                 if (!subTasks.Any()) return Constants.DefaultErrorAnswer.AsStreaming();
+
+                foreach(var stepTrace in StepTrace.AsStreamingThought(input, planResult.Thought, "", _agentExecutionContext.GetMessageId()))
+                {
+                    await Task.Delay(100);
+                    await EmitTracesAsync(stepTrace);
+                }
 
                 subTasks.ForEach(async (subTask) => await EmitTracesAsync(subTask.AsStepTrace(_agentExecutionContext.GetMessageId()), cancellationToken));
 
@@ -189,7 +198,7 @@ namespace PostgreSQL.Embedding.LlmServices
                 graphExecutor.OnStepChanged = async (stepTrace) => await EmitTracesAsync(stepTrace);
                 await graphExecutor.ExecuteAsync();
 
-                await EmitTracesAsync(StepTrace.Done(_agentExecutionContext.GetMessageId()));
+                await EmitTracesAsync(StepTrace.ThinkDone(_agentExecutionContext.GetMessageId()));
                 return subTasks.OrderByDescending(x => x.Id).FirstOrDefault().ExecuteResult.AsStreaming();
             }
             catch (Exception ex)

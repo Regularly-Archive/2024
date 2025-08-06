@@ -39,6 +39,12 @@ namespace PostgreSQL.Embedding.DataAccess.Entities
         [SugarColumn(ColumnName = "max_message_rounds", IsNullable = false, DefaultValue = "10")]
         public int MaxMessageRounds { get; set; }
 
+        [SugarColumn(ColumnName = "rewrite_query_count", IsNullable = false, DefaultValue = "5")]
+        public int RewriteQueryCount { get; set; }
+
+        [SugarColumn(ColumnName = "reranker_type", IsNullable = false, DefaultValue = "1")]
+        public int RerankerType { get; set; }
+
         [SugarColumn(IsIgnore = true)]
         public List<long> KnowledgeBaseIds { get; set; }
     }
