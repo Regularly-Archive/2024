@@ -1,10 +1,4 @@
-﻿using DocumentFormat.OpenXml.Math;
-using DocumentFormat.OpenXml.Office.SpreadSheetML.Y2023.MsForms;
-using Google.Protobuf.WellKnownTypes;
-using LLama.Batched;
-using MailKit.Search;
-using Microsoft.KernelMemory.DataFormats;
-using Microsoft.SemanticKernel;
+﻿using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common;
@@ -19,10 +13,10 @@ using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.LLmServices.Extensions;
 using PostgreSQL.Embedding.Planners;
 using PostgreSQL.Embedding.Plugins;
+using PostgreSQL.Embedding.Utils;
 using SqlSugar;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading;
 
 namespace PostgreSQL.Embedding.LlmServices
 {
@@ -38,6 +32,7 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly PromptTemplateService _promptTemplateService;
         private readonly ILogger<RAGFlowService> _logger;
         private readonly CallablePromptTemplate _promptTemplate;
+        private readonly AgentExecutionContext _agentExecutionContext;
         private Regex _regexCitations = new Regex(@"\^(\d+)");
         private SSEEmitter _sseEmitter;
         public RAGFlowService(Kernel kernel,
@@ -58,6 +53,7 @@ namespace PostgreSQL.Embedding.LlmServices
             _logger = _serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<RAGFlowService>();
             var httpContext = _serviceProvider.GetRequiredService<IHttpContextAccessor>()?.HttpContext;
             _sseEmitter = new SSEEmitter(httpContext);
+            _agentExecutionContext = _kernel.GetAgentExecutionContext();
         }
 
         /// <summary>
@@ -89,21 +85,22 @@ namespace PostgreSQL.Embedding.LlmServices
             _promptTemplate.AddVariable("question", input);
             _promptTemplate.AddVariable("empty_answer", Common.Constants.DefaultEmptyAnswer);
             _promptTemplate.AddVariable("histories", histories);
-            var chatResult = await _promptTemplate.InvokeAsync(_kernel, executionSettings);
 
-            var answer = chatResult.GetValue<string>();
+            var answer = string.Empty;
+            await foreach (var content in _promptTemplate.InvokeStreamingAsync(_kernel, executionSettings))
+            {
+                answer += content.Content;
+            }
+
             if (!string.IsNullOrEmpty(answer))
             {
                 if (answer.IndexOf(Common.Constants.DefaultEmptyAnswer) != -1)
-                {
-                    return $"<RAG>{Common.Constants.DefaultEmptyAnswer}</RAG>";
-                }
-                else
-                {
-                    // 匹配引用信息，对引用信息的索引进行重排
-                    var newAnswer = ReorderReferences(citations, answer);
-                    return $"<RAG>{newAnswer}</RAG>";
-                }
+                    return $"<KEEP_FORMAT>{Common.Constants.DefaultEmptyAnswer}</KEEP_FORMAT>";
+
+
+                // 匹配引用信息，对引用信息的索引进行重排
+                var newAnswer = ReorderReferences(citations, answer);
+                return $"<KEEP_FORMAT>{newAnswer}</KEEP_FORMAT>";
             }
 
             return Common.Constants.DefaultEmptyAnswer;
@@ -124,21 +121,22 @@ namespace PostgreSQL.Embedding.LlmServices
             _promptTemplate.AddVariable("question", input);
             _promptTemplate.AddVariable("empty_answer", Common.Constants.DefaultEmptyAnswer);
             _promptTemplate.AddVariable("histories", string.Empty);
-            var chatResult = await _promptTemplate.InvokeAsync(_kernel);
 
-            var answer = chatResult.GetValue<string>();
+            var answer = string.Empty;
+            await foreach (var content in _promptTemplate.InvokeStreamingAsync(_kernel))
+            {
+                answer += content.Content;
+            }
+
             if (!string.IsNullOrEmpty(answer))
             {
                 if (answer.IndexOf(Common.Constants.DefaultEmptyAnswer) != -1)
-                {
-                    return $"<RAG>{Common.Constants.DefaultEmptyAnswer}</RAG>";
-                }
-                else
-                {
-                    // 匹配引用信息，对引用信息的索引进行重排
-                    var newAnswer = ReorderReferences(citations, answer);
-                    return $"<RAG>{newAnswer}</RAG>";
-                }
+                    return $"<KEEP_FORMAT>{Common.Constants.DefaultEmptyAnswer}</KEEP_FORMAT>";
+
+
+                // 匹配引用信息，对引用信息的索引进行重排
+                var newAnswer = ReorderReferences(citations, answer);
+                return $"<KEEP_FORMAT>{newAnswer}</KEEP_FORMAT>";
             }
 
             return Common.Constants.DefaultEmptyAnswer;
@@ -155,21 +153,14 @@ namespace PostgreSQL.Embedding.LlmServices
             var app = await _llmAppRepository.GetAsync(appId);
             if (app == null) return [];
 
-
             var llmCitations = new List<LlmCitationModel>();
-
-
-            var llmKappKnowledges = await _llmAppKnowledgeRepository.FindListAsync(x => x.AppId == app.Id);
-            if (!llmKappKnowledges.Any()) return [];
-
-            var searchResults = new List<KMCitation>();
             var inputs = new List<string> { question };
 
             if (app.EnableRewrite)
             {
                 var similarQuestions = await RewriteQueryAsync(question, app.RewriteQueryCount, _kernel);
 
-                await EmitTracesAsync(StepTrace.Thought(question, $" 开始重写查询，共生成 {similarQuestions.Count} 个相似问题：{JsonConvert.SerializeObject(similarQuestions)}。", "", -1));
+                await EmitStreamingTracesAsync(StepTrace.Thought(question, $" 开始重写查询，共生成 {similarQuestions.Count} 个相似问题：{JsonConvert.SerializeObject(similarQuestions)}。", _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
                 _logger.LogInformation($" 开始重写查询，共生成 {similarQuestions.Count} 个相似问题：{JsonConvert.SerializeObject(similarQuestions)}。");
 
                 if (similarQuestions.Any()) { inputs.AddRange(similarQuestions); }
@@ -184,6 +175,8 @@ namespace PostgreSQL.Embedding.LlmServices
                 llmCitations.AddRange(webCitations);
             }
 
+
+            llmCitations.OrderByDescending(x => x.Relevance).ForEach((item, index) => item.Index = index + 1);
             return llmCitations;
         }
 
@@ -361,7 +354,7 @@ namespace PostgreSQL.Embedding.LlmServices
 
             if (citations.Any())
             {
-                await EmitTracesAsync(StepTrace.Thought(question, $"共检索到 {partitions.Count} 个文档块，即将生成答案。", "", -1));
+                await EmitStreamingTracesAsync(StepTrace.Thought(question, $"共检索到 {partitions.Count} 个文档块，即将生成答案。", _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
                 _logger.LogInformation($"已检索到 {partitions.Count} 个文档块，即将生成答案。");
             }
 
@@ -401,7 +394,7 @@ namespace PostgreSQL.Embedding.LlmServices
 
             if (citatios.Any())
             {
-                await EmitTracesAsync(StepTrace.Thought(question, $"已阅读 {searchEntries.Count} 个网页，即将生成答案。", "", -1));
+                await EmitStreamingTracesAsync(StepTrace.Thought(question, $"已阅读 {searchEntries.Count} 个网页，即将生成答案。", _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
                 _logger.LogInformation($"已阅读 {searchEntries.Count} 个网页，即将生成答案。");
             }
 
@@ -416,7 +409,7 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <returns></returns>
         private string ReorderReferences(List<LlmCitationModel> originCitations, string generatedAnswer)
         {
-            var markdownCitations = new List<string>();
+            var markdownCitations = new HashSet<string>();
 
             var matches = _regexCitations.Matches(generatedAnswer);
 
@@ -456,7 +449,7 @@ namespace PostgreSQL.Embedding.LlmServices
             var stringBuilder = new StringBuilder();
             stringBuilder.AppendLine(result);
             stringBuilder.AppendLine();
-            stringBuilder.AppendLine(string.Join("\r\n", markdownCitations));
+            stringBuilder.AppendLine($"<CITATIONS>{string.Join("\r\n", markdownCitations)}</CITATIONS>");
 
             return stringBuilder.ToString();
         }
@@ -466,6 +459,19 @@ namespace PostgreSQL.Embedding.LlmServices
             var result = new OpenAIStreamResult() { id = Guid.NewGuid().ToString("N"), obj = "chat.traces" };
             result.choices.Add(new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant", content = JsonConvert.SerializeObject(stepTrace) } });
             await _sseEmitter.EmitAsync(result, cancellationToken);
+        }
+
+        private async Task EmitStreamingTracesAsync(StepTrace stepTrace, CancellationToken cancellationToken = default)
+        {
+            if (stepTrace.Type != "Thought") return;
+
+            var streamingStepTraces = stepTrace.AsStreamingThought();
+            foreach (var streamingStepTrace in streamingStepTraces)
+            {
+                await Task.Delay(100);
+                await EmitTracesAsync(streamingStepTrace, cancellationToken);
+            }
+
         }
     }
 }

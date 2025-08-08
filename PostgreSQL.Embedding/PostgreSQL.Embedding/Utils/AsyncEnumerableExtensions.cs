@@ -1,17 +1,29 @@
 ﻿using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
+using System.Text.RegularExpressions;
 
 namespace PostgreSQL.Embedding.Utils
 {
     public static class AsyncEnumerableExtensions
     {
+        private static readonly Regex _regexCitations = new Regex(@"<CITATIONS>([\s\S]*?)<\/CITATIONS>", RegexOptions.Compiled);
         public static async IAsyncEnumerable<StreamingChatMessageContent> AsStreaming(this string content, int minLength = 1, int maxLength = 5)
         {
-            var streamingChatContents = SplitString(content, minLength, maxLength).Select(x => new StreamingChatMessageContent(AuthorRole.Assistant, x)).ToList();
+            var contentOfAnswer = content;
+            var citaionsMatch = _regexCitations.Match(content);
+            if (citaionsMatch.Success)
+                contentOfAnswer = content.Substring(0, citaionsMatch.Index);
+
+            // 发送答案
+            var streamingChatContents = SplitString(contentOfAnswer, minLength, maxLength).Select(x => new StreamingChatMessageContent(AuthorRole.Assistant, x)).ToList();
             foreach (var chatContent in streamingChatContents)
             {
                 yield return chatContent;
             }
+
+            // 发送引用
+            if (citaionsMatch.Success)
+                yield return new StreamingChatMessageContent(AuthorRole.Assistant, citaionsMatch.Groups[1].Value);
         }
 
         public static async IAsyncEnumerable<string> AsStreamingTexts(this string content, int minLength = 1, int maxLength = 5)

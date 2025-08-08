@@ -114,8 +114,9 @@ namespace PostgreSQL.Embedding.LlmServices
             }
 
             //HttpContext.Response.Headers[Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
+            var answerWithoutCitationsTag = answerBuilder.ToString().Replace("<CITATIONS>", "").Replace("</CITATIONS>", "");
+            await _chatHistoriesService.UpdateSystemMessageAsync(messageId, answerWithoutCitationsTag);
             await _httpContext.WriteStreamingChatCompletion(chatResult, messageId, cancellationToken);
-            await _chatHistoriesService.UpdateSystemMessageAsync(messageId, answerBuilder.ToString());
         }
 
         /// <summary>
