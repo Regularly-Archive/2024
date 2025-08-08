@@ -1,9 +1,8 @@
-﻿using DocumentFormat.OpenXml.Office.SpreadSheetML.Y2023.MsForms;
+﻿using DocumentFormat.OpenXml.Office.Y2022.FeaturePropertyBag;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Services;
 using Microsoft.SemanticKernel.TextGeneration;
-using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Json;
 using PostgreSQL.Embedding.Common.Models.Planners;
 using PostgreSQL.Embedding.LLmServices.Extensions;
@@ -11,7 +10,6 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
 namespace PostgreSQL.Embedding.Planners
@@ -33,7 +31,7 @@ namespace PostgreSQL.Embedding.Planners
         private const string TrimMessageFormat = "... I've removed the first {0} steps of my previous work to make room for the new stuff ...";
         private const string MainKey = "INPUT";
 
-        private readonly Regex _regexRAG = new Regex(@"<RAG>(.*?)</RAG>", RegexOptions.Singleline | RegexOptions.IgnoreCase);
+        private readonly Regex _regexKeepFormat = new Regex(@"<KEEP_FORMAT>([\s\S]*?)<\/KEEP_FORMAT>", RegexOptions.Compiled);
 
         private readonly Dictionary<string, string> _variables = new Dictionary<string, string>();
 
@@ -104,7 +102,6 @@ namespace PostgreSQL.Embedding.Planners
                     return nextStep.FinalAnswer;
                 }
 
-
                 _logger?.LogInformation("Action: No action to take");
 
                 if (TryGetThought(nextStep, chatHistory))
@@ -132,7 +129,7 @@ namespace PostgreSQL.Embedding.Planners
                 else
                 {
                     var trimedThought = step.Thought.Replace("-", "").Trim();
-                    if (!string.IsNullOrEmpty (trimedThought))
+                    if (!string.IsNullOrEmpty(trimedThought))
                         OnStepExecute?.Invoke(StepTrace.Thought("", trimedThought, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
                 }
             }
@@ -188,10 +185,9 @@ namespace PostgreSQL.Embedding.Planners
         {
             if (!string.IsNullOrEmpty(step.Action))
             {
-                this._logger?.LogInformation("Action: {Action}({ActionVariables}).",
-                    step.Action, JsonSerializerExtensions.Serialize(step.ActionVariables));
+                this._logger?.LogInformation("Action: {Action}({ActionVariables}).", step.Action, JsonSerializerExtensions.Serialize(step.ActionVariables));
 
-                // add [thought and] action to chat history
+                // add [thought] and [action] to chat history
                 var stringBuilder = new StringBuilder();
                 stringBuilder.Append(ActionTag);
                 var actionPayload = new { action = step.Action, action_variables = step.ActionVariables };
@@ -217,10 +213,10 @@ namespace PostgreSQL.Embedding.Planners
                     //}
 
                     step.Observation = string.IsNullOrEmpty(result) ? $"There is no result can be found from action '{step.Action}'." : result!;
-                    var ragMatch = _regexRAG.Match(step.Observation);
-                    if (ragMatch.Success)
+                    var keepFormatMatch = _regexKeepFormat.Match(step.Observation);
+                    if (keepFormatMatch.Success)
                     {
-                        step.FinalAnswer = ragMatch.Groups[1].Value.Trim();
+                        step.FinalAnswer = keepFormatMatch.Groups[1].Value.Trim();
                         return false;
                     }
 
@@ -396,7 +392,7 @@ namespace PostgreSQL.Embedding.Planners
             }
 
             var addThought = stepsTaken.Count == 0;
-            return GetCompletionAsync(aiService, reducedChatHistory, addThought, CancellationToken);
+            return GetStreamingCompletionAsync(aiService, reducedChatHistory, addThought, CancellationToken);
         }
 
         private async Task<string> GetCompletionAsync(IAIService aiService, ChatHistory chatHistory, bool addThought, CancellationToken CancellationToken)
@@ -421,6 +417,41 @@ namespace PostgreSQL.Embedding.Planners
 
                 var textContent = await textGenerationService.GetTextContentAsync(thoughtProcess);
                 return textContent.InnerContent.ToString();
+            }
+
+            throw new Exception("No available AIService for getting completions.");
+        }
+
+        private async Task<string> GetStreamingCompletionAsync(IAIService aiService, ChatHistory chatHistory, bool addThought, CancellationToken cancellationToken)
+        {
+            var promptExecutionSettings = new PromptExecutionSettings() { FunctionChoiceBehavior = FunctionChoiceBehavior.None() };
+            if (aiService is IChatCompletionService chatCompletionService)
+            {
+                var content = string.Empty;
+                await foreach (var chatMessageContent in chatCompletionService.GetStreamingChatMessageContentsAsync(chatHistory, promptExecutionSettings))
+                {
+                    content += chatMessageContent.Content;
+                }
+                return content;
+            }
+            else if (aiService is ITextGenerationService textGenerationService)
+            {
+                var thoughtProcess = string.Join("\n", chatHistory.Select(m => m.Content));
+
+                if (addThought)
+                {
+                    thoughtProcess = $"{thoughtProcess}\n{ThoughtTag}";
+                    addThought = false;
+                }
+
+                thoughtProcess = $"{thoughtProcess}\n";
+
+                var content = string.Empty;
+                await foreach (var textContent in textGenerationService.GetStreamingTextContentsAsync(thoughtProcess))
+                {
+                    content += textContent.InnerContent.ToString();
+                }
+                return content;
             }
 
             throw new Exception("No available AIService for getting completions.");
