@@ -17,5 +17,8 @@ namespace PostgreSQL.Embedding.DataAccess.Entities
         [SugarColumn(ColumnName ="is_user_message", ColumnDataType = "boolean")]
         public bool IsUserMessage { get; set; }
 
+        [SugarColumn(ColumnName = "reasoning_content", ColumnDataType = "text", IsNullable = true)]
+        public string ReasoningContent { get; set; }
+
     }
 }

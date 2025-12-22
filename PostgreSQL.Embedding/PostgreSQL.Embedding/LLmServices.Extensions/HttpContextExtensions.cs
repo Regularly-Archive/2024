@@ -125,7 +125,7 @@ namespace PostgreSQL.Embedding.LLmServices.Extensions
 
         public static async Task WriteStreamingChatCompletion(this Microsoft.AspNetCore.Http.HttpContext context, string data, long? messageId = null, CancellationToken cancellationToken = default)
         {
-            var texts = data.ToArray().Select(x => x.ToString()).ToAsyncEnumerable();
+            var texts = System.Linq.AsyncEnumerable.ToAsyncEnumerable(data.ToArray().Select(x => x.ToString()));
 
             var result = new OpenAIStreamResult() { id = messageId.HasValue ? messageId.ToString() : Guid.NewGuid().ToString() };
             result.choices = new List<StreamChoicesModel>()

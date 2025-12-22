@@ -1,6 +1,5 @@
 ﻿using AngleSharp;
 using Microsoft.SemanticKernel;
-using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Models.Search;
 using PostgreSQL.Embedding.Plugins.Abstration;
@@ -29,16 +28,17 @@ namespace PostgreSQL.Embedding.Plugins
 
         [KernelFunction]
         [Description("使用关键词进行检索")]
-        public async Task<SearchResult> SearchAsync([Description("关键词")] string query, int limit = 30)
+        public async Task<SearchResult> SearchAsync([Description("关键词")] string keyword, int limit = 30, string filterDomain = "")
         {
             using var httpClient = _httpClientFactory.CreateClient();
             httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0");
             httpClient.DefaultRequestHeaders.Referrer = new Uri("https://search.brave.com");
 
-            var searchResult = await GetAsync(httpClient, query, $"https://search.brave.com/search?q={WebUtility.UrlEncode(query)}&source=web");
+            var query = string.IsNullOrEmpty(filterDomain) ? keyword : $"site:{filterDomain} {keyword}";
+            var searchResult = await GetAsync(httpClient, keyword, $"https://search.brave.com/search?q={WebUtility.UrlEncode(query)}&source=web");
             while (searchResult.HasNextPage && searchResult.Entries.Count < limit)
             {
-                var newSearchResult = await GetAsync(httpClient, query, searchResult.NextPage);
+                var newSearchResult = await GetAsync(httpClient, keyword, searchResult.NextPage);
                 if (newSearchResult.Entries.Any())
                 {
                     searchResult.Entries.AddRange(newSearchResult.Entries);
@@ -50,7 +50,7 @@ namespace PostgreSQL.Embedding.Plugins
             return searchResult;
         }
 
-        public async Task<SearchResult> GetAsync(HttpClient httpClient, string query, string url)
+        public async Task<SearchResult> GetAsync(HttpClient httpClient, string keyword, string url)
         {
             try
             {
@@ -58,19 +58,19 @@ namespace PostgreSQL.Embedding.Plugins
                 response.EnsureSuccessStatusCode();
 
                 var responseBody = await response.Content.ReadAsStringAsync();
-                var searchResult = await ExtractSearchResults(query, responseBody);
+                var searchResult = await ExtractSearchResults(keyword, responseBody);
 
                 return searchResult;
             }
             catch (HttpRequestException ex)
             {
-                return new SearchResult();
+                return new SearchResult() { Keyword = keyword};
             }
         }
 
         private async Task<SearchResult> ExtractSearchResults(string query, string html)
         {
-            var seachResult = new SearchResult() { Query = query };
+            var seachResult = new SearchResult() { Keyword = query };
 
             var config = Configuration.Default.WithDefaultLoader();
             var context = BrowsingContext.New(config);

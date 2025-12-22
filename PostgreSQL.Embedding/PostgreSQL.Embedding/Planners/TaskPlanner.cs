@@ -33,6 +33,7 @@ namespace PostgreSQL.Embedding.Planners
 
             var functions = await CreateFunctionDescriptions(_kernel);
             _promptTemplate.AddVariable("functions", functions);
+            _promptTemplate.FunctionName = "TaskPlanner_GetSubTasks";
 
             var functionResult = string.Empty;
             await foreach (var content in _promptTemplate.InvokeStreamingAsync(_kernel))
@@ -44,6 +45,7 @@ namespace PostgreSQL.Embedding.Planners
             {
                 functionResult = functionResult.Replace("```json", "").Replace("```", "");
                 functionResult = PreprocessJsonData(functionResult);
+                _logger.LogInformation($"Generated SubTasks: {functionResult}");
                 var planResult = JsonConvert.DeserializeObject<PlanResult>(functionResult);
                 return planResult;
             }
@@ -63,6 +65,7 @@ namespace PostgreSQL.Embedding.Planners
 
             var functions = await CreateFunctionDescriptions(_kernel, x => x.PluginName == nameof(RAGFlowPlugin));
             _promptTemplate.AddVariable("functions", functions);
+            _promptTemplate.FunctionName = "TaskPlanner_GetRAGTasks";
 
             var functionResult = string.Empty;
             await foreach (var content in _promptTemplate.InvokeStreamingAsync(_kernel))
@@ -74,6 +77,7 @@ namespace PostgreSQL.Embedding.Planners
             {
                 functionResult = functionResult.Replace("```json", "").Replace("```", "");
                 functionResult = PreprocessJsonData(functionResult);
+                _logger.LogInformation($"Generated SubTasks: {functionResult}");
                 var planResult = JsonConvert.DeserializeObject<PlanResult>(functionResult);
                 return planResult;
             }

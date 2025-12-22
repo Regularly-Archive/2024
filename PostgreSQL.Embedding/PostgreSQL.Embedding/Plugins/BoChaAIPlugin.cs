@@ -24,7 +24,7 @@ namespace PostgreSQL.Embedding.Plugins
 
         [KernelFunction]
         [Description("从网络中搜索信息")]
-        public async Task<SearchResult> SearchAsync([Description("关键词")] string keyword, int limit = 30)
+        public async Task<SearchResult> SearchAsync([Description("关键词")] string keyword, int limit = 30, string filterDomain = "")
         {
             if (!Validate(out var errorMessages)) throw new Exception(string.Join("", errorMessages));
 
@@ -39,7 +39,7 @@ namespace PostgreSQL.Embedding.Plugins
             response.EnsureSuccessStatusCode();
 
             var searchResult = ExtractSearchResult(await response.Content.ReadAsStringAsync());
-            searchResult.Query = keyword;
+            searchResult.Keyword = keyword;
 
             return searchResult;
         }

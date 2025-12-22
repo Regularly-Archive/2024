@@ -1,8 +1,13 @@
 ﻿using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
+using MongoDB.Driver.Linq;
+using Newtonsoft.Json;
+using PostgreSQL.Embedding.Common.Models;
 using PostgreSQL.Embedding.Common.Models.Planners;
+using PostgreSQL.Embedding.LlmServices;
 using PostgreSQL.Embedding.LLmServices.Extensions;
 using System.Collections.Concurrent;
+using System.Threading.Tasks;
 
 namespace PostgreSQL.Embedding.Planners
 {
@@ -13,16 +18,20 @@ namespace PostgreSQL.Embedding.Planners
         private readonly StepwisePlanner _stepwisePlanner;
         private readonly AgentExecutionContext _agentExecutionContext;
         private readonly List<SubTask> _subTasks = new List<SubTask>();
+        private readonly CallablePromptTemplate _subTaskPromptTemplate;
+        private readonly Kernel _kernel;
 
         public Action<StepTrace> OnStepChanged { get; set; }
 
         public DAGraphExecutor(string query, List<SubTask> subTasks, StepwisePlanner stepwisePlanner, Kernel kernel)
         {
             _query = query;
+            _kernel = kernel;
             _subTasks = subTasks;
             _graph = BuildDAGraph(subTasks);
             _stepwisePlanner = stepwisePlanner;
             _agentExecutionContext = kernel.GetAgentExecutionContext();
+            _subTaskPromptTemplate = new PromptTemplateService().LoadTemplate("SubTask.txt");
         }
 
         public async Task ExecuteAsync()
@@ -32,7 +41,8 @@ namespace PostgreSQL.Embedding.Planners
             var paralleTasks = sortedTaskIds.FindAll(taskId => _graph[taskId].Indegress == 0).Select(async taskId =>
             {
                 var subTask = _subTasks.FirstOrDefault(x => x.Id == taskId);
-                await ExecuteSubTask(_query, subTask);
+                var taskStates = JsonConvert.SerializeObject(_subTasks.Select(x => new { Id = x.Id, Name = x.Name, Description = x.Description, State = x.Status.ToString() }));
+                await ExecuteSubTask(_query, subTask, taskStates);
             });
             await Task.WhenAll(paralleTasks);
 
@@ -40,11 +50,12 @@ namespace PostgreSQL.Embedding.Planners
             foreach (var taskId in serialTasks)
             {
                 var subTask = _subTasks.FirstOrDefault(x => x.Id == taskId);
-                await ExecuteSubTask(_query, subTask);
+                var taskStates = JsonConvert.SerializeObject(_subTasks.Select(x => new { Id = x.Id, Name = x.Name, Description = x.Description, State = x.Status.ToString() }));
+                await ExecuteSubTask(_query, subTask, taskStates);
             }
         }
 
-        private async Task ExecuteSubTask(string query, SubTask subTask)
+        private async Task ExecuteSubTask(string query, SubTask subTask, string taskStates)
         {
             _agentExecutionContext.SetStepId(subTask.Id.ToString());
 
@@ -76,7 +87,9 @@ namespace PostgreSQL.Embedding.Planners
             if (!subTask.DependsOn.Any())
             {
                 var chatHistory = new ChatHistory();
-                chatHistory.AddAssistantMessage(CreateObservation(query, subTask));
+
+                var context = await BuildSubTaskContext(query, subTask, taskStates, []);
+                chatHistory.AddAssistantMessage($"{context}");
 
                 var result = await plan.ExecuteAsync(subTask.Description, chatHistory);
                 subTask.ExecuteResult = result;
@@ -88,7 +101,9 @@ namespace PostgreSQL.Embedding.Planners
                 if (dependencies.All(x => x.Status == Common.Models.Planners.TaskStatus.Completed))
                 {
                     var chatHistory = new ChatHistory();
-                    chatHistory.AddAssistantMessage(CreateObservationWithDependencies(query, subTask, dependencies));
+
+                    var context = await BuildSubTaskContext(query, subTask, taskStates, dependencies);
+                    chatHistory.AddAssistantMessage($"{context}");
 
                     var result = await plan.ExecuteAsync(subTask.Description, chatHistory);
                     subTask.ExecuteResult = result;
@@ -119,38 +134,16 @@ namespace PostgreSQL.Embedding.Planners
             return graph;
         }
 
-        private string CreateObservation(string query, SubTask subTask)
+        private Task<string> BuildSubTaskContext(string query, SubTask subTask, string taskStates, List<SubTask> dependencies)
         {
-            return $"""
-                    [OBSERVATION]
-                    # 用户请求：{query}
-                    # 当前任务: {subTask.Description}
-                    """;
-        }
+            _subTaskPromptTemplate.AddVariable("goal", query);
+            _subTaskPromptTemplate.AddVariable("currentTask", subTask.Description);
+            _subTaskPromptTemplate.AddVariable("taskStates", taskStates);
+            _subTaskPromptTemplate.AddVariable("dependencies", JsonConvert.SerializeObject(dependencies.Select(x => new { Id = x.Id, Name = x.Name, Description = x.Description, State = x.Status.ToString(), Output = x.ExecuteResult })));
+            _subTaskPromptTemplate.AddVariable("requiredArtifacts", JsonConvert.SerializeObject(subTask.RequiredArtifacts));
+            _subTaskPromptTemplate.AddVariable("outputArtifacts", JsonConvert.SerializeObject(subTask.OutputArtifacts));
 
-        private string CreateObservationWithDependencies(string query, SubTask subTask, List<SubTask> dependencies)
-        {
-            var formattedDependencies = dependencies.Select(dependency =>
-            {
-                return $"""
-                        任务编号：{dependency.Id}
-                        任务名称： {dependency.Name}
-                        任务描述：{dependency.Description}
-                        执行结果：
-                        {dependency.ExecuteResult}
-                        """;
-            });
-
-            return $"""
-                    [OBSERVATION]
-                    # 用户请求：{query}
-                    # 当前任务：{subTask.Description}
-                    # 依赖项：
-                    {string.Join("\r\n", formattedDependencies)}
-
-                    请根据依赖项中的执行结果，判断是否需要执行进一步的动作；如果不需要，请返回符合当前任务预期的内容。
-                    如对依赖项中的内容真实性存疑，请使用合适的工具进行交叉验证，确保结果的客观、公正以及准确性。
-                    """;
+            return _subTaskPromptTemplate.RenderTemplateAsync(_kernel.Clone());
         }
     }
 

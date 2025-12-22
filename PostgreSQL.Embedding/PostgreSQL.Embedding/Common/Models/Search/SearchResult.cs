@@ -4,7 +4,7 @@ namespace PostgreSQL.Embedding.Common.Models.Search
 {
     public class SearchResult
     {
-        public string Query { get; set; }
+        public string Keyword { get; set; }
         public List<Entry> Entries { get; set; } = new List<Entry>();
         public bool HasNextPage { get; set; } = false;
         public string NextPage {  get; set; }

@@ -11,6 +11,7 @@ namespace PostgreSQL.Embedding.Common.Models
         public string Template { get; private set; }
         private Dictionary<string, object> _arguments = new Dictionary<string, object>();
         private readonly KernelPromptTemplateFactory _templateFactory = new KernelPromptTemplateFactory();
+        public string FunctionName { get; set; }
 
         public CallablePromptTemplate(string template)
         {
@@ -22,25 +23,25 @@ namespace PostgreSQL.Embedding.Common.Models
 
         public Task<FunctionResult> InvokeAsync(Kernel kernel, OpenAIPromptExecutionSettings executionSettings = null, CancellationToken cancellationToken = default)
         {
-            var kernelFunction = kernel.CreateFunctionFromPrompt(Template, executionSettings);
+            var kernelFunction = kernel.CreateFunctionFromPrompt(Template, executionSettings, functionName: FunctionName);
             return kernel.InvokeAsync(kernelFunction, new KernelArguments(_arguments), cancellationToken);
         }
 
         public Task<T> InvokeAsync<T>(Kernel kernel, OpenAIPromptExecutionSettings executionSettings = null, CancellationToken cancellationToken = default)
         {
-            var kernelFunction = kernel.CreateFunctionFromPrompt(Template, executionSettings);
+            var kernelFunction = kernel.CreateFunctionFromPrompt(Template, executionSettings, functionName: FunctionName);
             return kernel.InvokeAsync<T>(kernelFunction, new KernelArguments(_arguments), cancellationToken);
         }
 
         public IAsyncEnumerable<StreamingChatMessageContent> InvokeStreamingAsync(Kernel kernel, OpenAIPromptExecutionSettings executionSettings = null, CancellationToken cancellationToken = default)
         {
-            var kernelFunction = kernel.CreateFunctionFromPrompt(Template, executionSettings);
+            var kernelFunction = kernel.CreateFunctionFromPrompt(Template, executionSettings, functionName: FunctionName);
             return kernel.InvokeStreamingAsync<StreamingChatMessageContent>(kernelFunction, new KernelArguments(_arguments), cancellationToken);
         }
 
         public IAsyncEnumerable<T> InvokeStreamingAsync<T>(Kernel kernel, OpenAIPromptExecutionSettings executionSettings = null, CancellationToken cancellationToken = default)
         {
-            var kernelFunction = kernel.CreateFunctionFromPrompt(Template, executionSettings);
+            var kernelFunction = kernel.CreateFunctionFromPrompt(Template, executionSettings, functionName: FunctionName);
             return kernel.InvokeStreamingAsync<T>(kernelFunction, new KernelArguments(_arguments), cancellationToken);
         }
 

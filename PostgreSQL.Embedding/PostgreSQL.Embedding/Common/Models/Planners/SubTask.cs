@@ -26,6 +26,12 @@ namespace PostgreSQL.Embedding.Common.Models.Planners
         [JsonProperty("execute_result")]
         public string ExecuteResult { get; set; }
 
+        [JsonProperty("required_artifacts")]
+        public List<string> RequiredArtifacts { get; set; } = new List<string>();
+
+        [JsonProperty("output_artifacts")]
+        public List<string> OutputArtifacts { get; set; } = new List<string>();
+
         public StepTrace AsStepTrace(long messageId)
         {
             return StepTrace.Plan(Id.ToString(), Name, Description, ExecuteResult, Status.ToString().ToLower(), messageId);
@@ -39,6 +45,9 @@ namespace PostgreSQL.Embedding.Common.Models.Planners
 
         [JsonProperty("thought")]
         public string Thought {  get; set; }
+
+        [JsonProperty("output_format")]
+        public string OutputFormat { get; set; }
     }
 
     public enum TaskStatus

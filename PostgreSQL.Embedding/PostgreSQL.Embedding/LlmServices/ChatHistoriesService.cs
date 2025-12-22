@@ -55,6 +55,16 @@ namespace PostgreSQL.Embedding.LlmServices
             }
         }
 
+        public async Task UpdateSystemMessageAsync(long messageId, Action<ChatMessage> action)
+        {
+            var message = await _chatMessageRepository.GetAsync(messageId);
+            if (message != null)
+            {
+                action?.Invoke(message);
+                await _chatMessageRepository.UpdateAsync(message);
+            }
+        }
+
         /// <summary>
         /// 添加用户消息
         /// </summary>

@@ -100,6 +100,28 @@ namespace PostgreSQL.Embedding.Plugins.Abstration
             return artifactFactory(storageResult.FileId);
         }
 
+        protected async Task<string> CreateArtifactAsync(string fileName, string artifactContent, string contentType)
+        {
+            using var serviceScope = _serviceProvider.CreateScope();
+            var serviceProvider = serviceScope.ServiceProvider;
+
+            var filePath = Path.Combine(Path.GetTempPath(), fileName);
+            await File.WriteAllTextAsync(filePath, artifactContent);
+
+            var fileStorageService = serviceProvider.GetRequiredService<IFileStorageService>();
+            var storageResult = await fileStorageService.PutFileAsync("artifacts", filePath);
+            try
+            {
+                File.Delete(filePath);
+            }
+            catch (Exception ex)
+            {
+
+            }
+
+            return storageResult.FileId;
+        }
+
         protected async Task<LlmArtifactResponseModel> CreateArtifactsAsync(string fileName, byte[] artifactContent, Func<string, LlmArtifactResponseModel> artifactFactory)
         {
             using var serviceScope = _serviceProvider.CreateScope();

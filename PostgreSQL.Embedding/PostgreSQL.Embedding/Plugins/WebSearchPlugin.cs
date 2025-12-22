@@ -35,8 +35,9 @@ namespace PostgreSQL.Embedding.Plugins
         [Description("从网络中搜索信息")]
         public async Task<string> RunAsync(
             Kernel kernel,
-            [Description("用户请求")] string query,
+            [Description("用户请求")] string keyword,
             [Description("搜索引擎，可选值: Bing, Brave, JianAI, BoCha, SerpApi")] string searchEngine = "Brave",
+            [Description("过滤域名，例如: zhihu.com")] string filterDomain = "",
             [Description("是否向用户展示搜索结果，默认为 false ")] bool showSearchResult = false,
             [Description("是否只需要最终答案, 默认为 false")] bool onlyReturnAnswer = false
         )
@@ -45,7 +46,7 @@ namespace PostgreSQL.Embedding.Plugins
 
             using var serviceScope = _serviceProvider.CreateScope();
             var serviceEngine = GetSearchEngine(serviceScope.ServiceProvider, searchEngine);
-            var searchResult = await serviceEngine.SearchAsync(query);
+            var searchResult = await serviceEngine.SearchAsync(keyword, filterDomain: filterDomain);
 
             if (showSearchResult) await SendArtifacts(searchResult);
             if (onlyReturnAnswer)
@@ -53,10 +54,9 @@ namespace PostgreSQL.Embedding.Plugins
                 var memoryService = _serviceProvider.GetService<IMemoryService>();
                 var chatHistoryService = _serviceProvider.GetService<IChatHistoriesService>();
 
-
                 var ragFlowService = new RAGFlowService(clonedKernel, _serviceProvider, memoryService, chatHistoryService);
                 var citations = GetCitationsFromSearchEngine(searchResult);
-                return await ragFlowService.GenerateAnswerAsync(query, citations);
+                return await ragFlowService.GenerateAnswerAsync(keyword, citations);
             }
 
             return JsonConvert.SerializeObject(searchResult);

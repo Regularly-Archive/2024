@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>disable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <InvariantGlobalization>true</InvariantGlobalization>
@@ -29,7 +29,6 @@
 
   <ItemGroup>
 	  <PackageReference Include="CSnakes.Runtime" Version="1.2.0" />
-	  <PackageReference Include="python" Version="$(PythonVersion)" />
     <PackageReference Include="jieba.NET" Version="0.42.2" />
     <PackageReference Include="LLamaSharp" Version="0.23.0" />
     <PackageReference Include="LLamaSharp.Backend.Cpu" Version="0.23.0" />
@@ -62,6 +61,10 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.4.1" />
     <PackageReference Include="System.ServiceModel.Syndication" Version="8.0.0" />
+    <PackageReference Include="YamlDotNet" Version="16.3.0" />
+	  <PackageReference Include="System.Linq.Async" Version="6.0.1">
+		  <ExcludeAssets>all</ExcludeAssets>
+	  </PackageReference>
   </ItemGroup>
 
   <ItemGroup>
@@ -120,6 +123,9 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Common\Prompts\Stepwise.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Common\Prompts\SubTask.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Common\Prompts\TaskPlanner.txt">

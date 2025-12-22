@@ -423,7 +423,7 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <returns></returns>
         private async Task EmitFinalAnswerAsync(long? mesageId, string text, CancellationToken cancellationToken = default)
         {
-            var characters = text.ToArray().Select(x => x.ToString()).ToAsyncEnumerable();
+            var characters = System.Linq.AsyncEnumerable.ToAsyncEnumerable(text.ToArray().Select(x => x.ToString()));
 
             var result = new OpenAIStreamResult() { id = mesageId.HasValue ? mesageId.ToString() : Guid.NewGuid().ToString(), obj = "chat.completion" };
             result.choices.Add(new StreamChoicesModel() { delta = new OpenAIMessage() { role = "assistant" } });
