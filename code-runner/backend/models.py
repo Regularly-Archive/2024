@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Literal
+from typing import Literal, List, Optional
 
 class RunCodeRequest(BaseModel):
     code: str
@@ -17,3 +17,14 @@ class RunCodeResponse(BaseModel):
     contentType: str
     duration: float
     language: str
+
+
+class CodeFile(BaseModel):
+    path: str
+    content: str
+
+class RunFilesRequest(BaseModel):
+    language: str
+    files: List[CodeFile]
+    dependencies: Optional[List[str]] = []
+    entry_path: Optional[str] = None 

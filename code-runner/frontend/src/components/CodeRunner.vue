@@ -103,7 +103,7 @@ export default {
                 { value: 'csharp-mono', label: 'C#/Mono', code: 'using System;\n\nnamespace HelloWorld\n{\n    class Program\n    {\n        static void Main(string[] args)\n        {\n            Console.WriteLine("Hello, World!");\n        }\n    }\n}' },
                 { value: 'javascript', label: 'JavaScript', code: 'console.log("Hello, World!");' },
                 { value: 'typescript', label: 'TypeScript', code: 'console.log("Hello, World!");' },
-                { value: 'jupyter-python3', label: 'Jupyter/Python', code: "from matplotlib import pyplot as plt\nimport numpy as np\n\n# Generate 100 random data points along 3 dimensions\nx, y, scale = np.random.randn(3, 100)\nfig, ax = plt.subplots()\n\n# Map each onto a scatterplot we'll create with Matplotlib\nax.scatter(x=x, y=y, c=scale, s=np.abs(scale)*500)\nax.set(title=\"Some random data, created with JupyterLab!\")\nplt.show()" },
+                { value: 'jupyter-python', label: 'Jupyter/Python', code: "from matplotlib import pyplot as plt\nimport numpy as np\n\n# Generate 100 random data points along 3 dimensions\nx, y, scale = np.random.randn(3, 100)\nfig, ax = plt.subplots()\n\n# Map each onto a scatterplot we'll create with Matplotlib\nax.scatter(x=x, y=y, c=scale, s=np.abs(scale)*500)\nax.set(title=\"Some random data, created with JupyterLab!\")\nplt.show()" },
                 { value: 'jupyter-csharp', label: 'Jupyter/C#', code: 'Console.WriteLine("Hello, World!");' },
                 { value: 'jupyter-fsharp', label: 'Jupyter/F#', code: 'printfn "Hello from F#"' },
                 { value: 'jupyter-r', label: 'Jupyter/R', code: 'curve(sin(x), -2 * pi, 2 * pi)' },
