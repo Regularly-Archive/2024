@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Masuit.Tools;
+using Newtonsoft.Json;
 using PostgreSQL.Embedding.Planners;
 using PostgreSQL.Embedding.Utils;
 
@@ -84,12 +85,12 @@ namespace PostgreSQL.Embedding.Common.Models.Planners
                 Type = "MessageStatus"
             };
 
-        public static StepTrace ThinkDone(long messageId) =>
+        public static StepTrace ThinkDone(long messageId, double duration) =>
             new StepTrace()
             {
                 Id = Guid.NewGuid().ToString("N"),
                 Title = "[THINK_DONE]",
-                Content = "[THINK_DONE]",
+                Content = duration.Round(2).ToString(),
                 Status = "success",
                 MessageId = messageId,
                 Type = "MessageStatus"

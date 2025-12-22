@@ -9,6 +9,9 @@ namespace PostgreSQL.Embedding.Utils
         private static readonly Regex _regexCitations = new Regex(@"<CITATIONS>([\s\S]*?)<\/CITATIONS>", RegexOptions.Compiled);
         public static async IAsyncEnumerable<StreamingChatMessageContent> AsStreaming(this string content, int minLength = 1, int maxLength = 5)
         {
+            if (string.IsNullOrEmpty(content))
+                yield return new StreamingChatMessageContent(AuthorRole.Assistant, string.Empty);
+
             var contentOfAnswer = content;
             var citaionsMatch = _regexCitations.Match(content);
             if (citaionsMatch.Success)

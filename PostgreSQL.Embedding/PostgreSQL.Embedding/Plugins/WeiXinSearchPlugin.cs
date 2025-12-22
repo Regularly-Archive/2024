@@ -28,7 +28,7 @@ namespace PostgreSQL.Embedding.Plugins
 
         [KernelFunction]
         [Description("使用关键词进行检索")]
-        public async Task<SearchResult> SearchAsync([Description("关键词")] string query, int limit = 30)
+        public async Task<SearchResult> SearchAsync([Description("关键词")] string query, int limit = 30, string filterDomain = "")
         {
             using var httpClient = _httpClientFactory.CreateClient();
             httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0");
@@ -70,7 +70,7 @@ namespace PostgreSQL.Embedding.Plugins
 
         private async Task<SearchResult> ExtractSearchResults(string query, string html)
         {
-            var seachResult = new SearchResult() { Query = query };
+            var seachResult = new SearchResult() { Keyword = query };
 
             var config = Configuration.Default.WithDefaultLoader();
             var context = BrowsingContext.New(config);

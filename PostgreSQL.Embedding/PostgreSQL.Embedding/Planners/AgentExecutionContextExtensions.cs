@@ -36,5 +36,12 @@
         }
 
         public static string GetStepId(this AgentExecutionContext context) => context.GetData<string>("StepId");
+
+        public static void SetRunId(this AgentExecutionContext context, string value)
+        {
+            context.SetData("RunId", value);
+        }
+
+        public static string GetRunId(this AgentExecutionContext context) => context.GetData<string>("RunId");
     }
 }

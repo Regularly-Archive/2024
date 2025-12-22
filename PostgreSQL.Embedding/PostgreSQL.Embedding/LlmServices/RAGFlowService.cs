@@ -33,7 +33,7 @@ namespace PostgreSQL.Embedding.LlmServices
         private readonly ILogger<RAGFlowService> _logger;
         private readonly CallablePromptTemplate _promptTemplate;
         private readonly AgentExecutionContext _agentExecutionContext;
-        private Regex _regexCitations = new Regex(@"\^(\d+)");
+        private readonly Regex _regexCitations = new Regex(@"\^(\d+)", RegexOptions.Compiled);
         private SSEEmitter _sseEmitter;
         public RAGFlowService(Kernel kernel,
             IServiceProvider serviceProvider,
@@ -50,6 +50,7 @@ namespace PostgreSQL.Embedding.LlmServices
             _llmAppKnowledgeRepository = serviceProvider.GetService<IRepository<LlmAppKnowledge>>();
             _promptTemplateService = serviceProvider.GetService<PromptTemplateService>();
             _promptTemplate = _promptTemplateService.LoadTemplate("RAGPrompt.txt");
+            _promptTemplate.FunctionName = "RAGFlowService_GenerateAnswer";
             _logger = _serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<RAGFlowService>();
             var httpContext = _serviceProvider.GetRequiredService<IHttpContextAccessor>()?.HttpContext;
             _sseEmitter = new SSEEmitter(httpContext);
@@ -223,6 +224,7 @@ namespace PostgreSQL.Embedding.LlmServices
             try
             {
                 var rewritePromptTemplate = _promptTemplateService.LoadTemplate("RewritePrompt.txt");
+                rewritePromptTemplate.FunctionName = "RAGFlowService_RewriteQuery";
                 var executionSettings = new OpenAIPromptExecutionSettings() { Temperature = 0f };
 
                 rewritePromptTemplate.AddVariable("question", question);

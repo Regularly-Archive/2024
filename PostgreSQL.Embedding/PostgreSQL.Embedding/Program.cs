@@ -3,6 +3,7 @@ using LLama;
 using LLama.Common;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -196,10 +197,36 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors();
+
+var provider = new FileExtensionContentTypeProvider();
+provider.Mappings[".md"] = "text/markdown; charset=utf-8";
+provider.Mappings[".txt"] = "text/plain; charset=utf-8";
+provider.Mappings[".html"] = "text/html; charset=utf-8";
+provider.Mappings[".docx"] = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+provider.Mappings[".xlsx"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+provider.Mappings[".pptx"] = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+provider.Mappings[".pdf"] = "application/pdf";
+provider.Mappings[".zip"] = "application/zip";
+provider.Mappings[".yml"] = "application/x-yaml";
+provider.Mappings[".yaml"] = "application/x-yaml";
+provider.Mappings[".json"] = "application/json";
+provider.Mappings[".xml"] = "application/xml";
+provider.Mappings[".png"] = "image/png";
+provider.Mappings[".jpg"] = "image/jpeg";
+provider.Mappings[".jpeg"] = "image/jpeg";
+provider.Mappings[".gif"] = "image/gif";
+provider.Mappings[".webp"] = "image/webp";
+provider.Mappings[".bmp"] = "image/bmp";
+provider.Mappings[".svg"] = "image/svg+xml";
+
+
 app.UseStaticFiles(new StaticFileOptions()
 {
     FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.ContentRootPath)),
-    RequestPath = "/statics"
+    RequestPath = "/api/statics",
+    ServeUnknownFileTypes = true,
+    ContentTypeProvider = provider
+
 });
 
 app.UseMiddleware<DisableCompressionMiddleware>();

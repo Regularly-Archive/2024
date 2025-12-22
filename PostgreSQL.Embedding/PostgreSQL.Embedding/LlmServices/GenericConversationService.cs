@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Masuit.Tools;
+using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
@@ -13,7 +14,9 @@ using PostgreSQL.Embedding.LLmServices.Extensions;
 using PostgreSQL.Embedding.Planners;
 using PostgreSQL.Embedding.Services;
 using PostgreSQL.Embedding.Utils;
+using System.Diagnostics;
 using System.Text;
+using static LLama.Common.ChatHistory;
 
 
 namespace PostgreSQL.Embedding.LlmServices
@@ -51,9 +54,9 @@ namespace PostgreSQL.Embedding.LlmServices
             _agentExecutionContext = _kernel.GetAgentExecutionContext();
         }
 
-        public async Task InvokeAsync(ConversationRequestModel model, string input, CancellationToken cancellationToken = default)
+        public async Task InvokeAsync(ConversationRequestModel conversationRequest, string input, CancellationToken cancellationToken = default)
         {
-            _conversationId = !string.IsNullOrEmpty(model.ConversationId) ? model.ConversationId : Guid.NewGuid().ToString("N");
+            _conversationId = !string.IsNullOrEmpty(conversationRequest.ConversationId) ? conversationRequest.ConversationId : Guid.NewGuid().ToString("N");
             var conversationName = _httpContext.GetConversationName();
 
             _agentExecutionContext.SetAppId(_app.Id);
@@ -83,8 +86,8 @@ namespace PostgreSQL.Embedding.LlmServices
             }
 
             await _httpContext.Response.Body.FlushAsync().ConfigureAwait(false);
-            var conversationTask = model.Stream
-                ? InvokeStreamingChat(model, input, cancellationToken)
+            var conversationTask = conversationRequest.Stream
+                ? InvokeStreamingChat(conversationRequest, input, cancellationToken)
                 : InvokeChat(_httpContext, input, cancellationToken);
 
             await conversationTask;
@@ -98,13 +101,13 @@ namespace PostgreSQL.Embedding.LlmServices
         /// <param name="result"></param>
         /// <param name="input"></param>
         /// <returns></returns>
-        private async Task InvokeStreamingChat(ConversationRequestModel model, string input, CancellationToken cancellationToken = default)
+        private async Task InvokeStreamingChat(ConversationRequestModel conversationRequest, string input, CancellationToken cancellationToken = default)
         {
             var messageId = await _chatHistoriesService.AddSystemMessageAsync(_app.Id, _conversationId, string.Empty);
             _agentExecutionContext.SetMessageId(messageId);
 
-            var chatResult = model.AgenticMode
-                ? await InvokeStreamingByStepwisePlannerAsync(_kernel, input, cancellationToken)
+            var chatResult = conversationRequest.AgenticMode
+                ? await InvokeStreamingByStepwisePlannerAsync(_kernel, conversationRequest, input, cancellationToken)
                 : await InvokeStreamingByKernelAsync(_kernel, input, cancellationToken);
 
             var answerBuilder = new StringBuilder();
@@ -115,8 +118,8 @@ namespace PostgreSQL.Embedding.LlmServices
 
             //HttpContext.Response.Headers[Constants.HttpResponseHeader_ReferenceMessageId] = _messageReferenceId.ToString();
             var answerWithoutCitationsTag = answerBuilder.ToString().Replace("<CITATIONS>", "").Replace("</CITATIONS>", "");
-            await _chatHistoriesService.UpdateSystemMessageAsync(messageId, answerWithoutCitationsTag);
             await _httpContext.WriteStreamingChatCompletion(chatResult, messageId, cancellationToken);
+            await _chatHistoriesService.UpdateSystemMessageAsync(messageId, answerWithoutCitationsTag);
         }
 
         /// <summary>
@@ -164,12 +167,16 @@ namespace PostgreSQL.Embedding.LlmServices
             }
         }
 
-        private async Task<IAsyncEnumerable<StreamingChatMessageContent>> InvokeStreamingByStepwisePlannerAsync(Kernel kernel, string input, CancellationToken cancellationToken = default)
+        private async Task<IAsyncEnumerable<StreamingChatMessageContent>> InvokeStreamingByStepwisePlannerAsync(Kernel kernel, ConversationRequestModel conversationRequest, string input, CancellationToken cancellationToken = default)
         {
             try
             {
+                var stopwatch = Stopwatch.StartNew();
                 var currentUser = await _userInfoService.GetCurrentUserAsync();
                 //var chatHistory = await GetHistoricalMessagesAsync(_app.Id, _conversationId, _app.MaxMessageRounds);
+
+                var runId = Guid.NewGuid().ToString();
+                _agentExecutionContext.SetRunId(runId);
 
                 var taskPlanner = new TaskPlanner(kernel);
                 var planResult = _app.AppType == (int)LlmAppType.Chat
@@ -181,7 +188,9 @@ namespace PostgreSQL.Embedding.LlmServices
                 var subTasks = planResult.Tasks;
                 if (!subTasks.Any()) return Constants.DefaultErrorAnswer.AsStreaming();
 
-                foreach(var stepTrace in StepTrace.AsStreamingThought(input, planResult.Thought, "", _agentExecutionContext.GetMessageId()))
+                await UpdateReasoningContent(_agentExecutionContext.GetMessageId(), planResult.Thought);
+
+                foreach (var stepTrace in StepTrace.AsStreamingThought(input, planResult.Thought, "", _agentExecutionContext.GetMessageId()))
                 {
                     await Task.Delay(100);
                     await EmitTracesAsync(stepTrace);
@@ -191,15 +200,26 @@ namespace PostgreSQL.Embedding.LlmServices
 
                 var planner = new StepwisePlanner(_kernel, _promptTemplateService, new StepwisePlannerConfig() { MaxIterations = 30 });
                 planner.AddVariable("appId", _app.Id);
+                planner.AddVariable("runId", runId);
                 planner.AddVariable("conversationId", _conversationId);
                 planner.AddVariable("userId", currentUser.Id);
                 planner.AddVariable("currentTime", DateTime.Now);
+                planner.AddVariable("enableWebSearch", conversationRequest.AccessInternet);
+                planner.AddVariable("skillsRootFolder", "D:\\Projects\\skills\\skills");
+                planner.AddVariable("EnableMCP", false);
+                planner.AddVariable("EnableSkills", true);
 
                 var graphExecutor = new DAGraphExecutor(input, subTasks, planner, kernel);
-                graphExecutor.OnStepChanged = async (stepTrace) => await EmitTracesAsync(stepTrace);
+                graphExecutor.OnStepChanged = async (stepTrace) =>
+                {
+                    if (stepTrace.Type == "Thought") Task.Run(async() => await UpdateReasoningContent(_agentExecutionContext.GetMessageId(), stepTrace.Content));
+                    await EmitTracesAsync(stepTrace);
+                };
                 await graphExecutor.ExecuteAsync();
 
-                await EmitTracesAsync(StepTrace.ThinkDone(_agentExecutionContext.GetMessageId()));
+                stopwatch.Stop();
+                _logger.LogInformation($"本次任务耗时 {stopwatch.Elapsed.TotalSeconds.Round(2)} 秒");
+                await EmitTracesAsync(StepTrace.ThinkDone(_agentExecutionContext.GetMessageId(), stopwatch.Elapsed.TotalSeconds));
                 return subTasks.OrderByDescending(x => x.Id).FirstOrDefault().ExecuteResult.AsStreaming();
             }
             catch (Exception ex)
@@ -282,6 +302,15 @@ namespace PostgreSQL.Embedding.LlmServices
 
             result.choices[0].delta.content = conversationTitle;
             await _sseEmitter.EmitAsync(result, cancellationToken);
+        }
+
+        private async Task UpdateReasoningContent(long messageId, string reasoningContent)
+        {
+            await _chatHistoriesService.UpdateSystemMessageAsync(messageId, message =>
+            {
+                var newContent = (message.ReasoningContent ?? "") + reasoningContent;
+                message.ReasoningContent = newContent;
+            });
         }
     }
 }

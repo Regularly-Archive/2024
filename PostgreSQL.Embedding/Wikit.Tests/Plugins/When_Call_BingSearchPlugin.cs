@@ -24,7 +24,7 @@ namespace Wikit.Tests.Plugins
         [Fact]
         public async Task It_Should_Search_By_Keywords_Successfully()
         {
-            var searchResult = await _bingSearchPlugin.SearchAsync("元视角", 15);
+            var searchResult = await _bingSearchPlugin.SearchAsync("长安的荔枝 电影 杜甫", 15);
             this.ShouldSatisfyAllConditions(
                 () => searchResult.Entries.Count.ShouldBeGreaterThan(15)
             );
