@@ -74,6 +74,19 @@ def prepare_code_dir(code: str, extension: str, env: str, code_to_file, code_to_
         code_to_ipynb(code, code_path, language=language, dependencies=dependencies)
     return temp_dir
 
+def prepare_project_dir(files):
+    """
+    创建临时项目目录，并写入多个代码文件。
+    """
+    temp_dir = f"./runner_{{os.urandom(8).hex()}}"
+    os.makedirs(temp_dir, exist_ok=True)
+    for file in files:
+        file_path = os.path.join(temp_dir, file.path)
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        with open(file_path, 'wt', encoding='utf-8') as f:
+            f.write(file.content)
+    return temp_dir
+
 
 def create_container(config, temp_dir, user, format):
     """
