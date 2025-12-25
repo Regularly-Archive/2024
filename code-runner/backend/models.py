@@ -27,4 +27,18 @@ class RunFilesRequest(BaseModel):
     language: str
     files: List[CodeFile]
     dependencies: Optional[List[str]] = []
-    entry_path: Optional[str] = None 
+    entry_path: Optional[str] = None
+
+
+class ProjectArchiveRequest(BaseModel):
+    language: Optional[str] = None
+    entry_point: Optional[str] = None
+    build_command: Optional[str] = None
+    run_command: Optional[str] = None
+    max_archive_size: int = 50  # MB
+
+
+class ProjectArchiveResponse(RunCodeResponse):
+    detected_language: Optional[str] = None
+    detected_entry_point: Optional[str] = None
+    build_output: Optional[str] = None 

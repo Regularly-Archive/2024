@@ -3,6 +3,10 @@ import re
 import docker
 import os
 import shutil
+import zipfile
+import tarfile
+import tempfile
+from typing import List, Tuple, Optional
 
 client = docker.from_env()
 
@@ -65,7 +69,7 @@ def prepare_code_dir(code: str, extension: str, env: str, code_to_file, code_to_
     """
     创建临时代码目录，并写入代码或 notebook 文件。
     """
-    temp_dir = f"./runner_{{os.urandom(8).hex()}}"
+    temp_dir = f"./runner_{os.urandom(8).hex()}"
     os.makedirs(temp_dir, exist_ok=True)
     code_path = os.path.join(temp_dir, f'code.{extension}')
     if env != 'jupyter':
@@ -78,7 +82,7 @@ def prepare_project_dir(files):
     """
     创建临时项目目录，并写入多个代码文件。
     """
-    temp_dir = f"./runner_{{os.urandom(8).hex()}}"
+    temp_dir = f"./runner_{os.urandom(8).hex()}"
     os.makedirs(temp_dir, exist_ok=True)
     for file in files:
         file_path = os.path.join(temp_dir, file.path)
@@ -130,6 +134,7 @@ def run_command(container, command, user):
     """
     在容器内执行代码运行命令。
     """
+    print("execute command in container:", command)
     exec_result = container.exec_run(command, user=user, workdir=f"/home/{user}")
     return exec_result
 
@@ -154,3 +159,263 @@ def cleanup_container(container, temp_dir):
         container.stop()
         container.remove(force=True)
     shutil.rmtree(temp_dir)
+
+
+def extract_archive(archive_path: str, extract_to: str) -> List[str]:
+    """
+    解压压缩包到指定目录，支持的格式：zip, tar.gz, tar.bz2
+    返回解压的文件列表
+    """
+    extracted_files = []
+
+    try:
+        if archive_path.endswith('.zip'):
+            with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+                zip_ref.extractall(extract_to)
+                extracted_files = zip_ref.namelist()
+
+        elif archive_path.endswith(('.tar.gz', '.tgz')):
+            with tarfile.open(archive_path, 'r:gz') as tar_ref:
+                tar_ref.extractall(extract_to)
+                extracted_files = tar_ref.getnames()
+
+        elif archive_path.endswith(('.tar.bz2', '.tbz2')):
+            with tarfile.open(archive_path, 'r:bz2') as tar_ref:
+                tar_ref.extractall(extract_to)
+                extracted_files = tar_ref.getnames()
+
+        else:
+            raise ValueError(f"Unsupported archive format: {archive_path}")
+
+    except (zipfile.BadZipFile, tarfile.TarError) as e:
+        raise ValueError(f"Invalid archive file: {str(e)}")
+
+    return extracted_files
+
+
+def detect_project_type(project_dir: str) -> dict:
+    """
+    检测项目类型，返回语言信息和默认配置
+    """
+    # 导入PROJECT_DETECTORS配置
+    from config import PROJECT_DETECTORS
+
+    # 项目特征检测规则（简化版，保持核心功能）
+    project_indicators = {
+        'package.json': {
+            'language': 'javascript',
+            'entry_points': ['index.js', 'app.js', 'server.js', 'main.js'],
+            'dependency_files': ['package.json'],
+            'install_command': 'npm install',
+            'run_command': 'node {entry}'
+        },
+        'requirements.txt': {
+            'language': 'python3',
+            'entry_points': ['main.py', 'app.py', '__main__.py', 'run.py'],
+            'dependency_files': ['requirements.txt'],
+            'install_command': 'pip install -r requirements.txt',
+            'run_command': 'python {entry}'
+        },
+        'main.py': {
+            'language': 'python3',
+            'entry_points': ['main.py'],
+            'run_command': 'python main.py'
+        },
+        'pom.xml': {
+            'language': 'java',
+            'entry_points': [],  # Java需要构建后运行
+            'dependency_files': ['pom.xml'],
+            'build_command': 'mvn compile',
+            'run_command': 'mvn exec:java -Dexec.mainClass={main_class}'
+        },
+        # C# 支持
+        'Program.cs': {
+            'language': 'csharp',
+            'entry_points': ['Program.cs'],
+            'run_command': 'dotnet script {entry}'  # 或者 dotnet run
+        },
+        # Go 支持
+        'go.mod': {
+            'language': 'go',
+            'entry_points': ['main.go'],
+            'dependency_files': ['go.mod'],
+            'install_command': 'go mod tidy',
+            'run_command': 'go run .'
+        },
+        'main.go': {
+            'language': 'go',
+            'entry_points': ['main.go'],
+            'run_command': 'go run {entry}'
+        },
+        # C++ 支持
+        'main.cpp': {
+            'language': 'cpp',
+            'entry_points': ['main.cpp'],
+            'compile_command': 'g++ main.cpp -o main -std=c++17',
+            'run_command': './main'
+        },
+        'main.c': {
+            'language': 'cpp',  # 使用cpp镜像运行C程序
+            'entry_points': ['main.c'],
+            'compile_command': 'gcc main.c -o main',
+            'run_command': './main'
+        },
+        # Makefile支持
+        'Makefile': {
+            'language': 'cpp',
+            'entry_points': [],
+            'build_command': 'make',
+            'run_command': './main'  # 典型输出
+        }
+    }
+
+    detected_type = None
+    files_in_project = []
+
+    # 获取项目中的所有文件
+    for root, dirs, files in os.walk(project_dir):
+        for file in files:
+            files_in_project.append(os.path.relpath(os.path.join(root, file), project_dir))
+
+    # 检测项目类型 - 优先顺序
+    # 1. 查找具体的配置文件
+    for indicator, config in project_indicators.items():
+        if indicator in files_in_project:
+            detected_type = config.copy()
+            break
+    print("Detected project type:", detected_type)
+    if not detected_type or detected_type.get('language') == 'csharp':
+        # 2. 查找基于扩展名的项目文件
+        extension_indicators = {
+            '.csproj': {
+                'language': 'csharp',
+                'run_command': 'dotnet run'
+            },
+            '.sln': {
+                'language': 'csharp',
+                'description': 'C# Solution'
+            },
+            '.csx': {
+                'language': 'csharp',
+                'run_command': 'dotnet script {entry}'
+            },
+            '.cs': {
+                'language': 'csharp',
+                'run_command': 'dotnet run {entry}'
+            }
+        }
+
+        for file in files_in_project:
+            _, ext = os.path.splitext(file)
+            if ext in extension_indicators:
+                detected_type = extension_indicators[ext].copy()
+                break
+
+    if not detected_type:
+        # 3. 基于文件扩展名作语言检测
+        extensions = {}
+        for file in files_in_project:
+            _, ext = os.path.splitext(file)
+            if ext in ['.py', '.js', '.java', '.ts', '.go', '.rs', '.cpp', '.c', '.cs', '.csx', '.sh']:
+                extensions[ext] = extensions.get(ext, 0) + 1
+
+        # 取最多的扩展类型
+        if extensions:
+            main_ext = max(extensions, key=extensions.get)
+            ext_to_lang = {
+                '.py': 'python3',
+                '.js': 'javascript',
+                '.ts': 'typescript',
+                '.java': 'java',
+                '.go': 'go',
+                '.rs': 'rust',
+                '.cpp': 'cpp',
+                '.c': 'cpp',  # C用cpp镜像
+                '.cs': 'csharp',
+                '.csx': 'csharp',
+                '.sh': 'bash'
+            }
+            if main_ext in ext_to_lang:
+                detected_type = {
+                    'language': ext_to_lang[main_ext],
+                    'run_command': None  # 需要具体分析
+                }
+
+    # 如果没有明确入口点，尝试查找
+    if detected_type and not detected_type.get('entry_points'):
+        detected_type['entry_points'] = []
+        # 根据语言查找典型入口
+        lang = detected_type.get('language')
+        if lang == 'go':
+            candidates = ['main.go']
+        elif lang == 'csharp':
+            candidates = ['Program.cs', 'Main.cs']
+        elif lang == 'cpp':
+            candidates = ['main.cpp', 'main.c']
+        elif lang == 'rust':
+            candidates = ['src/main.rs', 'main.rs']
+        else:
+            candidates = ['main', 'index', 'app']
+
+        for file in files_in_project:
+            basename = os.path.basename(file).lower()
+            if any(cand.lower() in basename for cand in candidates):
+                detected_type['entry_points'].append(file)
+
+    return {
+        'language': detected_type.get('language') if detected_type else None,
+        'entry_points': detected_type.get('entry_points', []) if detected_type else [],
+        'dependency_files': detected_type.get('dependency_files', []) if detected_type else [],
+        'install_command': detected_type.get('install_command') if detected_type else None,
+        'build_command': detected_type.get('build_command') if detected_type else None,
+        'compile_command': detected_type.get('compile_command') if detected_type else None,
+        'run_command': detected_type.get('run_command') if detected_type else None,
+        'files': files_in_project
+    }
+
+
+def prepare_project_from_archive(archive_path: str) -> Tuple[str, dict]:
+    """
+    从压缩包准备项目目录，返回临时目录路径和项目信息
+    """
+    # 创建临时目录
+    temp_dir = tempfile.mkdtemp(prefix='project_')
+
+    try:
+        # 解压压缩包
+        extract_archive(archive_path, temp_dir)
+
+        # 检测项目类型
+        project_info = detect_project_type(temp_dir)
+
+        return temp_dir, project_info
+
+    except Exception as e:
+        # 出错时清理临时目录
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
+        raise e
+
+
+def find_entry_point(project_dir: str, entry_points: List[str], preferred: Optional[str] = None) -> Optional[str]:
+    """
+    在项目目录中查找入口文件
+    """
+    if preferred and os.path.exists(os.path.join(project_dir, preferred)):
+        return preferred
+
+    for entry in entry_points:
+        if os.path.exists(os.path.join(project_dir, entry)):
+            return entry
+
+    # 如果没找到预设的入口点，查找单个可执行文件
+    candidates = []
+    for root, dirs, files in os.walk(project_dir):
+        for file in files:
+            if file.endswith(('.py', '.js', '.java', '.go', '.rs')):
+                candidates.append(os.path.relpath(os.path.join(root, file), project_dir))
+
+    if len(candidates) == 1:
+        return candidates[0]
+
+    return None
