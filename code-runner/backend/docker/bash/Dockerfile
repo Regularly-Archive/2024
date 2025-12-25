@@ -1,39 +1,23 @@
-FROM alpine:3.19
+FROM alpine:3.20
 
-# Install bash and common utilities
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories \
+ && apk update
+
 RUN apk add --no-cache \
-    bash \
-    curl \
-    wget \
-    git \
-    vim \
-    nano \
-    jq \
-    python3 \
-    py3-pip \
-    nodejs \
-    npm \
-    make \
-    gcc \
-    g++ \
-    libc-dev \
-    linux-headers \
-    && rm -rf /var/cache/apk/*
+    bash curl wget git vim nano jq \
+    python3 py3-pip \
+    nodejs npm \
+    make gcc g++ libc-dev linux-headers
 
-# Create sandbox user
-RUN adduser -D -s /bin/bash sandbox \
-  && addgroup sandbox wheel
+RUN adduser -D -s /bin/bash sandbox
 
-# Set up bash configuration
 RUN echo 'export PS1="\u@\h:\w\$ "' >> /home/sandbox/.bashrc \
-  && echo 'export PATH=$PATH:/home/sandbox/.local/bin' >> /home/sandbox/.bashrc \
-  && echo 'alias ll="ls -la"' >> /home/sandbox/.bashrc
+ && echo 'export PATH=$PATH:/home/sandbox/.local/bin' >> /home/sandbox/.bashrc \
+ && echo 'alias ll="ls -la"' >> /home/sandbox/.bashrc
 
 USER sandbox
 WORKDIR /home/sandbox
 
-# Create common directories
-RUN mkdir -p /home/sandbox/{bin,lib,src,tmp}
+RUN mkdir -p bin lib src tmp
 
-# Set default command
 CMD ["/bin/bash"]

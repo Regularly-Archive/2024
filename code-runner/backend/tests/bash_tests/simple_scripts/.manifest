@@ -1,0 +1,15 @@
+{
+    "description": "简单脚本测试",
+    "tests": [
+        {
+            "name": "自动检测执行",
+            "mainScript": null,
+            "arguments": null
+        },
+        {
+            "name": "指定主脚本执行",
+            "mainScript": "test.sh",
+            "arguments": null
+        }
+    ]
+}

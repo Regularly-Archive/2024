@@ -1,0 +1,10 @@
+{
+    "description": "带参数脚本测试",
+    "tests": [
+        {
+            "name": "带参数执行",
+            "mainScript": "args.sh",
+            "arguments": "Alice 25 Beijing"
+        }
+    ]
+}

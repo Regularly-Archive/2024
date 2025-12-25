@@ -1,0 +1,10 @@
+{
+    "description": "多模块项目测试",
+    "tests": [
+        {
+            "name": "主脚本执行",
+            "mainScript": "main.sh",
+            "arguments": null
+        }
+    ]
+}

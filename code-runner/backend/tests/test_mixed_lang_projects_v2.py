@@ -170,10 +170,10 @@ def test_project(project_path: str, run_command: Optional[str] = None, data: Opt
 
 def scan_and_test_tests_directory():
     """扫描 tests 目录并测试所有项目"""
-    tests_dir = Path("tests")
+    tests_dir = Path("project_tests")
 
     if not tests_dir.exists():
-        print(f"tests 目录不存在: {tests_dir}")
+        print(f"project_tests 目录不存在: {tests_dir}")
         return
 
     results = []

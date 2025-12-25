@@ -12,7 +12,9 @@ from utils import (
     find_entry_point, detect_project_type
 )
 from models import RunCodeRequest, RunJupyterCellRequest, RunCodeResponse, RunFilesRequest, ProjectArchiveResponse
+from models_bash import BashScriptResponse
 import traceback
+import shutil
 
 app = FastAPI()
 app.add_middleware(
@@ -340,6 +342,152 @@ async def run_project_archive(
             os.unlink(temp_archive_path)
         print(e)
         raise HTTPException(status_code=500, detail=f"Failed to process archive: {str(e)}")
+
+@app.post("/api/bash/run", response_model=BashScriptResponse)
+async def run_bash_script(
+    archive_file: UploadFile = File(...),
+    main_script: str = Form(None),
+    arguments: str = Form(None)
+):
+    """
+    运行bash脚本（支持多文件引用）
+    """
+    from models_bash import BashScriptResponse
+
+    start_time = time.time()
+    temp_archive_path = None
+    container = None
+    run_cmd = None
+
+    try:
+        print(f"Bash script request: file={archive_file.filename}, main_script={main_script}, arguments={arguments}")
+
+        # 保存上传的压缩包
+        temp_dir = tempfile.mkdtemp()
+        temp_archive_path = os.path.join(temp_dir, archive_file.filename)
+
+        with open(temp_archive_path, 'wb') as f:
+            content = await archive_file.read()
+            f.write(content)
+
+        # 解压压缩包
+        script_dir = os.path.join(temp_dir, 'bash_workdir')
+        os.makedirs(script_dir, exist_ok=True)
+
+        if archive_file.filename.endswith('.zip'):
+            shutil.unpack_archive(temp_archive_path, script_dir, 'zip')
+        else:
+            # 支持 tar.gz
+            shutil.unpack_archive(temp_archive_path, script_dir, 'tar')
+
+        # 设置正确的权限
+        if os.name != "nt":
+            uid = os.getuid()
+            gid = os.getgid()
+            os.chown(script_dir, uid, gid)
+            os.chmod(script_dir, 0o755)
+
+        # 确定主脚本
+        if main_script:
+            main_script_path = os.path.join(script_dir, main_script.lstrip('/'))
+            if not os.path.exists(main_script_path):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Specified script '{main_script}' not found in archive"
+                )
+            main_script = main_script.lstrip('/')  # Remove leading slash if any
+        else:
+            # 查找主脚本（main.sh > run.sh > start.sh > 第一个.sh）
+            sh_files = []
+            for root, dirs, files in os.walk(script_dir):
+                for file in files:
+                    if file.endswith('.sh'):
+                        rel_path = os.path.relpath(os.path.join(root, file), script_dir)
+                        sh_files.append(rel_path)
+
+            if not sh_files:
+                raise HTTPException(status_code=400, detail="No bash scripts found in archive")
+
+            # 优先级：main.sh > run.sh > start.sh > 第一个.sh
+            main_script_candidates = ['main.sh', 'run.sh', 'start.sh']
+            main_script = None
+            for candidate in main_script_candidates:
+                for sh_file in sh_files:
+                    if sh_file == candidate:
+                        main_script = candidate
+                        break
+                if main_script:
+                    break
+
+            if not main_script:
+                main_script = sh_files[0]  # 取第一个找到的sh文件
+
+        # 确保主脚本可执行
+        main_script_path = os.path.join(script_dir, main_script)
+        os.chmod(main_script_path, 0o755)
+
+        # 构建运行命令
+        run_cmd = f'bash {main_script}'
+        if arguments:
+            run_cmd += f' {arguments}'
+
+        print(f"Running bash command: {run_cmd}")
+
+        # 创建容器
+        config = LANGUAGE_CONFIG.get('bash', {})
+        container = create_container(config, script_dir,'sandbox', '')
+
+        # 设置正确的权限
+        exec_result = run_container_command(
+            container,
+            f"sh -c '{run_cmd} > output.txt 2>&1'",
+            user='sandbox'
+        )
+
+        # 读取输出
+        output = exec_result.output.decode('utf-8') if exec_result.output else ""
+
+        # 如果 output.txt 有内容，优先使用它
+        output = read_output(script_dir, output)
+
+        # 清理输出
+        output = remove_ansi_sequences(output)
+
+        duration = time.time() - start_time
+
+        return BashScriptResponse(
+            output=output,
+            duration=duration,
+            exit_code=exec_result.exit_code
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Bash script error: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to run bash script: {str(e)}")
+    finally:
+        # 清理
+        if container:
+            try:
+                container.kill()
+                container.remove()
+            except:
+                pass
+
+        # 清理临时文件
+        if temp_archive_path and os.path.exists(temp_archive_path):
+            try:
+                os.unlink(temp_archive_path)
+            except:
+                pass
+
+        if temp_dir and os.path.exists(temp_dir):
+            try:
+                shutil.rmtree(temp_dir)
+            except:
+                pass
 
 if __name__ == "__main__":
     import uvicorn
