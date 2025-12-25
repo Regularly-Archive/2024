@@ -1,0 +1,10 @@
+{
+    "description": "环境变量测试",
+    "tests": [
+        {
+            "name": "运行环境变量测试",
+            "mainScript": "app.sh",
+            "arguments": null
+        }
+    ]
+}
