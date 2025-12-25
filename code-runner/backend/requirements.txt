@@ -2,3 +2,4 @@ fastapi
 uvicorn
 docker
 nbformat
+python-multipart
