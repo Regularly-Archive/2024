@@ -1,0 +1,5 @@
+{
+    "language": "cpp",
+    "description": "A standard single-file C project compiled with gcc",
+    "project_form": "cpp-project"
+}

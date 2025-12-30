@@ -1,0 +1,5 @@
+{
+    "language": "typescript",
+    "description": "A standard TypeScript project using package.json",
+    "project_form": "typescript-project"
+}

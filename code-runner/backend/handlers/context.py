@@ -1,0 +1,40 @@
+from dataclasses import dataclass
+from typing import Optional, Dict
+from models import ProjectInfo, RuntimeInfo, ExecutionResult
+from config import LANGUAGE_CONFIG
+
+
+@dataclass
+class HandlerContext:
+    runtime_info: RuntimeInfo
+    project_info: ProjectInfo
+    execution_result: ExecutionResult = None
+
+    def __init__(self, project_info: ProjectInfo):
+        self.project_info = project_info
+        langconfig = LANGUAGE_CONFIG.get(project_info.language)
+        self.runtime_info = RuntimeInfo(
+            user='sandbox' if langconfig.get('env') != 'jupyter' else 'jovyan',
+            image_name=langconfig.get('image'),
+            container_id=''
+        )
+
+    @property
+    def language(self):
+        return self.project_info.language
+
+    @property
+    def entry_point(self):
+        return self.project_info.entry_point
+
+    @property
+    def dependencies(self):
+        return self.project_info.dependencies
+
+    @property
+    def project_form(self):
+        return self.project_info.project_form
+
+    @property
+    def project_dir(self):
+        return self.project_info.project_dir
