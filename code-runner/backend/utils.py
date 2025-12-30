@@ -197,8 +197,7 @@ def detect_project_type(project_dir: str) -> dict:
     """
     检测项目类型，返回语言信息和默认配置
     """
-    # 导入PROJECT_DETECTORS配置
-    from config import PROJECT_DETECTORS
+
 
     # 项目特征检测规则（简化版，保持核心功能）
     project_indicators = {
@@ -419,3 +418,16 @@ def find_entry_point(project_dir: str, entry_points: List[str], preferred: Optio
         return candidates[0]
 
     return None
+
+
+
+def is_jbang_file(file_path: str) -> bool:
+    """检查文件是否是 Jbang 格式的 Java 文件"""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            first_line = f.readline().strip()
+            if first_line.startswith('///usr/bin/env jbang'):
+                return True
+        return False
+    except Exception:
+        return False

@@ -1,3 +1,6 @@
+from utils import is_jbang_file
+
+
 LANGUAGE_CONFIG = {
     'python2': {
         'env': 'python2',
@@ -32,21 +35,21 @@ LANGUAGE_CONFIG = {
         'install': 'npm install {deps}'
     },
     'csharp': {
-        'env' : 'dotnet',
+        'env': 'dotnet',
         'image': 'code_runner/dotnet',
         'command': "dotnet run code.cs",
         'commandRedirect': "sh -c 'dotnet run code.cs > output.txt'",
         'extension': 'csx'
     },
     'csharp-sfa': {
-        'env' :'dotnet',
+        'env': 'dotnet',
         'image': 'code_runner/dotnet',
         'command': "dotnet run code.cs",
         'commandRedirect': "sh -c 'dotnet run code.cs > output.txt'",
         'extension': 'cs'
     },
     'csharp-mono': {
-        'env' :'mono',
+        'env': 'mono',
         'image': 'code_runner/mono',
         'command': "sh -c 'mcs -out:code -codepage:utf8 code.cs && mono code --encoding=utf8'",
         'commandRedirect': "sh -c 'mcs -out:code -codepage:utf8 code.cs && mono code --encoding=utf8 > output.txt'",
@@ -108,125 +111,165 @@ LANGUAGE_CONFIG = {
         'commandRedirect': "sh -c 'lua code.lua > output.txt'",
         'extension': 'lua',
     },
-    'bash': 
-    {
+    'bash': {
         'env': 'bash',
         'image': 'code_runner/bash',
         'command': 'bash {entry}',
         'commandRedirect': "sh -c 'bash {entry} > output.txt'",
         'extension': 'sh'
+    },
+    'rust': {
+        'env': 'bash',
+        'image': 'code_runner/rust',
     }
 }
 
-# 项目特征文件到语言类型的映射
-PROJECT_DETECTORS = {
+PROJECT_INDICATORS = {
     'package.json': {
         'language': 'javascript',
         'entry_points': ['index.js', 'app.js', 'server.js', 'main.js'],
         'dependency_files': ['package.json'],
-        'install_command': 'npm install',
-        'build_command': None,
-        'run_command': 'node {entry}'
+        'project_form': 'nodejs-project',
+        'description': 'Node.js Application'
     },
     'requirements.txt': {
         'language': 'python3',
         'entry_points': ['main.py', 'app.py', '__main__.py', 'run.py'],
         'dependency_files': ['requirements.txt'],
-        'install_command': 'pip install -r requirements.txt',
-        'build_command': None,
-        'run_command': 'python {entry}'
+        'project_form': 'python-project',
+        'description': 'Python Project'
     },
     'main.py': {
         'language': 'python3',
         'entry_points': ['main.py'],
-        'install_command': None,
-        'build_command': None,
-        'run_command': 'python main.py'
+        'run_command': 'python main.py',
+        'project_form': 'python-project',
+        'description': 'Python Project'
     },
     'pom.xml': {
         'language': 'java',
         'entry_points': [],
         'dependency_files': ['pom.xml'],
-        'install_command': None,  # Maven自动处理依赖
-        'build_command': 'mvn compile',
-        'run_command': 'mvn exec:java -Dexec.mainClass={main_class}'
+        'project_form': 'java-project',
+        'description': 'Java Project(Maven)'
     },
-    # C# 项目支持
-    '*.csproj': {
+    'Program.cs': {
         'language': 'csharp',
         'entry_points': ['Program.cs'],
-        'project_files': ['*.csproj'],
-        'build_command': 'dotnet build',
-        'run_command': 'dotnet run'
     },
-    '*.sln': {
-        'language': 'csharp',
-        'entry_points': [],
-        'project_files': ['*.sln', '*.csproj'],
-        'description': 'C# Solution file detected'
-    },
-    '*.cs': {
-        'language': 'csharp-sfa',
-        'entry_points': ['Program.cs'],
-        'run_command': 'dotnet run {entry}'  # 
-    },
-    # C# 脚本文件
-    '*.csx': {
-        'language': 'csharp',
-        'entry_points': ['main.csx'],
-        'run_command': 'dotnet script {entry}'  # 使用 dotnet-script 工具
-    },
-    # Go 项目支持
     'go.mod': {
         'language': 'go',
         'entry_points': ['main.go'],
-        'dependency_files': ['go.mod', 'go.sum'],
-        'install_command': 'go mod tidy',
-        'build_command': None,
-        'run_command': 'go run .'  # 运行整个目录
+        'dependency_files': ['go.mod'],
+        'project_form': 'go-module',
+        'description': 'Go Module-based Application'
     },
     'main.go': {
         'language': 'go',
         'entry_points': ['main.go'],
-        'run_command': 'go run {entry}'
-    },
-    # C/C++ 项目支持
-    'Makefile': {
-        'language': 'cpp',
-        'entry_points': ['main.cpp', 'main.c'],
-        'build_command': 'make',
-        'run_command': './main'  # 假设编译输出为 main
-    },
-    'CMakeLists.txt': {
-        'language': 'cpp',
-        'entry_points': ['main.cpp', 'main.c'],
-        'build_commands': ['mkdir -p build', 'cd build && cmake ..', 'cd build && make'],
-        'run_command': './build/main'  # 假设编译输出为 build/main
+        'project_form': 'go-sfa',
+        'description': 'Go Application'
     },
     'main.cpp': {
         'language': 'cpp',
         'entry_points': ['main.cpp'],
-        'compile_command': 'g++ main.cpp -o main -std=c++17',
-        'run_command': './main'
     },
     'main.c': {
-        'language': 'cpp',  # C文件也用cpp镜像，因为包含gcc/g++
+        'language': 'cpp',
         'entry_points': ['main.c'],
-        'compile_command': 'gcc main.c -o main',
-        'run_command': './main'
     },
-    'main.sh': {
-        'language': 'bash',
-        'entry_points': ['main.sh'],
-        'install_command': None,
-        'build_command': None,
-        'run_command': 'bash main.sh'
+    'Makefile': {
+        'language': 'cpp',
+        'entry_points': [],
     },
-    '*.sh': {
+    'tsconfig.json': {
+        'language': 'typescript',
+        'entry_points': ['index.ts', 'app.ts', 'server.ts', 'main.ts'],
+        'dependency_files': ['package.json', 'tsconfig.json'],
+        'project_form': 'typescript-project',
+        'description': 'TypeScript Project'
+    },
+    'Cargo.toml': {
+        'language': 'rust',
+        'entry_points': ['src/main.rs', 'main.rs'],
+        'dependency_files': ['Cargo.toml'],
+        'project_form': 'rust-project',
+        'description': 'rust-project'
+    }
+}
+
+
+EXTENSION_INDICATORS = {
+    '.csproj': {
+        'language': 'csharp',
+        'project_form': 'csharp-project',
+        'description': 'Project-based C# Application'
+    },
+    '.sln': {
+        'language': 'csharp',
+        'project_form': 'csharp-solution',
+        'description': 'Solution-based C# Application'
+    },
+    '.csx': {
+        'language': 'csharp',
+        'project_form': 'csharp-script',
+        'description': 'Script-based C# Application'
+    },
+    '.cs': {
+        'language': 'csharp',
+        'project_form': 'csharp-sfa',
+        'description': 'Single File Based C# Application',
+        'match_rule': lambda filePath: not filePath.endswith('.csproj') or not filePath.endswith('.sln')
+    },
+    '.mod': {
+        'language': 'go',
+        'project_form': 'go-module',
+        'description': 'Go Module-based Application'
+    },
+    '.sh': {
         'language': 'bash',
-        'entry_points': ['{filename}'],
-        'install_command': None,
-        'build_command': None,
-        'run_command': 'bash {entry}'
+        'project_form': 'bash-script',
+        'description': 'Bash Script'
+    },
+    '.ts': {
+        'language': 'typescript',
+        'project_form': 'typescript-project',
+        'description': 'TypeScript Application'
+    },
+    '.js': {
+        'language': 'javascript',
+        'project_form': 'nodejs-project',
+        'description': 'Node.js Application'
+    },
+    '.py': {
+        'language': 'python3',
+        'project_form': 'python-project',
+        'description': 'Python Project'
+    },
+    '.c': {
+        'language': 'cpp',
+        'project_form': 'cpp-sfa',
+        'description': 'C Application'
+    },
+    '.cpp': {
+        'language': 'cpp',
+        'project_form': 'cpp-sfa',
+        'description': 'C++ Application'
+    },
+    '.java': {
+        'language': 'java',
+        'project_form': 'jbang-project',
+        'description': 'Java Project(JBang Format)',
+        'match_rule': lambda filePath: is_jbang_file(filePath)
+    },
+    '.go': {
+        'language': 'go',   
+        'project_form': 'go-sfa',
+        'description': 'Go Application'
+    },
+    '.rs': {
+        'language': 'rust', 
+        'project_form': 'rust-project',
+        'description': 'Rust Application'
     }
 }

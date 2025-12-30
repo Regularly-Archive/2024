@@ -11,6 +11,7 @@ import json
 import requests
 from pathlib import Path
 from typing import Dict, List, Optional
+import argparse
 
 
 def is_jbang_file(file_path: str) -> bool:
@@ -40,76 +41,17 @@ def create_project_archive(project_dir: str) -> str:
                 zipf.write(file_path, arc_path)
     return temp_file
 
-
-def parse_project_info(project_path: str) -> Dict:
-    """解析项目信息，确定项目类型和依赖"""
-    project_type = "unknown"
-    info = {
-        'name': os.path.basename(project_path),
-        'type': 'unknown',
-        'dependencies': [],
-        'entry_point': None
-    }
-
-    file_list = []
-    for root, dirs, files in os.walk(project_path):
-        for file in files:
-            if not file.startswith('.'):
-                file_list.append(os.path.join(root, file))
-
-    # 检查项目类型
-    if any(f.endswith('.csproj') for f in file_list):
-        info['type'] = 'csharp_project'
-        info['entry_point'] = next((f for f in file_list if f.endswith('Program.cs')), None)
-    elif any(f.endswith('.csx') for f in file_list):
-        info['type'] = 'csharp_script'
-        info['entry_point'] = next((f for f in file_list if f.endswith('.csx')), None)
-    elif 'pom.xml' in [os.path.basename(f) for f in file_list]:
-        info['type'] = 'java_maven'
-        info['entry_point'] = next((f for f in file_list if f.endswith('Main.java')), None)
-    elif any(f.endswith('.java') for f in file_list):
-        # 检测是否是 Jbang 格式的单文件
-        jbang_file = next((f for f in file_list if f.endswith('Main.java') and is_jbang_file(f)), None)
-        if jbang_file:
-            info['type'] = 'java_jbang'
-            info['entry_point'] = jbang_file
-        else:
-            info['type'] = 'java_sfa'
-            info['entry_point'] = next((f for f in file_list if f.endswith('Main.java')), None)
-    elif 'package.json' in [os.path.basename(f) for f in file_list]:
-        info['type'] = 'typescript'
-        info['entry_point'] = next((f for f in file_list if f.endswith('index.ts')), None)
-    elif any(f.endswith('.py') for f in file_list):
-        info['type'] = 'python'
-        info['entry_point'] = next((f for f in file_list if f.endswith('main.py')), None)
-    elif any(f.endswith('.go') for f in file_list):
-        if 'go.mod' in [os.path.basename(f) for f in file_list]:
-            info['type'] = 'go_module'
-        else:
-            info['type'] = 'go_sfa'
-        # 查找主入口文件
-        if 'go.mod' in [os.path.basename(f) for f in file_list]:
-            # 有 go.mod 的项目，通常在根目录有 main.go
-            info['entry_point'] = next((f for f in file_list if f.endswith('/main.go')), None)
-        else:
-            # 单文件项目
-            info['entry_point'] = next((f for f in file_list if f.endswith('.go')), None)
-    elif any(f.endswith('.cpp') or f.endswith('.c') for f in file_list):
-        info['type'] = 'cpp'
-        info['entry_point'] = next((f for f in file_list
-                                  if f.endswith('main.cpp') or f.endswith('main.c')), None)
-
-    return info
-
-
 def test_project(project_path: str, run_command: Optional[str] = None, data: Optional[dict] = None) -> Dict:
     """测试单个项目"""
-    print(f"\n=== 测试项目: {os.path.basename(project_path)} ===")
+    project_name = os.path.basename(project_path)
+    print(f"\n***** 测试项目: {project_name} *****")
 
     # 解析项目信息
-    project_info = parse_project_info(project_path)
-    print(f"项目类型: {project_info['type']}")
-    print(f"入口文件: {os.path.basename(project_info['entry_point']) if project_info['entry_point'] else 'N/A'}")
+    with open(os.path.join(project_path, '.manifest'), 'r', encoding='utf-8') as f:
+        manifest = json.load(f)
+        print(f"项目语言: {manifest.get('language', 'N/A')}")
+        print(f"项目形式: {manifest.get('project_form', 'N/A')}")
+        print(f"项目描述: {manifest.get('description', 'N/A')}")
 
     # 创建压缩包
     zip_path = create_project_archive(project_path)
@@ -120,7 +62,7 @@ def test_project(project_path: str, run_command: Optional[str] = None, data: Opt
 
         with open(zip_path, 'rb') as zip_file:
             files = {
-                'archive_file': (f'{project_info["name"]}.zip', zip_file, 'application/zip')
+                'archive_file': (f'{project_name}.zip', zip_file, 'application/zip')
             }
 
             request_data = data.copy() if data else {}
@@ -133,6 +75,7 @@ def test_project(project_path: str, run_command: Optional[str] = None, data: Opt
 
             if response.status_code == 200:
                 result = response.json()
+                print(result)
                 print(f"耗时: {result.get('duration')}")
                 print(f"检测到的语言: {result.get('detected_language')}")
                 print(f"检测到的入口点: {result.get('detected_entry_point')}")
@@ -168,7 +111,7 @@ def test_project(project_path: str, run_command: Optional[str] = None, data: Opt
             os.unlink(zip_path)
 
 
-def scan_and_test_tests_directory():
+def scan_and_test_tests_directory(filter):
     """扫描 tests 目录并测试所有项目"""
     tests_dir = Path("project_tests")
 
@@ -183,34 +126,13 @@ def scan_and_test_tests_directory():
     print("=" * 60)
 
     for project_dir in sorted(project_dirs):
+        project_name = os.path.basename(project_dir)
+        if not filter(project_name):
+            continue
+
         # 根据项目类型确定特殊参数和运行命令
         run_command = None
         data = {}
-
-        # 先解析项目信息
-        project_info = parse_project_info(str(project_dir))
-        project_type = project_info.get('type', '')
-
-        if project_type == 'go_module':
-            # Go Module 项目: 下载依赖并运行
-            run_command = 'go run .'
-            data['language'] = 'go'
-        elif project_type == 'go_sfa':
-            # Go 单文件: 直接运行
-            entry_point = os.path.basename(project_info['entry_point'])
-            run_command = f'go run {entry_point}'
-            data['language'] = 'go'
-        elif project_type == 'typescript':
-            run_command = 'npm install && npm start'
-        elif project_dir.name.startswith('java_pom'):
-            run_command = 'mvn compile exec:java'
-        elif project_dir.name.startswith('java_sfa'):
-            run_command = 'jbang Main.java'
-        elif 'java_jbang' in parse_project_info(str(project_dir)).get('type', ''):
-            # 使用 jbang 运行
-            project_info = parse_project_info(str(project_dir))
-            entry_file = os.path.basename(project_info['entry_point'])
-            run_command = f'jbang {entry_file}'
 
         result = test_project(str(project_dir), run_command, data)
         results.append({
@@ -237,14 +159,14 @@ def scan_and_test_tests_directory():
     return results
 
 
-def main():
+def main(filter):
     """主函数"""
     print("开始扫描 tests 目录...")
     print("确保后端服务正在运行: python server.py")
     print()
 
     try:
-        results = scan_and_test_tests_directory()
+        results = scan_and_test_tests_directory(filter)
 
         # 保存结果到文件
         if results:
@@ -259,4 +181,10 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+
+    parser = argparse.ArgumentParser(description="A script to test codes from different languages")
+    parser.add_argument("--project", type=str, help="项目名称")
+    args = parser.parse_args()
+
+    filter = lambda x:  args.project == x if args.project else True
+    main(filter)

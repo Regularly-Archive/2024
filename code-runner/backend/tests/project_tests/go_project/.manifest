@@ -1,0 +1,5 @@
+{
+    "language": "go",
+    "description": "A module-based Go project",
+    "project_form": "go-module"
+}
