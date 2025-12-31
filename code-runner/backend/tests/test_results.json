@@ -1,10 +1,10 @@
 [
   {
-    "project": "csharp_sfa",
+    "project": "python_project",
     "result": {
       "success": true,
       "detected_language": null,
-      "output": "",
+      "output": "{\n  \"A\": 52,\n  \"B\": 56,\n  \"Sum\": 108,\n  \"Timestamp\": \"2025-12-31T08:01:49.184696\",\n  \"Language\": \"Python Project\"\n}",
       "error": null
     }
   }

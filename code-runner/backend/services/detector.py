@@ -80,6 +80,11 @@ PROJECT_INDICATORS = {
         'language': 'rust',
         'dependency_files': ['Cargo.toml'],
         'project_form': ProjectForm.RUST.key,
+    },
+    'pom.xml':{
+        'language': 'java',
+        'dependency_files': ['pom.xml'],
+        'project_form': ProjectForm.JAVA_MAVEN.key
     }
 }
 
@@ -165,7 +170,7 @@ EXTENSION_INDICATORS = {
 
 class ProjectDetector:
 
-    def detect_project_info(self, project_dir: str) -> ProjectInfo:
+    def detect_project_info(self, project_dir: str, entry_point: str = None) -> ProjectInfo:
         files_in_project = [
             os.path.relpath(os.path.join(root, f), project_dir)
             for root, _, files in os.walk(project_dir)
@@ -182,7 +187,7 @@ class ProjectDetector:
                     'project_form': config['project_form'],
                     'description': ProjectForm.from_key(config['project_form']),
                     'dependency_files': config.get('dependency_files', []),
-                    'entry_points': []
+                    'entry_points': [entry_point] if entry_point else []
                 }
                 break
 
@@ -216,13 +221,12 @@ class ProjectDetector:
                     'project_form': project_form,
                     'description': description,
                     'dependency_files': [],
-                    'entry_points': []
+                    'entry_points': [entry_point] if entry_point else []
                 }
 
-        if detected_type:
+        if detected_type and not detected_type['entry_points']:
             detected_type['entry_points'] = self._find_entry_points(detected_type['language'], files_in_project)
             if not detected_type['entry_points']:
-                print(files_in_project)
                 detected_type['entry_points'] = [files_in_project[0]] if len(files_in_project) == 1 else []
                 if not detected_type['entry_points']:
                     raise ValueError(

@@ -47,7 +47,8 @@ class HandlerResolver:
             return JavaScriptProjectHandler(ctx)
 
         if ctx.language == "bash":
-            pass
+            from handlers.bash.project import BashProjectHandler
+            return BashProjectHandler(ctx)
 
         if ctx.language == "lua":
             from handlers.lua.project import LuaProjectHandler
