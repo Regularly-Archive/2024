@@ -17,21 +17,39 @@ class RunnerService:
                     continue
 
                 result = handler.execute_stage(stage)
-                if result.exit_code != 0:
-                    self.logger.error("The stage '%s' failed (exit code %d).", stage, result.exit_code)
-                    self.logger.error("\n%s\n[Stage: %s]\n[Command]: %s\n[Stdout]:\n%s\n[Stderr]:\n%s\n%s", 
-                        "-" * 60, result.name, result.command, result.stdout, result.stderr, "-" * 60)
-                    break
-                else:
-                    execution_result.stages.append(result)
-                    self.logger.info("The stage '%s' completed successfully in %.2f seconds.", stage, result.duration)
+                self._log_stage_result(result)
 
-            output = execution_result.final_output
-            self.logger.info("\n[Execution Output]\n%s", output)
-            return output
+                if result.exit_code != 0:
+                    break
         finally:
             duration = time.time() - start_time
             self.logger.info("The handler '%s' completed in %.2f seconds.", handler.__class__.__name__, duration)
             execution_result.total_duration = duration
             handler.ctx.execution_result = execution_result
             handler.cleanup()
+            
+    def _log_stage_result(self, result):
+        status = "SUCCESS" if result.exit_code == 0 else "FAILED"
+        duration = f"{result.duration:.2f}s"
+
+        command = (
+            ' '.join(result.command)
+            if isinstance(result.command, (list, tuple))
+            else result.command
+        )
+
+        header = f"[{result.name}] {status} ({duration}) | {command}"
+
+        output = result.stderr or result.stdout
+        message = header
+
+        if output:
+            message = f"{header}\n{output.rstrip()}"
+
+        if result.exit_code == 0:
+            self.logger.info(message)
+        else:
+            self.logger.error(message)
+
+
+

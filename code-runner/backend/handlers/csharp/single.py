@@ -4,5 +4,5 @@ class CSharpSingleFileHandler(BaseHandler):
 
     def define_pipeline(self):
         return {
-            'run': f"dotnet run {self.ctx.entry_point}"
+            'run': f"dotnet run {self.ctx.entry_point} -c Release"
         }

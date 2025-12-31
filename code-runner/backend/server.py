@@ -4,7 +4,7 @@ import time
 import os
 import tempfile
 from typing import Optional, List
-from config import LANGUAGE_CONFIG
+from config import LANGUAGE_RUNTIME_MAP
 from utils import (
     code_to_ipynb, code_to_file, prepare_code_dir, create_container,
     install_dependencies, run_command as run_container_command, read_output, cleanup_container,
@@ -34,7 +34,7 @@ detector = ProjectDetector()
 @app.post("/api/code/run", response_model=RunCodeResponse)
 async def run_code(request: RunCodeRequest = Body(...)):
     start_time = time.time()
-    config = LANGUAGE_CONFIG.get(request.language)
+    config = LANGUAGE_RUNTIME_MAP.get(request.language)
     if not config:
         raise HTTPException(status_code=400, detail=f"Unsupported language: {request.language}")
     
@@ -61,7 +61,7 @@ async def run_code(request: RunCodeRequest = Body(...)):
 @app.post("/api/jupyter/run", response_model=RunCodeResponse)
 async def run_jupyter(request: RunJupyterCellRequest = Body(...)):
     start_time = time.time()
-    config = LANGUAGE_CONFIG.get(f'jupyter-{request.language}')
+    config = LANGUAGE_RUNTIME_MAP.get(f'jupyter-{request.language}')
     if not config:
         raise HTTPException(status_code=400, detail=f"Unsupported language: {request.language}")
     
@@ -88,7 +88,7 @@ async def run_jupyter(request: RunJupyterCellRequest = Body(...)):
 @app.post("/api/files/run", response_model=RunCodeResponse)
 async def run_files(request: RunFilesRequest = Body(...)):
     start_time = time.time()
-    config = LANGUAGE_CONFIG.get(request.language)
+    config = LANGUAGE_RUNTIME_MAP.get(request.language)
     if not config:
         raise HTTPException(status_code=400, detail=f"Unsupported language: {request.language}")
     
@@ -154,10 +154,10 @@ async def run_project_archive(
         resolver = HandlerResolver()
         handler = resolver.resolve(ctx)
         runnerService = RunnerService()
-        output = runnerService.run(handler)
-        print(ctx.execution_result)
+        runnerService.run(handler)
+
         return RunCodeResponse(
-            output=output, 
+            output=ctx.execution_result.final_output, 
             contentType='text/plain', 
             duration=ctx.execution_result.total_duration, 
             language=ctx.language,
@@ -261,7 +261,7 @@ async def run_bash_script(
         print(f"Running bash command: {run_cmd}")
 
         # 创建容器
-        config = LANGUAGE_CONFIG.get('bash', {})
+        config = LANGUAGE_RUNTIME_MAP.get('bash', {})
         container = create_container(config, script_dir,'sandbox', '')
 
         # 设置正确的权限

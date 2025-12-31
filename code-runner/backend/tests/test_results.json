@@ -1,10 +1,10 @@
 [
   {
-    "project": "rust_project",
+    "project": "csharp_sfa",
     "result": {
       "success": true,
       "detected_language": null,
-      "output": "{\"a\":0,\"b\":5,\"sum\":5}\n",
+      "output": "",
       "error": null
     }
   }
