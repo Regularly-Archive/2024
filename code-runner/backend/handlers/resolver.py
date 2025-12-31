@@ -42,7 +42,7 @@ class HandlerResolver:
             from handlers.cpp.project import CPPProjectHandler
             return CPPProjectHandler(ctx)
 
-        if ctx.language == "javascript":
+        if ctx.language == "javascript" or ctx.language == "typescript":
             from handlers.javascript.project import JavaScriptProjectHandler
             return JavaScriptProjectHandler(ctx)
 
@@ -57,4 +57,4 @@ class HandlerResolver:
             from handlers.rust.project import RustProjectHandler
             return RustProjectHandler(ctx)
 
-        raise ValueError(f"Unsupported language '{ctx.language}or project type: {ctx.language}")
+        raise ValueError(f"Unsupported language '{ctx.language}' or project_form '{ctx.project_form}'")

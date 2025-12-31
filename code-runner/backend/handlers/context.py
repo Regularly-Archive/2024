@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional, Dict
 from models import ProjectInfo, RuntimeInfo, ExecutionResult
-from config import LANGUAGE_CONFIG
+from config import LANGUAGE_RUNTIME_MAP
 
 
 @dataclass
@@ -12,7 +12,7 @@ class HandlerContext:
 
     def __init__(self, project_info: ProjectInfo):
         self.project_info = project_info
-        langconfig = LANGUAGE_CONFIG.get(project_info.language)
+        langconfig = LANGUAGE_RUNTIME_MAP.get(project_info.language)
         self.runtime_info = RuntimeInfo(
             user='sandbox' if langconfig.get('env') != 'jupyter' else 'jovyan',
             image_name=langconfig.get('image'),
