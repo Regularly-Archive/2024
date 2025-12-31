@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Literal, List, Optional
+from typing import Literal, List, Optional, Dict, Any
 
 class RunCodeRequest(BaseModel):
     code: str
@@ -51,6 +51,8 @@ class RuntimeInfo(BaseModel):
     user: str
     container_id: Optional[str] = None
     environment: Optional[str] = None
+    container_envs: Dict[str, str] = Field(default_factory=dict)
+    runtime_args: str = ''
 
 class ProjectArchiveResponse(RunCodeResponse):
     detected_language: Optional[str] = None

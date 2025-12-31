@@ -8,11 +8,10 @@ from config import LANGUAGE_RUNTIME_MAP
 from utils import (
     code_to_ipynb, code_to_file, prepare_code_dir, create_container,
     install_dependencies, run_command as run_container_command, read_output, cleanup_container,
-    remove_ansi_sequences, prepare_project_dir, prepare_project_from_archive,
-    find_entry_point, detect_project_type, extract_archive
+    remove_ansi_sequences, prepare_project_dir, 
+    extract_archive
 )
 from models import RunCodeRequest, RunJupyterCellRequest, RunCodeResponse, RunFilesRequest, ProjectArchiveResponse
-from models_bash import BashScriptResponse
 import traceback
 import shutil
 from handlers.context import HandlerContext
@@ -170,7 +169,7 @@ async def run_project_archive(
         print(f"Error running project archive: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to run project archive: {str(e)}")
 
-@app.post("/api/bash/run", response_model=BashScriptResponse)
+@app.post("/api/project/run-bash", response_model=RunCodeResponse)
 async def run_bash_script(
     archive_file: UploadFile = File(...),
     main_script: str = Form(None),
@@ -179,142 +178,58 @@ async def run_bash_script(
     """
     运行bash脚本（支持多文件引用）
     """
-    from models_bash import BashScriptResponse
+    if not main_script or not main_script.strip():
+        raise HTTPException(status_code=400, detail="The parameter main_script must be specified")
 
-    start_time = time.time()
     temp_archive_path = None
-    container = None
-    run_cmd = None
+    try:
+
+        filename = archive_file.filename
+        if not filename.endswith(('.zip', '.tar.gz', '.tgz', '.tar.bz2', '.tbz2')):
+            raise HTTPException(
+                status_code=400,
+                detail="Unsupported archive format. Supported formats: zip, tar.gz, tar.bz2"
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Validation error: {str(e)}")
 
     try:
-        print(f"Bash script request: file={archive_file.filename}, main_script={main_script}, arguments={arguments}")
-
-        # 保存上传的压缩包
-        temp_dir = tempfile.mkdtemp()
-        temp_archive_path = os.path.join(temp_dir, archive_file.filename)
-
-        with open(temp_archive_path, 'wb') as f:
+        # 保存上传的压缩包到临时文件
+        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(archive_file.filename)[1]) as tmp_file:
+            temp_archive_path = tmp_file.name
             content = await archive_file.read()
-            f.write(content)
+            tmp_file.write(content)
 
-        # 解压压缩包
-        script_dir = os.path.join(temp_dir, 'bash_workdir')
-        os.makedirs(script_dir, exist_ok=True)
+        project_dir = tempfile.mkdtemp(prefix='project_')
+        extract_archive(temp_archive_path, project_dir)
 
-        if archive_file.filename.endswith('.zip'):
-            shutil.unpack_archive(temp_archive_path, script_dir, 'zip')
-        else:
-            # 支持 tar.gz
-            shutil.unpack_archive(temp_archive_path, script_dir, 'tar')
+        if not os.path.exists(os.path.join(project_dir, main_script)):
+            raise HTTPException(status_code=400, detail=f"The main_script '{main_script}' must exists")
 
-        # 设置正确的权限
-        if os.name != "nt":
-            uid = os.getuid()
-            gid = os.getgid()
-            os.chown(script_dir, uid, gid)
-            os.chmod(script_dir, 0o755)
-
-        # 确定主脚本
-        if main_script:
-            main_script_path = os.path.join(script_dir, main_script.lstrip('/'))
-            if not os.path.exists(main_script_path):
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Specified script '{main_script}' not found in archive"
-                )
-            main_script = main_script.lstrip('/')  # Remove leading slash if any
-        else:
-            # 查找主脚本（main.sh > run.sh > start.sh > 第一个.sh）
-            sh_files = []
-            for root, dirs, files in os.walk(script_dir):
-                for file in files:
-                    if file.endswith('.sh'):
-                        rel_path = os.path.relpath(os.path.join(root, file), script_dir)
-                        sh_files.append(rel_path)
-
-            if not sh_files:
-                raise HTTPException(status_code=400, detail="No bash scripts found in archive")
-
-            # 优先级：main.sh > run.sh > start.sh > 第一个.sh
-            main_script_candidates = ['main.sh', 'run.sh', 'start.sh']
-            main_script = None
-            for candidate in main_script_candidates:
-                for sh_file in sh_files:
-                    if sh_file == candidate:
-                        main_script = candidate
-                        break
-                if main_script:
-                    break
-
-            if not main_script:
-                main_script = sh_files[0]  # 取第一个找到的sh文件
-
-        # 确保主脚本可执行
-        main_script_path = os.path.join(script_dir, main_script)
-        os.chmod(main_script_path, 0o755)
-
-        # 构建运行命令
-        run_cmd = f'bash {main_script}'
-        if arguments:
-            run_cmd += f' {arguments}'
-
-        print(f"Running bash command: {run_cmd}")
-
-        # 创建容器
-        config = LANGUAGE_RUNTIME_MAP.get('bash', {})
-        container = create_container(config, script_dir,'sandbox', '')
-
-        # 设置正确的权限
-        exec_result = run_container_command(
-            container,
-            f"sh -c '{run_cmd} > output.txt 2>&1'",
-            user='sandbox'
+        ctx = HandlerContext(
+            project_info=detector.detect_project_info(project_dir, main_script)
         )
 
-        # 读取输出
-        output = exec_result.output.decode('utf-8') if exec_result.output else ""
+        ctx.runtime_info.runtime_args = arguments or '' 
 
-        # 如果 output.txt 有内容，优先使用它
-        output = read_output(script_dir, output)
+        resolver = HandlerResolver()
+        handler = resolver.resolve(ctx)
+        runnerService = RunnerService()
+        runnerService.run(handler)
 
-        # 清理输出
-        output = remove_ansi_sequences(output)
-
-        duration = time.time() - start_time
-
-        return BashScriptResponse(
-            output=output,
-            duration=duration,
-            exit_code=exec_result.exit_code
+        return RunCodeResponse(
+            output=ctx.execution_result.final_output, 
+            contentType='text/plain', 
+            duration=ctx.execution_result.total_duration, 
+            language=ctx.language,
+            project_info = ctx.project_info,
+            runtime_info = ctx.runtime_info
         )
-
-    except HTTPException:
-        raise
     except Exception as e:
-        print(f"Bash script error: {e}")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Failed to run bash script: {str(e)}")
-    finally:
-        # 清理
-        if container:
-            try:
-                container.kill()
-                container.remove()
-            except:
-                pass
-
-        # 清理临时文件
-        if temp_archive_path and os.path.exists(temp_archive_path):
-            try:
-                os.unlink(temp_archive_path)
-            except:
-                pass
-
-        if temp_dir and os.path.exists(temp_dir):
-            try:
-                shutil.rmtree(temp_dir)
-            except:
-                pass
+        import traceback
+        print(traceback.print_exc())
+        print(f"Error running project archive: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to run project archive: {str(e)}")
 
 @app.post("/api/python/run", response_model=RunCodeResponse)
 async def run_code(request: RunCodeRequest = Body(...)):
@@ -326,7 +241,7 @@ async def run_code(request: RunCodeRequest = Body(...)):
     
     project_info = detector.detect_project_info(project_dir)
     runtime_info =  {
-        'docker_image': LANGUAGE_CONFIG.get('python3').get('image')
+        'docker_image': LANGUAGE_RUNTIME_MAP.get('python3').get('image')
     }
     ctx = HandlerContext(
         runtime_info=runtime_info,
