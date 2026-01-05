@@ -7,12 +7,15 @@ class DockerClient:
     def __init__(self):
         self.client = docker.from_env()
         self.logger = get_logger(__name__)
+        self.cache_root = os.path.abspath('D:\\.cache\\')
 
     def create_container(self, image_name, project_dir, user, format):
         return self.client.containers.run(
         image=image_name,
         command="sleep infinity",
-        volumes={os.path.abspath(project_dir): {'bind': f'/home/{user}', 'mode': 'rw'}},
+        volumes={
+            os.path.abspath(project_dir): {'bind': f'/home/{user}', 'mode': 'rw'},
+        },
         tty=True,
         detach=True,
         environment={
@@ -58,7 +61,7 @@ class DockerClient:
             workdir=f"/home/{user}",
         )["Id"]
 
-        # 2. start exec (stream)
+    
         output = self.client.api.exec_start(
             exec_id,
             stream=True,
@@ -71,6 +74,6 @@ class DockerClient:
             if stderr:
                 yield "stderr", stderr.decode(errors="ignore")
 
-        # 3. inspect exec → exit code（关键）
+        
         inspect = self.client.api.exec_inspect(exec_id)
         yield "exit", inspect["ExitCode"]
