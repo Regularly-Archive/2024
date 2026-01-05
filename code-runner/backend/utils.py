@@ -71,7 +71,7 @@ def prepare_code_dir(code: str, extension: str, env: str, code_to_file, code_to_
     """
     temp_dir = f"./runner_{os.urandom(8).hex()}"
     os.makedirs(temp_dir, exist_ok=True)
-    code_path = os.path.join(temp_dir, f'code.{extension}')
+    code_path = os.path.join(temp_dir, f'code{extension}')
     if env != 'jupyter':
         code_to_file(code, code_path, language=language, dependencies=dependencies)
     else:

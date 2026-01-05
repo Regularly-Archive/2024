@@ -8,7 +8,7 @@ class PythonProjectHandler(BaseHandler):
             'run': f"python {self.ctx.entry_point}"
         }
 
-        if os.path.exists(os.path.join(self.ctx.project_dir, "requirements.txt")):
-            pipeline['install'] = "pip install -r requirements.txt" 
+        if self.ctx.project_info.has_dependencies("requirements.txt"):
+            pipeline['install'] = "uv venv .venv && sh .venv/bin/activate && uv pip install -r requirements.txt" 
         
         return pipeline

@@ -1,10 +1,12 @@
 import time
 from services.logger import get_logger
 from models import ExecutionResult
+from concurrent.futures import ThreadPoolExecutor
 
 class RunnerService:
     def __init__(self):
         self.logger = get_logger(__name__)
+        self.cleanup_executor = ThreadPoolExecutor(max_workers=4)
 
     def run(self, handler):
         start_time = time.time()
@@ -28,7 +30,7 @@ class RunnerService:
             self.logger.info("The handler '%s' completed in %.2f seconds.", handler.__class__.__name__, duration)
             execution_result.total_duration = duration
             handler.ctx.execution_result = execution_result
-            handler.cleanup()
+            self.cleanup_executor.submit(handler.cleanup)
             
     def _log_stage_result(self, result):
         status = "SUCCESS" if result.exit_code == 0 else "FAILED"

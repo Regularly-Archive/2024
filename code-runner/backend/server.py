@@ -28,34 +28,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-detector = ProjectDetector()
+project_detector = ProjectDetector()
+handler_resolver = HandlerResolver()
+runnerService = RunnerService()
 
 @app.post("/api/code/run", response_model=RunCodeResponse)
 async def run_code(request: RunCodeRequest = Body(...)):
-    start_time = time.time()
     config = LANGUAGE_RUNTIME_MAP.get(request.language)
     if not config:
         raise HTTPException(status_code=400, detail=f"Unsupported language: {request.language}")
     
     extension = config['extension']
     env = config['env']
-    user = 'sandbox' if env != 'jupyter' else 'jovyan'
     temp_dir = prepare_code_dir(request.code, extension, env, code_to_file, code_to_ipynb, language=request.language, dependencies=request.dependencies)
-    container = None
-    try:
-        container = create_container(config, temp_dir, user, '')
-        install_dependencies(container, request.language, request.dependencies, user, config)
-        exec_result = run_container_command(container, config['commandRedirect'], user)
-        output = exec_result.output.decode('utf-8')
-        output = remove_ansi_sequences(output)
-        output = read_output(temp_dir, output)
-        output = remove_ansi_sequences(output)
-        duration = time.time() - start_time
-        return RunCodeResponse(output=output, contentType='text/plain', duration=duration, language=request.language)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        cleanup_container(container, temp_dir)
+    ctx = HandlerContext(
+        project_info=project_detector.create_project_info(temp_dir, None, request.dependencies),
+    )
+
+    handler = handler_resolver.resolve(ctx)
+    runnerService.run(handler)
+
+    return RunCodeResponse(
+        output=ctx.execution_result.final_output, 
+        contentType='text/plain', 
+        duration=ctx.execution_result.total_duration, 
+        language=ctx.language,
+        project_info = ctx.project_info,
+        runtime_info = ctx.runtime_info
+    )
 
 @app.post("/api/jupyter/run", response_model=RunCodeResponse)
 async def run_jupyter(request: RunJupyterCellRequest = Body(...)):
@@ -84,32 +84,6 @@ async def run_jupyter(request: RunJupyterCellRequest = Body(...)):
     finally:
         cleanup_container(container, temp_dir)
 
-@app.post("/api/files/run", response_model=RunCodeResponse)
-async def run_files(request: RunFilesRequest = Body(...)):
-    start_time = time.time()
-    config = LANGUAGE_RUNTIME_MAP.get(request.language)
-    if not config:
-        raise HTTPException(status_code=400, detail=f"Unsupported language: {request.language}")
-    
-    extension = config['extension']
-    env = config['env']
-    user = 'sandbox' if env != 'jupyter' else 'jovyan'
-    temp_dir = prepare_project_dir(request.files)
-    container = None
-    try:
-        container = create_container(config, temp_dir, user, '')
-        install_dependencies(container, request.language, request.dependencies, user, config)
-        exec_result = run_container_command(container, config['commandRedirect'], user)
-        output = exec_result.output.decode('utf-8')
-        output = remove_ansi_sequences(output)
-        output = read_output(temp_dir, output)
-        output = remove_ansi_sequences(output)
-        duration = time.time() - start_time
-        return RunCodeResponse(output=output, contentType='text/plain', duration=duration, language=request.language)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        cleanup_container(container, temp_dir)
 
 
 @app.post("/api/project/run-archive", response_model=ProjectArchiveResponse)
@@ -147,12 +121,10 @@ async def run_project_archive(
         extract_archive(temp_archive_path, project_dir)
 
         ctx = HandlerContext(
-            project_info=detector.detect_project_info(project_dir),
+            project_info=project_detector.detect_project_info(project_dir),
         )
 
-        resolver = HandlerResolver()
-        handler = resolver.resolve(ctx)
-        runnerService = RunnerService()
+        handler = handler_resolver.resolve(ctx)
         runnerService.run(handler)
 
         return RunCodeResponse(
@@ -207,7 +179,7 @@ async def run_bash_script(
             raise HTTPException(status_code=400, detail=f"The main_script '{main_script}' must exists")
 
         ctx = HandlerContext(
-            project_info=detector.detect_project_info(project_dir, main_script)
+            project_info=project_detector.detect_project_info(project_dir, main_script)
         )
 
         ctx.runtime_info.runtime_args = arguments or '' 
@@ -230,33 +202,6 @@ async def run_bash_script(
         print(traceback.print_exc())
         print(f"Error running project archive: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to run project archive: {str(e)}")
-
-@app.post("/api/python/run", response_model=RunCodeResponse)
-async def run_code(request: RunCodeRequest = Body(...)):
-    start_time = time.time()
-    project_dir = f"./runner_{os.urandom(8).hex()}"
-    os.makedirs(project_dir, exist_ok=True)
-    with open(os.path.join(project_dir, 'test.py'), 'w', encoding='utf-8') as f:
-        f.write(request.code)
-    
-    project_info = detector.detect_project_info(project_dir)
-    runtime_info =  {
-        'docker_image': LANGUAGE_RUNTIME_MAP.get('python3').get('image')
-    }
-    ctx = HandlerContext(
-        runtime_info=runtime_info,
-        project_info=project_info,
-        user='sandbox'
-    )
-
-
-    resolver = HandlerResolver()
-    handler = resolver.resolve(ctx)
-    runnerService = RunnerService()
-    output = runnerService.run(handler)
-    duration = time.time() - start_time
-    
-    return RunCodeResponse(output=output, contentType='text/plain', duration=duration, language=ctx.language)
 
 if __name__ == "__main__":
     import uvicorn

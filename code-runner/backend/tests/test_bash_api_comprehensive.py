@@ -24,8 +24,9 @@ class BashAPITester:
 
     def create_archive_from_directory(self, project_dir):
         """从目录创建包含所有文件的压缩包"""
-        temp_file = tempfile.mktemp(suffix='.zip')
-        with zipfile.ZipFile(temp_file, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        temp_file = tempfile.NamedTemporaryFile(suffix=".zip", delete=False)
+        zip_path = Path(temp_file.name)
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for root, dirs, files in os.walk(project_dir):
                 # 排除隐藏文件和目录
                 files = [f for f in files if not f.startswith('.')]
@@ -35,7 +36,7 @@ class BashAPITester:
                     file_path = os.path.join(root, file)
                     arc_path = os.path.relpath(file_path, project_dir)
                     zipf.write(file_path, arc_path)
-        return temp_file
+        return zip_path
 
     def upload_and_test(self, archive_path, main_script=None, arguments=None):
         """上传并运行bash脚本"""

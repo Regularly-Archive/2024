@@ -1,7 +1,9 @@
 from enum import Enum
 from utils import is_jbang_file
-from models import ProjectInfo
+from models import ProjectInfo, Dependency
 import os
+from typing import List
+
 
 class ProjectForm(Enum):
     NODEJS = ("nodejs-project", "Node.js Application")
@@ -37,6 +39,7 @@ class ProjectForm(Enum):
                 return item.description
         return None
 
+
 DEFAULT_ENTRY_CANDIDATES = {
     'go': ['main.go'],
     'csharp': ["Program.cs", "Main.cs"],
@@ -48,7 +51,6 @@ DEFAULT_ENTRY_CANDIDATES = {
     'javascript': ['index.js', 'app.js', 'server.js', 'main.js'],
     'lua': ['main.lua']
 }
-
 
 PROJECT_INDICATORS = {
     'package.json': {
@@ -81,7 +83,7 @@ PROJECT_INDICATORS = {
         'dependency_files': ['Cargo.toml'],
         'project_form': ProjectForm.RUST.key,
     },
-    'pom.xml':{
+    'pom.xml': {
         'language': 'java',
         'dependency_files': ['pom.xml'],
         'project_form': ProjectForm.JAVA_MAVEN.key
@@ -168,6 +170,7 @@ EXTENSION_INDICATORS = {
     }
 }
 
+
 class ProjectDetector:
 
     def detect_project_info(self, project_dir: str, entry_point: str = None) -> ProjectInfo:
@@ -177,12 +180,12 @@ class ProjectDetector:
             for f in files
         ]
 
-        detected_type = None
+        detected_project = None
 
         # 根据项目特征文件检测项目类型
         for indicator, config in PROJECT_INDICATORS.items():
             if indicator in files_in_project:
-                detected_type = {
+                detected_project = {
                     'language': config['language'],
                     'project_form': config['project_form'],
                     'description': ProjectForm.from_key(config['project_form']),
@@ -209,14 +212,14 @@ class ProjectDetector:
             language = chosen['language']
             project_form = chosen['project_form']
             description = ProjectForm.from_key(project_form)
-            if detected_type:
-                detected_type.update({
+            if detected_project:
+                detected_project.update({
                     'language': language,
                     'project_form': project_form,
                     'description': description
                 })
             else:
-                detected_type = {
+                detected_project = {
                     'language': language,
                     'project_form': project_form,
                     'description': description,
@@ -224,27 +227,67 @@ class ProjectDetector:
                     'entry_points': [entry_point] if entry_point else []
                 }
 
-        if detected_type and not detected_type['entry_points']:
-            detected_type['entry_points'] = self._find_entry_points(detected_type['language'], files_in_project)
-            if not detected_type['entry_points']:
-                detected_type['entry_points'] = [files_in_project[0]] if len(files_in_project) == 1 else []
-                if not detected_type['entry_points']:
+        if detected_project and not detected_project['entry_points']:
+            detected_project['entry_points'] = self._find_entry_points(
+                detected_project['language'], files_in_project)
+            if not detected_project['entry_points']:
+                detected_project['entry_points'] = [files_in_project[0]] if len(files_in_project) == 1 else []
+                if not detected_project['entry_points']:
                     raise ValueError(
-                        f"Unable to detect entry point for project (language={detected_type.get('language')}, "
-                        f"project_form={detected_type.get('project_form')})"
+                        f"Unable to detect entry point for project (language={detected_project.get('language')}, "
+                        f"project_form={detected_project.get('project_form')})"
                     )
 
+        language = detected_project.get('language', 'unknown')
         return ProjectInfo(
             project_dir=project_dir,
-            language=detected_type.get('language', 'unknown'),
+            language=language,
             files=files_in_project,
-            entry_point=detected_type['entry_points'][0] if detected_type.get('entry_points') else None,
-            dependencies=detected_type.get('dependency_files', []),
-            project_form=detected_type.get('project_form'),
-            description=detected_type.get('description')
+            entry_point=detected_project['entry_points'][0] if detected_project.get('entry_points') else None,
+            dependencies=self._collect_project_dependencies(language, detected_project),
+            project_form=detected_project.get('project_form'),
+            description=detected_project.get('description')
         )
 
+    def create_project_info(self, project_dir: str, entry_point: str, dependencies: list[str]) -> List[str]:
+        project_info = self.detect_project_info(project_dir, entry_point)
+        project_info.dependencies = self._collect_file_dependencies(project_info.language, dependencies)
+        return project_info
 
-    def _find_entry_points(self, language: str, files: list[str]):
+    def _find_entry_points(self, language: str, files: list[str]) -> List[str]:
         candidates = DEFAULT_ENTRY_CANDIDATES.get(language, [])
         return [f for f in files if any(f.lower().endswith(c.lower()) for c in candidates)]
+
+    def _collect_project_dependencies(self, language: str, detected_project: dict) -> List[Dependency]:
+        dependency_files = detected_project.get('dependency_files', [])
+        if not dependency_files:
+            return []
+
+        return [
+            Dependency(
+                language=language,
+                kind="manifest",
+                scope="project",
+                path=dependency_files[0],
+                name=dependency_files[0],
+                version=None,
+                source="manifest_file"
+            )
+        ]
+
+    def _collect_file_dependencies(self, language: str, dependencies: list[str]) -> List[Dependency]:
+        if not dependencies:
+            return []
+
+        return [
+            Dependency(
+                language=language,
+                kind="atomic",
+                scope="file",
+                path=None,
+                name=dep,
+                version=None,
+                source="inline_cmd",
+            )
+            for dep in dependencies
+        ]
