@@ -23,6 +23,7 @@ class ProjectForm(Enum):
     CPP_SFA = ("cpp-sfa", "C/C++ Single File Application")
     RUST = ("rust-project", "Rust Application")
     LUA_SCRIPT = ("lua-script", "Lua Script")
+    JUPYTER = ("jupyter", "Run code in Jupyter Notebook")
 
     @property
     def key(self):
@@ -150,8 +151,7 @@ EXTENSION_INDICATORS = {
     '.java': {
         'language': 'java',
         'project_form': ProjectForm.JAVA_JBANG.key,
-        'priority': 50,
-        'match_rule': lambda filePath: is_jbang_file(filePath)
+        'priority': 50
     },
     '.go': {
         'language': 'go',
@@ -166,6 +166,11 @@ EXTENSION_INDICATORS = {
     '.lua': {
         'language': 'lua',
         'project_form': ProjectForm.LUA_SCRIPT.key,
+        'priority': 50
+    },
+    '.ipynb': {
+        'language': 'jupyter',
+        'project_form': ProjectForm.JUPYTER.key,
         'priority': 50
     }
 }
@@ -228,8 +233,7 @@ class ProjectDetector:
                 }
 
         if detected_project and not detected_project['entry_points']:
-            detected_project['entry_points'] = self._find_entry_points(
-                detected_project['language'], files_in_project)
+            detected_project['entry_points'] = self._find_entry_points(detected_project['language'], files_in_project)
             if not detected_project['entry_points']:
                 detected_project['entry_points'] = [files_in_project[0]] if len(files_in_project) == 1 else []
                 if not detected_project['entry_points']:
@@ -249,8 +253,9 @@ class ProjectDetector:
             description=detected_project.get('description')
         )
 
-    def create_project_info(self, project_dir: str, entry_point: str, dependencies: list[str]) -> List[str]:
+    def build_project_info(self, project_dir: str, language: str, entry_point: str, dependencies: list[str]) -> List[str]:
         project_info = self.detect_project_info(project_dir, entry_point)
+        project_info.language = language if project_info.language == 'jupyter' else project_info.language
         project_info.dependencies = self._collect_file_dependencies(project_info.language, dependencies)
         return project_info
 
@@ -276,18 +281,35 @@ class ProjectDetector:
         ]
 
     def _collect_file_dependencies(self, language: str, dependencies: list[str]) -> List[Dependency]:
-        if not dependencies:
-            return []
-
-        return [
-            Dependency(
-                language=language,
-                kind="atomic",
-                scope="file",
-                path=None,
-                name=dep,
-                version=None,
-                source="inline_cmd",
-            )
-            for dep in dependencies
+        languages_supporting_single_file_dependencies = [
+            'csharp', 'jupyter-csharp', 'jupyter-python', 'jupyter-r', 'java', 'python'
         ]
+
+        if (not dependencies) or (not language in languages_supporting_single_file_dependencies):
+            return []
+        if language == 'python':
+            return [
+                Dependency(
+                    language=language,
+                    kind="atomic",
+                    scope="file",
+                    path=None,
+                    name=dep,
+                    version=None,
+                    source="inline_cmd",
+                )
+                for dep in dependencies
+            ]
+        else:
+            return [
+                Dependency(
+                    language=language,
+                    kind="atomic",
+                    scope="file",
+                    path=None,
+                    name=dep,
+                    version=None,
+                    source="file_header",
+                )
+                for dep in dependencies
+            ]

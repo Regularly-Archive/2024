@@ -1,11 +1,165 @@
 [
   {
-    "project": "python_project",
+    "project": "c_sfa",
     "result": {
       "success": true,
       "detected_language": null,
-      "output": "{\n  \"A\": 48,\n  \"B\": 95,\n  \"Sum\": 143,\n  \"Timestamp\": \"2026-01-05T06:20:47.668521\",\n  \"Language\": \"Python Project\"\n}",
+      "output": "{\n  \"A\": 43,\n  \"B\": 39,\n  \"Sum\": 82,\n  \"Timestamp\": 1767687925,\n  \"Language\": \"C\"\n}",
       "error": null
+    }
+  },
+  {
+    "project": "cpp_make",
+    "result": {
+      "success": true,
+      "detected_language": null,
+      "output": "{\n  \"A\": 3,\n  \"B\": 13,\n  \"Sum\": 16,\n  \"Timestamp\": 1767687928,\n  \"Language\": \"Makefile (C++)\"\n}",
+      "error": null
+    }
+  },
+  {
+    "project": "cpp_sfa",
+    "result": {
+      "success": true,
+      "detected_language": null,
+      "output": "{\n  \"A\": 9,\n  \"B\": 46,\n  \"Sum\": 55,\n  \"Timestamp\": 1767687931,\n  \"Language\": \"C++\"\n}",
+      "error": null
+    }
+  },
+  {
+    "project": "csharp_project",
+    "result": {
+      "success": false,
+      "error": "HTTPConnectionPool(host='localhost', port=8001): Read timed out. (read timeout=60)",
+      "output": ""
+    }
+  },
+  {
+    "project": "csharp_script",
+    "result": {
+      "success": false,
+      "error": "HTTPConnectionPool(host='localhost', port=8001): Read timed out. (read timeout=60)",
+      "output": ""
+    }
+  },
+  {
+    "project": "csharp_script_entry",
+    "result": {
+      "success": false,
+      "error": "HTTPConnectionPool(host='localhost', port=8001): Read timed out. (read timeout=60)",
+      "output": ""
+    }
+  },
+  {
+    "project": "csharp_sfa",
+    "result": {
+      "success": false,
+      "error": "HTTPConnectionPool(host='localhost', port=8001): Read timed out. (read timeout=60)",
+      "output": ""
+    }
+  },
+  {
+    "project": "csharp_sfa_entry",
+    "result": {
+      "success": false,
+      "error": "HTTPConnectionPool(host='localhost', port=8001): Read timed out. (read timeout=60)",
+      "output": ""
+    }
+  },
+  {
+    "project": "go_project",
+    "result": {
+      "success": true,
+      "detected_language": null,
+      "output": "go: downloading github.com/sirupsen/logrus v1.9.3\ngo: downloading github.com/google/uuid v1.3.0\ngo: calculator imports\n\tgithub.com/google/uuid: github.com/google/uuid@v1.3.0: Get \"https://proxy.golang.org/github.com/google/uuid/@v/v1.3.0.zip\": EOF\ngo: calculator imports\n\tgithub.com/sirupsen/logrus: github.com/sirupsen/logrus@v1.9.3: Get \"https://proxy.golang.org/github.com/sirupsen/logrus/@v/v1.9.3.zip\": EOF",
+      "error": null
+    }
+  },
+  {
+    "project": "go_sfa",
+    "result": {
+      "success": true,
+      "detected_language": null,
+      "output": "{\n  \"A\": 16,\n  \"B\": 97,\n  \"Sum\": 113,\n  \"Timestamp\": \"2026-01-06T08:31:19Z\",\n  \"Language\": \"Go Single File\"\n}",
+      "error": null
+    }
+  },
+  {
+    "project": "go_sfa_entry",
+    "result": {
+      "success": true,
+      "detected_language": null,
+      "output": "{\n  \"A\": 64,\n  \"B\": 100,\n  \"Sum\": 164,\n  \"Timestamp\": \"2026-01-06T08:31:33Z\",\n  \"Language\": \"Go Single File\"\n}",
+      "error": null
+    }
+  },
+  {
+    "project": "java_project",
+    "result": {
+      "success": true,
+      "detected_language": null,
+      "output": "",
+      "error": null
+    }
+  },
+  {
+    "project": "java_sfa",
+    "result": {
+      "success": true,
+      "detected_language": null,
+      "output": "bash: warning: setlocale: LC_ALL: cannot change locale (en_US.UTF-8)\nPicked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8\n[jbang] Resolving dependencies...\n[jbang]    com.google.code.gson:gson:2.10.1\n[jbang]    org.slf4j:slf4j-simple:2.0.9\n[jbang] [ERROR] Could not resolve dependencies: Failed to collect dependencies at com.google.code.gson:gson:jar:2.10.1\n[jbang] Run with --verbose for more details",
+      "error": null
+    }
+  },
+  {
+    "project": "java_sfa_entry",
+    "result": {
+      "success": true,
+      "detected_language": null,
+      "output": "bash: warning: setlocale: LC_ALL: cannot change locale (en_US.UTF-8)\nPicked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8\n[jbang] Resolving dependencies...\n[jbang]    com.google.code.gson:gson:2.10.1\n[jbang]    org.slf4j:slf4j-simple:2.0.9\n[jbang] [ERROR] Could not resolve dependencies: Failed to collect dependencies at com.google.code.gson:gson:jar:2.10.1\n[jbang] Run with --verbose for more details",
+      "error": null
+    }
+  },
+  {
+    "project": "javascript_project",
+    "result": {
+      "success": true,
+      "detected_language": null,
+      "output": "{\n  \"A\": 67,\n  \"B\": 83,\n  \"Sum\": 150,\n  \"Timestamp\": \"2026-01-06T08:32:40.419Z\",\n  \"Language\": \"JavaScript\"\n}",
+      "error": null
+    }
+  },
+  {
+    "project": "python_project",
+    "result": {
+      "success": false,
+      "error": "HTTPConnectionPool(host='localhost', port=8001): Read timed out. (read timeout=60)",
+      "output": ""
+    }
+  },
+  {
+    "project": "rust_project",
+    "result": {
+      "success": false,
+      "error": "HTTPConnectionPool(host='localhost', port=8001): Read timed out. (read timeout=60)",
+      "output": ""
+    }
+  },
+  {
+    "project": "rust_sfa",
+    "result": {
+      "success": true,
+      "detected_language": null,
+      "output": "error[E0432]: unresolved import `rand`\n --> test.rs:1:5\n  |\n1 | use rand::Rng;\n  |     ^^^^ maybe a missing crate `rand`?\n  |\n  = help: consider adding `extern crate rand` to use the `rand` crate\nerror[E0432]: unresolved import `serde`\n --> test.rs:2:5\n  |\n2 | use serde::Serialize;\n  |     ^^^^^ maybe a missing crate `serde`?\n  |\n  = help: consider adding `extern crate serde` to use the `serde` crate\nerror[E0432]: unresolved import `serde_json`\n --> test.rs:3:5\n  |\n3 | use serde_json;\n  |     ^^^^^^^^^^ no `serde_json` in the root\nerror[E0433]: failed to resolve: use of undeclared crate or module `rand`\n  --> test.rs:13:19\n   |\n13 |     let mut rng = rand::thread_rng();\n   |                   ^^^^ use of undeclared crate or module `rand`\nerror: aborting due to 4 previous errors\n\nSome errors have detailed explanations: E0432, E0433.\nFor more information about an error, try `rustc --explain E0432`.",
+      "error": null
+    }
+  },
+  {
+    "project": "typescript_project",
+    "result": {
+      "success": false,
+      "error": "HTTPConnectionPool(host='localhost', port=8001): Read timed out. (read timeout=60)",
+      "output": ""
     }
   }
 ]

@@ -52,41 +52,40 @@ LANGUAGE_RUNTIME_MAP = {
     'jupyter-csharp': {
         'env': 'jupyter',
         'image': 'code_runner/jupyterlab',
-        'command': "python /nbconvert/convert.py /home/jovyan/code.ipynb /home/jovyan/output.txt --kernel .net-csharp",
-        'commandRedirect': "python /nbconvert/convert.py /home/jovyan/code.ipynb /home/jovyan/output.txt --kernel .net-csharp",
-        'extension': 'ipynb'
+        'kernel': '.net-csharp',
+        'extension': '.ipynb'
     },
     'jupyter-fsharp': {
         'env': 'jupyter',
         'image': 'code_runner/jupyterlab',
-        'command': "python /nbconvert/convert.py /home/jovyan/code.ipynb /home/jovyan/output.txt --kernel .net-fsharp",
-        'commandRedirect': "python /nbconvert/convert.py /home/jovyan/code.ipynb /home/jovyan/output.txt --kernel .net-fsharp",
-        'extension': 'ipynb'
+        'kernel': ".net-fsharp",
+        'extension': '.ipynb'
     },
     'jupyter-python': {
         'env': 'jupyter',
         'image': 'code_runner/jupyterlab',
-        'command': "python /nbconvert/convert.py /home/jovyan/code.ipynb /home/jovyan/output.txt --kernel python3",
-        'commandRedirect': "python /nbconvert/convert.py /home/jovyan/code.ipynb /home/jovyan/output.txt --kernel python3",
-        'extension': 'ipynb'
+        'kernel': "python3",
+        'extension': '.ipynb'
     },
     'jupyter-r': {
         'env': 'jupyter',
         'image': 'code_runner/jupyterlab',
-        'command': "python /nbconvert/convert.py /home/jovyan/code.ipynb /home/jovyan/output.txt --kernel ir",
-        'commandRedirect': "python /nbconvert/convert.py /home/jovyan/code.ipynb /home/jovyan/output.txt --kernel ir",
-        'extension': 'ipynb'
+        'kernel': "ir",
+        'extension': '.ipynb'
     },
     'lua': {
         'env': 'lua',
         'image': 'code_runner/lua',
+        'extension': '.lua'
     },
     'bash': {
         'env': 'bash',
         'image': 'code_runner/bash',
+        'extension': '.sh'
     },
     'rust': {
-        'env': 'bash',
+        'env': 'rust',
         'image': 'code_runner/rust',
+        'extension': '.rs'
     }
 }

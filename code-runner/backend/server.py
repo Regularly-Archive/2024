@@ -5,12 +5,8 @@ import os
 import tempfile
 from typing import Optional, List
 from config import LANGUAGE_RUNTIME_MAP
-from utils import (
-    code_to_ipynb, code_to_file, prepare_code_dir, create_container,
-    install_dependencies, run_command as run_container_command, read_output, cleanup_container,
-    remove_ansi_sequences, prepare_project_dir, 
-    extract_archive
-)
+from utils import read_output, prepare_project_dir_from_code, prepare_project_dir_from_archive
+
 from models import RunCodeRequest, RunJupyterCellRequest, RunCodeResponse, RunFilesRequest, ProjectArchiveResponse
 import traceback
 import shutil
@@ -28,63 +24,61 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-project_detector = ProjectDetector()
-handler_resolver = HandlerResolver()
+projectDetector = ProjectDetector()
+handlerResolver = HandlerResolver()
 runnerService = RunnerService()
 
 @app.post("/api/code/run", response_model=RunCodeResponse)
 async def run_code(request: RunCodeRequest = Body(...)):
-    config = LANGUAGE_RUNTIME_MAP.get(request.language)
-    if not config:
-        raise HTTPException(status_code=400, detail=f"Unsupported language: {request.language}")
-    
-    extension = config['extension']
-    env = config['env']
-    temp_dir = prepare_code_dir(request.code, extension, env, code_to_file, code_to_ipynb, language=request.language, dependencies=request.dependencies)
-    ctx = HandlerContext(
-        project_info=project_detector.create_project_info(temp_dir, None, request.dependencies),
-    )
+    """
+    运行代码片段
+    """
+    try:
+        project_dir = prepare_project_dir_from_code(request.code, request.language, request.dependencies)
+        project_info = projectDetector.build_project_info(project_dir, request.language, None, request.dependencies)
+        ctx = HandlerContext.from_project(project_info)
 
-    handler = handler_resolver.resolve(ctx)
-    runnerService.run(handler)
+        handler = handlerResolver.resolve(ctx)
+        runnerService.run(handler)
 
-    return RunCodeResponse(
-        output=ctx.execution_result.final_output, 
-        contentType='text/plain', 
-        duration=ctx.execution_result.total_duration, 
-        language=ctx.language,
-        project_info = ctx.project_info,
-        runtime_info = ctx.runtime_info
-    )
+        return RunCodeResponse(
+            output=ctx.execution_result.final_output, 
+            contentType='text/plain', 
+            duration=ctx.execution_result.total_duration, 
+            language=ctx.language,
+            project_info = ctx.project_info,
+            runtime_info = ctx.runtime_info
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/jupyter/run", response_model=RunCodeResponse)
 async def run_jupyter(request: RunJupyterCellRequest = Body(...)):
-    start_time = time.time()
-    config = LANGUAGE_RUNTIME_MAP.get(f'jupyter-{request.language}')
-    if not config:
-        raise HTTPException(status_code=400, detail=f"Unsupported language: {request.language}")
-    
-    extension = config['extension']
-    env = config['env']
-    user = 'jovyan'
-    temp_dir = prepare_code_dir(request.code, extension, env, code_to_file, code_to_ipynb, language=request.language, dependencies=request.dependencies)
-    container = None
+    """
+    运行 Jupyter 项目
+    """
     try:
-        container = create_container(config, temp_dir, user, request.format)
-        install_dependencies(container, request.language, request.dependencies, user, config)
-        exec_result = run_container_command(container, config['commandRedirect'], user)
-        output = exec_result.output.decode('utf-8')
-        output = remove_ansi_sequences(output)
-        output = read_output(temp_dir, output)
-        output = remove_ansi_sequences(output)
-        duration = time.time() - start_time
-        return RunCodeResponse(output=output, contentType=f'text/{request.format}', duration=duration, language=request.language)
+        project_dir = prepare_project_dir_from_code(request.code, request.language, request.dependencies)
+        project_info = projectDetector.build_project_info(project_dir, request.language, None, request.dependencies)
+        ctx = HandlerContext.from_project(project_info)
+        
+        language_config = LANGUAGE_RUNTIME_MAP[request.language]
+        ctx.set_container_env('KERNEL_NAME', language_config['kernel'])
+        ctx.set_container_env('NBCONVERT_OUTPUT_FORMAT', request.format)
+
+        handler = handlerResolver.resolve(ctx)
+        runnerService.run(handler)
+
+        return RunCodeResponse(
+            output=read_output(project_dir,''),
+            contentType='text/plain' if request.format == 'html' else 'text/notebook', 
+            duration=ctx.execution_result.total_duration, 
+            language=ctx.language,
+            project_info = ctx.project_info,
+            runtime_info = ctx.runtime_info
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        cleanup_container(container, temp_dir)
-
-
 
 @app.post("/api/project/run-archive", response_model=ProjectArchiveResponse)
 async def run_project_archive(
@@ -96,35 +90,14 @@ async def run_project_archive(
     dependencies: Optional[List[str]] = Form(None)
 ):
     """
-    运行压缩包中的项目
+    运行项目
     """
-    temp_archive_path = None
     try:
+        project_dir = await prepare_project_dir_from_archive(archive_file)
 
-        filename = archive_file.filename
-        if not filename.endswith(('.zip', '.tar.gz', '.tgz', '.tar.bz2', '.tbz2')):
-            raise HTTPException(
-                status_code=400,
-                detail="Unsupported archive format. Supported formats: zip, tar.gz, tar.bz2"
-            )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Validation error: {str(e)}")
+        ctx = HandlerContext.from_project(projectDetector.detect_project_info(project_dir))
 
-    try:
-        # 保存上传的压缩包到临时文件
-        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(archive_file.filename)[1]) as tmp_file:
-            temp_archive_path = tmp_file.name
-            content = await archive_file.read()
-            tmp_file.write(content)
-
-        project_dir = tempfile.mkdtemp(prefix='project_')
-        extract_archive(temp_archive_path, project_dir)
-
-        ctx = HandlerContext(
-            project_info=project_detector.detect_project_info(project_dir),
-        )
-
-        handler = handler_resolver.resolve(ctx)
+        handler = handlerResolver.resolve(ctx)
         runnerService.run(handler)
 
         return RunCodeResponse(
@@ -138,8 +111,7 @@ async def run_project_archive(
     except Exception as e:
         import traceback
         print(traceback.print_exc())
-        print(f"Error running project archive: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to run project archive: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/project/run-bash", response_model=RunCodeResponse)
 async def run_bash_script(
@@ -148,45 +120,21 @@ async def run_bash_script(
     arguments: str = Form(None)
 ):
     """
-    运行bash脚本（支持多文件引用）
+    运行 Bash 项目
     """
-    if not main_script or not main_script.strip():
-        raise HTTPException(status_code=400, detail="The parameter main_script must be specified")
-
-    temp_archive_path = None
     try:
-
-        filename = archive_file.filename
-        if not filename.endswith(('.zip', '.tar.gz', '.tgz', '.tar.bz2', '.tbz2')):
-            raise HTTPException(
-                status_code=400,
-                detail="Unsupported archive format. Supported formats: zip, tar.gz, tar.bz2"
-            )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Validation error: {str(e)}")
-
-    try:
-        # 保存上传的压缩包到临时文件
-        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(archive_file.filename)[1]) as tmp_file:
-            temp_archive_path = tmp_file.name
-            content = await archive_file.read()
-            tmp_file.write(content)
-
-        project_dir = tempfile.mkdtemp(prefix='project_')
-        extract_archive(temp_archive_path, project_dir)
+        if not main_script or not main_script.strip():
+            raise ValueError("The parameter main_script must be specified")
+        
+        project_dir = await prepare_project_dir_from_archive(archive_file)
 
         if not os.path.exists(os.path.join(project_dir, main_script)):
-            raise HTTPException(status_code=400, detail=f"The main_script '{main_script}' must exists")
+            raise ValueError(f"The main_script '{main_script}' must exists")
 
-        ctx = HandlerContext(
-            project_info=project_detector.detect_project_info(project_dir, main_script)
-        )
-
+        ctx = HandlerContext.from_project(projectDetector.detect_project_info(project_dir, main_script))
         ctx.runtime_info.runtime_args = arguments or '' 
 
-        resolver = HandlerResolver()
-        handler = resolver.resolve(ctx)
-        runnerService = RunnerService()
+        handler = handlerResolver.resolve(ctx)
         runnerService.run(handler)
 
         return RunCodeResponse(
@@ -198,9 +146,6 @@ async def run_bash_script(
             runtime_info = ctx.runtime_info
         )
     except Exception as e:
-        import traceback
-        print(traceback.print_exc())
-        print(f"Error running project archive: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to run project archive: {str(e)}")
 
 if __name__ == "__main__":

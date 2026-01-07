@@ -5,12 +5,12 @@ class PythonSingleFileHandler(BaseHandler):
 
     def define_pipeline(self): 
         pipeline = {
-            'run': f"python {self.ctx.entry_point}"
+            'run': f"uv venv && .venv/bin/python {self.ctx.entry_point}"
         }
         
         dependencies = self.ctx.project_info.get_inline_cmd_dependencies()
         if dependencies:
             deps = " ".join(list(map(lambda x:x.name, dependencies)))
-            pipeline['install'] = f"uv venv .venv && sh .venv/bin/activate && uv pip install {deps}"
+            pipeline['install'] = f"uv venv && uv pip install {deps}"
         
         return pipeline

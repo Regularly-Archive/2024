@@ -57,5 +57,9 @@ class HandlerResolver:
         if ctx.language == "rust":
             from handlers.rust.project import RustProjectHandler
             return RustProjectHandler(ctx)
+        
+        if 'jupyter' in ctx.language:
+            from handlers.jupyter.project import JupyterProjectHandler
+            return JupyterProjectHandler(ctx)
 
         raise ValueError(f"Unsupported language '{ctx.language}' or project_form '{ctx.project_form}'")

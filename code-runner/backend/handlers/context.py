@@ -13,10 +13,12 @@ class HandlerContext:
     def __init__(self, project_info: ProjectInfo):
         self.project_info = project_info
         langconfig = LANGUAGE_RUNTIME_MAP.get(project_info.language)
+        environment = langconfig.get('env')
         self.runtime_info = RuntimeInfo(
-            user='sandbox' if langconfig.get('env') != 'jupyter' else 'jovyan',
+            user='sandbox' if environment != 'jupyter' else 'jovyan',
             image_name=langconfig.get('image'),
-            container_id=''
+            container_id='',
+            environment=environment
         )
 
     @property
@@ -38,3 +40,17 @@ class HandlerContext:
     @property
     def project_dir(self):
         return self.project_info.project_dir
+    
+    def set_container_env(self, key, value):
+        self.runtime_info.container_envs[key] = value
+    
+    def get_container_env(self, key):
+        if not key in self.runtime_info.container_envs:
+            return None
+        
+        return self.runtime_info.container_envs[key]
+    
+    @classmethod
+    def from_project(cls, project_info: ProjectInfo):
+        return cls(project_info=project_info)
+
