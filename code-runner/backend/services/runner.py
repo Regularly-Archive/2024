@@ -18,8 +18,7 @@ class RunnerService:
                 if not stage in handler.build_pipeline:
                     continue
 
-                #result = handler.execute_stage(stage)
-                result = handler.test_stage(stage)
+                result = handler.execute_stage(stage)
                 execution_result.stages.append(result)
                 self._log_stage_result(result)
 

@@ -16,7 +16,6 @@ type CalculationResult struct {
 	Sum       int    `json:"Sum"`
 	Timestamp string `json:"Timestamp"`
 	Language  string `json:"Language"`
-	RequestID string `json:"RequestID"`
 }
 
 var log = logrus.New()
@@ -38,7 +37,6 @@ func calculate() *CalculationResult {
 		"a":         a,
 		"b":         b,
 		"sum":       sum,
-		"requestID": requestID,
 	}).Info("Calculation performed")
 
 	return &CalculationResult{
@@ -47,7 +45,6 @@ func calculate() *CalculationResult {
 		Sum:       sum,
 		Timestamp: time.Now().Format(time.RFC3339),
 		Language:  "Go Module",
-		RequestID: requestID,
 	}
 }
 

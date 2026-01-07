@@ -1,98 +1,176 @@
 <template>
-    <div class="flex flex-col h-screen p-5">
-        <h1 class="text-3xl text-green-600 text-center mb-4">Code Runner</h1>
-        <div class="flex items-center mb-4">
-            <label for="language-select" class="mr-2">选择语言:</label>
-            <select v-model="selectedLanguage" id="language-select" class="border rounded p-2 mr-2">
-                <option v-for="lang in languageOptions" :key="lang.value" :value="lang.value">{{ lang.label }}</option>
-            </select>
-            <button @click="executeCode" class="bg-blue-500 text-white rounded p-2 hover:bg-blue-600 flex items-center"
-                :disabled="isLoading">
-                <span v-if="isLoading" class="flex items-center">
-                    <svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none"
-                        viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
-                        </circle>
-                        <path class="opacity-75" fill="currentColor"
-                            d="M4 12a8 8 0 018-8v2a6 6 0 100 12v2a8 8 0 01-8-8z"></path>
-                    </svg>
-                    运行中...
-                </span>
-                <span v-else>运行代码</span>
-            </button>
-            <div v-if="executionTime" class="ml-4 text-gray-600">本次运行耗时: {{ executionTime }} s</div>
-        </div>
-        <div class="flex flex-1">
-            <div class="flex-1 border rounded p-2 mr-5 flex flex-col">
-                <Codemirror v-model:value="codeContent" :options="editorOptions" ref="cmRef" height="100%" width="100%"
-                    @change="handleChange" @input="handleInput" @ready="handleReady"></Codemirror>
-                <div class="mt-4">
-                    <label class="block mb-1">依赖项管理：</label>
-                    <textarea v-model="dependencies" rows="4" placeholder="" class="w-full border rounded p-2 resize-y"></textarea>
-                </div>
-            </div>
-            <div class="flex-1 border rounded p-2 bg-gray-50">
-                <pre class="h-full bg-black text-white" v-if="!isNotebook">{{ executionOutput }}</pre>
-                <div class="h-full" v-html="executionOutput" v-if="showHtml"></div>
-                <RenderJupyterNotebook class="h-full" :notebook="notebook" v-show="showJupyter" ref="jupyter" />
-            </div>
-        </div>
+  <div class="flex flex-col h-screen p-5 bg-gray-100">
+    <!-- 标题 -->
+    <h1 class="text-3xl text-green-600 font-semibold text-center mb-4 drop-shadow-md">
+      Code Runner
+    </h1>
+
+    <!-- 工具栏 -->
+    <div class="flex items-center mb-4 gap-3">
+      <label for="language-select" class="font-medium text-gray-700">选择语言:</label>
+      <select
+        v-model="selectedLanguage"
+        id="language-select"
+        class="border border-gray-300 rounded-lg p-2 shadow-sm focus:ring-1 focus:ring-blue-400 focus:outline-none"
+      >
+        <option v-for="lang in languageOptions" :key="lang.value" :value="lang.value">
+          {{ lang.label }}
+        </option>
+      </select>
+
+      <button
+        @click="executeCode"
+        :disabled="isLoading"
+        class="bg-blue-500 text-white rounded-lg p-2 flex items-center gap-2 shadow hover:bg-blue-600 active:scale-95 transition-transform duration-150"
+      >
+        <span v-if="isLoading" class="flex items-center gap-2">
+          <svg
+            class="animate-spin h-5 w-5 text-white"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v2a6 6 0 100 12v2a8 8 0 01-8-8z"/>
+          </svg>
+          运行中...
+        </span>
+        <span v-else>运行代码</span>
+      </button>
+
+      <div v-if="executionTime" class="ml-4 text-gray-600">
+        本次运行耗时: {{ executionTime }} s
+      </div>
     </div>
+
+    <!-- 左右布局 -->
+    <div class="flex flex-1 gap-5">
+      <!-- 左侧: 代码 + 依赖 -->
+      <div class="flex flex-col flex-1 border rounded-lg shadow-sm overflow-hidden bg-white">
+        <!-- 代码输入区 -->
+        <div class="flex-1 overflow-auto p-3 bg-gray-50 rounded-t-lg">
+          <Codemirror
+            v-model:value="codeContent"
+            :options="editorOptions"
+            ref="cmRef"
+            class="h-full w-full rounded-lg"
+          />
+        </div>
+
+        <!-- 可拖拽分隔条 -->
+        <div
+          class="h-2 cursor-row-resize bg-gray-300 hover:bg-gray-400 my-1"
+          @mousedown.prevent="startDrag"
+        ></div>
+
+        <!-- 依赖输入区 -->
+        <div
+          class="overflow-auto p-3 border-t border-gray-200 bg-gray-100 md:block rounded-b-lg"
+          :style="{ height: dependencyHeight + 'px' }"
+        >
+          <label class="block mb-1 font-medium text-gray-700">依赖项管理：</label>
+          <textarea
+            v-model="dependencies"
+            class="w-full h-full border border-gray-300 rounded-lg p-2 resize-none"
+            placeholder="每行一个依赖"
+          ></textarea>
+        </div>
+      </div>
+
+      <!-- 右侧输出区 -->
+      <div
+        class="flex-1 rounded-lg p-2 overflow-hidden flex flex-col"
+        :class="{
+          'border border-gray-300 bg-gray-50': !isNotebook && !showHtml,
+          'border border-purple-400 bg-purple-50': showHtml,
+          'border border-green-400 bg-green-50': showJupyter
+        }"
+      >
+        <!-- 普通文本输出 -->
+        <pre
+          v-if="!isNotebook && !showHtml"
+          class="flex-1 bg-gray-900 text-white p-4 overflow-auto rounded"
+        >
+{{ executionOutput }}</pre>
+
+        <!-- HTML 输出 -->
+        <div v-if="showHtml" class="flex-1 overflow-auto p-2" v-html="executionOutput"></div>
+
+        <!-- Jupyter Notebook 输出 -->
+        <RenderJupyterNotebook
+          v-if="showJupyter"
+          class="flex-1 overflow-auto"
+          :notebook="notebook"
+          ref="jupyter"
+        />
+      </div>
+    </div>
+  </div>
 </template>
+
 
 <script>
 import "codemirror/mode/javascript/javascript.js";
 import Codemirror from "codemirror-editor-vue3";
-import RenderJupyterNotebook from 'render-jupyter-notebook-vue'
+import RenderJupyterNotebook from "render-jupyter-notebook-vue";
 
 export default {
-    components: {
-        Codemirror,
-        RenderJupyterNotebook
+  components: { Codemirror, RenderJupyterNotebook },
+  data() {
+    return {
+      selectedLanguage: "python3",
+      codeContent: "",
+      executionOutput: "",
+      outputType: "",
+      languageOptions: this.getLanguageOptions(),
+      isLoading: false,
+      notebook: { cells: [] },
+      executionTime: null,
+      editorOptions: { mode: "python3", lineNumbers: true, lineWrapping: true },
+      dependencies: "",
+      dependencyHeight: 120, // 默认高度
+      dragging: false
+    };
+  },
+  watch: {
+    selectedLanguage(newLang) {
+      this.updateCodeContent(newLang);
+      this.dependencies = "";
+    }
+  },
+  mounted() {
+    this.updateCodeContent(this.selectedLanguage);
+    window.addEventListener("mousemove", this.onDrag);
+    window.addEventListener("mouseup", this.stopDrag);
+  },
+  beforeUnmount() {
+    window.removeEventListener("mousemove", this.onDrag);
+    window.removeEventListener("mouseup", this.stopDrag);
+  },
+  computed: {
+    showHtml() {
+      return this.selectedLanguage.includes("jupyter") && this.outputType === "text/html";
     },
-    data() {
-        return {
-            selectedLanguage: 'python3',
-            codeContent: '',
-            executionOutput: '',
-            outputType: '',
-            languageOptions: this.getLanguageOptions(),
-            isLoading: false,
-            notebook: { cells: [] },
-            editorOptions: {
-                mode: this.selectedLanguage,
-                lineNumbers: true,
-                lineWrapping: true,
-            },
-            dependencies: ''
-        };
+    showJupyter() {
+      return this.selectedLanguage.includes("jupyter") && this.outputType === "text/notebook";
     },
-    watch: {
-        selectedLanguage(newLang) {
-            this.updateCodeContent(newLang);
-            this.dependencies = '';
-        },
+    isNotebook() {
+      return this.selectedLanguage.includes("jupyter");
+    }
+  },
+  methods: {
+    startDrag() { this.dragging = true; },
+    onDrag(e) {
+      if (this.dragging) {
+        // 限制最小高度 60px，最大 400px
+        const newHeight = Math.min(Math.max(window.innerHeight - e.clientY - 30, 60), 400);
+        this.dependencyHeight = newHeight;
+      }
     },
-    mounted() {
-        this.updateCodeContent(this.selectedLanguage);
-    },
-    computed: {
-        formattedCode() {
-            return `<pre><code class="${this.selectedLanguage}">${this.codeContent}</code></pre>`;
-        },
-        showHtml() {
-            return this.selectedLanguage.indexOf('jupyter') != -1 && this.outputType == 'text/html'
-        },
-        showJupyter() {
-            return this.selectedLanguage.indexOf('jupyter') != -1 && this.outputType == 'text/notebook'
-        },
-        isNotebook() {
-            return this.selectedLanguage.indexOf('jupyter') != -1
-        }
-    },
-    methods: {
-        getLanguageOptions() {
-            return [
+    stopDrag() { this.dragging = false; },
+
+    getLanguageOptions() {
+      return [
                 { value: 'python2', label: 'Python2', code: '# -*- coding: utf-8 -*-\nprint("Hello, World!")' },
                 { value: 'python3', label: 'Python3', code: 'print("Hello, World!")' },
                 { value: 'cpp', label: 'C++', code: '#include <iostream>\n\nusing namespace std;\nint main() {\n    cout << "Hello, World!";\n    return 0;\n}' },
@@ -107,63 +185,58 @@ export default {
                 { value: 'jupyter-csharp', label: 'Jupyter/C#', code: 'Console.WriteLine("Hello, World!");' },
                 { value: 'jupyter-fsharp', label: 'Jupyter/F#', code: 'printfn "Hello from F#"' },
                 { value: 'jupyter-r', label: 'Jupyter/R', code: 'curve(sin(x), -2 * pi, 2 * pi)' },
-
-            ];
-        },
-        updateCodeContent(newLang) {
-            const selectedLang = this.languageOptions.find(lang => lang.value === newLang);
-            this.codeContent = selectedLang ? selectedLang.code : '';
-            this.editorOptions.mode = newLang;
-            this.executionOutput = '';
-            this.notebook = { cells: [] }
-        },
-        async executeCode() {
-            this.isLoading = true;
-            this.reset()
-
-            try {
-                const response = await fetch('http://localhost:8001/api/code/run', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        code: this.codeContent,
-                        language: this.selectedLanguage,
-                        dependencies: this.dependencies
-                            .split('\n')
-                            .map(dep => dep.trim())
-                            .filter(dep => dep.length > 0)
-                    })
-                });
-
-                const data = await response.json();
-                this.executionOutput = data.output;
-                this.executionTime = data.duration;
-                this.outputType = data.contentType
-                this.$nextTick(async () => {
-                    hljs.highlightAll();
-                    if (this.showJupyter) {
-                        this.notebook = JSON.parse(this.executionOutput)
-                        this.$refs.jupyter.render().then()
-                    }
-                });
-
-            } catch (error) {
-                this.executionOutput = `Error: ${error}`;
-            } finally {
-                this.isLoading = false;
-            }
-        },
-        handleChange() { },
-        handleInput() { },
-        handleReady() { },
-        reset() {
-            this.outputType = '';
-            this.executionOutput = '';
-            this.executionTime = null;
-            this.notebook = { cells: [] }
-        }
+      ];
     },
+
+    updateCodeContent(newLang) {
+      const lang = this.languageOptions.find(l => l.value === newLang);
+      this.codeContent = lang ? lang.code : "";
+      this.editorOptions.mode = newLang;
+      this.executionOutput = "";
+      this.outputType = "";
+      this.notebook = { cells: [] };
+    },
+
+    async executeCode() {
+      this.isLoading = true;
+      this.reset();
+
+      try {
+        const env = this.selectedLanguage.includes("jupyter") ? "jupyter" : "code";
+        const response = await fetch(`http://localhost:8001/api/${env}/run`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            code: this.codeContent,
+            language: this.selectedLanguage,
+            dependencies: this.dependencies.split("\n").map(d => d.trim()).filter(d => d),
+            format: "notebook"
+          })
+        });
+        const data = await response.json();
+        this.executionOutput = data.output;
+        this.executionTime = data.duration;
+        this.outputType = data.contentType;
+
+        this.$nextTick(() => {
+          if (this.showJupyter) {
+            this.notebook = JSON.parse(this.executionOutput);
+            this.$refs.jupyter.render();
+          }
+        });
+      } catch (error) {
+        this.executionOutput = `Error: ${error}`;
+      } finally {
+        this.isLoading = false;
+      }
+    },
+
+    reset() {
+      this.executionOutput = "";
+      this.outputType = "";
+      this.executionTime = null;
+      this.notebook = { cells: [] };
+    }
+  }
 };
 </script>

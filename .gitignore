@@ -108,3 +108,7 @@ code-runner/backend/services/__pycache__/detector.cpython-39.pyc
 code-runner/backend/services/__pycache__/
 code-runner/backend/runner_3c29689aa1ca3ddc/
 code-runner/backend/runner_*/*
+code-runner/backend/runners/
+code-runner/backend/handlers/jupyter/__pycache__/
+code-runner/backend/handlers/python/__pycache__/
+code-runner/backend/handlers/lua/__pycache__/

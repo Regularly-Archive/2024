@@ -9,7 +9,12 @@ class DockerClient:
         self.logger = get_logger(__name__)
         self.cache_root = os.path.abspath('D:\\.cache\\')
 
-    def create_container(self, image_name, project_dir, user, format):
+    def create_container(self, image_name, project_dir, user, envs):
+        default_envs = {
+            'LANG': 'en_US.UTF-8',
+            'LC_ALL': 'en_US.UTF-8',
+        }
+        merged_envs = {**default_envs, **envs}
         return self.client.containers.run(
         image=image_name,
         command="sleep infinity",
@@ -18,11 +23,7 @@ class DockerClient:
         },
         tty=True,
         detach=True,
-        environment={
-            'LANG': 'en_US.UTF-8',
-            'LC_ALL': 'en_US.UTF-8',
-            'NBCONVERT_OUTPUT_FORMAT': format
-        }
+        environment=merged_envs
     )
 
     def run_command(self, container, command, user):
