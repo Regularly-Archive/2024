@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Optional, Dict
 from models import ProjectInfo, RuntimeInfo, ExecutionResult
 from config import LANGUAGE_RUNTIME_MAP
+from pathlib import Path
 
 
 @dataclass
@@ -40,6 +41,10 @@ class HandlerContext:
     @property
     def project_dir(self):
         return self.project_info.project_dir
+    
+    @property
+    def project_id(self):
+        return Path(self.project_info.project_dir).name.replace('project_', '')
     
     def set_container_env(self, key, value):
         self.runtime_info.container_envs[key] = value

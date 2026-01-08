@@ -6,6 +6,7 @@ import tempfile
 from typing import Optional, List
 from config import LANGUAGE_RUNTIME_MAP
 from utils import read_output, prepare_project_dir_from_code, prepare_project_dir_from_archive
+from fastapi.staticfiles import StaticFiles
 
 from models import RunCodeRequest, RunJupyterCellRequest, RunCodeResponse, RunFilesRequest, ProjectArchiveResponse
 import traceback
@@ -23,6 +24,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.mount("/static", StaticFiles(directory="./static"), name="static")
 
 projectDetector = ProjectDetector()
 handlerResolver = HandlerResolver()
@@ -69,6 +71,7 @@ async def run_jupyter(request: RunJupyterCellRequest = Body(...)):
         handler = handlerResolver.resolve(ctx)
         runnerService.run(handler)
 
+        print(ctx.execution_result)
         return RunCodeResponse(
             output=read_output(project_dir,''),
             contentType='text/plain' if request.format == 'html' else 'text/notebook', 

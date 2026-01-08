@@ -89,3 +89,48 @@ LANGUAGE_RUNTIME_MAP = {
         'extension': '.rs'
     }
 }
+
+
+ALLOWED_ARTIFACT_PATTERNS = [
+    # 表格 / 数据
+    "*.csv",
+    "*.xlsx",
+    "*.xls",
+
+    # 文档
+    "*.pdf",
+    "*.docx",
+    "*.md",
+    "*.markdown",
+    "*.html",
+    "*.htm",
+    "*.txt",
+
+    # 图片
+    "*.png",
+    "*.jpg",
+    "*.jpeg",
+    "*.gif",
+    "*.svg",
+    "*.webp",
+]
+
+IGNORED_DIRS = {
+    # logs
+    "log", "logs",
+
+    # Python
+    "__pycache__", ".pytest_cache", ".mypy_cache",
+    ".venv", "venv", ".conda", ".ipython",
+
+    # Node / JS
+    "node_modules", ".npm", ".yarn", ".pnpm",
+
+    # Java / JVM
+    ".gradle", "target", ".m2",
+
+    # General
+    ".git", ".svn", ".hg",
+    ".cache", ".tmp", "tmp"
+}
+

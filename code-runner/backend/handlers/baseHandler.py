@@ -28,9 +28,6 @@ class BaseHandler(ABC):
         self.ctx.runtime_info.container_id = self.container.short_id
         self.logger.info("The container %s(%s) is created.", self.container.name, self.container.short_id)
 
-    def collect_generated_files(self) -> list[str]:
-        pass
-
     def cleanup(self):
         self.client.cleanup_container(self.container, self.ctx.project_dir, False)
     

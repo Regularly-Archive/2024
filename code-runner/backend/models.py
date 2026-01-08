@@ -116,10 +116,17 @@ class StageResult(BaseModel):
     def status(self) -> str:
         return "success" if self.exit_code == 0 else "error"
 
+class Artifact(BaseModel):
+    name: str
+    path: str
+    size: int
+    mime: Optional[str] = None
 
 class ExecutionResult(BaseModel):
+    execution_id: str
     stages: List[StageResult] = Field(default_factory=list)
     total_duration: float = 0.0
+    artifacts: list[Artifact] = Field(default_factory=list)
 
     @property
     def status(self) -> str:
