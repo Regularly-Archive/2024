@@ -112,3 +112,6 @@ code-runner/backend/runners/
 code-runner/backend/handlers/jupyter/__pycache__/
 code-runner/backend/handlers/python/__pycache__/
 code-runner/backend/handlers/lua/__pycache__/
+code-runner/backend/static/
+code-runner/backend/handlers/java/__pycache__/
+code-runner/backend/handlers/go/__pycache__/
