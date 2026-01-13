@@ -1,0 +1,5 @@
+{
+    "language": "rust",
+    "description": "A standard Rust project using Cargo.toml",
+    "project_form": "rust-project"
+}

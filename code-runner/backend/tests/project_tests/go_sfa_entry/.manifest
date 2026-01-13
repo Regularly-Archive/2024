@@ -1,0 +1,5 @@
+{
+    "language": "go",
+    "description": "A single file Go application with custom entry point",
+    "project_form": "go-sfa"
+}

@@ -1,0 +1,2 @@
+using System.IO;
+File.WriteAllText("csharp_output.txt", "Hello from C#");
