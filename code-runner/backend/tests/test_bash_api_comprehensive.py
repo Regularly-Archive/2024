@@ -11,7 +11,7 @@ import tempfile
 import os
 import json
 from pathlib import Path
-import io
+import io, zipfile
 
 BASE_URL = "http://localhost:8001"
 
@@ -22,42 +22,21 @@ class BashAPITester:
         self.temp_dir = tempfile.mkdtemp()
         self.test_base_path = Path(__file__).parent / "bash_tests"
 
-    def create_archive_from_directory(self, test_dir, arcname):
+    def create_archive_from_directory(self, project_dir):
         """从目录创建包含所有文件的压缩包"""
-        archive_path = os.path.join(self.temp_dir, arcname)
+        temp_file = tempfile.NamedTemporaryFile(suffix=".zip", delete=False)
+        zip_path = Path(temp_file.name)
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for root, dirs, files in os.walk(project_dir):
+                # 排除隐藏文件和目录
+                files = [f for f in files if not f.startswith('.')]
+                dirs[:] = [d for d in dirs if not d.startswith('.')]
 
-        with tarfile.open(archive_path, "w:gz") as tar:
-            # 遍历目录中的所有文件
-            for root, dirs, files in os.walk(test_dir):
                 for file in files:
-                    # 跳过 manifest 文件
-                    if file == ".manifest":
-                        continue
                     file_path = os.path.join(root, file)
-                    arc_path = os.path.relpath(file_path, test_dir)
-
-                    # 对于bash脚本文件，确保使用Unix行尾格式
-                    if file.endswith('.sh'):
-                        # 读取文件内容并进行行尾转换
-                        with open(file_path, 'rb') as f:
-                            content = f.read()
-
-                        # 转换行尾符 (CRLF -> LF)
-                        content = content.replace(b'\r\n', b'\n')
-
-                        # 创建 TarInfo 对象
-                        tarinfo = tarfile.TarInfo(name=arc_path)
-                        tarinfo.size = len(content)
-                        tarinfo.mode = 0o755  # 确保有执行权限
-
-                        # 使用 BytesIO 将内容添加到压缩包
-                        content_io = io.BytesIO(content)
-                        tar.addfile(tarinfo, content_io)
-                    else:
-                        # 非bash脚本文件直接添加
-                        tar.add(file_path, arcname=arc_path)
-
-        return archive_path
+                    arc_path = os.path.relpath(file_path, project_dir)
+                    zipf.write(file_path, arc_path)
+        return zip_path
 
     def upload_and_test(self, archive_path, main_script=None, arguments=None):
         """上传并运行bash脚本"""
@@ -69,7 +48,7 @@ class BashAPITester:
             if arguments:
                 data['arguments'] = arguments
 
-            return requests.post(f"{self.base_url}/api/bash/run", files=files, data=data)
+            return requests.post(f"{self.base_url}/api/project/run-bash", files=files, data=data)
 
     def run_directory_tests(self, test_dir):
         """运行单个测试目录中的所有测试用例"""
@@ -85,7 +64,7 @@ class BashAPITester:
         print(f"\n=== {manifest['description']} ===")
 
         # 创建压缩包
-        archive_path = self.create_archive_from_directory(test_dir, f"{test_dir.name}.tar.gz")
+        archive_path = self.create_archive_from_directory(test_dir)
 
         # 执行每个测试用例
         for test_case in manifest['tests']:

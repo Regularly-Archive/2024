@@ -1,0 +1,5 @@
+{
+    "language": "csharp",
+    "description": "A C# single file application",
+    "project_form": "csharp-sfa"
+}

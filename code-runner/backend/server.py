@@ -1,20 +1,20 @@
-from fastapi import FastAPI, HTTPException, Body, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, Body, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
-import time
+from fastapi.responses import FileResponse
 import os
-import tempfile
 from typing import Optional, List
-from config import LANGUAGE_CONFIG, PROJECT_DETECTORS
-from utils import (
-    code_to_ipynb, code_to_file, prepare_code_dir, create_container,
-    install_dependencies, run_command as run_container_command, read_output, cleanup_container,
-    remove_ansi_sequences, prepare_project_dir, prepare_project_from_archive,
-    find_entry_point, detect_project_type
-)
-from models import RunCodeRequest, RunJupyterCellRequest, RunCodeResponse, RunFilesRequest, ProjectArchiveResponse
-from models_bash import BashScriptResponse
-import traceback
-import shutil
+from config import LANGUAGE_RUNTIME_MAP
+from utils import read_output, prepare_project_dir_from_code, prepare_project_dir_from_archive
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
+import mimetypes
+
+from models import RunCodeRequest, RunJupyterCodeCellRequest, RunCodeResponse, RunFilesRequest, ProjectArchiveResponse
+from handlers.context import HandlerContext
+from handlers.resolver import HandlerResolver
+from services.runner import RunnerService
+from services.detector import ProjectDetector
+from views import SandboxResponseView, ArtifactView
 
 app = FastAPI()
 app.add_middleware(
@@ -24,470 +24,145 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.mount("/static", StaticFiles(directory="./static", html=False), name="static")
 
+projectDetector = ProjectDetector()
 
-@app.post("/api/code/run", response_model=RunCodeResponse)
-async def run_code(request: RunCodeRequest = Body(...)):
-    start_time = time.time()
-    config = LANGUAGE_CONFIG.get(request.language)
-    if not config:
-        raise HTTPException(status_code=400, detail=f"Unsupported language: {request.language}")
-    
-    extension = config['extension']
-    env = config['env']
-    user = 'sandbox' if env != 'jupyter' else 'jovyan'
-    temp_dir = prepare_code_dir(request.code, extension, env, code_to_file, code_to_ipynb, language=request.language, dependencies=request.dependencies)
-    container = None
+@app.post("/api/code/run", response_model=SandboxResponseView)
+async def run_code(request: RunCodeRequest = Body(...), raw_request: Request = None):
+    """
+    运行代码片段
+    """
     try:
-        container = create_container(config, temp_dir, user, '')
-        install_dependencies(container, request.language, request.dependencies, user, config)
-        exec_result = run_container_command(container, config['commandRedirect'], user)
-        output = exec_result.output.decode('utf-8')
-        output = remove_ansi_sequences(output)
-        output = read_output(temp_dir, output)
-        output = remove_ansi_sequences(output)
-        duration = time.time() - start_time
-        return RunCodeResponse(output=output, contentType='text/plain', duration=duration, language=request.language)
+        project_dir = prepare_project_dir_from_code(request.code, request.language, request.dependencies)
+        project_info = projectDetector.build_project_info(project_dir, request.language, None, request.dependencies)
+        ctx = HandlerContext.from_project(project_info)
+
+        runnerService = RunnerService(ctx)
+        runnerService.run()
+
+        return SandboxResponseView.from_context(ctx, raw_request, content_type='text/plain')
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        cleanup_container(container, temp_dir)
 
-@app.post("/api/jupyter/run", response_model=RunCodeResponse)
-async def run_jupyter(request: RunJupyterCellRequest = Body(...)):
-    start_time = time.time()
-    config = LANGUAGE_CONFIG.get(f'jupyter-{request.language}')
-    if not config:
-        raise HTTPException(status_code=400, detail=f"Unsupported language: {request.language}")
-    
-    extension = config['extension']
-    env = config['env']
-    user = 'jovyan'
-    temp_dir = prepare_code_dir(request.code, extension, env, code_to_file, code_to_ipynb, language=request.language, dependencies=request.dependencies)
-    container = None
+@app.post("/api/jupyter/run", response_model=SandboxResponseView)
+async def run_jupyter(request: RunJupyterCodeCellRequest = Body(...), raw_request: Request = None):
+    """
+    运行 Jupyter 项目
+    """
     try:
-        container = create_container(config, temp_dir, user, request.format)
-        install_dependencies(container, request.language, request.dependencies, user, config)
-        exec_result = run_container_command(container, config['commandRedirect'], user)
-        output = exec_result.output.decode('utf-8')
-        output = remove_ansi_sequences(output)
-        output = read_output(temp_dir, output)
-        output = remove_ansi_sequences(output)
-        duration = time.time() - start_time
-        return RunCodeResponse(output=output, contentType=f'text/{request.format}', duration=duration, language=request.language)
+        project_dir = prepare_project_dir_from_code(request.code, request.language, request.dependencies)
+        project_info = projectDetector.build_project_info(project_dir, request.language, None, request.dependencies)
+        ctx = HandlerContext.from_project(project_info)
+        
+        language_config = LANGUAGE_RUNTIME_MAP[request.language]
+        ctx.set_container_env('KERNEL_NAME', language_config['kernel'])
+        ctx.set_container_env('NBCONVERT_OUTPUT_FORMAT', request.format)
+
+        runnerService = RunnerService(ctx)
+        runnerService.run()
+
+        content_type = 'text/plain' if request.format == 'html' else 'text/notebook'
+        output_file = 'output.html' if request.format == 'html' else 'output.ipynb'
+        response = SandboxResponseView.from_context(ctx, raw_request, content_type=content_type)
+        response.result.output = read_output(project_dir, output_file, '')
+        return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        cleanup_container(container, temp_dir)
 
-@app.post("/api/files/run", response_model=RunCodeResponse)
-async def run_files(request: RunFilesRequest = Body(...)):
-    start_time = time.time()
-    config = LANGUAGE_CONFIG.get(request.language)
-    if not config:
-        raise HTTPException(status_code=400, detail=f"Unsupported language: {request.language}")
-    
-    extension = config['extension']
-    env = config['env']
-    user = 'sandbox' if env != 'jupyter' else 'jovyan'
-    temp_dir = prepare_project_dir(request.files)
-    container = None
-    try:
-        container = create_container(config, temp_dir, user, '')
-        install_dependencies(container, request.language, request.dependencies, user, config)
-        exec_result = run_container_command(container, config['commandRedirect'], user)
-        output = exec_result.output.decode('utf-8')
-        output = remove_ansi_sequences(output)
-        output = read_output(temp_dir, output)
-        output = remove_ansi_sequences(output)
-        duration = time.time() - start_time
-        return RunCodeResponse(output=output, contentType='text/plain', duration=duration, language=request.language)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        cleanup_container(container, temp_dir)
-
-
-@app.post("/api/project/run-archive", response_model=ProjectArchiveResponse)
+@app.post("/api/project/run-archive", response_model=SandboxResponseView)
 async def run_project_archive(
     archive_file: UploadFile = File(...),
     language: Optional[str] = Form(None),
     entry_point: Optional[str] = Form(None),
     build_command: Optional[str] = Form(None),
     run_command: Optional[str] = Form(None),
-    dependencies: Optional[List[str]] = Form(None)
+    dependencies: Optional[List[str]] = Form(None),
+    raw_request: Request = None
 ):
     """
-    运行压缩包中的项目
+    运行项目
     """
-    start_time = time.time()
-    temp_archive_path = None
-
     try:
-        # 验证上传的文件
-        print(f"Upload file: {archive_file.filename}")
-        print(f"Language: {language}")
-        print(f"Entry point: {entry_point}")
+        project_dir = await prepare_project_dir_from_archive(archive_file)
+
+        ctx = HandlerContext.from_project(projectDetector.detect_project_info(project_dir))
+
+        runnerService = RunnerService(ctx)
+        runnerService.run()
+
+        return SandboxResponseView.from_context(ctx, raw_request, content_type='text/plain')
     except Exception as e:
-        print(e)
-        raise HTTPException(status_code=500, detail=f"Upload error: {str(e)}\nCheck logs for details")
+        import traceback
+        print(traceback.print_exc())
+        raise HTTPException(status_code=500, detail=str(e))
 
-    try:
-        # 验证上传的文件
-        print(f"Validating archive file...")
-        if hasattr(archive_file, 'filename') and archive_file.filename:
-            filename = archive_file.filename
-            print(f"Filename: {filename}")
-        else:
-            filename = "unknown"
-            print("Using unknown filename")
-
-        print(f"Validation check - filename: {filename}")
-        if not filename.endswith(('.zip', '.tar.gz', '.tgz', '.tar.bz2', '.tbz2')):
-            print("Unsupported format detected")
-            raise HTTPException(
-                status_code=400,
-                detail="Unsupported archive format. Supported formats: zip, tar.gz, tar.bz2"
-            )
-        print("Validation passed")
-    except Exception as e:
-        print(e)
-        raise HTTPException(status_code=500, detail=f"Validation error: {str(e)}")
-
-    try:
-        # 保存上传的压缩包到临时文件
-        print(f"About to read file content...")
-        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(archive_file.filename)[1]) as tmp_file:
-            temp_archive_path = tmp_file.name
-            content = await archive_file.read()
-            tmp_file.write(content)
-
-        # 解压并检测项目类型
-        print("Calling prepare_project_from_archive...")
-        project_dir, project_info = prepare_project_from_archive(temp_archive_path)
-        print(f"Project dir: {project_dir}")
-        print(f"Project info: {project_info}")
-
-        # 如果没有指定语言，使用自动检测的
-        if not language:
-            language = project_info.get('language')
-            if not language:
-                # 尝试通过文件扩展名检测
-                extensions = {}
-                for file in project_info['files']:
-                    _, ext = os.path.splitext(file)
-                    if ext in ['.py', '.js', '.java', '.ts', '.go']:
-                        extensions[ext] = extensions.get(ext, 0) + 1
-
-                if extensions:
-                    main_ext = max(extensions, key=extensions.get)
-                    ext_to_lang = {'.py': 'python3', '.js': 'javascript', '.java': 'java', '.ts': 'typescript', '.go': 'go'}
-                    language = ext_to_lang.get(main_ext)
-
-        if not language:
-            raise HTTPException(
-                status_code=400,
-                detail="Unable to detect project language. Please specify language parameter. "
-                       f"Detected files: {project_info['files'][:10]}"
-            )
-
-        # 获取语言配置
-        config = LANGUAGE_CONFIG.get(language)
-        if not config:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported language: {language}. Supported: {list(LANGUAGE_CONFIG.keys())}"
-            )
-
-        # 确定入口点
-        detected_entry = None
-        if entry_point:
-            # 用户指定的入口点
-            if not os.path.exists(os.path.join(project_dir, entry_point)):
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Specified entry point not found: {entry_point}. "
-                           f"Available files: {project_info['files'][:10]}"
-                )
-            detected_entry = entry_point
-        else:
-            # 自动查找入口点
-            print(f"Finding entry point for project...")
-            entry_points = project_info.get('entry_points', []) or []
-            print(f"Available entry points: {entry_points}")
-            detected_entry = find_entry_point(
-                project_dir,
-                entry_points,
-                None
-            )
-
-            # 如果没找到，让用户指定
-            if not detected_entry:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Unable to detect entry point. Please specify entry_point parameter. "
-                           "Typical patterns: main.py, index.js, app.py"
-                )
-            print(f"Found entry point: {detected_entry}")
-
-        # 确定运行命令
-        run_cmd = run_command if run_command else None
-        print(f"Initial run command: {run_cmd}")
-        if not run_cmd:
-            # 使用项目配置或默认命令
-            if project_info.get('run_command'):
-                run_cmd = project_info['run_command'].replace('{entry}', detected_entry)
-            else:
-                # 使用语言配置的默认命令
-                extension = os.path.splitext(detected_entry)[1]
-                if extension == '.py' and language == 'python3':
-                    run_cmd = f"python {detected_entry}"
-                elif extension == '.js' and language == 'javascript':
-                    run_cmd = f"node {detected_entry}"
-                else:
-                    # 使用配置中的命令模板
-                    run_cmd = config.get('command', '').replace('code.' + config['extension'], detected_entry)
-
-        # 设置正确的commandRedirect
-        config = config.copy()
-        config['commandRedirect'] = f"sh -c '{run_cmd} > output.txt'"
-
-        # 确定用户
-        env = config.get('env', 'sandbox')
-        user = 'jovyan' if env == 'jupyter' else 'sandbox'
-
-        container = None
-
-        try:
-            # 创建容器
-            container = create_container(config, project_dir, user, '')
-
-            # 编译步骤（C/C++/部分C#项目需要）
-            build_output = ""
-            try:
-                # 编译单个源文件
-                if project_info.get('compile_command'):
-                    exec_result = container.exec_run(
-                        project_info['compile_command'],
-                        user=user,
-                        workdir=f"/home/{user}"
-                    )
-                    if exec_result.exit_code != 0:
-                        raise RuntimeError(f"Compilation failed: {exec_result.output.decode('utf-8')}")
-                    build_output += exec_result.output.decode('utf-8')
-
-                # 构建项目的
-                elif project_info.get('build_command'):
-                    exec_result = container.exec_run(
-                        project_info['build_command'],
-                        user=user,
-                        workdir=f"/home/{user}"
-                    )
-                    if exec_result.exit_code != 0:
-                        raise RuntimeError(f"Build failed: {exec_result.output.decode('utf-8')}")
-                    build_output += exec_result.output.decode('utf-8')
-
-                # 安装依赖
-                if project_info.get('install_command') and not dependencies:
-                    exec_result = container.exec_run(
-                        project_info['install_command'],
-                        user=user,
-                        workdir=f"/home/{user}"
-                    )
-                    if exec_result.exit_code != 0:
-                        raise RuntimeError(f"Dependency installation failed: {exec_result.output.decode('utf-8')}")
-                    build_output += exec_result.output.decode('utf-8')
-
-            except RuntimeError as e:
-                raise HTTPException(status_code=400, detail=str(e))
-
-            # 安装额外依赖
-            if dependencies:
-                install_dependencies(container, language, dependencies, user, config)
-
-            # 运行项目
-            exec_result = run_container_command(container, config['commandRedirect'], user)
-            output = exec_result.output.decode('utf-8')
-            output = remove_ansi_sequences(output)
-            output = read_output(project_dir, output)
-            output = remove_ansi_sequences(output)
-
-            duration = time.time() - start_time
-
-            return ProjectArchiveResponse(
-                output=output,
-                contentType='text/plain',
-                duration=duration,
-                language=language,
-                detected_language=project_info.get('language'),
-                detected_entry_point=detected_entry,
-                build_output=remove_ansi_sequences(build_output) if build_output else None
-            )
-
-        except Exception as e:
-            print(e)
-            raise HTTPException(status_code=500, detail=str(e))
-        finally:
-            cleanup_container(container, project_dir)
-            # 清理临时压缩包文件
-            if temp_archive_path and os.path.exists(temp_archive_path):
-                os.unlink(temp_archive_path)
-
-    except HTTPException:
-        # 重新抛出HTTP异常
-        raise
-    except Exception as e:
-        # 清理临时压缩包文件
-        if temp_archive_path and os.path.exists(temp_archive_path):
-            os.unlink(temp_archive_path)
-        print(e)
-        raise HTTPException(status_code=500, detail=f"Failed to process archive: {str(e)}")
-
-@app.post("/api/bash/run", response_model=BashScriptResponse)
+@app.post("/api/project/run-bash", response_model=RunCodeResponse)
 async def run_bash_script(
     archive_file: UploadFile = File(...),
     main_script: str = Form(None),
     arguments: str = Form(None)
 ):
     """
-    运行bash脚本（支持多文件引用）
+    运行 Bash 项目
     """
-    from models_bash import BashScriptResponse
-
-    start_time = time.time()
-    temp_archive_path = None
-    container = None
-    run_cmd = None
-
     try:
-        print(f"Bash script request: file={archive_file.filename}, main_script={main_script}, arguments={arguments}")
+        if not main_script or not main_script.strip():
+            raise ValueError("The parameter main_script must be specified")
+        
+        project_dir = await prepare_project_dir_from_archive(archive_file)
 
-        # 保存上传的压缩包
-        temp_dir = tempfile.mkdtemp()
-        temp_archive_path = os.path.join(temp_dir, archive_file.filename)
+        if not os.path.exists(os.path.join(project_dir, main_script)):
+            raise ValueError(f"The main_script '{main_script}' must exists")
 
-        with open(temp_archive_path, 'wb') as f:
-            content = await archive_file.read()
-            f.write(content)
+        ctx = HandlerContext.from_project(projectDetector.detect_project_info(project_dir, main_script))
+        ctx.runtime_info.runtime_args = arguments or '' 
 
-        # 解压压缩包
-        script_dir = os.path.join(temp_dir, 'bash_workdir')
-        os.makedirs(script_dir, exist_ok=True)
+        runnerService = RunnerService(ctx)
+        runnerService.run()
 
-        if archive_file.filename.endswith('.zip'):
-            shutil.unpack_archive(temp_archive_path, script_dir, 'zip')
-        else:
-            # 支持 tar.gz
-            shutil.unpack_archive(temp_archive_path, script_dir, 'tar')
-
-        # 设置正确的权限
-        if os.name != "nt":
-            uid = os.getuid()
-            gid = os.getgid()
-            os.chown(script_dir, uid, gid)
-            os.chmod(script_dir, 0o755)
-
-        # 确定主脚本
-        if main_script:
-            main_script_path = os.path.join(script_dir, main_script.lstrip('/'))
-            if not os.path.exists(main_script_path):
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Specified script '{main_script}' not found in archive"
-                )
-            main_script = main_script.lstrip('/')  # Remove leading slash if any
-        else:
-            # 查找主脚本（main.sh > run.sh > start.sh > 第一个.sh）
-            sh_files = []
-            for root, dirs, files in os.walk(script_dir):
-                for file in files:
-                    if file.endswith('.sh'):
-                        rel_path = os.path.relpath(os.path.join(root, file), script_dir)
-                        sh_files.append(rel_path)
-
-            if not sh_files:
-                raise HTTPException(status_code=400, detail="No bash scripts found in archive")
-
-            # 优先级：main.sh > run.sh > start.sh > 第一个.sh
-            main_script_candidates = ['main.sh', 'run.sh', 'start.sh']
-            main_script = None
-            for candidate in main_script_candidates:
-                for sh_file in sh_files:
-                    if sh_file == candidate:
-                        main_script = candidate
-                        break
-                if main_script:
-                    break
-
-            if not main_script:
-                main_script = sh_files[0]  # 取第一个找到的sh文件
-
-        # 确保主脚本可执行
-        main_script_path = os.path.join(script_dir, main_script)
-        os.chmod(main_script_path, 0o755)
-
-        # 构建运行命令
-        run_cmd = f'bash {main_script}'
-        if arguments:
-            run_cmd += f' {arguments}'
-
-        print(f"Running bash command: {run_cmd}")
-
-        # 创建容器
-        config = LANGUAGE_CONFIG.get('bash', {})
-        container = create_container(config, script_dir,'sandbox', '')
-
-        # 设置正确的权限
-        exec_result = run_container_command(
-            container,
-            f"sh -c '{run_cmd} > output.txt 2>&1'",
-            user='sandbox'
+        return RunCodeResponse(
+            output=ctx.execution_result.final_output, 
+            content_type='text/plain', 
+            duration=ctx.execution_result.total_duration, 
+            language=ctx.language,
+            project_info = ctx.project_info,
+            runtime_info = ctx.runtime_info
         )
-
-        # 读取输出
-        output = exec_result.output.decode('utf-8') if exec_result.output else ""
-
-        # 如果 output.txt 有内容，优先使用它
-        output = read_output(script_dir, output)
-
-        # 清理输出
-        output = remove_ansi_sequences(output)
-
-        duration = time.time() - start_time
-
-        return BashScriptResponse(
-            output=output,
-            duration=duration,
-            exit_code=exec_result.exit_code
-        )
-
-    except HTTPException:
-        raise
     except Exception as e:
-        print(f"Bash script error: {e}")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Failed to run bash script: {str(e)}")
-    finally:
-        # 清理
-        if container:
-            try:
-                container.kill()
-                container.remove()
-            except:
-                pass
+        raise HTTPException(status_code=500, detail=f"Failed to run project archive: {str(e)}")
 
-        # 清理临时文件
-        if temp_archive_path and os.path.exists(temp_archive_path):
-            try:
-                os.unlink(temp_archive_path)
-            except:
-                pass
+@app.get("/api/projects/{project_id}/executions/{execution_id}/artifacts", response_model=List[ArtifactView])
+def get_artifacts(raw_request: Request, project_id: str, execution_id: str) -> List[ArtifactView]:
+    static_root = Path("./static/projects") / project_id / "executions" / execution_id / "artifacts"
+    if not static_root.exists():
+        return []
+    
+    artifacts = []
+    for file_path in static_root.rglob("*"):
+        if file_path.is_file():
+            artifacts.append(ArtifactView.from_file(project_id, execution_id, file_path, raw_request))
 
-        if temp_dir and os.path.exists(temp_dir):
-            try:
-                shutil.rmtree(temp_dir)
-            except:
-                pass
+    return artifacts
+
+@app.get("/api/projects/{project_id}/executions/{execution_id}/artifacts/{artifact_path:path}")
+def get_artifact(project_id: str, execution_id: str, artifact_path: str) -> FileResponse:
+    static_root = (Path("./static/projects") / project_id / "executions" / execution_id / "artifacts").resolve()
+    file_path = (static_root / artifact_path).resolve() 
+
+    if not str(file_path).startswith(str(static_root)):
+        raise HTTPException(status_code=403, detail="Invalid artifact path")
+
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="Artifact not found")
+
+    mime, _ = mimetypes.guess_type(file_path)
+
+    return FileResponse(
+        path=file_path,
+        media_type=mime or "application/octet-stream",
+        filename=file_path.name, 
+    )
 
 if __name__ == "__main__":
     import uvicorn

@@ -1,0 +1,13 @@
+{
+  "name": "calculation-project",
+  "version": "1.0.0",
+  "description": "Generate two random numbers and output their sum as JSON",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": ["calculation", "json", "demo"],
+  "author": "",
+  "license": "MIT"
+}

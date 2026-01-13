@@ -1,0 +1,5 @@
+{
+    "language": "java",
+    "description": "A single file Java application based on JBang with custom entry point",
+    "project_form": "jbang-project"
+}

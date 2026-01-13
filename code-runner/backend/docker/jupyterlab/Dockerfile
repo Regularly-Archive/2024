@@ -1,5 +1,6 @@
 FROM jupyter/datascience-notebook:latest
-ARG DOTNET_VERSION=8.0
+ARG DOTNET_VERSION=9.0
+ARG VERSION_ID=22.04
 
 USER root
 ENV PATH="/opt/conda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH}"
