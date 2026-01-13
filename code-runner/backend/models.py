@@ -1,32 +1,26 @@
 from pydantic import BaseModel, Field
 from typing import Literal, List, Optional, Dict, Any
 
-
 class RunCodeRequest(BaseModel):
     code: str
     language: str
     dependencies: list[str] = []
 
-
-class RunJupyterCellRequest(BaseModel):
+class RunJupyterCodeCellRequest(BaseModel):
     code: str
     language: str
     dependencies: list[str] = []
-    format: Literal['html', 'notebook'] = Field(
-        'html', description='The output format for jupyter runner')
-
+    format: Literal['html', 'notebook'] = Field('html', description='The output format for jupyter runner')
 
 class RunCodeResponse(BaseModel):
     output: str
-    contentType: str
+    content_type: str
     duration: float
     language: str
-
 
 class CodeFile(BaseModel):
     path: str
     content: str
-
 
 class RunFilesRequest(BaseModel):
     language: str
@@ -34,14 +28,12 @@ class RunFilesRequest(BaseModel):
     dependencies: Optional[List[str]] = []
     entry_path: Optional[str] = None
 
-
 class ProjectArchiveRequest(BaseModel):
     language: Optional[str] = None
     entry_point: Optional[str] = None
     build_command: Optional[str] = None
     run_command: Optional[str] = None
     max_archive_size: int = 50  # MB
-
 
 # 依赖类型
 DependencyKind = Literal["manifest", "atomic"]
@@ -92,6 +84,7 @@ class RuntimeInfo(BaseModel):
     user: str
     container_id: Optional[str] = None
     environment: Optional[str] = None
+    version: Optional[str] = None
     container_envs: Dict[str, str] = Field(default_factory=dict)
     runtime_args: str = ''
 

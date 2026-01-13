@@ -115,3 +115,5 @@ code-runner/backend/handlers/lua/__pycache__/
 code-runner/backend/static/
 code-runner/backend/handlers/java/__pycache__/
 code-runner/backend/handlers/go/__pycache__/
+code-runner/backend/handlers/cpp/__pycache__/project.cpython-39.pyc
+code-runner/backend/handlers/javascript/__pycache__/project.cpython-39.pyc

@@ -5,6 +5,7 @@ from models import Artifact
 import mimetypes
 from pydantic import BaseModel
 import shutil
+import os
 
 
 
@@ -33,7 +34,7 @@ class ArtifactCollector:
         self._before: Dict[str, FileSnapshot] = {}
 
         base_static_root = static_root or Path('./static')
-        self._static_root = base_static_root / project_id / "executions" / execution_id / "artifacts"
+        self._static_root = base_static_root / "projects" / project_id / "executions" / execution_id / "artifacts"
         self._static_root.mkdir(parents=True, exist_ok=True)
 
     def _is_ignored_dir(self, path: Path) -> bool:
@@ -51,16 +52,16 @@ class ArtifactCollector:
         if not self.project_dir.exists():
             return snapshot
 
-        for path in self.project_dir.rglob("*"):
-            if not path.is_file():
-                continue
-
-            if self._is_ignored_dir(path.relative_to(self.project_dir)):
-                continue
-            
-            rel = str(path.relative_to(self.project_dir))
-
+        for path in self._iter_project_files():
             try:
+                if not path.is_file():
+                    continue
+
+                if self._is_ignored_dir(path.relative_to(self.project_dir)):
+                    continue
+                
+                rel = str(path.relative_to(self.project_dir))
+
                 stat = path.stat()
                 snapshot[rel] = FileSnapshot(
                     size=stat.st_size,
@@ -106,6 +107,19 @@ class ArtifactCollector:
             mime=mime,
         )
     
+    def _iter_project_files(self):
+        for root, dirs, files in os.walk(self.project_dir):
+            dirs[:] = [
+                d for d in dirs
+                if d not in self.ignored_dirs and not d.startswith(".")
+            ]
+
+            for name in files:
+                if name.startswith("."):
+                    continue
+
+                yield Path(root) / name
+
     def snapshot_before(self) -> None:
         self._before = self._snapshot()
 
@@ -124,3 +138,4 @@ class ArtifactCollector:
                 artifacts.append(artifact)
             
         return sorted(artifacts, key=lambda a: a.path)
+        

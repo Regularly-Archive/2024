@@ -3,8 +3,8 @@
     "project": "c_sfa",
     "result": {
       "success": true,
-      "detected_language": null,
-      "output": "{\n  \"A\": 43,\n  \"B\": 39,\n  \"Sum\": 82,\n  \"Timestamp\": 1767687925,\n  \"Language\": \"C\"\n}",
+      "detected_language": "cpp",
+      "output": "{\n  \"A\": 23,\n  \"B\": 1,\n  \"Sum\": 24,\n  \"Timestamp\": 1768209229,\n  \"Language\": \"C\"\n}",
       "error": null
     }
   },
@@ -12,8 +12,8 @@
     "project": "cpp_make",
     "result": {
       "success": true,
-      "detected_language": null,
-      "output": "{\n  \"A\": 3,\n  \"B\": 13,\n  \"Sum\": 16,\n  \"Timestamp\": 1767687928,\n  \"Language\": \"Makefile (C++)\"\n}",
+      "detected_language": "cpp",
+      "output": "{\n  \"A\": 59,\n  \"B\": 30,\n  \"Sum\": 89,\n  \"Timestamp\": 1768209232,\n  \"Language\": \"Makefile (C++)\"\n}",
       "error": null
     }
   },
@@ -21,57 +21,62 @@
     "project": "cpp_sfa",
     "result": {
       "success": true,
-      "detected_language": null,
-      "output": "{\n  \"A\": 9,\n  \"B\": 46,\n  \"Sum\": 55,\n  \"Timestamp\": 1767687931,\n  \"Language\": \"C++\"\n}",
+      "detected_language": "cpp",
+      "output": "{\n  \"A\": 39,\n  \"B\": 83,\n  \"Sum\": 122,\n  \"Timestamp\": 1768209235,\n  \"Language\": \"C++\"\n}",
       "error": null
     }
   },
   {
     "project": "csharp_project",
     "result": {
-      "success": false,
-      "error": "HTTPConnectionPool(host='localhost', port=8001): Read timed out. (read timeout=60)",
-      "output": ""
+      "success": true,
+      "detected_language": "csharp",
+      "output": "{\n  \"A\": 98,\n  \"B\": 67,\n  \"Sum\": 165,\n  \"Timestamp\": \"2026-01-12T09:14:28.2038444+00:00\",\n  \"Language\": \"C# Project\"\n}",
+      "error": null
     }
   },
   {
     "project": "csharp_script",
     "result": {
-      "success": false,
-      "error": "HTTPConnectionPool(host='localhost', port=8001): Read timed out. (read timeout=60)",
-      "output": ""
+      "success": true,
+      "detected_language": "csharp",
+      "output": "{\n  \"A\": 29,\n  \"B\": 63,\n  \"Sum\": 92,\n  \"Timestamp\": \"2026-01-12T09:15:07.978401+00:00\",\n  \"Language\": \"C# Script\"\n}",
+      "error": null
     }
   },
   {
     "project": "csharp_script_entry",
     "result": {
-      "success": false,
-      "error": "HTTPConnectionPool(host='localhost', port=8001): Read timed out. (read timeout=60)",
-      "output": ""
+      "success": true,
+      "detected_language": "csharp",
+      "output": "{\n  \"A\": 22,\n  \"B\": 27,\n  \"Sum\": 49,\n  \"Timestamp\": \"2026-01-12T09:15:47.313335+00:00\",\n  \"Language\": \"C# Script\"\n}",
+      "error": null
     }
   },
   {
     "project": "csharp_sfa",
     "result": {
-      "success": false,
-      "error": "HTTPConnectionPool(host='localhost', port=8001): Read timed out. (read timeout=60)",
-      "output": ""
+      "success": true,
+      "detected_language": "csharp",
+      "output": "{\n  \"A\": 24,\n  \"B\": 85,\n  \"Sum\": 109,\n  \"Timestamp\": \"2026-01-12T09:16:01.3827776+00:00\",\n  \"Language\": \"C# Script\"\n}",
+      "error": null
     }
   },
   {
     "project": "csharp_sfa_entry",
     "result": {
-      "success": false,
-      "error": "HTTPConnectionPool(host='localhost', port=8001): Read timed out. (read timeout=60)",
-      "output": ""
+      "success": true,
+      "detected_language": "csharp",
+      "output": "{\n  \"A\": 53,\n  \"B\": 2,\n  \"Sum\": 55,\n  \"Timestamp\": \"2026-01-12T09:16:14.2606064+00:00\",\n  \"Language\": \"C# Script\"\n}",
+      "error": null
     }
   },
   {
     "project": "go_project",
     "result": {
       "success": true,
-      "detected_language": null,
-      "output": "go: downloading github.com/sirupsen/logrus v1.9.3\ngo: downloading github.com/google/uuid v1.3.0\ngo: calculator imports\n\tgithub.com/google/uuid: github.com/google/uuid@v1.3.0: Get \"https://proxy.golang.org/github.com/google/uuid/@v/v1.3.0.zip\": EOF\ngo: calculator imports\n\tgithub.com/sirupsen/logrus: github.com/sirupsen/logrus@v1.9.3: Get \"https://proxy.golang.org/github.com/sirupsen/logrus/@v/v1.9.3.zip\": EOF",
+      "detected_language": "go",
+      "output": "# calculator\n./main.go:34:2: declared and not used: requestID",
       "error": null
     }
   },
@@ -79,8 +84,8 @@
     "project": "go_sfa",
     "result": {
       "success": true,
-      "detected_language": null,
-      "output": "{\n  \"A\": 16,\n  \"B\": 97,\n  \"Sum\": 113,\n  \"Timestamp\": \"2026-01-06T08:31:19Z\",\n  \"Language\": \"Go Single File\"\n}",
+      "detected_language": "go",
+      "output": "{\n  \"A\": 68,\n  \"B\": 51,\n  \"Sum\": 119,\n  \"Timestamp\": \"2026-01-12T09:16:49Z\",\n  \"Language\": \"Go Single File\"\n}",
       "error": null
     }
   },
@@ -88,8 +93,8 @@
     "project": "go_sfa_entry",
     "result": {
       "success": true,
-      "detected_language": null,
-      "output": "{\n  \"A\": 64,\n  \"B\": 100,\n  \"Sum\": 164,\n  \"Timestamp\": \"2026-01-06T08:31:33Z\",\n  \"Language\": \"Go Single File\"\n}",
+      "detected_language": "go",
+      "output": "{\n  \"A\": 94,\n  \"B\": 72,\n  \"Sum\": 166,\n  \"Timestamp\": \"2026-01-12T09:17:03Z\",\n  \"Language\": \"Go Single File\"\n}",
       "error": null
     }
   },
@@ -97,8 +102,8 @@
     "project": "java_project",
     "result": {
       "success": true,
-      "detected_language": null,
-      "output": "",
+      "detected_language": "java",
+      "output": "[INFO] Scanning for projects...\nDownloading from central: https://repo.maven.apache.org/maven2/org/codehaus/mojo/maven-metadata.xml\nDownloading from central: https://repo.maven.apache.org/maven2/org/apache/maven/plugins/maven-metadata.xml\nProgress (1): 4.6 kB\nProgress (1): 9.8 kB\nProgress (1): 14 kB\n\nDownloaded from central: https://repo.maven.apache.org/maven2/org/apache/maven/plugins/maven-metadata.xml (14 kB at 22 kB/s)\nProgress (1): 3.9 kB\nProgress (1): 7.7 kB\nProgress (1): 13 kB\nProgress (1): 20 kB\nProgress (1): 20 kB\n\nDownloaded from central: https://repo.maven.apache.org/maven2/org/codehaus/mojo/maven-metadata.xml (20 kB at 27 kB/s)\nDownloading from central: https://repo.maven.apache.org/maven2/org/codehaus/mojo/exec-maven-plugin/3.6.3/exec-maven-plugin-3.6.3.pom\nProgress (1): 1.0 kB\nProgress (1): 2.9 kB\nProgress (1): 5.3 kB\nProgress (1): 9.0 kB\nProgress (1): 11 kB\nProgress (1): 14 kB\nProgress (1): 16 kB\n\nDownloaded from central: https://repo.maven.apache.org/maven2/org/codehaus/mojo/exec-maven-plugin/3.6.3/exec-maven-plugin-3.6.3.pom (16 kB at 58 kB/s)\nDownloading from central: https://repo.maven.apache.org/maven2/org/codehaus/mojo/mojo-parent/94/mojo-parent-94.pom\nProgress (1): 711 B\nProgress (1): 1.7 kB\nProgress (1): 5.2 kB\nProgress (1): 7.3 kB\nProgress (1): 8.8 kB\nProgress (1): 11 kB\nProgress (1): 14 kB\nProgress (1): 17 kB\nProgress (1): 22 kB\nProgress (1): 26 kB\nProgress (1): 28 kB\nProgress (1): 31 kB\nProgress (1): 34 kB\nProgress (1): 38 kB\n\nDownloaded from central: https://repo.maven.apache.org/maven2/org/codehaus/mojo/mojo-parent/94/mojo-parent-94.pom (38 kB at 129 kB/s)\nDownloading from central: https://repo.maven.apache.org/maven2/org/junit/junit-bom/5.14.0/junit-bom-5.14.0.pom\nProgress (1): 908 B\nProgress (1): 2.3 kB\nProgress (1): 5.7 kB\n\nDownloaded from central: https://repo.maven.apache.org/maven2/org/junit/junit-bom/5.14.0/junit-bom-5.14.0.pom (5.7 kB at 24 kB/s)\nDownloading from central: https://repo.maven.apache.org/maven2/org/codehaus/mojo/exec-maven-plugin/3.6.3/exec-maven-plugin-3.6.3.jar\nProgress (1): 0.9/95 kB\nProgress (1): 2.3/95 kB\nProgress (1): 3.6/95 kB\nProgress (1): 5.0/95 kB\nProgress (1): 6.4/95 kB\nProgress (1): 7.7/95 kB\nProgress (1): 9.1/95 kB\nProgress (1): 10/95 kB\nProgress (1): 12/95 kB\nProgress (1): 13/95 kB\nProgress (1): 14/95 kB\nProgress (1): 16/95 kB\nProgress (1): 17/95 kB\nProgress (1): 18/95 kB\nProgress (1): 20/95 kB\nProgress (1): 21/95 kB\nProgress (1): 23/95 kB\nProgress (1): 24/95 kB\nProgress (1): 25/95 kB\nProgress (1): 27/95 kB\nProgress (1): 28/95 kB\rProgress (1): 29/95 kB\nProgress (1): 31/95 kB\nProgress (1): 32/95 kB\nProgress (1): 33/95 kB\nProgress (1): 38/95 kB\nProgress (1): 42/95 kB\nProgress (1): 46/95 kB\nProgress (1): 50/95 kB\nProgress (1): 55/95 kB\nProgress (1): 59/95 kB\nProgress (1): 63/95 kB\nProgress (1): 67/95 kB\nProgress (1): 72/95 kB\nProgress (1): 76/95 kB\nProgress (1): 80/95 kB\nProgress (1): 84/95 kB\nProgress (1): 88/95 kB\nProgress (1): 93/95 kB\nProgress (1): 95 kB\n\nDownloaded from central: https://repo.maven.apache.org/maven2/org/codehaus/mojo/exec-maven-plugin/3.6.3/exec-maven-plugin-3.6.3.jar (95 kB at 277 kB/s)\n[INFO]\n[INFO] -----------------------< com.example:calculator >-----------------------\n[INFO] Building calculator 1.0.0\n[INFO]   from pom.xml\n[INFO] --------------------------------[ jar ]---------------------------------\n[INFO] \n[INFO] --- exec:3.6.3:java (default-cli) @ calculator ---\nDownloading from central: https://repo.maven.apache.org/maven2/org/apache/maven/resolver/maven-resolver-util/1.9.24/maven-resolver-util-1.9.24.pom\nProgress (1): 838 B\nProgress (1): 2.2 kB\n\nDownloaded from central: https://repo.maven.apache.org/maven2/org/apache/maven/resolver/maven-resolver-util/1.9.24/maven-resolver-util-1.9.24.pom (2.2 kB at 7.7 kB/s)\nDownloading from central: https://repo.maven.apache.org/maven2/org/apache/maven/resolver/maven-resolver/1.9.24/maven-resolver-1.9.24.pom\nProgress (1): 755 B\nProgress (1): 2.3 kB\nProgress (1): 4.0 kB\nProgress (1): 9.1 kB\nProgress (1): 12 kB\nProgress (1): 16 kB\nProgress (1): 19 kB\nProgress (1): 20 kB\nProgress (1): 23 kB\nProgress (1): 25 kB\n\nDownloaded from central: https://repo.maven.apache.org/maven2/org/apache/maven/resolver/maven-resolver/1.9.24/maven-resolver-1.9.24.pom (25 kB at 70 kB/s)\nDownloading from central: https://repo.maven.apache.org/maven2/org/apache/maven/maven-parent/45/maven-parent-45.pom\nProgress (1): 708 B\rProgress (1): 1.9 kB\nProgress (1): 5.5 kB\nProgress (1): 9.6 kB\nProgress (1): 14 kB\nProgress (1): 19 kB\nProgress (1): 23 kB\nProgress (1): 25 kB\nProgress (1): 27 kB\nProgress (1): 29 kB\nProgress (1): 33 kB\nProgress (1): 37 kB\nProgress (1): 39 kB\nProgress (1): 42 kB\nProgress (1): 45 kB\nProgress (1): 49 kB\nProgress (1): 50 kB\nProgress (1): 53 kB\n\nDownloaded from central: https://repo.maven.apache.org/maven2/org/apache/maven/maven-parent/45/maven-parent-45.pom (53 kB at 191 kB/s)\nDownloading from central: https://repo.maven.apache.org/maven2/org/apache/apache/35/apache-35.pom\nProgress (1): 736 B\nProgress (1): 2.0 kB\nProgress (1): 4.0 kB\nProgress (1): 5.9 kB\nProgress (1): 11 kB\nProgress (1): 15 kB\nProgress (1): 19 kB\nProgress (1): 20 kB\rProgress (1): 22 kB\nProgress (1): 24 kB\n\nDownloaded from central: https://repo.maven.apache.org/maven2/org/apache/apache/35/apache-35.pom (24 kB at 95 kB/s)\nDownloading from central: https://repo.maven.apache.org/maven2/org/junit/junit-bom/5.13.1/junit-bom-5.13.1.pom\nProgress (1): 908 B\nProgress (1): 4.1 kB\nProgress (1): 5.6 kB\n\nDownloaded from central: https://repo.maven.apache.org/maven2/org/junit/junit-bom/5.13.1/junit-bom-5.13.1.pom (5.6 kB at 22 kB/s)\nDownloading from central: https://repo.maven.apache.org/maven2/org/apache/maven/resolver/maven-resolver-api/1.9.24/maven-resolver-api-1.9.24.pom\nProgress (1): 833 B\nProgress (1): 2.2 kB\n\nDownloaded from central: https://repo.maven.apache.org/maven2/org/apache/maven/resolver/maven-resolver-api/1.9.24/maven-resolver-api-1.9.24.pom (2.2 kB at 8.0 kB/s)\nDownloading from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-utils/4.0.2/plexus-utils-4.0.2.pom\nProgress (1): 965 B\nProgress (1): 4.3 kB\nProgress (1): 7.6 kB\nProgress (1): 12 kB\nProgress (1): 13 kB\n\nDownloaded from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-utils/4.0.2/plexus-utils-4.0.2.pom (13 kB at 49 kB/s)\nDownloading from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-xml/3.0.1/plexus-xml-3.0.1.pom\nProgress (1): 813 B\nProgress (1): 2.6 kB\nProgress (1): 3.7 kB\n\nDownloaded from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-xml/3.0.1/plexus-xml-3.0.1.pom (3.7 kB at 13 kB/s)\nDownloading from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus/18/plexus-18.pom\nProgress (1): 687 B\rProgress (1): 2.5 kB\nProgress (1): 6.4 kB\nProgress (1): 8.8 kB\nProgress (1): 10 kB\nProgress (1): 14 kB\nProgress (1): 17 kB\nProgress (1): 19 kB\nProgress (1): 22 kB\nProgress (1): 26 kB\nProgress (1): 29 kB\n\nDownloaded from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus/18/plexus-18.pom (29 kB at 107 kB/s)\nDownloading from central: https://repo.maven.apache.org/maven2/org/junit/junit-bom/5.10.2/junit-bom-5.10.2.pom\nProgress (1): 908 B\nProgress (1): 4.1 kB\nProgress (1): 5.6 kB\n\nDownloaded from central: https://repo.maven.apache.org/maven2/org/junit/junit-bom/5.10.2/junit-bom-5.10.2.pom (5.6 kB at 21 kB/s)\nDownloading from central: https://repo.maven.apache.org/maven2/org/apache/commons/commons-exec/1.6.0/commons-exec-1.6.0.pom\nProgress (1): 755 B\rProgress (1): 2.2 kB\nProgress (1): 4.0 kB\nProgress (1): 6.5 kB\nProgress (1): 9.8 kB\nProgress (1): 11 kB\n                   \rDownloaded from central: https://repo.maven.apache.org/maven2/org/apache/commons/commons-exec/1.6.0/commons-exec-1.6.0.pom (11 kB at 40 kB/s)\nDownloading from central: https://repo.maven.apache.org/maven2/org/apache/commons/commons-parent/93/commons-parent-93.pom\nProgress (1): 699 B\nProgress (1): 1.9 kB\rProgress (1): 3.2 kB\nProgress (1): 4.6 kB\nProgress (1): 6.7 kB\nProgress (1): 9.4 kB\nProgress (1): 11 kB\nProgress (1): 12 kB\nProgress (1): 14 kB\rProgress (1): 16 kB\nProgress (1): 19 kB\nProgress (1): 22 kB\nProgress (1): 24 kB\nProgress (1): 26 kB\nProgress (1): 29 kB\nProgress (1): 33 kB\nProgress (1): 34 kB\nProgress (1): 39 kB\nProgress (1): 42 kB\nProgress (1): 45 kB\nProgress (1): 48 kB\nProgress (1): 51 kB\nProgress (1): 53 kB\nProgress (1): 57 kB\nProgress (1): 59 kB\nProgress (1): 59 kB\nProgress (1): 63 kB\nProgress (1): 66 kB\nProgress (1): 70 kB\nProgress (1): 72 kB\rProgress (1): 74 kB\nProgress (1): 77 kB\nProgress (1): 79 kB\n                   \rDownloaded from central: https://repo.maven.apache.org/maven2/org/apache/commons/commons-parent/93/commons-parent-93.pom (79 kB at 224 kB/s)\nDownloading from central: https://repo.maven.apache.org/maven2/org/junit/junit-bom/5.14.1/junit-bom-5.14.1.pom\nProgress (1): 908 B\nProgress (1): 4.1 kB\nProgress (1): 5.7 kB\n\nDownloaded from central: https://repo.maven.apache.org/maven2/org/junit/junit-bom/5.14.1/junit-bom-5.14.1.pom (5.7 kB at 25 kB/s)\nDownloading from central: https://repo.maven.apache.org/maven2/org/ow2/asm/asm/9.9.1/asm-9.9.1.pom\nProgress (1): 1.3 kB\rProgress (1): 2.4 kB\n\nDownloaded from central: https://repo.maven.apache.org/maven2/org/ow2/asm/asm/9.9.1/asm-9.9.1.pom (2.4 kB at 8.8 kB/s)\nDownloading from central: https://repo.maven.apache.org/maven2/org/ow2/asm/asm-commons/9.9.1/asm-commons-9.9.1.pom\nProgress (1): 1.1 kB\nProgress (1): 2.8 kB\n\nDownloaded from central: https://repo.maven.apache.org/maven2/org/ow2/asm/asm-commons/9.9.1/asm-commons-9.9.1.pom (2.8 kB at 9.2 kB/s)\nDownloading from central: https://repo.maven.apache.org/maven2/org/ow2/asm/asm-tree/9.9.1/asm-tree-9.9.1.pom\nProgress (1): 1.1 kB\nProgress (1): 2.6 kB\n\nDownloaded from central: https://repo.maven.apache.org/maven2/org/ow2/asm/asm-tree/9.9.1/asm-tree-9.9.1.pom (2.6 kB at 8.2 kB/s)\nDownloading from central: https://repo.maven.apache.org/maven2/org/apache/maven/resolver/maven-resolver-util/1.9.24/maven-resolver-util-1.9.24.jar\nDownloading from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-utils/4.0.2/plexus-utils-4.0.2.jar\nDownloading from central: https://repo.maven.apache.org/maven2/org/apache/maven/resolver/maven-resolver-api/1.9.24/maven-resolver-api-1.9.24.jar\nDownloading from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-xml/3.0.1/plexus-xml-3.0.1.jar\nDownloading from central: https://repo.maven.apache.org/maven2/org/apache/commons/commons-exec/1.6.0/commons-exec-1.6.0.jar\nProgress (1): 0.9/196 kB\nProgress (1): 2.3/196 kB\nProgress (1): 3.6/196 kB\nProgress (1): 5.0/196 kB\nProgress (1): 6.4/196 kB\nProgress (1): 7.7/196 kB\nProgress (1): 9.1/196 kB\nProgress (1): 10/196 kB\nProgress (1): 12/196 kB\nProgress (1): 13/196 kB\nProgress (1): 15/196 kB\nProgress (1): 16/196 kB\nProgress (1): 17/196 kB\nProgress (1): 19/196 kB\nProgress (1): 20/196 kB\nProgress (1): 21/196 kB\nProgress (1): 23/196 kB\nProgress (1): 24/196 kB\nProgress (1): 26/196 kB\nProgress (1): 27/196 kB\nProgress (1): 28/196 kB\nProgress (1): 30/196 kB\nProgress (1): 31/196 kB\nProgress (2): 31/196 kB | 7.7/193 kB\rProgress (2): 31/196 kB | 16/193 kB\nProgress (2): 32/196 kB | 16/193 kB\nProgress (2): 34/196 kB | 16/193 kB\nProgress (2): 35/196 kB | 16/193 kB\nProgress (2): 36/196 kB | 16/193 kB\nProgress (2): 38/196 kB | 16/193 kB\nProgress (2): 39/196 kB | 16/193 kB\nProgress (2): 41/196 kB | 16/193 kB\nProgress (2): 42/196 kB | 16/193 kB\nProgress (2): 43/196 kB | 16/193 kB\nProgress (2): 45/196 kB | 16/193 kB\nProgress (2): 46/196 kB | 16/193 kB\nProgress (2): 47/196 kB | 16/193 kB\nProgress (2): 49/196 kB | 16/193 kB\nProgress (2): 50/196 kB | 16/193 kB\nProgress (2): 52/196 kB | 16/193 kB\nProgress (2): 56/196 kB | 16/193 kB\nProgress (2): 56/196 kB | 32/193 kB\nProgress (2): 60/196 kB | 32/193 kB\nProgress (2): 60/196 kB | 49/193 kB\nProgress (2): 60/196 kB | 65/193 kB\nProgress (2): 64/196 kB | 65/193 kB\nProgress (2): 68/196 kB | 65/193 kB\nProgress (2): 73/196 kB | 65/193 kB\rProgress (2): 73/196 kB | 81/193 kB\nProgress (2): 77/196 kB | 81/193 kB\nProgress (2): 81/196 kB | 81/193 kB\nProgress (2): 85/196 kB | 81/193 kB\nProgress (2): 90/196 kB | 81/193 kB\nProgress (2): 94/196 kB | 81/193 kB\nProgress (2): 98/196 kB | 81/193 kB\nProgress (2): 102/196 kB | 81/193 kB\nProgress (2): 107/196 kB | 81/193 kB\nProgress (2): 111/196 kB | 81/193 kB\nProgress (2): 115/196 kB | 81/193 kB\nProgress (2): 119/196 kB | 81/193 kB\nProgress (2): 123/196 kB | 81/193 kB\nProgress (2): 128/196 kB | 81/193 kB\nProgress (2): 132/196 kB | 81/193 kB\rProgress (2): 132/196 kB | 98/193 kB\nProgress (2): 136/196 kB | 98/193 kB\nProgress (2): 140/196 kB | 98/193 kB\nProgress (2): 145/196 kB | 98/193 kB\nProgress (2): 145/196 kB | 114/193 kB\nProgress (2): 149/196 kB | 114/193 kB\rProgress (2): 153/196 kB | 114/193 kB\nProgress (2): 157/196 kB | 114/193 kB\nProgress (2): 162/196 kB | 114/193 kB\nProgress (2): 162/196 kB | 131/193 kB\nProgress (2): 166/196 kB | 131/193 kB\nProgress (2): 170/196 kB | 131/193 kB\nProgress (2): 174/196 kB | 131/193 kB\nProgress (2): 178/196 kB | 131/193 kB\rProgress (2): 178/196 kB | 147/193 kB\nProgress (2): 183/196 kB | 147/193 kB\nProgress (2): 183/196 kB | 163/193 kB\nProgress (2): 187/196 kB | 163/193 kB\nProgress (2): 191/196 kB | 163/193 kB\rProgress (2): 191/196 kB | 180/193 kB\nProgress (2): 195/196 kB | 180/193 kB\nProgress (2): 195/196 kB | 193 kB\nProgress (2): 196 kB | 193 kB\n\nDownloaded from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-utils/4.0.2/plexus-utils-4.0.2.jar (193 kB at 492 kB/s)\nDownloading from central: https://repo.maven.apache.org/maven2/org/ow2/asm/asm/9.9.1/asm-9.9.1.jar\nDownloaded from central: https://repo.maven.apache.org/maven2/org/apache/maven/resolver/maven-resolver-util/1.9.24/maven-resolver-util-1.9.24.jar (196 kB at 477 kB/s)\nDownloading from central: https://repo.maven.apache.org/maven2/org/ow2/asm/asm-commons/9.9.1/asm-commons-9.9.1.jar\nProgress (1): 0.9/69 kB\nProgress (1): 2.3/69 kB\nProgress (1): 3.6/69 kB\nProgress (1): 5.0/69 kB\nProgress (1): 6.4/69 kB\nProgress (1): 7.7/69 kB\nProgress (1): 9.1/69 kB\nProgress (1): 10/69 kB\nProgress (1): 12/69 kB\nProgress (1): 13/69 kB\nProgress (1): 15/69 kB\nProgress (1): 16/69 kB\nProgress (1): 17/69 kB\nProgress (1): 19/69 kB\nProgress (1): 20/69 kB\nProgress (1): 21/69 kB\nProgress (1): 23/69 kB\nProgress (1): 24/69 kB\nProgress (1): 26/69 kB\nProgress (1): 27/69 kB\nProgress (1): 28/69 kB\nProgress (1): 30/69 kB\nProgress (1): 31/69 kB\nProgress (1): 32/69 kB\nProgress (1): 34/69 kB\nProgress (1): 35/69 kB\nProgress (2): 35/69 kB | 3.8/126 kB\rProgress (2): 36/69 kB | 3.8/126 kB\nProgress (2): 36/69 kB | 8.0/126 kB\rProgress (2): 38/69 kB | 8.0/126 kB\nProgress (2): 38/69 kB | 12/126 kB\nProgress (2): 39/69 kB | 12/126 kB\nProgress (2): 39/69 kB | 16/126 kB\nProgress (2): 39/69 kB | 20/126 kB\nProgress (2): 41/69 kB | 20/126 kB\nProgress (2): 41/69 kB | 36/126 kB\nProgress (2): 42/69 kB | 36/126 kB\nProgress (2): 42/69 kB | 53/126 kB\nProgress (2): 43/69 kB | 53/126 kB\rProgress (2): 43/69 kB | 61/126 kB\rProgress (3): 43/69 kB | 61/126 kB | 0.9/94 kB\rProgress (3): 45/69 kB | 61/126 kB | 0.9/94 kB\nProgress (3): 46/69 kB | 61/126 kB | 0.9/94 kB\rProgress (3): 46/69 kB | 77/126 kB | 0.9/94 kB\rProgress (3): 46/69 kB | 77/126 kB | 2.3/94 kB\nProgress (3): 46/69 kB | 77/126 kB | 3.6/94 kB\rProgress (3): 47/69 kB | 77/126 kB | 3.6/94 kB\rProgress (3): 47/69 kB | 93/126 kB | 3.6/94 kB\nProgress (3): 49/69 kB | 93/126 kB | 3.6/94 kB\nProgress (3): 49/69 kB | 93/126 kB | 5.0/94 kB\nProgress (3): 49/69 kB | 110/126 kB | 5.0/94 kB\nProgress (3): 49/69 kB | 110/126 kB | 6.4/94 kB\rProgress (3): 49/69 kB | 110/126 kB | 7.7/94 kB\rProgress (3): 50/69 kB | 110/126 kB | 7.7/94 kB\nProgress (3): 50/69 kB | 126 kB | 7.7/94 kB\nProgress (3): 50/69 kB | 126 kB | 9.1/94 kB\rProgress (3): 52/69 kB | 126 kB | 9.1/94 kB\nProgress (3): 53/69 kB | 126 kB | 9.1/94 kB\rProgress (3): 53/69 kB | 126 kB | 10/94 kB\nProgress (3): 54/69 kB | 126 kB | 10/94 kB\rProgress (3): 54/69 kB | 126 kB | 12/94 kB\nProgress (3): 54/69 kB | 126 kB | 13/94 kB\rProgress (3): 56/69 kB | 126 kB | 13/94 kB\nProgress (3): 56/69 kB | 126 kB | 15/94 kB\nProgress (3): 60/69 kB | 126 kB | 15/94 kB\nProgress (3): 60/69 kB | 126 kB | 16/94 kB\rProgress (3): 64/69 kB | 126 kB | 16/94 kB\nProgress (3): 64/69 kB | 126 kB | 17/94 kB\rProgress (3): 64/69 kB | 126 kB | 19/94 kB\nProgress (3): 64/69 kB | 126 kB | 20/94 kB\nProgress (3): 68/69 kB | 126 kB | 20/94 kB\nProgress (3): 69 kB | 126 kB | 20/94 kB   \rProgress (3): 69 kB | 126 kB | 21/94 kB\nProgress (3): 69 kB | 126 kB | 23/94 kB\nProgress (3): 69 kB | 126 kB | 24/94 kB\nProgress (3): 69 kB | 126 kB | 26/94 kB\nProgress (3): 69 kB | 126 kB | 27/94 kB\nProgress (3): 69 kB | 126 kB | 28/94 kB\nProgress (3): 69 kB | 126 kB | 30/94 kB\nProgress (3): 69 kB | 126 kB | 31/94 kB\nProgress (3): 69 kB | 126 kB | 32/94 kB\rProgress (4): 69 kB | 126 kB | 32/94 kB | 0.9/157 kB\rProgress (5): 69 kB | 126 kB | 32/94 kB | 0.9/157 kB | 7.7/75 kB\nProgress (5): 69 kB | 126 kB | 32/94 kB | 2.3/157 kB | 7.7/75 kB\rProgress (5): 69 kB | 126 kB | 32/94 kB | 2.3/157 kB | 16/75 kB \rProgress (5): 69 kB | 126 kB | 34/94 kB | 2.3/157 kB | 16/75 kB\nProgress (5): 69 kB | 126 kB | 34/94 kB | 3.6/157 kB | 16/75 kB\rProgress (5): 69 kB | 126 kB | 35/94 kB | 3.6/157 kB | 16/75 kB\nProgress (5): 69 kB | 126 kB | 36/94 kB | 3.6/157 kB | 16/75 kB\rProgress (5): 69 kB | 126 kB | 36/94 kB | 5.0/157 kB | 16/75 kB\nProgress (5): 69 kB | 126 kB | 36/94 kB | 5.0/157 kB | 32/75 kB\nProgress (5): 69 kB | 126 kB | 36/94 kB | 6.4/157 kB | 32/75 kB\rProgress (5): 69 kB | 126 kB | 38/94 kB | 6.4/157 kB | 32/75 kB\nProgress (5): 69 kB | 126 kB | 39/94 kB | 6.4/157 kB | 32/75 kB\rProgress (5): 69 kB | 126 kB | 39/94 kB | 6.4/157 kB | 49/75 kB\nProgress (5): 69 kB | 126 kB | 39/94 kB | 7.7/157 kB | 49/75 kB\nProgress (5): 69 kB | 126 kB | 41/94 kB | 7.7/157 kB | 49/75 kB\nProgress (5): 69 kB | 126 kB | 41/94 kB | 9.1/157 kB | 49/75 kB\nProgress (5): 69 kB | 126 kB | 41/94 kB | 9.1/157 kB | 65/75 kB\nProgress (5): 69 kB | 126 kB | 41/94 kB | 10/157 kB | 65/75 kB\nProgress (5): 69 kB | 126 kB | 42/94 kB | 10/157 kB | 65/75 kB\nProgress (5): 69 kB | 126 kB | 42/94 kB | 12/157 kB | 65/75 kB\rProgress (5): 69 kB | 126 kB | 42/94 kB | 12/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 43/94 kB | 12/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 45/94 kB | 12/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 45/94 kB | 13/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 46/94 kB | 13/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 46/94 kB | 14/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 47/94 kB | 14/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 47/94 kB | 16/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 47/94 kB | 17/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 47/94 kB | 18/157 kB | 75 kB\rProgress (5): 69 kB | 126 kB | 47/94 kB | 20/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 47/94 kB | 21/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 47/94 kB | 23/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 47/94 kB | 24/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 47/94 kB | 25/157 kB | 75 kB\rProgress (5): 69 kB | 126 kB | 49/94 kB | 25/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 49/94 kB | 27/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 50/94 kB | 27/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 50/94 kB | 28/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 52/94 kB | 28/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 53/94 kB | 28/157 kB | 75 kB\rProgress (5): 69 kB | 126 kB | 53/94 kB | 29/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 53/94 kB | 31/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 54/94 kB | 31/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 54/94 kB | 32/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 56/94 kB | 32/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 56/94 kB | 33/157 kB | 75 kB\rProgress (5): 69 kB | 126 kB | 60/94 kB | 33/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 60/94 kB | 35/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 64/94 kB | 35/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 68/94 kB | 35/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 73/94 kB | 35/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 77/94 kB | 35/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 77/94 kB | 36/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 77/94 kB | 38/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 77/94 kB | 39/157 kB | 75 kB\nProgress (5): 69 kB | 126 kB | 77/94 kB | 40/157 kB | 75 kB\n                                                           \rDownloaded from central: https://repo.maven.apache.org/maven2/org/ow2/asm/asm/9.9.1/asm-9.9.1.jar (126 kB at 199 kB/s)\nDownloading from central: https://repo.maven.apache.org/maven2/org/ow2/asm/asm-tree/9.9.1/asm-tree-9.9.1.jar\nProgress (4): 69 kB | 81/94 kB | 40/157 kB | 75 kB\nProgress (4): 69 kB | 85/94 kB | 40/157 kB | 75 kB\nProgress (4): 69 kB | 89/94 kB | 40/157 kB | 75 kB\nProgress (4): 69 kB | 94/94 kB | 40/157 kB | 75 kB\nProgress (4): 69 kB | 94 kB | 40/157 kB | 75 kB\nProgress (4): 69 kB | 94 kB | 42/157 kB | 75 kB\nProgress (4): 69 kB | 94 kB | 43/157 kB | 75 kB\nProgress (4): 69 kB | 94 kB | 44/157 kB | 75 kB\nProgress (4): 69 kB | 94 kB | 46/157 kB | 75 kB\nProgress (4): 69 kB | 94 kB | 47/157 kB | 75 kB\nProgress (4): 69 kB | 94 kB | 49/157 kB | 75 kB\nProgress (4): 69 kB | 94 kB | 50/157 kB | 75 kB\nProgress (4): 69 kB | 94 kB | 51/157 kB | 75 kB\nProgress (4): 69 kB | 94 kB | 53/157 kB | 75 kB\r                                               \rDownloaded from central: https://repo.maven.apache.org/maven2/org/apache/commons/commons-exec/1.6.0/commons-exec-1.6.0.jar (69 kB at 107 kB/s)\nProgress (3): 94 kB | 54/157 kB | 75 kB\nProgress (3): 94 kB | 55/157 kB | 75 kB\nProgress (3): 94 kB | 57/157 kB | 75 kB\nProgress (3): 94 kB | 62/157 kB | 75 kB\nProgress (3): 94 kB | 66/157 kB | 75 kB\r                                       \rDownloaded from central: https://repo.maven.apache.org/maven2/org/ow2/asm/asm-commons/9.9.1/asm-commons-9.9.1.jar (75 kB at 115 kB/s)\nProgress (2): 94 kB | 70/157 kB\nProgress (2): 94 kB | 74/157 kB\nProgress (2): 94 kB | 78/157 kB\nProgress (2): 94 kB | 82/157 kB\nProgress (2): 94 kB | 86/157 kB\nProgress (2): 94 kB | 90/157 kB\n\nDownloaded from central: https://repo.maven.apache.org/maven2/org/codehaus/plexus/plexus-xml/3.0.1/plexus-xml-3.0.1.jar (94 kB at 135 kB/s)\nProgress (1): 95/157 kB\nProgress (1): 99/157 kB\nProgress (1): 103/157 kB\nProgress (1): 107/157 kB\nProgress (1): 112/157 kB\nProgress (1): 116/157 kB\nProgress (1): 120/157 kB\nProgress (1): 124/157 kB\nProgress (1): 128/157 kB\nProgress (1): 133/157 kB\nProgress (1): 137/157 kB\nProgress (1): 141/157 kB\nProgress (1): 145/157 kB\nProgress (1): 150/157 kB\nProgress (1): 154/157 kB\nProgress (1): 157 kB\nProgress (2): 157 kB | 7.7/52 kB\nProgress (2): 157 kB | 16/52 kB\nProgress (2): 157 kB | 32/52 kB\nProgress (2): 157 kB | 49/52 kB\nProgress (2): 157 kB | 52 kB\n                            \rDownloaded from central: https://repo.maven.apache.org/maven2/org/apache/maven/resolver/maven-resolver-api/1.9.24/maven-resolver-api-1.9.24.jar (157 kB at 170 kB/s)\nDownloaded from central: https://repo.maven.apache.org/maven2/org/ow2/asm/asm-tree/9.9.1/asm-tree-9.9.1.jar (52 kB at 56 kB/s)\n{\n  \"a\" : 45,\n  \"b\" : 47,\n  \"sum\" : 92,\n  \"timestamp\" : 1768209471514,\n  \"language\" : \"Java Maven\"\n}\n[INFO] ------------------------------------------------------------------------\n[INFO] BUILD SUCCESS\n[INFO] ------------------------------------------------------------------------\n[INFO] Total time:  14.027 s\n[INFO] Finished at: 2026-01-12T09:17:53Z\n[INFO] ------------------------------------------------------------------------",
       "error": null
     }
   },
@@ -106,8 +111,8 @@
     "project": "java_sfa",
     "result": {
       "success": true,
-      "detected_language": null,
-      "output": "bash: warning: setlocale: LC_ALL: cannot change locale (en_US.UTF-8)\nPicked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8\n[jbang] Resolving dependencies...\n[jbang]    com.google.code.gson:gson:2.10.1\n[jbang]    org.slf4j:slf4j-simple:2.0.9\n[jbang] [ERROR] Could not resolve dependencies: Failed to collect dependencies at com.google.code.gson:gson:jar:2.10.1\n[jbang] Run with --verbose for more details",
+      "detected_language": "java",
+      "output": "{\n  \"a\": 58,\n  \"b\": 100,\n  \"sum\": 158,\n  \"timestamp\": \"Jan 12, 2026, 9:18:05?AM\",\n  \"language\": \"Java Single File\"\n}",
       "error": null
     }
   },
@@ -115,8 +120,8 @@
     "project": "java_sfa_entry",
     "result": {
       "success": true,
-      "detected_language": null,
-      "output": "bash: warning: setlocale: LC_ALL: cannot change locale (en_US.UTF-8)\nPicked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8\n[jbang] Resolving dependencies...\n[jbang]    com.google.code.gson:gson:2.10.1\n[jbang]    org.slf4j:slf4j-simple:2.0.9\n[jbang] [ERROR] Could not resolve dependencies: Failed to collect dependencies at com.google.code.gson:gson:jar:2.10.1\n[jbang] Run with --verbose for more details",
+      "detected_language": "java",
+      "output": "{\n  \"a\": 32,\n  \"b\": 38,\n  \"sum\": 70,\n  \"timestamp\": \"Jan 12, 2026, 9:18:18?AM\",\n  \"language\": \"Java Single File\"\n}",
       "error": null
     }
   },
@@ -124,17 +129,18 @@
     "project": "javascript_project",
     "result": {
       "success": true,
-      "detected_language": null,
-      "output": "{\n  \"A\": 67,\n  \"B\": 83,\n  \"Sum\": 150,\n  \"Timestamp\": \"2026-01-06T08:32:40.419Z\",\n  \"Language\": \"JavaScript\"\n}",
+      "detected_language": "javascript",
+      "output": "{\n  \"A\": 6,\n  \"B\": 34,\n  \"Sum\": 40,\n  \"Timestamp\": \"2026-01-12T09:18:22.397Z\",\n  \"Language\": \"JavaScript\"\n}",
       "error": null
     }
   },
   {
     "project": "python_project",
     "result": {
-      "success": false,
-      "error": "HTTPConnectionPool(host='localhost', port=8001): Read timed out. (read timeout=60)",
-      "output": ""
+      "success": true,
+      "detected_language": "python3",
+      "output": "{\n  \"A\": 54,\n  \"B\": 93,\n  \"Sum\": 147,\n  \"Timestamp\": \"2026-01-12T09:19:13.536355\",\n  \"Language\": \"Python Project\"\n}",
+      "error": null
     }
   },
   {
@@ -148,10 +154,9 @@
   {
     "project": "rust_sfa",
     "result": {
-      "success": true,
-      "detected_language": null,
-      "output": "error[E0432]: unresolved import `rand`\n --> test.rs:1:5\n  |\n1 | use rand::Rng;\n  |     ^^^^ maybe a missing crate `rand`?\n  |\n  = help: consider adding `extern crate rand` to use the `rand` crate\nerror[E0432]: unresolved import `serde`\n --> test.rs:2:5\n  |\n2 | use serde::Serialize;\n  |     ^^^^^ maybe a missing crate `serde`?\n  |\n  = help: consider adding `extern crate serde` to use the `serde` crate\nerror[E0432]: unresolved import `serde_json`\n --> test.rs:3:5\n  |\n3 | use serde_json;\n  |     ^^^^^^^^^^ no `serde_json` in the root\nerror[E0433]: failed to resolve: use of undeclared crate or module `rand`\n  --> test.rs:13:19\n   |\n13 |     let mut rng = rand::thread_rng();\n   |                   ^^^^ use of undeclared crate or module `rand`\nerror: aborting due to 4 previous errors\n\nSome errors have detailed explanations: E0432, E0433.\nFor more information about an error, try `rustc --explain E0432`.",
-      "error": null
+      "success": false,
+      "error": "HTTPConnectionPool(host='localhost', port=8001): Read timed out. (read timeout=60)",
+      "output": ""
     }
   },
   {
