@@ -19,7 +19,8 @@ class HandlerContext:
             user='sandbox' if environment != 'jupyter' else 'jovyan',
             image_name=langconfig.get('image'),
             container_id='',
-            environment=environment
+            environment=environment,
+            version=langconfig.get('version')
         )
 
     @property
@@ -46,8 +47,16 @@ class HandlerContext:
     def project_id(self):
         return Path(self.project_info.project_dir).name.replace('project_', '')
     
+    @property
+    def project_name(self):
+        return Path(self.project_info.project_dir).name
+    
     def set_container_env(self, key, value):
         self.runtime_info.container_envs[key] = value
+
+    def set_container_envs(self, envs: Dict[str, str]):
+        for key, value in envs.items():
+            self.runtime_info.container_envs[key] = value
     
     def get_container_env(self, key):
         if not key in self.runtime_info.container_envs:

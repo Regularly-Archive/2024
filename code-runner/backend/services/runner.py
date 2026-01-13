@@ -4,35 +4,37 @@ from models import ExecutionResult
 from concurrent.futures import ThreadPoolExecutor
 import uuid
 from services.collector import ArtifactCollector
+from handlers.resolver import HandlerResolver
 from config import ALLOWED_ARTIFACT_PATTERNS, IGNORED_DIRS
 
 class RunnerService:
-    def __init__(self):
+    def __init__(self, ctx):
         self.logger = get_logger(__name__)
         self.cleanup_executor = ThreadPoolExecutor(max_workers=4)
         self.artifact_collector = None
+        self.handler = HandlerResolver().resolve(ctx)
 
-    def run(self, handler):
+    def run(self):
         start_time = time.time()
         execution_id = f"exec_{uuid.uuid4().hex[:12]}"
         execution_result = ExecutionResult(execution_id=execution_id, stages=[], total_duration=0.0, artifacts=[])
         self.artifact_collector = ArtifactCollector(
-            handler.ctx.project_id,
-            handler.ctx.project_dir, 
+            self.handler.ctx.project_id,
+            self.handler.ctx.project_dir, 
             execution_id,
             30 * 1024 * 1024,
             ALLOWED_ARTIFACT_PATTERNS,
             IGNORED_DIRS
         )
         try:
-            handler.prepare()
+            self.handler.prepare()
             self.artifact_collector.snapshot_before()
 
             for stage in ['install', 'build', 'run']:
-                if not stage in handler.build_pipeline:
+                if not stage in self.handler.build_pipeline:
                     continue
 
-                result = handler.execute_stage(stage)
+                result = self.handler.execute_stage(stage)
                 execution_result.stages.append(result)
                 self._log_stage_result(result)
 
@@ -47,10 +49,10 @@ class RunnerService:
             print(traceback.print_exc())
         finally:
             duration = time.time() - start_time
-            self.logger.info("The handler '%s' handled in %.2fs.", handler.__class__.__name__, duration)
+            self.logger.info("The handler '%s' handled in %.2fs.", self.handler.__class__.__name__, duration)
             execution_result.total_duration = duration
-            handler.ctx.execution_result = execution_result
-            self.cleanup_executor.submit(handler.cleanup)
+            self.handler.ctx.execution_result = execution_result
+            self.cleanup_executor.submit(self.handler.cleanup)
             
     def _log_stage_result(self, result):
         status = "SUCCESS" if result.exit_code == 0 else "FAILED"

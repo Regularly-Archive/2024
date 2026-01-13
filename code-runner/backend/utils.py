@@ -96,11 +96,11 @@ def prepare_project_dir_from_code(code: str, language: str, dependencies: List[s
         code_to_ipynb(code, code_file, language=language, dependencies=dependencies)
     return project_dir
 
-def read_output(temp_dir, fallback_output):
+def read_output(temp_dir, output_file, fallback_output):
     """
     读取代码执行输出结果。
     """
-    redirected_output = os.path.join(temp_dir, 'output.txt')
+    redirected_output = os.path.join(temp_dir, output_file)
     if not os.path.exists(redirected_output):
         return 'An error occurs when executing code.'
     with open(redirected_output, 'rt', encoding='utf-8') as f:

@@ -64,19 +64,17 @@ def test_project(project_path: Path, run_command: Optional[str] = None, data: Op
             response = requests.post(url, files=files, data=request_data, timeout=60)
 
         if response.ok:
-            result = response.json()
+            res = response.json()
             print(f"状态码: {response.status_code}")
-            print(f"耗时: {result.get('duration')}")
-            print(f"检测到的语言: {result.get('detected_language')}")
-            print(f"检测到的入口点: {result.get('detected_entry_point')}")
-            if result.get('build_output'):
-                print(f"编译输出:\n{result.get('build_output')}")
-            print(f"运行输出:\n{result.get('output', '')}")
+            print(f"耗时: {res.get('result').get('duration')}")
+            print(f"检测到的语言: {res.get('runtime').get('language')}")
+            print(f"检测到的入口点: {res.get('runtime').get('enrty_point', 'N/A')}")
+            print(f"运行输出:\n{res.get('result').get('output')}")
 
             return {
                 'success': True,
-                'detected_language': result.get('detected_language'),
-                'output': result.get('output', ''),
+                'detected_language': res.get('runtime').get('language'),
+                'output': res.get('result').get('output', ''),
                 'error': None
             }
         else:

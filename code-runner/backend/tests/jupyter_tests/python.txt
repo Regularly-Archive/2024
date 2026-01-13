@@ -1,0 +1,6 @@
+import matplotlib.pyplot as plt
+plt.plot([1,2,3,4],[10,20,25,30])
+plt.title("Python Plot Example")
+plt.savefig("python_plot.png")
+plt.close()
+print("Plot saved as python_plot.png")
