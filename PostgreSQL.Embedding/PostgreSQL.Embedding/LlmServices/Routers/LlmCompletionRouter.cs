@@ -45,13 +45,13 @@ namespace PostgreSQL.Embedding.LlmServices.Routers
                         request.RequestUri = new Uri("https://api.siliconflow.cn/v1/chat/completions");
                         break;
                     case LlmServiceProvider.MiniMax:
-                        request.RequestUri = new Uri("https://api.minimax.chat/v1/text/chatcompletion_v2");
+                        request.RequestUri = new Uri("https://api.minimaxi.com/v1/chat/completions");
                         break;
                     case LlmServiceProvider.LingYi:
                         request.RequestUri = new Uri("https://api.lingyiwanwu.com/v1/chat/completions");
                         break;
                     case LlmServiceProvider.Google:
-                        request.RequestUri = new Uri("https://generativelanguage.googleapis.com/v1beta/");
+                        request.RequestUri = new Uri("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions");
                         break;
                 }
 

@@ -1,0 +1,10 @@
+{
+    "description": "函数测试",
+    "tests": [
+        {
+            "name": "函数测试",
+            "mainScript": "functions.sh",
+            "arguments": null
+        }
+    ]
+}

@@ -187,7 +187,7 @@ class ProjectDetector:
 
         detected_project = None
 
-        # 根据项目特征文件检测项目类型
+        # Detect project type by manifest files
         for indicator, config in PROJECT_INDICATORS.items():
             if indicator in files_in_project:
                 detected_project = {
@@ -199,7 +199,7 @@ class ProjectDetector:
                 }
                 break
 
-        # 根据文件扩展名检测项目类型
+        # Detect project type by file extension
         matches = []
         for file in files_in_project:
             _, ext = os.path.splitext(file)
@@ -210,7 +210,7 @@ class ProjectDetector:
                 if match_rule(filePath):
                     matches.append(indicator)
 
-        # 按优先级排序
+        # Sort by priority
         if matches:
             matches.sort(key=lambda x: x['priority'], reverse=True)
             chosen = matches[0]

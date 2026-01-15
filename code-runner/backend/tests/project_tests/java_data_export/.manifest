@@ -1,0 +1,6 @@
+{
+    "language": "java",
+    "description": "Java project that exports CSV and text report files",
+    "project_form": "java-sfa",
+    "expected_artifacts": ["java_export.csv", "summary_report.txt"]
+}

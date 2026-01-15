@@ -1,10 +1,4 @@
-﻿using Microsoft.KernelMemory;
-using Microsoft.KernelMemory.Handlers;
-using Microsoft.KernelMemory.Pipeline;
-using PostgreSQL.Embedding.Common;
-using PostgreSQL.Embedding.DataAccess;
-using PostgreSQL.Embedding.DataAccess.Entities;
-using PostgreSQL.Embedding.LlmServices.Abstration;
+﻿using PostgreSQL.Embedding.LlmServices.Abstration;
 
 namespace PostgreSQL.Embedding.LlmServices
 {

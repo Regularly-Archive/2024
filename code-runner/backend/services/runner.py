@@ -6,6 +6,7 @@ import uuid
 from services.collector import ArtifactCollector
 from handlers.resolver import HandlerResolver
 from config import ALLOWED_ARTIFACT_PATTERNS, IGNORED_DIRS
+import traceback
 
 class RunnerService:
     def __init__(self, ctx):
@@ -45,8 +46,7 @@ class RunnerService:
                 if result.exit_code != 0:
                     break
         except Exception as e:
-            import traceback
-            print(traceback.print_exc())
+            self.logger.error("Execution error: %s\n%s", e, traceback.format_exc())
         finally:
             duration = time.time() - start_time
             self.logger.info("The handler '%s' handled in %.2fs.", self.handler.__class__.__name__, duration)

@@ -1,9 +1,59 @@
 import mimetypes
 from pydantic import BaseModel, Field
-from typing import Optional
-from models import Artifact
+from typing import Optional, List, Literal
 from pathlib import Path
 from fastapi import Request
+
+import models  # for ArtifactView inheritance
+
+# ============ API Request Models ============
+
+class RunCodeRequest(BaseModel):
+    code: str
+    language: str
+    dependencies: list[str] = []
+
+class RunJupyterCodeCellRequest(BaseModel):
+    code: str
+    language: str
+    dependencies: list[str] = []
+    format: Literal['html', 'notebook'] = Field('html', description='The output format for jupyter runner')
+
+class CodeFile(BaseModel):
+    path: str
+    content: str
+
+class RunFilesRequest(BaseModel):
+    language: str
+    files: List[CodeFile]
+    dependencies: Optional[List[str]] = []
+    entry_path: Optional[str] = None
+
+class ProjectArchiveRequest(BaseModel):
+    language: Optional[str] = None
+    entry_point: Optional[str] = None
+    build_command: Optional[str] = None
+    run_command: Optional[str] = None
+    max_archive_size: int = 50  # MB
+
+
+# ============ API Response Models ============
+
+class RunCodeResponse(BaseModel):
+    output: str
+    content_type: str
+    duration: float
+    language: str
+
+class ProjectArchiveResponse(RunCodeResponse):
+    detected_language: Optional[str] = None
+    detected_entry_point: Optional[str] = None
+    build_output: Optional[str] = None
+    project_info: Optional[dict] = None
+    runtime_info: dict = Field(default_factory=dict)
+
+
+# ============ View Models ============
 
 class RuntimeInfoView(BaseModel):
     language: str
@@ -13,9 +63,9 @@ class RuntimeInfoView(BaseModel):
 
 class ProjectInfoView(BaseModel):
     project_id: Optional[str] = None
-    project_name: Optional[str] = None 
+    project_name: Optional[str] = None
 
-class ArtifactView(Artifact):
+class ArtifactView(models.Artifact):
     url: str
 
     @classmethod
@@ -33,7 +83,7 @@ class ArtifactView(Artifact):
         )
     
     @classmethod
-    def from_artifact(cls, artifact: Artifact, project_id: str, execution_id: str, request: Request):
+    def from_artifact(cls, artifact: models.Artifact, project_id: str, execution_id: str, request: Request):
         base_url = str(request.base_url).rstrip("/")
         return cls(
             name=artifact.name,

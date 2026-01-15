@@ -109,12 +109,12 @@ LANGUAGE_RUNTIME_MAP = {
 
 
 ALLOWED_ARTIFACT_PATTERNS = [
-    # 表格 / 数据
+    # Spreadsheet / Data
     "*.csv",
     "*.xlsx",
     "*.xls",
 
-    # 文档
+    # Documents
     "*.pdf",
     "*.docx",
     "*.md",
@@ -123,7 +123,7 @@ ALLOWED_ARTIFACT_PATTERNS = [
     "*.htm",
     "*.txt",
 
-    # 图片
+    # Images
     "*.png",
     "*.jpg",
     "*.jpeg",

@@ -1,0 +1,10 @@
+{
+    "description": "文件操作测试",
+    "tests": [
+        {
+            "name": "文件读写测试",
+            "mainScript": "file_ops.sh",
+            "arguments": null
+        }
+    ]
+}

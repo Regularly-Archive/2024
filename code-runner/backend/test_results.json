@@ -1,0 +1,22 @@
+[
+  {
+    "project": "python_plot_export",
+    "result": {
+      "success": true,
+      "detected_language": "python3",
+      "entry_point": null,
+      "output": "Plot saved: analysis_plots.png\nAnalysis complete!",
+      "artifacts": [
+        {
+          "name": "analysis_plots.png",
+          "path": "analysis_plots.png",
+          "size": 133260,
+          "mime": "image/png",
+          "url": "http://localhost:8001/api/projects/vyt1kibh/executions/exec_2484fcc49e9f/artifacts/analysis_plots.png"
+        }
+      ],
+      "duration": 51.982572078704834,
+      "error": null
+    }
+  }
+]

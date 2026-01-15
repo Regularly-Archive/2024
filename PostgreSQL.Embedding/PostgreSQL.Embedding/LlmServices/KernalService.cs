@@ -1,15 +1,12 @@
-﻿using Microsoft.Extensions.ObjectPool;
-using Microsoft.Extensions.Options;
+﻿using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Plugins.Core;
-using ModelContextProtocol.Client;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.DataAccess;
 using PostgreSQL.Embedding.DataAccess.Entities;
 using PostgreSQL.Embedding.LlmServices.Abstration;
 using PostgreSQL.Embedding.LlmServices.Routers;
 using PostgreSQL.Embedding.Planners;
-using PostgreSQL.Embedding.Plugins;
 using PostgreSQL.Embedding.Utils;
 
 namespace PostgreSQL.Embedding.LlmServices

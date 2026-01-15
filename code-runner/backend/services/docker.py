@@ -7,7 +7,8 @@ class DockerClient:
     def __init__(self):
         self.client = docker.from_env()
         self.logger = get_logger(__name__)
-        self.cache_root = os.path.abspath('D:\\.cache\\')
+        # Cross-platform cache directory: ~/.cache/code-runner
+        self.cache_root = os.path.join(os.path.expanduser("~"), ".cache", "code-runner")
 
     def create_container(self, image_name, project_dir, user, envs):
         default_envs = {

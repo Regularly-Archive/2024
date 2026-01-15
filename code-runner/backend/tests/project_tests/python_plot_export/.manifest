@@ -1,0 +1,6 @@
+{
+    "language": "python3",
+    "description": "Python project that generates multi-panel matplotlib plots",
+    "project_form": "python-project",
+    "expected_artifacts": ["analysis_plots.png"]
+}

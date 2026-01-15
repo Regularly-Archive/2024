@@ -1,47 +1,16 @@
+"""
+Internal business models for the sandbox.
+
+These models are used for internal state management and are not directly bound to APIs.
+"""
 from pydantic import BaseModel, Field
-from typing import Literal, List, Optional, Dict, Any
+from typing import Literal, List, Optional, Dict
 
-class RunCodeRequest(BaseModel):
-    code: str
-    language: str
-    dependencies: list[str] = []
 
-class RunJupyterCodeCellRequest(BaseModel):
-    code: str
-    language: str
-    dependencies: list[str] = []
-    format: Literal['html', 'notebook'] = Field('html', description='The output format for jupyter runner')
+# ============ Dependency Models ============
 
-class RunCodeResponse(BaseModel):
-    output: str
-    content_type: str
-    duration: float
-    language: str
-
-class CodeFile(BaseModel):
-    path: str
-    content: str
-
-class RunFilesRequest(BaseModel):
-    language: str
-    files: List[CodeFile]
-    dependencies: Optional[List[str]] = []
-    entry_path: Optional[str] = None
-
-class ProjectArchiveRequest(BaseModel):
-    language: Optional[str] = None
-    entry_point: Optional[str] = None
-    build_command: Optional[str] = None
-    run_command: Optional[str] = None
-    max_archive_size: int = 50  # MB
-
-# 依赖类型
 DependencyKind = Literal["manifest", "atomic"]
-
-# 依赖作用域
 DependencyScope = Literal["project", "file"]
-
-# 依赖源
 DependencySource = Literal["manifest_file", "file_header", "inline_cmd"]
 
 class Dependency(BaseModel):
@@ -54,6 +23,8 @@ class Dependency(BaseModel):
     source: DependencySource
 
 
+# ============ Project Models ============
+
 class ProjectInfo(BaseModel):
     project_dir: str
     language: str
@@ -65,19 +36,21 @@ class ProjectInfo(BaseModel):
 
     def has_dependencies(self) -> bool:
         return bool(self.dependencies)
-    
+
     def has_dependencies(self, name: str) -> bool:
         return any(
             d.name == name or (d.kind == "manifest" and d.path and name in d.path)
             for d in self.dependencies
         )
-    
+
     def get_inline_cmd_dependencies(self) -> List[Dependency]:
         return [
             d for d in self.dependencies
             if d.kind == "atomic" and d.source == "inline_cmd"
         ]
 
+
+# ============ Runtime Models ============
 
 class RuntimeInfo(BaseModel):
     image_name: str
@@ -89,13 +62,7 @@ class RuntimeInfo(BaseModel):
     runtime_args: str = ''
 
 
-class ProjectArchiveResponse(RunCodeResponse):
-    detected_language: Optional[str] = None
-    detected_entry_point: Optional[str] = None
-    build_output: Optional[str] = None
-    project_info: ProjectInfo = None
-    runtime_info: dict = Field(default_factory=dict)
-
+# ============ Execution Result Models ============
 
 class StageResult(BaseModel):
     name: str
@@ -109,17 +76,12 @@ class StageResult(BaseModel):
     def status(self) -> str:
         return "success" if self.exit_code == 0 else "error"
 
-class Artifact(BaseModel):
-    name: str
-    path: str
-    size: int
-    mime: Optional[str] = None
 
 class ExecutionResult(BaseModel):
     execution_id: str
     stages: List[StageResult] = Field(default_factory=list)
     total_duration: float = 0.0
-    artifacts: list[Artifact] = Field(default_factory=list)
+    artifacts: list = Field(default_factory=list)
 
     @property
     def status(self) -> str:
@@ -133,3 +95,12 @@ class ExecutionResult(BaseModel):
         last = self.stages[-1]
         output = last.stdout if last.exit_code == 0 else last.stderr
         return output or ""
+
+
+# ============ Artifact Model ============
+
+class Artifact(BaseModel):
+    name: str
+    path: str
+    size: int
+    mime: Optional[str] = None

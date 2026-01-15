@@ -9,8 +9,8 @@ import uuid
 
 def code_to_ipynb(code_string, notebook_name='output_notebook.ipynb', language=None, dependencies=None):
     """
-    生成 Jupyter Notebook 文件，并在首单元注入依赖安装代码。
-    自动插入屏蔽 Python 警告的代码（在依赖安装后）。
+    Generate Jupyter Notebook file with dependency installation code injected in the first cell.
+    Automatically inserts code to suppress Python warnings (after dependency installation).
     """
     nb = nbformat.v4.new_notebook()
     cells = []
@@ -37,7 +37,7 @@ def code_to_ipynb(code_string, notebook_name='output_notebook.ipynb', language=N
 
 def code_to_file(code_string, file_path, language=None, dependencies=None):
     """
-    生成代码文件，并按语言类型在文件头注入依赖声明。
+    Generate code file with dependency declarations injected at the file header based on language type.
     """
     dependencies = [dep for dep in dependencies if dep and dep.strip()]
     if language == 'csharp' and dependencies:
@@ -54,7 +54,7 @@ def code_to_file(code_string, file_path, language=None, dependencies=None):
 
 async def prepare_project_dir_from_archive(archive_file) -> str:
     """
-    从压缩包临时项目目录，并写入多个代码文件。
+    Extract project files from archive to a temporary directory.
     """
     allowed_extensions = ('.zip', '.tar.gz', '.tgz', '.tar.bz2', '.tbz2')
     filename = archive_file.filename
@@ -98,7 +98,7 @@ def prepare_project_dir_from_code(code: str, language: str, dependencies: List[s
 
 def read_output(temp_dir, output_file, fallback_output):
     """
-    读取代码执行输出结果。
+    Read code execution output result.
     """
     redirected_output = os.path.join(temp_dir, output_file)
     if not os.path.exists(redirected_output):
@@ -109,8 +109,8 @@ def read_output(temp_dir, output_file, fallback_output):
 
 def extract_archive(archive_path: str, extract_to: str) -> List[str]:
     """
-    解压压缩包到指定目录，支持的格式：zip, tar.gz, .taz, tar.bz2, .tbz2
-    返回解压的文件列表
+    Extract archive to specified directory. Supported formats: zip, tar.gz, .taz, tar.bz2, .tbz2
+    Returns the list of extracted files.
     """
     extracted_files = []
 
@@ -139,7 +139,7 @@ def extract_archive(archive_path: str, extract_to: str) -> List[str]:
     return extracted_files
 
 def is_jbang_file(file_path: str) -> bool:
-    """检查文件是否是 Jbang 格式的 Java 文件"""
+    """Check if the file is in JBang format for Java."""
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             first_line = f.readline().strip()
