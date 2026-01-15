@@ -1,0 +1,10 @@
+{
+    "description": "管道和重定向测试",
+    "tests": [
+        {
+            "name": "管道和重定向测试",
+            "mainScript": "pipe_test.sh",
+            "arguments": null
+        }
+    ]
+}

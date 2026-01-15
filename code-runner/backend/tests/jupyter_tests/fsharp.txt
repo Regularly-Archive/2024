@@ -1,2 +1,0 @@
-open System.IO
-File.WriteAllText("fsharp_output.txt", "Hello from F#")

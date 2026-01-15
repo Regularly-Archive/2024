@@ -1,0 +1,10 @@
+{
+    "description": "条件判断测试",
+    "tests": [
+        {
+            "name": "条件判断测试",
+            "mainScript": "conditionals.sh",
+            "arguments": null
+        }
+    ]
+}

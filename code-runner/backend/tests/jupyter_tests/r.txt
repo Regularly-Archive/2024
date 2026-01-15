@@ -1,5 +1,0 @@
-library(ggplot2)
-df <- data.frame(x=c(1,2,3,4), y=c(10,20,25,30))
-p <- ggplot(df, aes(x=x, y=y)) + geom_line() + ggtitle("R Plot Example")
-ggsave("r_plot.png", plot=p)
-print("Plot saved as r_plot.png")

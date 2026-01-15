@@ -8,13 +8,20 @@ from utils import read_output, prepare_project_dir_from_code, prepare_project_di
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 import mimetypes
+import traceback
 
-from models import RunCodeRequest, RunJupyterCodeCellRequest, RunCodeResponse, RunFilesRequest, ProjectArchiveResponse
+from models import ProjectInfo, RuntimeInfo, ExecutionResult
 from handlers.context import HandlerContext
 from handlers.resolver import HandlerResolver
 from services.runner import RunnerService
 from services.detector import ProjectDetector
-from views import SandboxResponseView, ArtifactView
+from services.logger import get_logger
+from views import (
+    RunCodeRequest, RunJupyterCodeCellRequest, RunCodeResponse,
+    SandboxResponseView, ArtifactView
+)
+
+logger = get_logger(__name__)
 
 app = FastAPI()
 app.add_middleware(
@@ -31,7 +38,7 @@ projectDetector = ProjectDetector()
 @app.post("/api/code/run", response_model=SandboxResponseView)
 async def run_code(request: RunCodeRequest = Body(...), raw_request: Request = None):
     """
-    运行代码片段
+    Run code snippet
     """
     try:
         project_dir = prepare_project_dir_from_code(request.code, request.language, request.dependencies)
@@ -48,7 +55,7 @@ async def run_code(request: RunCodeRequest = Body(...), raw_request: Request = N
 @app.post("/api/jupyter/run", response_model=SandboxResponseView)
 async def run_jupyter(request: RunJupyterCodeCellRequest = Body(...), raw_request: Request = None):
     """
-    运行 Jupyter 项目
+    Run Jupyter project
     """
     try:
         project_dir = prepare_project_dir_from_code(request.code, request.language, request.dependencies)
@@ -81,7 +88,7 @@ async def run_project_archive(
     raw_request: Request = None
 ):
     """
-    运行项目
+    Run project
     """
     try:
         project_dir = await prepare_project_dir_from_archive(archive_file)
@@ -93,8 +100,7 @@ async def run_project_archive(
 
         return SandboxResponseView.from_context(ctx, raw_request, content_type='text/plain')
     except Exception as e:
-        import traceback
-        print(traceback.print_exc())
+        logger.error("Failed to run project archive: %s\n%s", e, traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/project/run-bash", response_model=RunCodeResponse)
@@ -104,7 +110,7 @@ async def run_bash_script(
     arguments: str = Form(None)
 ):
     """
-    运行 Bash 项目
+    Run Bash project
     """
     try:
         if not main_script or not main_script.strip():

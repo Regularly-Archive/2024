@@ -1,0 +1,6 @@
+{
+    "language": "python3",
+    "description": "Python project that exports CSV and JSON data",
+    "project_form": "python-project",
+    "expected_artifacts": ["users_export.csv", "export_summary.json"]
+}
