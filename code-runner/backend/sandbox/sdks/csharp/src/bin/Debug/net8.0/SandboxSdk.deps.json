@@ -1,0 +1,23 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "SandboxSdk/0.1.0": {
+        "runtime": {
+          "SandboxSdk.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "SandboxSdk/0.1.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

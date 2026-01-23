@@ -22,7 +22,7 @@ from sandbox.models import (
 from sandbox.runner import SandboxService
 from sandbox.docker_service import SandboxDockerClient
 from sandbox.storage import SandboxStorage, SandboxRepository
-from sandbox.config import TEMPLATES, TEMPLATE_IMAGES, get_template, resolve_image, list_templates
+from sandbox.config import TEMPLATES, TEMPLATE_IMAGES, get_template, resolve_image, list_templates, get_resources
 
 __all__ = [
     # Models
@@ -52,4 +52,5 @@ __all__ = [
     "get_template",
     "resolve_image",
     "list_templates",
+    "get_resources",
 ]

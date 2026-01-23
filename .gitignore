@@ -118,3 +118,5 @@ code-runner/backend/handlers/go/__pycache__/
 code-runner/backend/handlers/cpp/__pycache__/project.cpython-39.pyc
 code-runner/backend/handlers/javascript/__pycache__/project.cpython-39.pyc
 code-runner/backend/sandbox/__pycache__/
+code-runner/backend/sandbox/sdks/typescript/node_modules
+'code-runner/backend/sandbox/sdks/typescript/dist

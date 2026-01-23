@@ -1,0 +1,12 @@
+D:\Projects\2024\code-runner\backend\sandbox\sdks\csharp\src\obj\Debug\net8.0\SandboxSdk.GeneratedMSBuildEditorConfig.editorconfig
+D:\Projects\2024\code-runner\backend\sandbox\sdks\csharp\src\obj\Debug\net8.0\SandboxSdk.AssemblyInfoInputs.cache
+D:\Projects\2024\code-runner\backend\sandbox\sdks\csharp\src\obj\Debug\net8.0\SandboxSdk.AssemblyInfo.cs
+D:\Projects\2024\code-runner\backend\sandbox\sdks\csharp\src\obj\Debug\net8.0\SandboxSdk.csproj.CoreCompileInputs.cache
+D:\Projects\2024\code-runner\backend\sandbox\sdks\csharp\src\obj\Debug\net8.0\SandboxSdk.sourcelink.json
+D:\Projects\2024\code-runner\backend\sandbox\sdks\csharp\src\bin\Debug\net8.0\SandboxSdk.deps.json
+D:\Projects\2024\code-runner\backend\sandbox\sdks\csharp\src\bin\Debug\net8.0\SandboxSdk.dll
+D:\Projects\2024\code-runner\backend\sandbox\sdks\csharp\src\bin\Debug\net8.0\SandboxSdk.pdb
+D:\Projects\2024\code-runner\backend\sandbox\sdks\csharp\src\obj\Debug\net8.0\SandboxSdk.dll
+D:\Projects\2024\code-runner\backend\sandbox\sdks\csharp\src\obj\Debug\net8.0\refint\SandboxSdk.dll
+D:\Projects\2024\code-runner\backend\sandbox\sdks\csharp\src\obj\Debug\net8.0\SandboxSdk.pdb
+D:\Projects\2024\code-runner\backend\sandbox\sdks\csharp\src\obj\Debug\net8.0\ref\SandboxSdk.dll

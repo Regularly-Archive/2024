@@ -7,13 +7,16 @@ import os
 import json
 import sqlite3
 from datetime import datetime
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, List, Any, TYPE_CHECKING
 from contextlib import contextmanager
 from dataclasses import dataclass, asdict
 
 from sandbox.models import SandboxStatus
 from sandbox.docker_service import SandboxDockerClient
 from services.logger import get_logger
+
+if TYPE_CHECKING:
+    from sandbox.runner import SandboxInstance
 
 logger = get_logger(__name__)
 
@@ -31,6 +34,7 @@ class SandboxRecord:
     created_at: str
     expires_at: str
     file_hashes: str  # JSON string
+    created_at_db: str = ""  # Timestamp when record was created in DB
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -261,14 +265,17 @@ class SandboxRepository:
     Repository pattern for sandbox operations.
 
     Combines storage with container management for recovery and cleanup.
+    Provides unified state management with memory cache + SQLite persistence.
     """
 
     def __init__(self, storage: SandboxStorage = None):
         self.storage = storage or SandboxStorage()
         self.docker = SandboxDockerClient()
+        self._cache: Dict[str, "SandboxInstance"] = {}  # In-memory cache
 
     def save(self, instance: "SandboxInstance") -> bool:
-        """Save a sandbox instance."""
+        """Save a sandbox instance to storage and cache."""
+        # Save to SQLite
         record = SandboxRecord(
             sandbox_id=instance.sandbox_id,
             template_id=instance.template_id,
@@ -281,13 +288,33 @@ class SandboxRepository:
             expires_at=instance.expires_at.isoformat(),
             file_hashes=json.dumps(instance.file_hashes)
         )
-        return self.storage.save_sandbox(record)
+
+        if not self.storage.save_sandbox(record):
+            return False
+
+        # Update cache
+        self._cache[instance.sandbox_id] = instance
+        return True
 
     def load(self, sandbox_id: str) -> Optional["SandboxInstance"]:
-        """Load a sandbox instance from storage."""
-        from dataclasses import dataclass
+        """Load a sandbox instance from storage.
+
+        Uses memory cache first, then falls back to SQLite.
+        Automatically validates container existence.
+        """
         from datetime import datetime
 
+        # Check cache first
+        if sandbox_id in self._cache:
+            instance = self._cache[sandbox_id]
+            # Verify container is still running
+            container = self.docker.get_container_by_id(instance.container_id)
+            if container and container.status == "running":
+                return instance
+            # Container gone, remove from cache and fall through to storage check
+            del self._cache[sandbox_id]
+
+        # Load from storage
         record = self.storage.get_sandbox(sandbox_id)
         if not record:
             return None
@@ -299,24 +326,11 @@ class SandboxRepository:
             self.storage.update_status(sandbox_id, "terminated")
             return None
 
-        @dataclass
-        class LoadedInstance:
-            sandbox_id: str
-            template_id: str
-            container_id: str
-            image_name: str
-            workdir: str
-            user: str
-            status: SandboxStatus
-            created_at: datetime
-            expires_at: datetime
-            file_hashes: Dict[str, str]
+        # Import SandboxInstance at runtime to avoid circular import
+        from sandbox.runner import SandboxInstance
 
-            @property
-            def is_expired(self):
-                return datetime.now() > self.expires_at
-
-        return LoadedInstance(
+        # Create instance
+        instance = SandboxInstance(
             sandbox_id=record.sandbox_id,
             template_id=record.template_id,
             container_id=record.container_id,
@@ -328,6 +342,14 @@ class SandboxRepository:
             expires_at=datetime.fromisoformat(record.expires_at),
             file_hashes=json.loads(record.file_hashes) if record.file_hashes else {}
         )
+
+        # Add to cache
+        self._cache[sandbox_id] = instance
+        return instance
+
+    def get_or_load(self, sandbox_id: str) -> Optional["SandboxInstance"]:
+        """Get from cache or load from storage."""
+        return self.load(sandbox_id)
 
     def list_all(self) -> List["SandboxInstance"]:
         """Load all running sandboxes from storage."""
@@ -380,5 +402,31 @@ class SandboxRepository:
         return count
 
     def destroy(self, sandbox_id: str) -> bool:
-        """Delete sandbox record (after container is already removed)."""
+        """Delete sandbox record from storage and cache."""
+        # Remove from cache
+        self._cache.pop(sandbox_id, None)
+        # Delete from storage
         return self.storage.delete_sandbox(sandbox_id)
+
+    def update_status(self, sandbox_id: str, status: str) -> bool:
+        """Update sandbox status in both storage and memory cache."""
+        # Update storage
+        if not self.storage.update_status(sandbox_id, status):
+            return False
+
+        # Update memory cache if exists
+        if sandbox_id in self._cache:
+            self._cache[sandbox_id].status = SandboxStatus(status)
+
+        return True
+
+    def update_file_hashes(self, sandbox_id: str, hashes: Dict[str, str]) -> bool:
+        """Update file hashes for a sandbox."""
+        if not self.storage.update_file_hashes(sandbox_id, hashes):
+            return False
+
+        # Update memory cache if exists
+        if sandbox_id in self._cache:
+            self._cache[sandbox_id].file_hashes = hashes
+
+        return True

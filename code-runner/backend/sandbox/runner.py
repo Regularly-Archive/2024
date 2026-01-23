@@ -26,9 +26,9 @@ from sandbox.models import (
 )
 from sandbox.config import (
     TEMPLATES, TEMPLATE_IMAGES, get_template, resolve_image, list_templates,
-    resolve_capabilities
+    resolve_capabilities, get_resources
 )
-from sandbox.docker_service import SandboxDockerClient
+from sandbox.docker_service import SandboxDockerClient, ExecutionTimeout
 from sandbox.storage import SandboxRepository
 from services.logger import get_logger
 
@@ -55,12 +55,15 @@ class SandboxInstance:
 
 
 class SandboxService:
-    """Service for managing sandboxes with persistent storage."""
+    """Service for managing sandboxes with persistent storage.
+
+    All state operations go through SandboxRepository, which provides
+    unified access to both memory cache and SQLite storage.
+    """
 
     def __init__(self, repository: SandboxRepository = None):
         self.docker = SandboxDockerClient()
         self.repo = repository or SandboxRepository()
-        self._instances: Dict[str, SandboxInstance] = {}  # In-memory cache
 
         # Recover orphaned sandboxes on startup
         self._recover_sandboxes()
@@ -90,33 +93,23 @@ class SandboxService:
         return f"exec_{uuid.uuid4().hex[:12]}"
 
     def _get_instance(self, sandbox_id: str) -> Optional[SandboxInstance]:
-        """Get sandbox instance from cache or storage."""
-        # Check cache first
-        if sandbox_id in self._instances:
-            return self._instances[sandbox_id]
-
-        # Try to load from storage
-        instance = self.repo.load(sandbox_id)
-        if instance:
-            self._instances[sandbox_id] = instance
-        return instance
+        """Get sandbox instance from repository (cache + storage)."""
+        return self.repo.load(sandbox_id)
 
     def _save_instance(self, instance: SandboxInstance) -> bool:
-        """Save instance to storage and cache."""
-        self._instances[instance.sandbox_id] = instance
+        """Save instance through repository."""
         return self.repo.save(instance)
 
     def _remove_instance(self, sandbox_id: str) -> bool:
-        """Remove instance from cache and storage."""
-        self._instances.pop(sandbox_id, None)
+        """Remove instance through repository."""
         return self.repo.destroy(sandbox_id)
 
     def _mark_expired(self):
         """Mark expired sandboxes."""
-        for sandbox_id, instance in list(self._instances.items()):
+        for instance in self.repo.list_all():
             if instance.is_expired():
                 instance.status = SandboxStatus.TERMINATED
-                self.repo.storage.update_status(sandbox_id, "terminated")
+                self.repo.update_status(instance.sandbox_id, "terminated")
 
     def list_templates(self) -> List[Template]:
         """List all available templates."""
@@ -151,13 +144,17 @@ class SandboxService:
         max_time = template.constraints.get("max_exec_time", "30m")
         expires_at = self._parse_timeout(max_time)
 
-        # Create container
+        # Get resource limits from template
+        resources = get_resources(request.template)
+
+        # Create container with resource limits
         try:
             container = self.docker.create_container(
                 sandbox_id=sandbox_id,
                 image_name=image_name,
                 workdir=workdir,
-                envs={}
+                envs={},
+                resources=resources
             )
         except Exception as e:
             logger.error("Failed to create container: %s", e)
@@ -233,7 +230,7 @@ class SandboxService:
         # Check expiry
         if instance.is_expired():
             instance.status = SandboxStatus.TERMINATED
-            self.repo.storage.update_status(sandbox_id, "terminated")
+            self.repo.update_status(sandbox_id, "terminated")
 
         return SandboxDetailResponse(
             sandbox_id=sandbox_id,
@@ -321,13 +318,13 @@ class SandboxService:
 
         if instance.is_expired():
             instance.status = SandboxStatus.TERMINATED
-            self.repo.storage.update_status(sandbox_id, "terminated")
+            self.repo.update_status(sandbox_id, "terminated")
             return None, ErrorResponse(error="Sandbox expired", detail="Please create a new sandbox")
 
         container = self.docker.get_container_by_id(instance.container_id)
         if not container:
             instance.status = SandboxStatus.TERMINATED
-            self.repo.storage.update_status(sandbox_id, "terminated")
+            self.repo.update_status(sandbox_id, "terminated")
             return None, ErrorResponse(error="Container not found", detail="Container may have been removed")
 
         # Determine working directory
@@ -339,13 +336,21 @@ class SandboxService:
         # Start timing
         start_time = time.time()
 
-        # Execute command
+        # Execute command with optional timeout
         try:
             exit_code, stdout, stderr = self.docker.exec_command(
                 container,
                 request.cmd,
                 instance.user,
-                cwd
+                cwd,
+                timeout=request.timeout
+            )
+        except ExecutionTimeout:
+            instance.status = SandboxStatus.ERROR
+            self.repo.update_status(sandbox_id, "error")
+            return None, ErrorResponse(
+                error="Execution timeout",
+                detail=f"Command exceeded {request.timeout}s timeout"
             )
         except Exception as e:
             return None, ErrorResponse(error="Execution failed", detail=str(e))
@@ -643,23 +648,19 @@ class SandboxService:
         ), None
 
     def list_sandboxes(self) -> List[Dict]:
-        """List all running sandboxes."""
+        """List all running sandboxes through repository."""
         # Reload from storage to get any recovered sandboxes
         self._mark_expired()
 
         result = []
-        for sandbox_id in list(self._instances.keys()):
-            instance = self._get_instance(sandbox_id)
-            if not instance:
-                continue
-
+        for instance in self.repo.list_all():
             container = self.docker.get_container_by_id(instance.container_id)
             status = container.status if container else "unknown"
             if instance.is_expired():
                 status = "expired"
 
             result.append({
-                "sandbox_id": sandbox_id,
+                "sandbox_id": instance.sandbox_id,
                 "template": instance.template_id,
                 "status": status,
                 "created_at": instance.created_at.isoformat(),

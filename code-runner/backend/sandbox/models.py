@@ -86,6 +86,7 @@ class ExecRequest(BaseModel):
     cmd: str
     cwd: Optional[str] = None
     env: Dict[str, str] = Field(default_factory=dict)
+    timeout: Optional[int] = Field(default=None, description="Max execution time in seconds")
 
 
 class ExecResponse(BaseModel):
