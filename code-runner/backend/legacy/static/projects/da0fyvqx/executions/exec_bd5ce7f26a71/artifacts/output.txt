@@ -1,0 +1,51 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "85836e47",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-01-12T09:47:33.940086Z",
+     "iopub.status.busy": "2026-01-12T09:47:33.938645Z",
+     "iopub.status.idle": "2026-01-12T09:47:35.820185Z",
+     "shell.execute_reply": "2026-01-12T09:47:35.819505Z"
+    },
+    "hide_input": true
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Plot saved as python_plot.png\n"
+     ]
+    }
+   ],
+   "source": [
+    "import matplotlib.pyplot as plt\n",
+    "plt.plot([1,2,3,4],[10,20,25,30])\n",
+    "plt.title(\"Python Plot Example\")\n",
+    "plt.savefig(\"python_plot.png\")\n",
+    "plt.close()\n",
+    "print(\"Plot saved as python_plot.png\")"
+   ]
+  }
+ ],
+ "metadata": {
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.11.6"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

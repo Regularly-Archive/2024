@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"D:\\\\Projects\\\\2024\\\\PostgreSQL.Embedding\\\\PostgreSQL.Embedding\" log --oneline -10)"
+    ]
+  }
+}

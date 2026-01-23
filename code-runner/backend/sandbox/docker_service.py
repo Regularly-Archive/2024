@@ -4,16 +4,22 @@ Docker service for the sandbox runtime.
 Provides container lifecycle management and command execution.
 """
 import os
+import time
 import docker
 import shutil
 import uuid
 import hashlib
 import shlex
 from datetime import datetime
-from typing import Optional, Dict, List, Tuple, Generator
+from typing import Optional, Dict, List, Tuple, Generator, Any
 from services.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+class ExecutionTimeout(Exception):
+    """Raised when command execution exceeds timeout."""
+    pass
 
 
 class SandboxDockerClient:
@@ -46,7 +52,8 @@ class SandboxDockerClient:
         sandbox_id: str,
         image_name: str,
         workdir: str = "/workspace",
-        envs: Optional[Dict[str, str]] = None
+        envs: Optional[Dict[str, str]] = None,
+        resources: Optional[Dict[str, Any]] = None
     ) -> docker.models.containers.Container:
         """
         Create a new container for a sandbox.
@@ -56,6 +63,7 @@ class SandboxDockerClient:
             image_name: Docker image to use
             workdir: Working directory in the container
             envs: Environment variables
+            resources: Resource limits (memory, cpu, pids)
 
         Returns:
             The created container
@@ -76,7 +84,8 @@ class SandboxDockerClient:
 
         self.logger.info("Creating container from image %s for sandbox %s", image_name, sandbox_id)
 
-        container = self.client.containers.run(
+        # Build container kwargs
+        container_kwargs = dict(
             image=image_name,
             command="sleep infinity",
             volumes={
@@ -91,6 +100,21 @@ class SandboxDockerClient:
             }
         )
 
+        # Apply resource limits if provided
+        if resources:
+            container_kwargs["mem_limit"] = resources.get("memory", "256m")
+            container_kwargs["cpu_period"] = 100000
+            container_kwargs["cpu_quota"] = int(resources.get("cpu", 0.5) * 100000)
+            container_kwargs["pids_limit"] = resources.get("pids", 100)
+            self.logger.info(
+                "Applying resource limits: mem=%s, cpu=%.2f, pids=%d",
+                container_kwargs["mem_limit"],
+                resources.get("cpu", 0.5),
+                container_kwargs["pids_limit"]
+            )
+
+        container = self.client.containers.run(**container_kwargs)
+
         self.logger.info("Container %s created for sandbox %s", container.short_id, sandbox_id)
         return container
 
@@ -99,7 +123,8 @@ class SandboxDockerClient:
         container: docker.models.containers.Container,
         cmd: str,
         user: str = "sandbox",
-        workdir: str = "/workspace"
+        workdir: str = "/workspace",
+        timeout: Optional[int] = None
     ) -> Tuple[int, str, str]:
         """
         Execute a command and wait for completion.
@@ -109,9 +134,13 @@ class SandboxDockerClient:
             cmd: Command to execute
             user: User to run as
             workdir: Working directory
+            timeout: Maximum execution time in seconds (None for no limit)
 
         Returns:
             Tuple of (exit_code, stdout, stderr)
+
+        Raises:
+            ExecutionTimeout: If execution exceeds timeout
         """
         # Use sh -c with proper quoting for shell execution
         # The command is passed as a single string to be executed by shell
@@ -121,13 +150,18 @@ class SandboxDockerClient:
         stderr_chunks: List[str] = []
         exit_code_val = 0
 
-        for stream, content in self.run_command_as_stream(container, wrapped_cmd, user, workdir):
-            if stream == "stdout":
-                stdout_chunks.append(content)
-            elif stream == "stderr":
-                stderr_chunks.append(content)
-            elif stream == "exit":
-                exit_code_val = int(content)
+        try:
+            for stream, content in self.run_command_as_stream(
+                container, wrapped_cmd, user, workdir, timeout
+            ):
+                if stream == "stdout":
+                    stdout_chunks.append(content)
+                elif stream == "stderr":
+                    stderr_chunks.append(content)
+                elif stream == "exit":
+                    exit_code_val = int(content)
+        except ExecutionTimeout:
+            raise
 
         stdout = '\n'.join(stdout_chunks)
         stderr = '\n'.join(stderr_chunks)
@@ -139,20 +173,27 @@ class SandboxDockerClient:
         container: docker.models.containers.Container,
         cmd: str,
         user: str = "sandbox",
-        workdir: str = "/workspace"
+        workdir: str = "/workspace",
+        timeout: Optional[int] = None
     ) -> Generator[Tuple[str, str], None, None]:
         """
-        Execute a command with streaming output.
+        Execute a command with streaming output and optional timeout.
 
         Args:
             container: The container to execute in
             cmd: Command to execute
             user: User to run as
             workdir: Working directory
+            timeout: Maximum execution time in seconds (None for no limit)
 
         Yields:
             Tuples of (stream_type, content) where stream_type is 'stdout', 'stderr', or 'exit'
+
+        Raises:
+            ExecutionTimeout: If execution exceeds timeout
         """
+        start_time = time.time()
+
         try:
             exec_id = self.client.api.exec_create(
                 container.id,
@@ -168,6 +209,15 @@ class SandboxDockerClient:
             )
 
             for stdout, stderr in output:
+                # Check timeout
+                if timeout is not None and (time.time() - start_time) > timeout:
+                    # Try to kill the exec
+                    try:
+                        self.client.api.exec_kill(container.id, exec_id)
+                    except Exception:
+                        pass
+                    raise ExecutionTimeout(f"Command execution exceeded {timeout}s timeout")
+
                 if stdout:
                     yield "stdout", stdout.decode(errors='ignore')
                 if stderr:

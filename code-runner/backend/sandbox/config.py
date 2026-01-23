@@ -4,8 +4,22 @@ Template definitions for the sandbox runtime.
 Each template represents a class of machine capabilities - a stable contract
 that can be resolved to a Docker image.
 """
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from sandbox.models import Template
+
+# Default resource limits
+DEFAULT_RESOURCES: Dict[str, Any] = {
+    "memory": "256m",      # 256 MB
+    "cpu": 0.5,            # 50% of one CPU
+    "pids": 100            # Max 100 processes
+}
+
+# Heavy workloads get more resources
+HEAVY_RESOURCES: Dict[str, Any] = {
+    "memory": "1g",        # 1 GB
+    "cpu": 1.0,            # 100% of one CPU
+    "pids": 200            # Max 200 processes
+}
 
 # Template ID -> Template definition
 # The template is a stable contract; the image can be updated
@@ -25,7 +39,8 @@ TEMPLATES: Dict[str, Template] = {
         },
         constraints={
             "network": False,
-            "max_exec_time": "30m"
+            "max_exec_time": "30m",
+            "resources": DEFAULT_RESOURCES
         }
     ),
     "python-data": Template(
@@ -46,7 +61,8 @@ TEMPLATES: Dict[str, Template] = {
         },
         constraints={
             "network": False,
-            "max_exec_time": "1h"
+            "max_exec_time": "1h",
+            "resources": HEAVY_RESOURCES
         }
     ),
     "node-basic": Template(
@@ -64,7 +80,8 @@ TEMPLATES: Dict[str, Template] = {
         },
         constraints={
             "network": False,
-            "max_exec_time": "30m"
+            "max_exec_time": "30m",
+            "resources": DEFAULT_RESOURCES
         }
     ),
     "dotnet-basic": Template(
@@ -81,7 +98,8 @@ TEMPLATES: Dict[str, Template] = {
         },
         constraints={
             "network": False,
-            "max_exec_time": "30m"
+            "max_exec_time": "30m",
+            "resources": DEFAULT_RESOURCES
         }
     ),
     "cpp-basic": Template(
@@ -100,7 +118,8 @@ TEMPLATES: Dict[str, Template] = {
         },
         constraints={
             "network": False,
-            "max_exec_time": "30m"
+            "max_exec_time": "30m",
+            "resources": DEFAULT_RESOURCES
         }
     ),
     "java-basic": Template(
@@ -118,7 +137,8 @@ TEMPLATES: Dict[str, Template] = {
         },
         constraints={
             "network": False,
-            "max_exec_time": "30m"
+            "max_exec_time": "30m",
+            "resources": DEFAULT_RESOURCES
         }
     ),
     "rust-basic": Template(
@@ -136,7 +156,8 @@ TEMPLATES: Dict[str, Template] = {
         },
         constraints={
             "network": False,
-            "max_exec_time": "30m"
+            "max_exec_time": "30m",
+            "resources": DEFAULT_RESOURCES
         }
     ),
     "go-basic": Template(
@@ -153,7 +174,8 @@ TEMPLATES: Dict[str, Template] = {
         },
         constraints={
             "network": False,
-            "max_exec_time": "30m"
+            "max_exec_time": "30m",
+            "resources": DEFAULT_RESOURCES
         }
     ),
     "linux-basic": Template(
@@ -170,7 +192,8 @@ TEMPLATES: Dict[str, Template] = {
         },
         constraints={
             "network": False,
-            "max_exec_time": "30m"
+            "max_exec_time": "30m",
+            "resources": DEFAULT_RESOURCES
         }
     ),
     "jupyter-python": Template(
@@ -189,7 +212,8 @@ TEMPLATES: Dict[str, Template] = {
         },
         constraints={
             "network": False,
-            "max_exec_time": "1h"
+            "max_exec_time": "1h",
+            "resources": HEAVY_RESOURCES
         }
     ),
 }
@@ -221,6 +245,12 @@ def get_template(template_id: str) -> Template:
     if template_id not in TEMPLATES:
         raise ValueError(f"Unknown template: {template_id}")
     return TEMPLATES[template_id]
+
+
+def get_resources(template_id: str) -> Dict[str, Any]:
+    """Get resource limits for a template."""
+    template = get_template(template_id)
+    return template.constraints.get("resources", DEFAULT_RESOURCES)
 
 
 def list_templates() -> List[Template]:

@@ -1,0 +1,53 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "7a9dea96",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2026-01-12T09:47:40.485126Z",
+     "iopub.status.busy": "2026-01-12T09:47:40.481988Z",
+     "iopub.status.idle": "2026-01-12T09:47:41.207516Z",
+     "shell.execute_reply": "2026-01-12T09:47:41.206670Z"
+    },
+    "hide_input": true
+   },
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1m\u001b[22mSaving 6.67 x 6.67 in image\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[1] \"Plot saved as r_plot.png\"\n"
+     ]
+    }
+   ],
+   "source": [
+    "library(ggplot2)\n",
+    "df <- data.frame(x=c(1,2,3,4), y=c(10,20,25,30))\n",
+    "p <- ggplot(df, aes(x=x, y=y)) + geom_line() + ggtitle(\"R Plot Example\")\n",
+    "ggsave(\"r_plot.png\", plot=p)\n",
+    "print(\"Plot saved as r_plot.png\")"
+   ]
+  }
+ ],
+ "metadata": {
+  "language_info": {
+   "codemirror_mode": "r",
+   "file_extension": ".r",
+   "mimetype": "text/x-r-source",
+   "name": "R",
+   "pygments_lexer": "r",
+   "version": "4.3.1"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

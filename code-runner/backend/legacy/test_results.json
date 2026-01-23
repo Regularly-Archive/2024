@@ -1,0 +1,305 @@
+[
+  {
+    "project": "c_sfa",
+    "result": {
+      "success": true,
+      "detected_language": "cpp",
+      "entry_point": null,
+      "output": "{\n  \"A\": 28,\n  \"B\": 34,\n  \"Sum\": 62,\n  \"Timestamp\": 1768813685,\n  \"Language\": \"C\"\n}",
+      "artifacts": [],
+      "duration": 0.9586563110351562,
+      "error": null
+    }
+  },
+  {
+    "project": "cpp_make",
+    "result": {
+      "success": true,
+      "detected_language": "cpp",
+      "entry_point": null,
+      "output": "{\n  \"A\": 77,\n  \"B\": 47,\n  \"Sum\": 124,\n  \"Timestamp\": 1768813688,\n  \"Language\": \"Makefile (C++)\"\n}",
+      "artifacts": [],
+      "duration": 1.4450807571411133,
+      "error": null
+    }
+  },
+  {
+    "project": "cpp_sfa",
+    "result": {
+      "success": true,
+      "detected_language": "cpp",
+      "entry_point": null,
+      "output": "{\n  \"A\": 44,\n  \"B\": 35,\n  \"Sum\": 79,\n  \"Timestamp\": 1768813691,\n  \"Language\": \"C++\"\n}",
+      "artifacts": [],
+      "duration": 1.0733482837677002,
+      "error": null
+    }
+  },
+  {
+    "project": "csharp_project",
+    "result": {
+      "success": true,
+      "detected_language": "csharp",
+      "entry_point": null,
+      "output": "{\n  \"A\": 33,\n  \"B\": 89,\n  \"Sum\": 122,\n  \"Timestamp\": \"2026-01-19T09:08:46.6340332+00:00\",\n  \"Language\": \"C# Project\"\n}",
+      "artifacts": [
+        {
+          "name": "TestProject.csproj.FileListAbsolute.txt",
+          "path": "obj/Debug/net8.0/TestProject.csproj.FileListAbsolute.txt",
+          "size": 1150,
+          "mime": "text/plain",
+          "url": "http://localhost:8001/api/projects/bd1naidi/executions/exec_fbd155b971b9/artifacts/obj/Debug/net8.0/TestProject.csproj.FileListAbsolute.txt"
+        }
+      ],
+      "duration": 32.89837145805359,
+      "error": null
+    }
+  },
+  {
+    "project": "csharp_script",
+    "result": {
+      "success": true,
+      "detected_language": "csharp",
+      "entry_point": null,
+      "output": "{\n  \"A\": 37,\n  \"B\": 40,\n  \"Sum\": 77,\n  \"Timestamp\": \"2026-01-19T09:09:31.2659644+00:00\",\n  \"Language\": \"C# Script\"\n}",
+      "artifacts": [],
+      "duration": 42.37327313423157,
+      "error": null
+    }
+  },
+  {
+    "project": "csharp_script_entry",
+    "result": {
+      "success": true,
+      "detected_language": "csharp",
+      "entry_point": null,
+      "output": "{\n  \"A\": 25,\n  \"B\": 80,\n  \"Sum\": 105,\n  \"Timestamp\": \"2026-01-19T09:10:14.69335+00:00\",\n  \"Language\": \"C# Script\"\n}",
+      "artifacts": [],
+      "duration": 41.33164954185486,
+      "error": null
+    }
+  },
+  {
+    "project": "csharp_sfa",
+    "result": {
+      "success": true,
+      "detected_language": "csharp",
+      "entry_point": null,
+      "output": "{\n  \"A\": 43,\n  \"B\": 25,\n  \"Sum\": 68,\n  \"Timestamp\": \"2026-01-19T09:10:34.4809597+00:00\",\n  \"Language\": \"C# Script\"\n}",
+      "artifacts": [],
+      "duration": 17.555203437805176,
+      "error": null
+    }
+  },
+  {
+    "project": "csharp_sfa_entry",
+    "result": {
+      "success": true,
+      "detected_language": "csharp",
+      "entry_point": null,
+      "output": "{\n  \"A\": 14,\n  \"B\": 63,\n  \"Sum\": 77,\n  \"Timestamp\": \"2026-01-19T09:10:53.6157525+00:00\",\n  \"Language\": \"C# Script\"\n}",
+      "artifacts": [],
+      "duration": 16.976383209228516,
+      "error": null
+    }
+  },
+  {
+    "project": "go_project",
+    "result": {
+      "success": true,
+      "detected_language": "go",
+      "entry_point": null,
+      "output": "go: downloading github.com/sirupsen/logrus v1.9.3\ngo: downloading github.com/google/uuid v1.3.0\ngo: calculator imports\n\tgithub.com/google/uuid: github.com/google/uuid@v1.3.0: verifying module: github.com/google/uuid@v1.3.0: Get \"https://sum.golang.org/lookup/github.com/google/uuid@v1.3.0\": EOF\ngo: calculator imports\n\tgithub.com/sirupsen/logrus: github.com/sirupsen/logrus@v1.9.3: Get \"https://proxy.golang.org/github.com/sirupsen/logrus/@v/v1.9.3.zip\": EOF",
+      "artifacts": [],
+      "duration": 5.795897960662842,
+      "error": null
+    }
+  },
+  {
+    "project": "go_sfa",
+    "result": {
+      "success": true,
+      "detected_language": "go",
+      "entry_point": null,
+      "output": "{\n  \"A\": 63,\n  \"B\": 94,\n  \"Sum\": 157,\n  \"Timestamp\": \"2026-01-19T09:11:14Z\",\n  \"Language\": \"Go Single File\"\n}",
+      "artifacts": [],
+      "duration": 15.235960245132446,
+      "error": null
+    }
+  },
+  {
+    "project": "go_sfa_entry",
+    "result": {
+      "success": true,
+      "detected_language": "go",
+      "entry_point": null,
+      "output": "{\n  \"A\": 27,\n  \"B\": 18,\n  \"Sum\": 45,\n  \"Timestamp\": \"2026-01-19T09:11:30Z\",\n  \"Language\": \"Go Single File\"\n}",
+      "artifacts": [],
+      "duration": 13.389474630355835,
+      "error": null
+    }
+  },
+  {
+    "project": "java_data_export",
+    "result": {
+      "success": true,
+      "detected_language": "java",
+      "entry_point": null,
+      "output": "CSV exported: java_export.csv\nReport saved: summary_report.txt\nExport complete!",
+      "artifacts": [
+        {
+          "name": "java_export.csv",
+          "path": "java_export.csv",
+          "size": 578,
+          "mime": "application/vnd.ms-excel",
+          "url": "http://localhost:8001/api/projects/sf171pjl/executions/exec_31660f80a5ff/artifacts/java_export.csv"
+        },
+        {
+          "name": "summary_report.txt",
+          "path": "summary_report.txt",
+          "size": 404,
+          "mime": "text/plain",
+          "url": "http://localhost:8001/api/projects/sf171pjl/executions/exec_31660f80a5ff/artifacts/summary_report.txt"
+        }
+      ],
+      "duration": 4.002105951309204,
+      "error": null
+    }
+  },
+  {
+    "project": "java_project",
+    "result": {
+      "success": true,
+      "detected_language": "java",
+      "entry_point": null,
+      "output": "",
+      "artifacts": [],
+      "duration": 4.169506311416626,
+      "error": null
+    }
+  },
+  {
+    "project": "java_sfa",
+    "result": {
+      "success": true,
+      "detected_language": "java",
+      "entry_point": null,
+      "output": "bash: warning: setlocale: LC_ALL: cannot change locale (en_US.UTF-8)\nPicked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8\n[jbang] Resolving dependencies...\n[jbang]    com.google.code.gson:gson:2.10.1\n[jbang]\n   org.slf4j:slf4j-simple:2.0.9\n[jbang] [ERROR] Could not resolve dependencies: Failed to collect dependencies at com.google.code.gson:gson:jar:2.10.1\n[jbang] Run with --verbose for more details",
+      "artifacts": [],
+      "duration": 5.228878974914551,
+      "error": null
+    }
+  },
+  {
+    "project": "java_sfa_entry",
+    "result": {
+      "success": true,
+      "detected_language": "java",
+      "entry_point": null,
+      "output": "bash: warning: setlocale: LC_ALL: cannot change locale (en_US.UTF-8)\nPicked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8\n[jbang] Resolving dependencies...\n[jbang]    com.google.code.gson:gson:2.10.1\n[jbang]\n   org.slf4j:slf4j-simple:2.0.9\n[jbang] [ERROR] Could not resolve dependencies: Failed to collect dependencies at com.google.code.gson:gson:jar:2.10.1\n[jbang] Run with --verbose for more details",
+      "artifacts": [],
+      "duration": 2.9761855602264404,
+      "error": null
+    }
+  },
+  {
+    "project": "javascript_project",
+    "result": {
+      "success": true,
+      "detected_language": "javascript",
+      "entry_point": null,
+      "output": "{\n  \"A\": 70,\n  \"B\": 61,\n  \"Sum\": 131,\n  \"Timestamp\": \"2026-01-19T09:12:03.628Z\",\n  \"Language\": \"JavaScript\"\n}",
+      "artifacts": [],
+      "duration": 1.9527313709259033,
+      "error": null
+    }
+  },
+  {
+    "project": "python_data_export",
+    "result": {
+      "success": true,
+      "detected_language": "python3",
+      "entry_point": null,
+      "output": "CSV exported: users_export.csv\nTotal records: 50\nJSON summary: export_summary.json\nExport complete!",
+      "artifacts": [
+        {
+          "name": "users_export.csv",
+          "path": "users_export.csv",
+          "size": 1694,
+          "mime": "application/vnd.ms-excel",
+          "url": "http://localhost:8001/api/projects/bvigwa1p/executions/exec_819474e13035/artifacts/users_export.csv"
+        }
+      ],
+      "duration": 1.6675589084625244,
+      "error": null
+    }
+  },
+  {
+    "project": "python_plot_export",
+    "result": {
+      "success": true,
+      "detected_language": "python3",
+      "entry_point": null,
+      "output": "Plot saved: analysis_plots.png\nAnalysis complete!",
+      "artifacts": [
+        {
+          "name": "analysis_plots.png",
+          "path": "analysis_plots.png",
+          "size": 133608,
+          "mime": "image/png",
+          "url": "http://localhost:8001/api/projects/z9i132fm/executions/exec_65a627463d50/artifacts/analysis_plots.png"
+        }
+      ],
+      "duration": 53.05372714996338,
+      "error": null
+    }
+  },
+  {
+    "project": "python_project",
+    "result": {
+      "success": true,
+      "detected_language": "python3",
+      "entry_point": null,
+      "output": "{\n  \"A\": 10,\n  \"B\": 44,\n  \"Sum\": 54,\n  \"Timestamp\": \"2026-01-19T09:13:52.072221\",\n  \"Language\": \"Python Project\"\n}",
+      "artifacts": [],
+      "duration": 46.784520626068115,
+      "error": null
+    }
+  },
+  {
+    "project": "rust_project",
+    "result": {
+      "success": true,
+      "detected_language": "rust",
+      "entry_point": null,
+      "output": "{\"a\":93,\"b\":19,\"sum\":112}",
+      "artifacts": [],
+      "duration": 65.64463543891907,
+      "error": null
+    }
+  },
+  {
+    "project": "rust_sfa",
+    "result": {
+      "success": true,
+      "detected_language": "rust",
+      "entry_point": null,
+      "output": "error[E0432]: unresolved import `rand`\n --> test.rs:1:5\n  |\n1 | use rand::Rng;\n  |     ^^^^ maybe a missing crate `rand`?\n  |\n  = help: consider adding `extern crate rand` to use the `rand` crate\nerror[E0432]: unresolved import `serde`\n --> test.rs:2:5\n  |\n2 | use serde::Serialize;\n  |     ^^^^^ maybe a missing crate `serde`?\n  |\n  = help: consider adding `extern crate serde` to use the `serde` crate\n\nerror[E0432]: unresolved import `serde_json`\n --> test.rs:3:5\n  |\n3 | use serde_json;\n  |     ^^^^^^^^^^ no `serde_json` in the root\nerror[E0433]: failed to resolve: use of undeclared crate or module `rand`\n  --> test.rs:13:19\n   |\n13 |     let mut rng = rand::thread_rng();\n   |                   ^^^^ use of undeclared crate or module `rand`\nerror: aborting due to 4 previous errors\n\nSome errors have detailed explanations: E0432, E0433.\nFor more information about an error, try `rustc --explain E0432`.",
+      "artifacts": [],
+      "duration": 0.6478104591369629,
+      "error": null
+    }
+  },
+  {
+    "project": "typescript_project",
+    "result": {
+      "success": true,
+      "detected_language": "typescript",
+      "entry_point": null,
+      "output": "/home/sandbox/index.ts:1\nimport { randomInt } from 'crypto';\n^^^^^^\n\nSyntaxError: Cannot use import statement outside a module\n    at internalCompileFunction (node:internal/vm:76:18)\n    at wrapSafe (node:internal/modules/cjs/loader:1283:20)\n    at Module._compile (node:internal/modules/cjs/loader:1328:27)\n    at Module._extensions..js (node:internal/modules/cjs/loader:1422:10)\n    at Module.load (node:internal/modules/cjs/loader:1203:32)\n    at Module._load (node:internal/modules/cjs/loader:1019:12)\n    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:128:12)\n    at node:internal/main/run_main_module:28:49\n\nNode.js v18.20.4",
+      "artifacts": [],
+      "duration": 89.59940385818481,
+      "error": null
+    }
+  }
+]

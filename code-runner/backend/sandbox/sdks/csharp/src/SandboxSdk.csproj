@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>CodeRunner.SandboxSdk</RootNamespace>
+    <Description>C# SDK for Code Runner Sandbox Runtime</Description>
+    <Version>0.1.0</Version>
+    <Authors></Authors>
+    <PackageId>CodeRunner.SandboxSdk</PackageId>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+</Project>
