@@ -1,4 +1,3 @@
-using CSnakes.Runtime;
 using LLama;
 using LLama.Common;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -11,16 +10,21 @@ using Minio;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Confirguration;
 using PostgreSQL.Embedding.Common.Converters;
+using PostgreSQL.Embedding.Common.Extensions;
 using PostgreSQL.Embedding.Common.Middlewares;
-using PostgreSQL.Embedding.Common.Models.WebApi;
 using PostgreSQL.Embedding.Common.Settings;
-using PostgreSQL.Embedding.DataAccess;
+using PostgreSQL.Embedding.Domain.Models.WebApi;
 using PostgreSQL.Embedding.Handlers;
 using PostgreSQL.Embedding.Hubs;
-using PostgreSQL.Embedding.LlmServices;
-using PostgreSQL.Embedding.LlmServices.Abstration;
-using PostgreSQL.Embedding.LLmServices.Extensions;
-using PostgreSQL.Embedding.Services;
+using PostgreSQL.Embedding.Infrastructure;
+using PostgreSQL.Embedding.Infrastructure.DataAccess;
+using PostgreSQL.Embedding.Infrastructure.FileStorage;
+using PostgreSQL.Embedding.Infrastructure.Messaging;
+using PostgreSQL.Embedding.Llm.Abstractions;
+using PostgreSQL.Embedding.Llm.Core;
+using PostgreSQL.Embedding.Llm.Services;
+using PostgreSQL.Embedding.Llm.Services.Rerank;
+using PostgreSQL.Embedding.Llm.Services.Retrieval;
 using PostgreSQL.Embedding.Utils;
 using SqlSugar;
 using System.Text;
@@ -116,7 +120,7 @@ builder.Services.AddHttpClient()
 builder.Services.AddScoped<IConversationService, ConversationService>();
 builder.Services.AddScoped<IUserInfoService, UserInfoService>();
 builder.Services.AddScoped<IKernelService, KernalService>();
-builder.Services.AddScoped<IMemoryService, PostgreSQL.Embedding.LlmServices.MemoryService>();
+builder.Services.AddScoped<IMemoryService, MemoryService>();
 builder.Services.AddScoped<IImportingTaskHandler, FileImportingTaskHandler>();
 builder.Services.AddScoped<IImportingTaskHandler, TextImportingTaskHandler>();
 builder.Services.AddScoped<IImportingTaskHandler, UrlImportingTaskHandler>();
@@ -198,35 +202,25 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors();
 
-var provider = new FileExtensionContentTypeProvider();
-provider.Mappings[".md"] = "text/markdown; charset=utf-8";
-provider.Mappings[".txt"] = "text/plain; charset=utf-8";
-provider.Mappings[".html"] = "text/html; charset=utf-8";
-provider.Mappings[".docx"] = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-provider.Mappings[".xlsx"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-provider.Mappings[".pptx"] = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
-provider.Mappings[".pdf"] = "application/pdf";
-provider.Mappings[".zip"] = "application/zip";
-provider.Mappings[".yml"] = "application/x-yaml";
-provider.Mappings[".yaml"] = "application/x-yaml";
-provider.Mappings[".json"] = "application/json";
-provider.Mappings[".xml"] = "application/xml";
-provider.Mappings[".png"] = "image/png";
-provider.Mappings[".jpg"] = "image/jpeg";
-provider.Mappings[".jpeg"] = "image/jpeg";
-provider.Mappings[".gif"] = "image/gif";
-provider.Mappings[".webp"] = "image/webp";
-provider.Mappings[".bmp"] = "image/bmp";
-provider.Mappings[".svg"] = "image/svg+xml";
+// 补充自定义 MIME 类型映射（内置已包含常见类型）
+var contentTypeProvider = new FileExtensionContentTypeProvider
+{
+    Mappings =
+    {
+        [".docx"] = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        [".xlsx"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        [".pptx"] = "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        [".yml"] = "application/x-yaml",
+        [".yaml"] = "application/x-yaml",
+    }
+};
 
-
-app.UseStaticFiles(new StaticFileOptions()
+app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.ContentRootPath)),
     RequestPath = "/api/statics",
     ServeUnknownFileTypes = true,
-    ContentTypeProvider = provider
-
+    ContentTypeProvider = contentTypeProvider
 });
 
 app.UseMiddleware<DisableCompressionMiddleware>();

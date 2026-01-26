@@ -1,7 +1,7 @@
 ﻿using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
-using PostgreSQL.Embedding.LlmServices;
-using PostgreSQL.Embedding.LlmServices.Abstration;
+using PostgreSQL.Embedding.Llm.Abstractions;
+using PostgreSQL.Embedding.Llm.Core;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 

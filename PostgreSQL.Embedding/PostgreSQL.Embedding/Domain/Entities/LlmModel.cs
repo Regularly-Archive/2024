@@ -1,0 +1,30 @@
+﻿using SqlSugar;
+
+namespace PostgreSQL.Embedding.Domain.Entities
+{
+    [SugarTable("llm_models")]
+    public class LlmModel : BaseEntity
+    {
+        [SugarColumn(ColumnName = "model_name")]
+        public string ModelName { get; set; }
+
+        [SugarColumn(ColumnName = "model_type")]
+        public int ModelType { get; set; }
+
+        [SugarColumn(ColumnName = "api_key", IsNullable = true)]
+        public string ApiKey { get; set; }
+
+        [SugarColumn(ColumnName = "base_url", IsNullable = true)]
+        public string BaseUrl { get; set; }
+
+        [SugarColumn(ColumnName = "service_provider", IsNullable = false)]
+        public int ServiceProvider { get; set; }
+
+        [SugarColumn(ColumnName = "is_builtin_model", DefaultValue = "FALSE", IsNullable = true)]
+        public bool IsBuiltinModel { get; set; }
+
+        [SugarColumn(ColumnName = "is_default_model", DefaultValue = "FALSE", IsNullable = true)]
+        public bool IsDefaultModel { get; set; }
+        public int ApiFormat { get; set; }
+    }
+}

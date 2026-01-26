@@ -1,10 +1,10 @@
 ﻿using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common;
-using PostgreSQL.Embedding.Common.Models;
-using PostgreSQL.Embedding.Common.Models.Plugin;
-using PostgreSQL.Embedding.DataAccess;
-using PostgreSQL.Embedding.DataAccess.Entities;
-using PostgreSQL.Embedding.Services;
+using PostgreSQL.Embedding.Domain.Entities;
+using PostgreSQL.Embedding.Domain.Models;
+using PostgreSQL.Embedding.Domain.Models.Plugin;
+using PostgreSQL.Embedding.Infrastructure.DataAccess;
+using PostgreSQL.Embedding.Infrastructure.FileStorage;
 using System.Reflection;
 
 namespace PostgreSQL.Embedding.Plugins.Abstration

@@ -15,5 +15,6 @@ namespace PostgreSQL.Embedding.Common
         [Description("MiniMax")] MiniMax = 8,
         [Description("零一万物")] LingYi = 9,
         [Description("Google")] Google = 10,
+        Anthropic = 11,
     }
 }

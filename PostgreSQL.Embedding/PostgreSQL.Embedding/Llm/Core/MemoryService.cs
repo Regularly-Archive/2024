@@ -1,0 +1,172 @@
+﻿using Microsoft.Extensions.Options;
+using Microsoft.KernelMemory;
+using Microsoft.KernelMemory.Configuration;
+using PostgreSQL.Embedding.Common;
+using PostgreSQL.Embedding.Common.Extensions;
+using PostgreSQL.Embedding.Domain.Entities;
+using PostgreSQL.Embedding.Infrastructure.DataAccess;
+using PostgreSQL.Embedding.Llm.Abstractions;
+using PostgreSQL.Embedding.Llm.Routers;
+using PostgreSQL.Embedding.Utils;
+using SqlSugar;
+
+namespace PostgreSQL.Embedding.Llm.Core
+{
+    public class MemoryService : IMemoryService
+    {
+        private readonly IConfiguration _configuration;
+        private readonly IServiceProvider _serviceProvider;
+
+        private readonly IRepository<LlmModel> _llmModelRepository;
+        private readonly IRepository<LlmAppKnowledge> _llmAppKnowledgeRepository;
+        private readonly IRepository<KnowledgeBase> _knowledgeBaseRepository;
+        private readonly IRepository<TablePrefixMapping> _tablePrefixMappingRepository;
+
+        public MemoryService(IConfiguration configuration, IServiceProvider serviceProvider)
+        {
+            _serviceProvider = serviceProvider;
+            _configuration = configuration;
+            _llmModelRepository = serviceProvider.GetService<IRepository<LlmModel>>();
+            _llmAppKnowledgeRepository = serviceProvider.GetService<IRepository<LlmAppKnowledge>>();
+            _knowledgeBaseRepository = serviceProvider.GetService<IRepository<KnowledgeBase>>();
+            _tablePrefixMappingRepository = serviceProvider.GetService<IRepository<TablePrefixMapping>>();
+        }
+
+        public async Task<MemoryServerless> CreateByApp(LlmApp app)
+        {
+            var generationModel = await _llmModelRepository.FindAsync(x => x.ModelType == (int)ModelType.TextGeneration && x.ModelName == app.TextModel);
+
+            var embeddingModelId = await GetEmbeddingModelByKnowledges(app);
+            var embeddingModel = await _llmModelRepository.FindAsync(x => x.ModelType == (int)ModelType.TextEmbedding && x.ModelName == embeddingModelId);
+
+            var options = _serviceProvider.GetRequiredService<IOptions<LlmConfig>>();
+            var embeddingHttpClient = new HttpClient(new LlmEmbeddingRouter(embeddingModel, options));
+            var generationHttpClient = new HttpClient(new LlmCompletionRouter(generationModel, options));
+
+            var tableNamePrefix = await GenerateTableNamePrefix(embeddingModel);
+
+            var postgresConfig = new PostgresConfig()
+            {
+                ConnectionString = _configuration["ConnectionStrings:Default"]!,
+                TableNamePrefix = tableNamePrefix,
+            };
+
+            // Todo
+            // 需要解除对 OpenAIConfig 的依赖
+            var openAIConfig = new OpenAIConfig();
+            _configuration.BindSection(nameof(OpenAIConfig), openAIConfig);
+
+            var memoryBuilder = new KernelMemoryBuilder();
+
+#pragma warning disable KMEXP01 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+            memoryBuilder
+                .WithPostgresMemoryDb(postgresConfig)
+                .WithOpenAITextGeneration(openAIConfig, httpClient: generationHttpClient)
+                //.WithOpenAITextEmbeddingGeneration(openAIConfig, httpClient: embeddingHttpClient)
+                .WithOpenAICompatibleTextEmbeddingGeneration(openAIConfig, httpClient: embeddingHttpClient)
+                .WithCustomTextPartitioningOptions(new TextPartitioningOptions()
+                {
+                    MaxTokensPerParagraph = DefaultTextPartitioningOptions.MaxTokensPerParagraph,
+                    OverlappingTokens = DefaultTextPartitioningOptions.OverlappingTokens
+                })
+                .WithSearchClientConfig(new SearchClientConfig()
+                {
+                    EmptyAnswer = Common.Constants.DefaultEmptyAnswer
+
+                });
+#pragma warning restore KMEXP01 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+
+            return memoryBuilder.Build<MemoryServerless>(new KernelMemoryBuilderBuildOptions()
+            {
+                AllowMixingVolatileAndPersistentData = true,
+            });
+        }
+
+        public async Task<MemoryServerless> CreateByKnowledgeBase(KnowledgeBase knowledgeBase)
+        {
+            var embeddingModel = await _llmModelRepository.FindAsync(x => x.ModelType == (int)ModelType.TextEmbedding && x.ModelName == knowledgeBase.EmbeddingModel);
+            var generationModel = await _llmModelRepository.FindAsync(x => x.ModelType == (int)ModelType.TextGeneration && x.IsDefaultModel == true);
+
+            var options = _serviceProvider.GetRequiredService<IOptions<LlmConfig>>();
+            var embeddingHttpClient = new HttpClient(new LlmEmbeddingRouter(embeddingModel, options));
+            var generationHttpClient = new HttpClient(new LlmCompletionRouter(generationModel, options));
+
+            var tableNamePrefix = await GenerateTableNamePrefix(embeddingModel);
+
+            var postgresConfig = new PostgresConfig()
+            {
+                ConnectionString = _configuration["ConnectionStrings:Default"]!,
+                TableNamePrefix = tableNamePrefix,
+            };
+
+            // Todo
+            // 需要解除对 OpenAIConfig 的依赖
+            var openAIConfig = new OpenAIConfig() { APIKey = Guid.NewGuid().ToString(), MaxEmbeddingBatchSize =  1};
+            openAIConfig.EmbeddingModel = embeddingModel.ModelName;
+            openAIConfig.TextModel = generationModel.ModelName;
+
+            var memoryBuilder = new KernelMemoryBuilder();
+
+#pragma warning disable KMEXP01 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+            memoryBuilder
+                .WithPostgresMemoryDb(postgresConfig)
+                .WithOpenAITextGeneration(openAIConfig, httpClient: generationHttpClient)
+                //.WithOpenAITextEmbeddingGeneration(openAIConfig, httpClient: embeddingHttpClient)
+                .WithOpenAICompatibleTextEmbeddingGeneration(openAIConfig, httpClient: embeddingHttpClient)
+                .WithCustomTextPartitioningOptions(new TextPartitioningOptions()
+                {
+                    MaxTokensPerParagraph = (knowledgeBase.MaxTokensPerParagraph.HasValue ?
+                        knowledgeBase.MaxTokensPerParagraph.Value :
+                        DefaultTextPartitioningOptions.MaxTokensPerParagraph),
+                    OverlappingTokens = (knowledgeBase.OverlappingTokens.HasValue ?
+                        knowledgeBase.OverlappingTokens.Value :
+                        DefaultTextPartitioningOptions.OverlappingTokens),
+                })
+                .WithSearchClientConfig(new SearchClientConfig()
+                {
+                    EmptyAnswer = Common.Constants.DefaultEmptyAnswer
+                });
+#pragma warning restore KMEXP01 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+
+            return memoryBuilder.Build<MemoryServerless>(new KernelMemoryBuilderBuildOptions()
+            {
+                AllowMixingVolatileAndPersistentData = true,
+            });
+        }
+
+        private async Task<string> GenerateTableNamePrefix(LlmModel embeddingModel)
+        {
+            var tablePrefixMapping = await _tablePrefixMappingRepository.FindAsync(x => x.FullName == embeddingModel.ModelName);
+            if (tablePrefixMapping != null)
+                return $"sk-{tablePrefixMapping.ShortName.ToLower()}-";
+
+            var shortCode = string.Empty;
+            while (string.IsNullOrEmpty(shortCode))
+            {
+                shortCode = ShortUrlGenerator.GenerateShortCode(embeddingModel.ModelName);
+            }
+
+            await _tablePrefixMappingRepository.AddAsync(new TablePrefixMapping()
+            {
+                FullName = embeddingModel.ModelName,
+                ShortName = shortCode,
+            });
+
+            return $"sk-{shortCode.ToLower()}-";
+        }
+
+        private async Task<string> GetEmbeddingModelByKnowledges(LlmApp app)
+        {
+            var llmAppKnowledges = await _llmAppKnowledgeRepository.FindListAsync(x => x.AppId == app.Id);
+            if (llmAppKnowledges.Any())
+            {
+                var knowledgeBaseId = llmAppKnowledges.FirstOrDefault().KnowledgeBaseId;
+                var knowledageBase = await _knowledgeBaseRepository.GetAsync(knowledgeBaseId);
+                if (knowledageBase != null)
+                    return knowledageBase.EmbeddingModel;
+            }
+
+            return "GanymedeNil/text2vec-large-chinese";
+        }
+    }
+}

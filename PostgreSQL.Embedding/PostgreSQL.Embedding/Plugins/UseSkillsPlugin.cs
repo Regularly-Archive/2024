@@ -1,13 +1,10 @@
 ﻿using Microsoft.SemanticKernel;
-using ModelContextProtocol.Protocol.Types;
 using PostgreSQL.Embedding.Common.Attributes;
-using PostgreSQL.Embedding.Common.Models.Plugin;
+using PostgreSQL.Embedding.Domain.Models.Plugin;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 

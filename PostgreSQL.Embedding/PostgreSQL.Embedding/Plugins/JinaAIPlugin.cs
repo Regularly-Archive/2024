@@ -1,10 +1,8 @@
 ﻿using Microsoft.SemanticKernel;
-using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Attributes;
-using PostgreSQL.Embedding.Common.Models.Search;
+using PostgreSQL.Embedding.Domain.Models.Search;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
-using System.Text;
 using System.Text.Json.Serialization;
 
 namespace PostgreSQL.Embedding.Plugins

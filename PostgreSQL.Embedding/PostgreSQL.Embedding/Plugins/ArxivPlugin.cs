@@ -2,7 +2,7 @@
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Attributes;
-using PostgreSQL.Embedding.Common.Models;
+using PostgreSQL.Embedding.Domain.Models;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 using System.Xml.Linq;

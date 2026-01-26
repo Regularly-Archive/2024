@@ -1,9 +1,8 @@
 ﻿using Microsoft.SemanticKernel;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using PostgreSQL.Embedding.Common.Attributes;
-using PostgreSQL.Embedding.Common.Models.Plugin;
-using PostgreSQL.Embedding.Common.Models.Search;
+using PostgreSQL.Embedding.Domain.Models.Plugin;
+using PostgreSQL.Embedding.Domain.Models.Search;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 

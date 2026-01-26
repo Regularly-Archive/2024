@@ -1,10 +1,5 @@
-﻿using PostgreSQL.Embedding.Planners;
+﻿using PostgreSQL.Embedding.Llm.Planners;
 using Shouldly;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Wikit.Tests.Agents
 {

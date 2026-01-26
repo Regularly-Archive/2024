@@ -1,9 +1,9 @@
 ﻿using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Attributes;
-using PostgreSQL.Embedding.Common.Models;
-using PostgreSQL.Embedding.Common.Models.Plugin;
-using PostgreSQL.Embedding.LlmServices;
+using PostgreSQL.Embedding.Domain.Models;
+using PostgreSQL.Embedding.Domain.Models.Plugin;
+using PostgreSQL.Embedding.Llm.Services;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using SqlSugar;
 using System.ComponentModel;
@@ -47,7 +47,7 @@ namespace PostgreSQL.Embedding.Plugins
             var tableDescriptor = await GetTableDescriptorsAsync(Database);
             var databaseSchema = GeneratorDatabaseSchema(tableDescriptor);
 
-            var promptTemplate = _promptTemplateService.LoadTemplate("Text2SQL.txt");
+            var promptTemplate = _promptTemplateService.LoadTemplate("Text2SQL");
             promptTemplate.AddVariable("input", input);
             promptTemplate.AddVariable("schema", databaseSchema);
 

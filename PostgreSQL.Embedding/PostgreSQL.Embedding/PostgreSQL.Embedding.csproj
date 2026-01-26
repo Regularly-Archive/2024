@@ -10,6 +10,69 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Llm\Abstractions\Upload\06d309e4ead54d3da16a1e4ec649b80a\**" />
+    <Compile Remove="Llm\Abstractions\Upload\1a8d4bfaf29044b6898cbe96fbe8996c\**" />
+    <Compile Remove="Llm\Abstractions\Upload\320ea86db3414c99af4881453c8fe0b2\**" />
+    <Compile Remove="Llm\Abstractions\Upload\392a0038fc9f466e93e393f3a4841954\**" />
+    <Compile Remove="Llm\Abstractions\Upload\3c3b13f0cf484d96aa0be3a4562fa3b4\**" />
+    <Compile Remove="Llm\Abstractions\Upload\4a74cdc5c9b34816af7eb8b3f689f0b6\**" />
+    <Compile Remove="Llm\Abstractions\Upload\543a28638c474294bf26371b3d6f5e9a\**" />
+    <Compile Remove="Llm\Abstractions\Upload\5d339ed23dc8493c9da1897bd664b5a5\**" />
+    <Compile Remove="Llm\Abstractions\Upload\95083afd13da4f7bbca1ed5743f474d0\**" />
+    <Compile Remove="Llm\Abstractions\Upload\9e5e4e764aa24f7b9354d52e9bc21bf7\**" />
+    <Compile Remove="Llm\Abstractions\Upload\b8866b5924c749c89a467fe925596b39\**" />
+    <Compile Remove="Llm\Abstractions\Upload\b8d49192f9814df0b3a336da7678b795\**" />
+    <Compile Remove="Llm\Abstractions\Upload\f5dc8a79c3564130b1d848c45d73192e\**" />
+    <Compile Remove="Llm\Connectors\OpenAI\**" />
+    <Compile Remove="Llm\Connectors\OpenAI\**" />
+    <Content Remove="Llm\Abstractions\Upload\06d309e4ead54d3da16a1e4ec649b80a\**" />
+    <Content Remove="Llm\Abstractions\Upload\1a8d4bfaf29044b6898cbe96fbe8996c\**" />
+    <Content Remove="Llm\Abstractions\Upload\320ea86db3414c99af4881453c8fe0b2\**" />
+    <Content Remove="Llm\Abstractions\Upload\392a0038fc9f466e93e393f3a4841954\**" />
+    <Content Remove="Llm\Abstractions\Upload\3c3b13f0cf484d96aa0be3a4562fa3b4\**" />
+    <Content Remove="Llm\Abstractions\Upload\4a74cdc5c9b34816af7eb8b3f689f0b6\**" />
+    <Content Remove="Llm\Abstractions\Upload\543a28638c474294bf26371b3d6f5e9a\**" />
+    <Content Remove="Llm\Abstractions\Upload\5d339ed23dc8493c9da1897bd664b5a5\**" />
+    <Content Remove="Llm\Abstractions\Upload\95083afd13da4f7bbca1ed5743f474d0\**" />
+    <Content Remove="Llm\Abstractions\Upload\9e5e4e764aa24f7b9354d52e9bc21bf7\**" />
+    <Content Remove="Llm\Abstractions\Upload\b8866b5924c749c89a467fe925596b39\**" />
+    <Content Remove="Llm\Abstractions\Upload\b8d49192f9814df0b3a336da7678b795\**" />
+    <Content Remove="Llm\Abstractions\Upload\f5dc8a79c3564130b1d848c45d73192e\**" />
+    <Content Remove="Llm\Connectors\OpenAI\**" />
+    <Content Remove="Llm\Connectors\OpenAI\**" />
+    <EmbeddedResource Remove="Llm\Abstractions\Upload\06d309e4ead54d3da16a1e4ec649b80a\**" />
+    <EmbeddedResource Remove="Llm\Abstractions\Upload\1a8d4bfaf29044b6898cbe96fbe8996c\**" />
+    <EmbeddedResource Remove="Llm\Abstractions\Upload\320ea86db3414c99af4881453c8fe0b2\**" />
+    <EmbeddedResource Remove="Llm\Abstractions\Upload\392a0038fc9f466e93e393f3a4841954\**" />
+    <EmbeddedResource Remove="Llm\Abstractions\Upload\3c3b13f0cf484d96aa0be3a4562fa3b4\**" />
+    <EmbeddedResource Remove="Llm\Abstractions\Upload\4a74cdc5c9b34816af7eb8b3f689f0b6\**" />
+    <EmbeddedResource Remove="Llm\Abstractions\Upload\543a28638c474294bf26371b3d6f5e9a\**" />
+    <EmbeddedResource Remove="Llm\Abstractions\Upload\5d339ed23dc8493c9da1897bd664b5a5\**" />
+    <EmbeddedResource Remove="Llm\Abstractions\Upload\95083afd13da4f7bbca1ed5743f474d0\**" />
+    <EmbeddedResource Remove="Llm\Abstractions\Upload\9e5e4e764aa24f7b9354d52e9bc21bf7\**" />
+    <EmbeddedResource Remove="Llm\Abstractions\Upload\b8866b5924c749c89a467fe925596b39\**" />
+    <EmbeddedResource Remove="Llm\Abstractions\Upload\b8d49192f9814df0b3a336da7678b795\**" />
+    <EmbeddedResource Remove="Llm\Abstractions\Upload\f5dc8a79c3564130b1d848c45d73192e\**" />
+    <EmbeddedResource Remove="Llm\Connectors\OpenAI\**" />
+    <EmbeddedResource Remove="Llm\Connectors\OpenAI\**" />
+    <None Remove="Llm\Abstractions\Upload\06d309e4ead54d3da16a1e4ec649b80a\**" />
+    <None Remove="Llm\Abstractions\Upload\1a8d4bfaf29044b6898cbe96fbe8996c\**" />
+    <None Remove="Llm\Abstractions\Upload\320ea86db3414c99af4881453c8fe0b2\**" />
+    <None Remove="Llm\Abstractions\Upload\392a0038fc9f466e93e393f3a4841954\**" />
+    <None Remove="Llm\Abstractions\Upload\3c3b13f0cf484d96aa0be3a4562fa3b4\**" />
+    <None Remove="Llm\Abstractions\Upload\4a74cdc5c9b34816af7eb8b3f689f0b6\**" />
+    <None Remove="Llm\Abstractions\Upload\543a28638c474294bf26371b3d6f5e9a\**" />
+    <None Remove="Llm\Abstractions\Upload\5d339ed23dc8493c9da1897bd664b5a5\**" />
+    <None Remove="Llm\Abstractions\Upload\95083afd13da4f7bbca1ed5743f474d0\**" />
+    <None Remove="Llm\Abstractions\Upload\9e5e4e764aa24f7b9354d52e9bc21bf7\**" />
+    <None Remove="Llm\Abstractions\Upload\b8866b5924c749c89a467fe925596b39\**" />
+    <None Remove="Llm\Abstractions\Upload\b8d49192f9814df0b3a336da7678b795\**" />
+    <None Remove="Llm\Abstractions\Upload\f5dc8a79c3564130b1d848c45d73192e\**" />
+    <None Remove="Llm\Connectors\OpenAI\**" />
+    <None Remove="Llm\Connectors\OpenAI\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Remove="Assets\Scripts\BGE_reranker.py" />
     <None Remove="Assets\Scripts\BM25_reranker.py" />
     <None Remove="Assets\Scripts\flash_reranker.py" />
@@ -68,8 +131,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Application\DTOs\" />
     <Folder Include="Assets\Models\" />
-    <Folder Include="LlmServices\OpenAI\" />
   </ItemGroup>
 
   <ItemGroup>
@@ -102,6 +165,9 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Assets\Scripts\stopwords.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Common\Prompts\AgentPrompt.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Common\Prompts\DataAnalysis.txt">
@@ -155,6 +221,10 @@
     <None Update="Resources\stopwords.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Common\Prompts\*.txt" />
   </ItemGroup>
 
 </Project>
