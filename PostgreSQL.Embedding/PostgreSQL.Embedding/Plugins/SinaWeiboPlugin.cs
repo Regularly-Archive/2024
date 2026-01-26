@@ -1,16 +1,12 @@
-﻿using DocumentFormat.OpenXml.Math;
-using Microsoft.SemanticKernel;
+﻿using Microsoft.SemanticKernel;
 using MongoDB.Driver;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using PostgreSQL.Embedding.Common.Attributes;
-using PostgreSQL.Embedding.Common.Models;
-using PostgreSQL.Embedding.Common.Models.Plugin;
+using PostgreSQL.Embedding.Domain.Models;
+using PostgreSQL.Embedding.Domain.Models.Plugin;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
-using System.Net.Http;
-using System.Runtime.CompilerServices;
-using System.Text.Json.Serialization;
 
 namespace PostgreSQL.Embedding.Plugins
 {

@@ -1,5 +1,4 @@
-﻿using DocumentFormat.OpenXml.Wordprocessing;
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
@@ -7,22 +6,15 @@ using Microsoft.SemanticKernel.ChatCompletion;
 using Moq;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common;
-using PostgreSQL.Embedding.Common.Models.Planners;
-using PostgreSQL.Embedding.DataAccess;
-using PostgreSQL.Embedding.DataAccess.Entities;
-using PostgreSQL.Embedding.LlmServices;
-using PostgreSQL.Embedding.LlmServices.Routers;
-using PostgreSQL.Embedding.Planners;
+using PostgreSQL.Embedding.Domain.Entities;
+using PostgreSQL.Embedding.Domain.Models.Planners;
+using PostgreSQL.Embedding.Infrastructure.DataAccess;
+using PostgreSQL.Embedding.Llm.Planners;
+using PostgreSQL.Embedding.Llm.Routers;
+using PostgreSQL.Embedding.Llm.Services;
 using PostgreSQL.Embedding.Utils;
 using Shouldly;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using Xunit;
 
 namespace Wikit.Tests.Agents
 {
@@ -105,7 +97,7 @@ namespace Wikit.Tests.Agents
                 var kernelResult = await plan.ExecuteAsync(subTask.Description);
 
                 subTask.ExecuteResult = kernelResult;
-                subTask.Status = PostgreSQL.Embedding.Common.Models.Planners.TaskStatus.Completed;
+                subTask.Status = PostgreSQL.Embedding.Domain.Models.Planners.TaskStatus.Completed;
             }
 
             Console.WriteLine(JsonConvert.SerializeObject(subTasks));
@@ -139,7 +131,7 @@ namespace Wikit.Tests.Agents
             await graphExecutor.ExecuteAsync();
 
             this.ShouldSatisfyAllConditions(
-                () => subTasks.Tasks.All(x => x.Status == PostgreSQL.Embedding.Common.Models.Planners.TaskStatus.Completed).ShouldBeTrue()
+                () => subTasks.Tasks.All(x => x.Status == PostgreSQL.Embedding.Domain.Models.Planners.TaskStatus.Completed).ShouldBeTrue()
             );
         }
 

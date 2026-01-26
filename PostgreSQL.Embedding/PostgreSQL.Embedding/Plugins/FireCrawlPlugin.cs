@@ -1,6 +1,6 @@
 ﻿using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
-using PostgreSQL.Embedding.Common.Models.Plugin;
+using PostgreSQL.Embedding.Domain.Models.Plugin;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 

@@ -1,9 +1,8 @@
 ﻿using Microsoft.SemanticKernel;
-using Newtonsoft.Json.Linq;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Attributes;
-using PostgreSQL.Embedding.Common.Models;
-using PostgreSQL.Embedding.LlmServices;
+using PostgreSQL.Embedding.Domain.Models;
+using PostgreSQL.Embedding.Llm.Services;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 
@@ -24,7 +23,7 @@ namespace PostgreSQL.Embedding.Plugins
         public async Task<string> GenerateStaticPage([Description("用户请求")] string query, Kernel kernel)
         {
             var clonedKernel = kernel.Clone();
-            var promptTemplate = _promptTemplateService.LoadTemplate("StaticPages.txt");
+            var promptTemplate = _promptTemplateService.LoadTemplate("StaticPages");
             promptTemplate.AddVariable("query", query);
 
             var code = await promptTemplate.InvokeAsync<string>(clonedKernel);
@@ -38,7 +37,7 @@ namespace PostgreSQL.Embedding.Plugins
         public async Task<string> GenerateVueComponent([Description("用户请求")] string query, Kernel kernel)
         {
             var clonedKernel = kernel.Clone();
-            var promptTemplate = _promptTemplateService.LoadTemplate("VueComponent.txt");
+            var promptTemplate = _promptTemplateService.LoadTemplate("VueComponent");
             promptTemplate.AddVariable("query", query);
 
             var code = await promptTemplate.InvokeAsync<string>(clonedKernel);

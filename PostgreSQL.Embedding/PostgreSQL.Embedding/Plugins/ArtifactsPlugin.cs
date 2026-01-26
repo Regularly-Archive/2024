@@ -1,9 +1,8 @@
 ﻿using DocumentFormat.OpenXml.Wordprocessing;
 using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
-using PostgreSQL.Embedding.Planners;
+using PostgreSQL.Embedding.Llm.Planners;
 using PostgreSQL.Embedding.Plugins.Abstration;
-using SharpCompress.Common;
 using System.ComponentModel;
 using System.IO.Compression;
 using System.Text;

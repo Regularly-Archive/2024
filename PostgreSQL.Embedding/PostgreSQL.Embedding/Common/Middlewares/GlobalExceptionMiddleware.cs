@@ -1,10 +1,5 @@
-﻿using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.Mvc.Filters;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
-using System.Diagnostics;
-using PostgreSQL.Embedding.Common.Models.WebApi;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.AspNetCore.Mvc.Filters;
+using PostgreSQL.Embedding.Domain.Models.WebApi;
 using System.Net;
 
 namespace PostgreSQL.Embedding.Common.Middlewares

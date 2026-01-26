@@ -1,18 +1,13 @@
 ﻿using AngleSharp;
-using DocumentFormat.OpenXml.Office2016.Drawing.Command;
 using Microsoft.SemanticKernel;
-using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Attributes;
-using PostgreSQL.Embedding.Common.Models;
-using PostgreSQL.Embedding.Common.Models.Search;
+using PostgreSQL.Embedding.Domain.Models;
+using PostgreSQL.Embedding.Domain.Models.Search;
 using PostgreSQL.Embedding.Plugins.Abstration;
-using PostgreSQL.Embedding.Utils;
 using SqlSugar;
 using System.ComponentModel;
 using System.Net;
-using System.Net.Http;
-using static System.Net.WebRequestMethods;
 
 namespace PostgreSQL.Embedding.Plugins
 {

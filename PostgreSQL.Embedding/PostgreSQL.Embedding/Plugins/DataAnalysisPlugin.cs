@@ -1,12 +1,11 @@
 ﻿using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Confirguration;
-using PostgreSQL.Embedding.Common.Models;
-using PostgreSQL.Embedding.LlmServices;
+using PostgreSQL.Embedding.Domain.Models;
+using PostgreSQL.Embedding.Llm.Services;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 
@@ -34,7 +33,7 @@ namespace PostgreSQL.Embedding.Plugins
             Kernel kernel
         )
         {
-            var promptTemplate = _promptTemplateService.LoadTemplate("DataAnalysis.txt");
+            var promptTemplate = _promptTemplateService.LoadTemplate("DataAnalysis");
             promptTemplate.AddVariable("json_input", json);
             promptTemplate.AddVariable("files_input", string.Empty);
             promptTemplate.AddVariable("task", task);

@@ -3,9 +3,9 @@ using Mapster;
 using Microsoft.SemanticKernel;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Attributes;
-using PostgreSQL.Embedding.Common.Models.User;
+using PostgreSQL.Embedding.Domain.Models.User;
+using PostgreSQL.Embedding.Infrastructure;
 using PostgreSQL.Embedding.Plugins.Abstration;
-using PostgreSQL.Embedding.Services;
 using System.ComponentModel;
 
 namespace PostgreSQL.Embedding.Plugins

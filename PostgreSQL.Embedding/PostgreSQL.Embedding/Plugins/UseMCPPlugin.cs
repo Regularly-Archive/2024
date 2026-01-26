@@ -2,11 +2,11 @@
 using ModelContextProtocol.Client;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Attributes;
-using PostgreSQL.Embedding.DataAccess;
-using PostgreSQL.Embedding.DataAccess.Entities;
-using PostgreSQL.Embedding.LlmServices;
-using PostgreSQL.Embedding.LLmServices.Extensions;
-using PostgreSQL.Embedding.Planners;
+using PostgreSQL.Embedding.Common.Extensions;
+using PostgreSQL.Embedding.Domain.Entities;
+using PostgreSQL.Embedding.Infrastructure.DataAccess;
+using PostgreSQL.Embedding.Llm.Planners;
+using PostgreSQL.Embedding.Llm.Services;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;

@@ -1,17 +1,14 @@
-﻿using DocumentFormat.OpenXml.Spreadsheet;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.SemanticKernel;
+﻿using Microsoft.SemanticKernel;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Attributes;
-using PostgreSQL.Embedding.Common.Models;
-using PostgreSQL.Embedding.Common.Models.RAG;
-using PostgreSQL.Embedding.Common.Models.Search;
-using PostgreSQL.Embedding.LlmServices;
-using PostgreSQL.Embedding.LlmServices.Abstration;
+using PostgreSQL.Embedding.Domain.Models;
+using PostgreSQL.Embedding.Domain.Models.RAG;
+using PostgreSQL.Embedding.Domain.Models.Search;
+using PostgreSQL.Embedding.Llm.Abstractions;
+using PostgreSQL.Embedding.Llm.Core;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
-using System.Text;
 using System.Text.RegularExpressions;
 
 namespace PostgreSQL.Embedding.Plugins
