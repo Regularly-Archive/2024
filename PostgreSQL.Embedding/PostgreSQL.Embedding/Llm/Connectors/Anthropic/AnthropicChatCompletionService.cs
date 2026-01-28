@@ -1,9 +1,6 @@
-using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.TextGeneration;
-using Microsoft.SemanticKernel.TextToImage;
-using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -68,7 +65,11 @@ namespace PostgreSQL.Embedding.Llm.Connectors.Anthropic
             var request = BuildRequest(chatHistory, executionSettings);
             var response = await SendRequestAsync(request, cancellationToken);
 
-            var content = new ChatMessageContent(AuthorRole.Assistant, response.Content.LastOrDefault().Text, _modelId);
+            var reasoningContent = response.Content.FirstOrDefault(x => x.Type == "thinking");
+            var responseContent = response.Content.FirstOrDefault(x => x.Type == "text");
+#pragma warning disable SKEXP0110 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+            var content = new ChatMessageContent(AuthorRole.Assistant, responseContent.Text, _modelId, innerContent: new ReasoningContent(responseContent.Text));
+#pragma warning restore SKEXP0110 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
             return new List<ChatMessageContent> { content };
         }
 
@@ -116,13 +117,14 @@ namespace PostgreSQL.Embedding.Llm.Connectors.Anthropic
                             PropertyNameCaseInsensitive = true
                         });
 
-                        if (chunk?.Content?.FirstOrDefault()?.Text != null)
-                        {
-                            content = new StreamingChatMessageContent(
-                                AuthorRole.Assistant,
-                                chunk.Content.First().Text,
-                                _modelId);
-                        }
+                        if (chunk.Type != "content_block_delta") continue;
+                        var metadata = new Dictionary<string, object> { { "type", chunk.Type }, { "index", chunk.Index } };
+
+#pragma warning disable SKEXP0110 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+                        content = chunk?.Delta?.Text == null
+                            ? new StreamingChatMessageContent(role: AuthorRole.Assistant, content: string.Empty, choiceIndex: chunk.Index, modelId: _modelId, innerContent: new StreamingReasoningContent(chunk.Delta.Thinking), metadata: metadata)
+                            : new StreamingChatMessageContent(role: AuthorRole.Assistant, content: chunk?.Delta.Text, choiceIndex: chunk.Index, modelId: _modelId, metadata: metadata);
+#pragma warning restore SKEXP0110 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
                     }
                     catch (JsonException ex)
                     {
@@ -150,7 +152,12 @@ namespace PostgreSQL.Embedding.Llm.Connectors.Anthropic
             var request = BuildRequest(chatHistory, executionSettings);
             var response = await SendRequestAsync(request, cancellationToken);
 
-            var content = new TextContent(response.Content[0].Text, _modelId);
+            var reasoningContent = response.Content.FirstOrDefault(x => x.Type == "thinking");
+            var responseContent = response.Content.FirstOrDefault(x => x.Type == "text");
+
+#pragma warning disable SKEXP0110 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+            var content = new TextContent(responseContent.Text, _modelId, innerContent:new ReasoningContent(responseContent.Text));
+#pragma warning restore SKEXP0110 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
             return new List<TextContent> { content };
         }
 
@@ -201,13 +208,14 @@ namespace PostgreSQL.Embedding.Llm.Connectors.Anthropic
                             PropertyNameCaseInsensitive = true
                         });
 
-                        if (chunk?.Content?.FirstOrDefault()?.Text != null)
-                        {
-                            content = new StreamingTextContent(chunk.Content.First().Text)
-                            {
-                                ModelId = _modelId
-                            };
-                        }
+                        if (chunk.Type != "content_block_delta") continue;
+                        var metadata = new Dictionary<string, object> { { "type", chunk.Type }, { "index", chunk.Index } };
+
+#pragma warning disable SKEXP0110 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+                        content = chunk?.Delta?.Text == null
+                            ? new StreamingTextContent(text: string.Empty, choiceIndex: chunk.Index, modelId: _modelId, innerContent: new StreamingReasoningContent(chunk.Delta.Thinking), metadata: metadata)
+                            : new StreamingTextContent(text: chunk?.Delta.Text, choiceIndex: chunk.Index, modelId: _modelId, metadata: metadata);
+#pragma warning restore SKEXP0110 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
                     }
                     catch (JsonException ex)
                     {
@@ -368,6 +376,9 @@ namespace PostgreSQL.Embedding.Llm.Connectors.Anthropic
 
         [JsonPropertyName("delta")]
         public AnthropicDelta? Delta { get; set; }
+
+        [JsonPropertyName("content_block")]
+        public AnthropicContentBlock? ContentBlock { get; set; }
     }
 
     internal class AnthropicDelta
@@ -377,6 +388,21 @@ namespace PostgreSQL.Embedding.Llm.Connectors.Anthropic
 
         [JsonPropertyName("text")]
         public string Text { get; set; } = string.Empty;
+
+        [JsonPropertyName("thinking")]
+        public string Thinking { get; set; } = string.Empty;
+    }
+
+    internal class AnthropicContentBlock
+    {
+        [JsonPropertyName("type")]
+        public string Type { get; set; } = string.Empty;
+
+        [JsonPropertyName("text")]
+        public string Text { get; set; } = string.Empty;
+
+        [JsonPropertyName("thinking")]
+        public string Thinking { get; set; } = string.Empty;
     }
 
     #endregion

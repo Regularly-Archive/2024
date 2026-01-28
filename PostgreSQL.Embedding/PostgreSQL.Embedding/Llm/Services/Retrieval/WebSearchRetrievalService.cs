@@ -1,6 +1,6 @@
 ﻿using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Domain.Models.RAG;
-using PostgreSQL.Embedding.Plugins;
+using PostgreSQL.Embedding.Plugins.BuiltIn;
 
 namespace PostgreSQL.Embedding.Llm.Services.Retrieval;
 

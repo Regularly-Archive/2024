@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using PostgreSQL.Embedding.Plugins;
+using PostgreSQL.Embedding.Plugins.Custom;
 using Shouldly;
 
 namespace Wikit.Tests.Plugins

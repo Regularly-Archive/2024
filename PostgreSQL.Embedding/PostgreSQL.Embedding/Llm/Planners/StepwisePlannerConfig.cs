@@ -1,4 +1,4 @@
-﻿using PostgreSQL.Embedding.Plugins;
+﻿using PostgreSQL.Embedding.Plugins.Custom;
 
 namespace PostgreSQL.Embedding.Llm.Planners
 {

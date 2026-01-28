@@ -5,7 +5,7 @@ using PostgreSQL.Embedding.Common.Extensions;
 using PostgreSQL.Embedding.Domain.Models;
 using PostgreSQL.Embedding.Domain.Models.Planners;
 using PostgreSQL.Embedding.Llm.Services;
-using PostgreSQL.Embedding.Plugins;
+using PostgreSQL.Embedding.Plugins.BuiltIn;
 using System.Linq.Expressions;
 using System.Text;
 
@@ -21,7 +21,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
         {
             _kernel = kernel;
             _logger = _kernel.LoggerFactory.CreateLogger<TaskPlanner>();
-            _promptTemplate = _promptTemplateService.LoadTemplate("TaskPlanner");
+            _promptTemplate = _promptTemplateService.LoadTemplate("TaskPlanner.txt");
         }
 
         public async Task<PlanResult> GetSubTasksAsync(string query, string history = null, int limit = 5)
@@ -94,7 +94,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             var functionDescriptions = string.Join("\r\n", availableFunctions.Select(x => CreateFunctionDescription(x)));
 
             var arguments = new KernelArguments() { ["functionDescriptions"] = functionDescriptions };
-            return _promptTemplateService.RenderTemplateAsync("FunctionManual", kernel, arguments);
+            return _promptTemplateService.RenderTemplateAsync("FunctionManual.txt", kernel, arguments);
         }
 
         private string CreateFunctionDescription(KernelFunctionMetadata functionMetadata, bool includeParameters = false)

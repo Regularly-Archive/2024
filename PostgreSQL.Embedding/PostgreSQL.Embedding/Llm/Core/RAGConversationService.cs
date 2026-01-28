@@ -55,8 +55,8 @@ namespace PostgreSQL.Embedding.Llm.Core
             _knowledgeBaseRepository = _serviceProvider.GetService<IRepository<KnowledgeBase>>();
             _memoryService = memoryService;
             _promptTemplateService = _serviceProvider.GetService<PromptTemplateService>();
-            _promptTemplate = _promptTemplateService.LoadTemplate("RAGPrompt");
-            _rewritePromptTemplate = _promptTemplateService.LoadTemplate("RewritePrompt");
+            _promptTemplate = _promptTemplateService.LoadTemplate("RAGPrompt.txt");
+            _rewritePromptTemplate = _promptTemplateService.LoadTemplate("RewritePrompt.txt");
             _chatHistoriesService = chatHistoriesService;
             _logger = _serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<RAGConversationService>();
             _rerankService = _serviceProvider.GetRequiredService<IRerankService>();

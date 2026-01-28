@@ -10,5 +10,8 @@ namespace PostgreSQL.Embedding.Domain.Entities
 
         [SugarColumn(ColumnName = "plugin_id", IsNullable = false)]
         public long PluginId { get; set; }
+
+        [SugarColumn(ColumnName = "enabled", ColumnDataType = "boolean", DefaultValue = "TRUE")]
+        public bool Enabled { get; set; }
     }
 }

@@ -34,9 +34,7 @@ namespace PostgreSQL.Embedding.Llm.Core
 
         public async Task<Kernel> GetKernel(LlmModel llmModel, long? appId, bool initializeTools = true)
         {
-            var options = _serviceProvider.GetRequiredService<IOptions<LlmConfig>>();
-
-            var httpClient = new HttpClient(new LlmCompletionRouter(llmModel, options))
+            var httpClient = new HttpClient(new LlmCompletionRouter(llmModel, _serviceProvider.GetRequiredService<IOptions<LlmConfig>>()))
             {
                 Timeout = Timeout.InfiniteTimeSpan
             };
@@ -45,27 +43,8 @@ namespace PostgreSQL.Embedding.Llm.Core
             kernelBuilder.Services.AddLogging(loggingBuilder => loggingBuilder.AddConsole().SetMinimumLevel(LogLevel.Information));
             kernelBuilder.Services.AddScoped<AgentExecutionContext>();
 
-            // 根据 ApiFormat 选择连接器，而非 ServiceProvider
-            var apiFormat = (LlmApiFormat)llmModel.ApiFormat;
-
-            if (apiFormat == LlmApiFormat.Anthropic)
-            {
-                // 使用 Anthropic 格式连接器
-                kernelBuilder.AddAnthropicChatCompletion(
-                    modelId: llmModel.ModelName,
-                    apiKey: llmModel.ApiKey ?? string.Empty,
-                    endpoint: llmModel.BaseUrl,
-                    serviceId: null,
-                    httpClient: httpClient);
-            }
-            else
-            {
-                // 使用 OpenAI 兼容格式连接器（默认）
-                kernelBuilder.AddOpenAIChatCompletion(
-                    modelId: llmModel.ModelName,
-                    apiKey: llmModel.ApiKey ?? Guid.NewGuid().ToString(),
-                    httpClient: httpClient);
-            }
+            // 根据 LlmModel 自动选择 OpenAI 或 Anthropic
+            kernelBuilder.AddChatCompletionFromModel(llmModel, httpClient);
 
             var kernel = kernelBuilder.Build();
 
@@ -75,7 +54,7 @@ namespace PostgreSQL.Embedding.Llm.Core
 
             if (initializeTools)
             {
-                kernel = kernel.ImportLlmPlugins(_serviceProvider, appId);
+                kernel = await kernel.ImportLlmPluginsAsync(_serviceProvider, appId);
                 kernel = await kernel.ImportMCPServer(_serviceProvider, appId);
             }
 

@@ -96,7 +96,7 @@ namespace PostgreSQL.Embedding.Llm.Routers
                 {
                     model = dynamicObject["model"].Value<string>(),
                     messages = messageList,
-                    stream = dynamicObject.ContainsKey("stream")
+                    stream = dynamicObject.ContainsKey("stream") ? dynamicObject["stream"] : false,
                 };
                 request.Content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
             }
