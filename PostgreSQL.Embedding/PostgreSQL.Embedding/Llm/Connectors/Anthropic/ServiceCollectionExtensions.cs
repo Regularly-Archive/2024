@@ -2,6 +2,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.TextGeneration;
+using PostgreSQL.Embedding.Common;
+using PostgreSQL.Embedding.Domain.Entities;
 using System.Net.Http;
 
 namespace PostgreSQL.Embedding.Llm.Connectors.Anthropic;
@@ -57,5 +59,44 @@ public static class ServiceCollectionExtensions
         builder.Services.AddKeyedSingleton<ITextGenerationService>(serviceId, TextGenerationFactory);
 
         return builder;
+    }
+
+    /// <summary>
+    /// Adds OpenAI/Anthropic chat completion service from LlmModel entity.
+    /// </summary>
+    /// <param name="builder">The kernel builder.</param>
+    /// <param name="llmModel">The LLM model entity.</param>
+    /// <param name="httpClient">The optional HTTP client.</param>
+    /// <returns>The kernel builder.</returns>
+    public static IKernelBuilder AddChatCompletionFromModel(
+        this IKernelBuilder builder,
+        LlmModel llmModel,
+        HttpClient? httpClient = null)
+    {
+        _ = builder ?? throw new ArgumentNullException(nameof(builder));
+        _ = llmModel ?? throw new ArgumentNullException(nameof(llmModel));
+
+        var apiFormat = (LlmApiFormat)llmModel.ApiFormat;
+        var endpoint = string.IsNullOrEmpty(llmModel.BaseUrl)
+            ? null
+            : llmModel.BaseUrl;
+
+        switch (apiFormat)
+        {
+            case LlmApiFormat.Anthropic:
+                return builder.AddAnthropicChatCompletion(
+                    modelId: llmModel.ModelName,
+                    apiKey: llmModel.ApiKey ?? string.Empty,
+                    endpoint: endpoint,
+                    httpClient: httpClient);
+
+            case LlmApiFormat.OpenAI:
+            default:
+                return builder.AddOpenAIChatCompletion(
+                    modelId: llmModel.ModelName,
+                    apiKey: llmModel.ApiKey ?? string.Empty,
+                    endpoint: string.IsNullOrEmpty(llmModel.BaseUrl) ? null : new Uri(llmModel.BaseUrl),
+                    httpClient: httpClient);
+        }
     }
 }

@@ -126,7 +126,7 @@ namespace PostgreSQL.Embedding.Application.Controllers.Controllers
                 PluginName = lp.PluginName,
                 PluginIntro = lp.PluginIntro,
                 Version = lp.PluginVersion,
-                IsEnabled = lp.Enabled
+                IsEnabled = lap.Enabled
             })
             .ToList();
 

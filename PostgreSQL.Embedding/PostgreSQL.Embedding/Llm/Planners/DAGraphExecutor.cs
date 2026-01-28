@@ -29,7 +29,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             _graph = BuildDAGraph(subTasks);
             _stepwisePlanner = stepwisePlanner;
             _agentExecutionContext = kernel.GetAgentExecutionContext();
-            _subTaskPromptTemplate = new PromptTemplateService().LoadTemplate("SubTask");
+            _subTaskPromptTemplate = new PromptTemplateService().LoadTemplate("SubTask.txt");
         }
 
         public async Task ExecuteAsync()

@@ -30,7 +30,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 ["variableDescriptions"] = variableDescriptions,
                 ["suffix"] = _config.Suffix
             };
-            var systemMessage = await _promptTemplateService.RenderTemplateAsync("Stepwise", _kernel, arguments);
+            var systemMessage = await _promptTemplateService.RenderTemplateAsync("Stepwise.txt", _kernel, arguments);
 
             var logger = _kernel.LoggerFactory.CreateLogger<StepwisePlan>();
 
@@ -50,7 +50,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 ["variableDescriptions"] = variableDescriptions,
                 ["suffix"] = _config.Suffix
             };
-            var systemMessage = await _promptTemplateService.RenderTemplateAsync("Stepwise", _kernel, arguments);
+            var systemMessage = await _promptTemplateService.RenderTemplateAsync("Stepwise.txt", _kernel, arguments);
 
             var logger = _kernel.LoggerFactory.CreateLogger<StepwisePlan>();
 
@@ -67,7 +67,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             var functionDescriptions = string.Join("\r\n", availableFunctions.Select(x => CreateFunctionDescription(x)));
 
             var arguments = new KernelArguments() { ["functionDescriptions"] = functionDescriptions };
-            return _promptTemplateService.RenderTemplateAsync("FunctionManual", kernel, arguments);
+            return _promptTemplateService.RenderTemplateAsync("FunctionManual.txt", kernel, arguments);
         }
 
         private Task<string> CreateFunctionDescriptions(Kernel kernel, IList<KernelFunction> kernelFunctions)
@@ -76,7 +76,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             var functionDescriptions = string.Join("\r\n", availableFunctions.Select(x => CreateFunctionDescription(x)));
 
             var arguments = new KernelArguments() { ["functionDescriptions"] = functionDescriptions };
-            return _promptTemplateService.RenderTemplateAsync("FunctionManual", kernel, arguments);
+            return _promptTemplateService.RenderTemplateAsync("FunctionManual.txt", kernel, arguments);
         }
 
         private string CreateVariableDescriptions()

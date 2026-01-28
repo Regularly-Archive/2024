@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Extensions;
@@ -13,112 +13,202 @@ namespace PostgreSQL.Embedding.Utils
     public static class KernelPluginsExtensions
     {
         /// <summary>
-        /// 自动扫描程序集中的插件
+        /// 持久化所有插件元数据到数据库（启动时调用）
+        /// 从 DI 容器中获取已注册的插件类型并持久化
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="externalAssemblies"></param>
-        /// <returns></returns>
-        public static IServiceCollection RegisterLlmPlugins(this IServiceCollection services, IEnumerable<Assembly> externalAssemblies = null)
-        {
-            //var assembies = AssemblyLoadContext.Default.Assemblies;
-            var assembies = AssemblyLoadContext.Default.Assemblies.ToList().Where(x => x.FullName.Contains("PostgreSQL.Embedding"));
-            if (externalAssemblies != null && assembies.Any())
-                assembies = assembies.Concat(externalAssemblies);
-
-            var pluginTypes = assembies.SelectMany(x => x.DefinedTypes)
-                 .Where(x => x.GetCustomAttribute<KernelPluginAttribute>() != null).ToList();
-
-            foreach (var pluginType in pluginTypes)
-            {
-                var kernelPluginAttribute = pluginType.GetCustomAttribute<KernelPluginAttribute>();
-                if (!kernelPluginAttribute.Enabled) continue;
-
-                services.TryAddScoped(pluginType);
-            }
-
-            Task.Run(async () => await PersistLlmPliginsAsync(services, pluginTypes));
-            return services;
-        }
-
-        /// <summary>
-        /// 为 Kernel 导入插件
-        /// </summary>
-        /// <param name="kernel"></param>
-        /// <param name="serviceProvider"></param>
-        /// <param name="appId"></param>
-        /// <param name="externalAssemblies"></param>
-        /// <returns></returns>
-        public static Kernel ImportLlmPlugins(this Kernel kernel, IServiceProvider serviceProvider, long? appId = null, IEnumerable<Assembly> externalAssemblies = null)
-        {
-            //var assembies = AssemblyLoadContext.Default.Assemblies;
-            var assembies = AssemblyLoadContext.Default.Assemblies.ToList().Where(x => x.FullName.Contains("PostgreSQL.Embedding"));
-            if (externalAssemblies != null && assembies.Any())
-                assembies = assembies.Concat(externalAssemblies);
-
-            var pluginTypes = assembies.SelectMany(x => x.DefinedTypes)
-                .Where(x => x.GetCustomAttribute<KernelPluginAttribute>() != null).ToList();
-
-            foreach (var pluginType in pluginTypes)
-            {
-                var pluginInstance = serviceProvider.GetService(pluginType);
-                if (pluginInstance != null)
-                {
-                    var kernelPluginAttribute = pluginType.GetCustomAttribute<KernelPluginAttribute>();
-
-                    if (!kernelPluginAttribute.Enabled) continue;
-                    if (appId.HasValue)
-                        (pluginInstance as IPlugin).Initialize(appId.Value);
-
-                    if (!kernel.Plugins.TryGetPlugin(pluginType.Name, out _))
-                    {
-                        kernel.Plugins.AddFromObject(pluginInstance, pluginType.Name);
-                    }
-                }
-            }
-
-            return kernel;
-        }
-
-        /// <summary>
-        /// 持久化插件
-        /// </summary>
-        /// <param name="services"></param>
-        /// <param name="pluginTypes"></param>
-        /// <returns></returns>
-        private static async Task PersistLlmPliginsAsync(IServiceCollection services, IEnumerable<Type> pluginTypes)
+        public static async Task PersistAllPluginsAsync(this IServiceCollection services)
         {
             var serviceProvider = services.BuildServiceProvider();
             var pluginRepository = serviceProvider.GetRequiredService<IRepository<LlmPlugin>>();
 
-            foreach (var pluginType in pluginTypes)
+            // 从 DI 容器获取所有已注册的插件类型
+            var registeredPluginTypes = GetRegisteredPluginTypes(services);
+
+            foreach (var pluginType in registeredPluginTypes)
             {
                 var kernelPluginAttribute = pluginType.GetCustomAttribute<KernelPluginAttribute>();
-                if (!kernelPluginAttribute.Enabled) continue;
+                if (kernelPluginAttribute == null || !kernelPluginAttribute.Enabled) continue;
 
                 var pluginInstance = serviceProvider.GetRequiredService(pluginType);
-                var pluginName = (pluginInstance as IPlugin).PluginName ?? pluginType.Name;
+                var pluginName = (pluginInstance as IPlugin)?.PluginName ?? pluginType.Name;
+                var isBuiltin = IsBuiltInPlugin(pluginType);
 
                 var persistedPlugin = await pluginRepository.FindAsync(x => x.PluginName == pluginName);
-                if (persistedPlugin != null && persistedPlugin.PluginVersion != kernelPluginAttribute.Version)
+                if (persistedPlugin != null)
                 {
-                    persistedPlugin.PluginIntro = kernelPluginAttribute.Description;
-                    persistedPlugin.PluginName = pluginName;
-                    persistedPlugin.PluginVersion = kernelPluginAttribute.Version;
-                    await pluginRepository.UpdateAsync(persistedPlugin);
+                    // 更新版本或 IsBuiltin 状态
+                    if (persistedPlugin.PluginVersion != kernelPluginAttribute.Version ||
+                        persistedPlugin.IsBuiltin != isBuiltin)
+                    {
+                        persistedPlugin.PluginIntro = kernelPluginAttribute.Description;
+                        persistedPlugin.PluginName = pluginName;
+                        persistedPlugin.PluginVersion = kernelPluginAttribute.Version;
+                        persistedPlugin.TypeName = pluginType.FullName;
+                        persistedPlugin.IsBuiltin = isBuiltin;
+                        await pluginRepository.UpdateAsync(persistedPlugin);
+                    }
                 }
-                else if (persistedPlugin == null)
+                else
                 {
+                    // 新插件
                     var newPlugin = new LlmPlugin()
                     {
                         PluginIntro = kernelPluginAttribute.Description,
                         PluginName = pluginName,
                         TypeName = pluginType.FullName,
                         PluginVersion = kernelPluginAttribute.Version,
-                        Enabled = true,
+                        IsBuiltin = isBuiltin,
                     };
                     await pluginRepository.AddAsync(newPlugin);
                 }
             }
+        }
+
+        /// <summary>
+        /// 从 ServiceCollection 中获取所有已注册的插件类型
+        /// </summary>
+        private static IEnumerable<Type> GetRegisteredPluginTypes(IServiceCollection services)
+        {
+            var pluginTypes = new List<Type>();
+
+            foreach (var descriptor in services)
+            {
+                var implementationType = descriptor.ImplementationType;
+                if (implementationType != null &&
+                    implementationType.GetCustomAttribute<KernelPluginAttribute>() != null)
+                {
+                    pluginTypes.Add(implementationType);
+                }
+            }
+
+            return pluginTypes;
+        }
+
+        /// <summary>
+        /// 判断是否为 BuiltIn 插件
+        /// </summary>
+        private static bool IsBuiltInPlugin(Type pluginType)
+        {
+            return pluginType.Namespace?.StartsWith("PostgreSQL.Embedding.Plugins.BuiltIn") == true;
+        }
+
+        /// <summary>
+        /// 获取所有插件类型（包含 BuiltIn 和 Custom）
+        /// </summary>
+        private static IEnumerable<TypeInfo> GetAllPluginTypes()
+        {
+            return AssemblyLoadContext.Default.Assemblies
+                .Where(x => x.FullName.Contains("PostgreSQL.Embedding"))
+                .SelectMany(x => x.DefinedTypes)
+                .Where(x => x.GetCustomAttribute<KernelPluginAttribute>() != null);
+        }
+
+        /// <summary>
+        /// 导入所有插件（BuiltIn + 当前应用的 Custom）
+        /// </summary>
+        /// <param name="kernel"></param>
+        /// <param name="serviceProvider"></param>
+        /// <param name="appId">应用 ID，传入时导入该应用的 Custom 插件</param>
+        /// <returns></returns>
+        public static async Task<Kernel> ImportLlmPluginsAsync(
+            this Kernel kernel,
+            IServiceProvider serviceProvider,
+            long? appId = null)
+        {
+            // 1. 导入 BuiltIn 插件（从 DI 容器）
+            await ImportBuiltInPluginsAsync(kernel, serviceProvider, appId);
+
+            // 2. 导入 Custom 插件（从数据库，根据 appId）
+            if (appId.HasValue)
+            {
+                await ImportCustomPluginsAsync(kernel, serviceProvider, appId.Value);
+            }
+
+            return kernel;
+        }
+
+        /// <summary>
+        /// 导入 BuiltIn 插件（从 DI 容器）
+        /// </summary>
+        private static async Task ImportBuiltInPluginsAsync(
+            Kernel kernel,
+            IServiceProvider serviceProvider,
+            long? appId)
+        {
+            var builtInTypes = GetBuiltInPluginTypes();
+
+            foreach (var pluginType in builtInTypes)
+            {
+                var kernelPluginAttribute = pluginType.GetCustomAttribute<KernelPluginAttribute>();
+                if (kernelPluginAttribute == null || !kernelPluginAttribute.Enabled) continue;
+
+                var pluginInstance = serviceProvider.GetService(pluginType);
+                if (pluginInstance == null) continue;
+
+                if (appId.HasValue)
+                    (pluginInstance as IPlugin)?.Initialize(appId.Value);
+
+                if (!kernel.Plugins.TryGetPlugin(pluginType.Name, out _))
+                {
+                    kernel.Plugins.AddFromObject(pluginInstance, pluginType.Name);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 导入 Custom 插件（从数据库，根据 LlmAppPlugin 关联）
+        /// </summary>
+        private static async Task ImportCustomPluginsAsync(
+            Kernel kernel,
+            IServiceProvider serviceProvider,
+            long appId)
+        {
+            var appPluginRepository = serviceProvider.GetRequiredService<IRepository<LlmAppPlugin>>();
+            var pluginRepository = serviceProvider.GetRequiredService<IRepository<LlmPlugin>>();
+
+            // 获取该应用所有启用的插件关联
+            var appPlugins = await appPluginRepository.FindListAsync(
+                x => x.AppId == appId && x.Enabled);
+
+            foreach (var appPlugin in appPlugins)
+            {
+                var pluginMeta = await pluginRepository.GetAsync(appPlugin.PluginId);
+                if (pluginMeta == null) continue;
+
+                var pluginType = Type.GetType(pluginMeta.TypeName);
+                if (pluginType == null) continue;
+
+                try
+                {
+                    var pluginInstance = Activator.CreateInstance(pluginType);
+                    if (pluginInstance == null) continue;
+
+                    (pluginInstance as IPlugin)?.Initialize(appId);
+
+                    if (!kernel.Plugins.TryGetPlugin(pluginMeta.PluginName, out _))
+                    {
+                        kernel.Plugins.AddFromObject(pluginInstance, pluginMeta.PluginName);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    serviceProvider.GetService<ILoggerFactory>()
+                        ?.CreateLogger("LlmPlugins")
+                        .LogError(ex, "Failed to load custom plugin: {PluginName}", pluginMeta.PluginName);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 获取所有 BuiltIn 插件类型
+        /// </summary>
+        private static IEnumerable<TypeInfo> GetBuiltInPluginTypes()
+        {
+            return AssemblyLoadContext.Default.Assemblies
+                .Where(x => x.FullName.Contains("PostgreSQL.Embedding"))
+                .SelectMany(x => x.DefinedTypes)
+                .Where(x => x.Namespace?.StartsWith("PostgreSQL.Embedding.Plugins.BuiltIn") == true)
+                .Where(x => x.GetCustomAttribute<KernelPluginAttribute>() != null);
         }
 
         public static async Task AddMCPServerAsync(this Kernel kernel, string name, string command, string[] args = null, Dictionary<string, string> env = null, CacheableMcpClientFactory cachedMcpClientFactory = null, IServiceProvider serviceProvider = null, bool cacheToolsList = true)
@@ -135,23 +225,31 @@ namespace PostgreSQL.Embedding.Utils
             }
             catch (Exception ex)
             {
-                await Task.CompletedTask;
+                kernel.Services.GetService<ILoggerFactory>()?.CreateLogger("MCP")
+                    .LogError(ex, "Failed to add MCP server {ServerName}", name);
             }
-
         }
 
         public static async Task AddMCPServerAsync(this Kernel kernel, string name, string url, Dictionary<string, string> headers = null, CacheableMcpClientFactory cachedMcpClientFactory = null, IServiceProvider serviceProvider = null, bool cacheToolsList = true)
         {
-            var validName = name.Replace("-", "_");
-            var client = cachedMcpClientFactory.GetOrCreate(name, url, headers);
+            try
+            {
+                var validName = name.Replace("-", "_");
+                var client = cachedMcpClientFactory.GetOrCreate(name, url, headers);
 
-            var loggerFactory = kernel.Services.GetRequiredService<ILoggerFactory>();
-            var kernelFunctions = await client.GetKernelFunctionsAsync(loggerFactory, serviceProvider, cacheToolsList);
+                var loggerFactory = kernel.Services.GetRequiredService<ILoggerFactory>();
+                var kernelFunctions = await client.GetKernelFunctionsAsync(loggerFactory, serviceProvider, cacheToolsList);
 
-            kernel.Plugins.AddFromFunctions(validName, kernelFunctions);
+                kernel.Plugins.AddFromFunctions(validName, kernelFunctions);
+            }
+            catch (Exception ex)
+            {
+                kernel.Services.GetService<ILoggerFactory>()?.CreateLogger("MCP")
+                    .LogError(ex, "Failed to add MCP server {ServerName}", name);
+            }
         }
 
-        public static async Task AddMCPServerAsync(this Kernel kernel, MCPServer mcpServer, CacheableMcpClientFactory cacheableMcpClientFactory, IServiceProvider serviceProvider,bool cacheToolsList)
+        public static async Task AddMCPServerAsync(this Kernel kernel, MCPServer mcpServer, CacheableMcpClientFactory cacheableMcpClientFactory, IServiceProvider serviceProvider, bool cacheToolsList)
         {
             if (mcpServer.TransportType == (int)Common.TransportType.Stdio)
             {

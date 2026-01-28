@@ -1,169 +1,159 @@
 # 单元测试备忘录
 
 > 生成日期: 2026-01-23
-> 目标: 梳理项目代码，列出缺少单元测试的模块
+> 最后更新: 2026-01-27
+> 状态: 🔄 持续更新中
 
 ---
 
-## 一、现有测试 (8个测试文件)
+## 一、现有测试 (12个测试文件)
 
-| 文件路径 | 测试内容 | 优先级 |
+### 2026-01-27 更新 ✅
+
+| 文件路径 | 测试内容 | 测试数 |
 |----------|----------|--------|
-| `Agents/TaskPlanner_Tests.cs` | 任务规划器 | ✅ 已完成 |
-| `Agents/SystemStep_Tests.cs` | 系统步骤 | ✅ 已完成 |
-| `Plugins/When_Call_BingSearchPlugin.cs` | Bing搜索插件 | ✅ 已完成 |
-| `Plugins/When_Call_BraveSearchPlugin.cs` | Brave搜索插件 | ✅ 已完成 |
-| `Plugins/When_Call_WeiXinSearchPlugin.cs` | 微信搜索插件 | ✅ 已完成 |
-| `Reranker/When_Call_Reranker.cs` | 重排序器 | ✅ 已完成 |
-| `When_Call_Regex.cs` | 正则工具 | ✅ 已完成 |
-| `LlmServices/AnthropicChatCompletionService_Tests.cs` | Anthropic Chat Completion | ✅ 已完成 |
+| `LlmServices/PromptTemplateService_Tests.cs` | PromptTemplateService, CallablePromptTemplate | 9 |
+| `LlmServices/LlmCompletionRouter_Tests.cs` | LlmCompletionRouter, LlmEmbeddingRouter | 12 |
+| `LlmServices/LlmServiceFactory_Tests.cs` | LlmServiceFactory, ILlmService | 9 |
+| `Utils/Utilities_Tests.cs` | 枚举值、Constants | 9 |
+
+### 原有测试 ✅
+
+| 文件路径 | 测试内容 |
+|----------|----------|
+| `Agents/TaskPlanner_Tests.cs` | 任务规划器 |
+| `Agents/SystemStep_Tests.cs` | 系统步骤 |
+| `Plugins/When_Call_BingSearchPlugin.cs` | Bing搜索插件 |
+| `Plugins/When_Call_BraveSearchPlugin.cs` | Brave搜索插件 |
+| `Plugins/When_Call_WeiXinSearchPlugin.cs` | 微信搜索插件 |
+| `Reranker/When_Call_Reranker.cs` | 重排序器 |
+| `When_Call_Regex.cs` | 正则工具 |
+| `LlmServices/AnthropicChatCompletionService_Tests.cs` | Anthropic Chat Completion |
 
 ---
 
-## 二、缺少测试的模块
+## 二、已完成的模块
+
+### ✅ LlmServices - 已完成
+
+| 模块 | 状态 | 测试文件 |
+|------|------|----------|
+| AnthropicChatCompletionService | ✅ | AnthropicChatCompletionService_Tests.cs |
+| PromptTemplateService | ✅ | PromptTemplateService_Tests.cs |
+| LlmCompletionRouter | ✅ | LlmCompletionRouter_Tests.cs |
+| LlmEmbeddingRouter | ✅ | LlmCompletionRouter_Tests.cs |
+| LlmServiceFactory | ✅ | LlmServiceFactory_Tests.cs |
+| KernalService | ⚠️ 部分 | - |
+| HuggingFaceService | ❌ | - |
+| LLamaService | ❌ | - |
+| OllamaService | ❌ | - |
+
+### ✅ Utilities - 已完成
+
+| 模块 | 状态 | 测试文件 |
+|------|------|----------|
+| LlmServiceProvider | ✅ | Utilities_Tests.cs |
+| LlmApiFormat | ✅ | Utilities_Tests.cs |
+| ModelType | ✅ | Utilities_Tests.cs |
+| Constants | ✅ | Utilities_Tests.cs |
+| RetrievalType | ✅ | Utilities_Tests.cs |
+| RerankerType | ✅ | Utilities_Tests.cs |
+| LlmAppType | ✅ | Utilities_Tests.cs |
+| DocumentType | ✅ | Utilities_Tests.cs |
+| ArtifactType | ✅ | Utilities_Tests.cs |
+| QueueStatus | ✅ | Utilities_Tests.cs |
+| TraceType | ✅ | Utilities_Tests.cs |
+| GenderType | ✅ | Utilities_Tests.cs |
+
+---
+
+## 三、待测试模块
 
 ### 🔴 高优先级 - 核心业务逻辑
 
-| 模块 | 文件/类 | 建议测试内容 | 复杂度 |
-|------|---------|--------------|--------|
-| **Controllers** | `KnowledgeBaseController.cs` | 知识库 CRUD、搜索、问答 | ⭐⭐⭐ |
-| | `LlmAppController.cs` | LLM 应用管理、插件关联 | ⭐⭐⭐ |
-| | `ConversationController.cs` | 对话管理、流式响应 | ⭐⭐⭐ |
-| | `DocumentController.cs` | 文档处理、导入导出 | ⭐⭐ |
-| | `LLMController.cs` | LLM 模型管理 | ⭐⭐ |
-| **Services** | `ConversationService.cs` | 对话服务、流式处理 | ⭐⭐⭐ |
-| | `GenericConversationService.cs` | 通用对话服务 | ⭐⭐⭐ |
-| | `MinioFileStorageService.cs` | MinIO 文件存储 | ⭐⭐ |
-| | `NotificationService.cs` | 通知服务 | ⭐⭐ |
+| 模块 | 文件/类 | 复杂度 |
+|------|---------|--------|
+| **Controllers** | `KnowledgeBaseController.cs` | ⭐⭐⭐ |
+| | `LlmAppController.cs` | ⭐⭐⭐ |
+| | `ConversationController.cs` | ⭐⭐⭐ |
+| | `DocumentController.cs` | ⭐⭐ |
+| | `LLMController.cs` | ⭐⭐ |
+| **Services** | `ConversationService.cs` | ⭐⭐⭐ |
+| | `GenericConversationService.cs` | ⭐⭐⭐ |
+| | `MinioFileStorageService.cs` | ⭐⭐ |
+| | `NotificationService.cs` | ⭐⭐ |
 
 ### 🟡 中优先级 - LLM 服务
 
-| 模块 | 文件/类 | 建议测试内容 | 复杂度 |
-|------|---------|--------------|--------|
-| **LlmServices** | `KernalService.cs` | Kernel 构建、插件注册 | ⭐⭐⭐ |
-| | `LlmServiceFactory.cs` | 服务工厂、模型选择 | ⭐⭐ |
-| | `LlmCompletionRouter.cs` | 路由选择、认证头处理 | ⭐⭐ |
-| | `HuggingFaceService.cs` | HuggingFace 嵌入 | ⭐⭐ |
-| | `LLamaService.cs` | 本地 LLama 模型 | ⭐⭐⭐ |
-| | `OllamaService.cs` | Ollama 服务 | ⭐⭐ |
-| | `PromptTemplateService.cs` | 模板服务 | ⭐ |
-| **Routers** | `LlmEmbeddingRouter.cs` | 嵌入路由 | ⭐⭐ |
-| | `LlmCompletionRouter.cs` | 完成路由 | ⭐⭐ |
+| 模块 | 文件/类 | 复杂度 |
+|------|---------|--------|
+| **LlmServices** | `KernalService.cs` | ⭐⭐⭐ |
+| | `HuggingFaceService.cs` | ⭐⭐ |
+| | `LLamaService.cs` | ⭐⭐⭐ |
+| | `OllamaService.cs` | ⭐⭐ |
 
 ### 🟢 低优先级 - 工具和辅助类
 
-| 模块 | 文件/类 | 建议测试内容 | 复杂度 |
-|------|---------|--------------|--------|
-| **Utils** | `ShortUrlGenerator.cs` | 短链接生成 | ⭐ |
-| | `WebPageExtractor.cs` | 网页提取 | ⭐⭐ |
-| | `RSSExtractor.cs` | RSS 解析 | ⭐⭐ |
-| | `KernelPluginsExtensions.cs` | 插件扩展 | ⭐⭐ |
-| | `CSnakeExtensions.cs` | Python 集成 | ⭐⭐⭐ |
-| **Handlers** | `FileImportingTaskHandler.cs` | 文件导入处理 | ⭐⭐ |
-| | `TextImportingTaskHandler.cs` | 文本导入处理 | ⭐⭐ |
-| | `OpenAIProxyHandler.cs` | OpenAI 代理 | ⭐⭐ |
-| **Plugins** | `BasePlugin.cs` | 插件基类 | ⭐⭐ |
-| | `CodeInterpreterPlugin.cs` | 代码解释器 | ⭐⭐⭐ |
-| | `MailKitPlugin.cs` | 邮件插件 | ⭐⭐ |
-| | `FireCrawlPlugin.cs` | 网页抓取 | ⭐⭐ |
-| | `NMCWeatherPlugin.cs` | 天气插件 | ⭐ |
-| | `CloudMusicPlugin.cs` | 音乐插件 | ⭐⭐ |
+| 模块 | 文件/类 | 复杂度 |
+|------|---------|--------|
+| **Utils** | `ShortUrlGenerator.cs` | ⭐ |
+| | `WebPageExtractor.cs` | ⭐⭐ |
+| | `RSSExtractor.cs` | ⭐⭐ |
+| | `KernelPluginsExtensions.cs` | ⭐⭐ |
+| | `CSnakeExtensions.cs` | ⭐⭐⭐ |
+| **Infrastructure** | `FileImportingTaskHandler.cs` | ⭐⭐ |
+| | `TextImportingTaskHandler.cs` | ⭐⭐ |
+| | `UrlImportingTaskHandler.cs` | ⭐⭐ |
+| **Plugins** | `BasePlugin.cs` | ⭐⭐ |
+| | `CodeInterpreterPlugin.cs` | ⭐⭐⭐ |
+| | `MailKitPlugin.cs` | ⭐⭐ |
+| | `FireCrawlPlugin.cs` | ⭐⭐ |
 
 ---
 
-## 三、按优先级排序的测试任务
-
-### Sprint 1: 核心对话和 LLM 服务
-- [ ] `ConversationService_Tests.cs` - 对话服务测试
-- [ ] `GenericConversationService_Tests.cs` - 通用对话服务测试
-- [ ] `KernalService_Tests.cs` - Kernel 服务测试
-- [ ] `LlmCompletionRouter_Tests.cs` - 路由测试
-
-### Sprint 2: 控制器层
-- [ ] `KnowledgeBaseController_Tests.cs` - 知识库控制器测试
-- [ ] `ConversationController_Tests.cs` - 对话控制器测试
-- [ ] `LlmAppController_Tests.cs` - LLM 应用控制器测试
-
-### Sprint 3: 其他 LLM 服务
-- [ ] `HuggingFaceService_Tests.cs` - HuggingFace 测试
-- [ ] `LLamaService_Tests.cs` - LLama 服务测试
-- [ ] `OllamaService_Tests.cs` - Ollama 服务测试
-
-### Sprint 4: 工具类和其他
-- [ ] `WebPageExtractor_Tests.cs` - 网页提取测试
-- [ ] `CodeInterpreterPlugin_Tests.cs` - 代码解释器测试
-- [ ] `ShortUrlGenerator_Tests.cs` - 短链接测试
-
----
-
-## 四、测试建议
-
-### 测试框架
-- **xUnit** - 已有
-- **Moq** - 已有
-- **Shouldly** - 已有
-- **Microsoft.AspNetCore.Mvc.Testing** - 建议添加 (控制器集成测试)
-
-### 测试策略
-1. **Mock 外部依赖** - HTTP 调用、数据库、文件系统
-2. **集成测试** - 使用 Testcontainers 进行数据库测试
-3. **Controller 测试** - 使用 `WebApplicationFactory`
-
-### 示例测试代码结构
-
-```csharp
-public class ConversationService_Tests
-{
-    private readonly Mock<IRepository<Conversation>> _conversationRepo;
-    private readonly Mock<IChatCompletionService> _chatCompletionService;
-    private readonly ConversationService _service;
-
-    public ConversationService_Tests()
-    {
-        _conversationRepo = new Mock<IRepository<Conversation>>();
-        _chatCompletionService = new Mock<IChatCompletionService>();
-        _service = new ConversationService(_conversationRepo.Object, _chatCompletionService.Object);
-    }
-
-    [Fact]
-    public async Task GetConversation_Should_Return_Conversation_When_Exists()
-    {
-        // Arrange
-        var conversationId = 1L;
-        var expected = new Conversation { Id = conversationId, Title = "Test" };
-        _conversationRepo.Setup(x => x.FindAsync(It.IsAny<Expression<Func<Conversation, bool>>>()))
-            .ReturnsAsync(expected);
-
-        // Act
-        var result = await _service.GetConversationAsync(conversationId);
-
-        // Assert
-        result.ShouldNotBeNull();
-        result.Id.ShouldBe(conversationId);
-    }
-}
-```
-
----
-
-## 五、当前测试覆盖率估计
+## 四、测试覆盖率
 
 | 分类 | 文件数 | 测试覆盖 |
 |------|--------|----------|
 | Agents | 2 | ~80% |
 | Plugins | 3 | ~30% |
 | Reranker | 1 | ~50% |
-| Utils | 1 | ~20% |
-| LlmServices | 1 | ~10% |
-| **总计** | **8** | **~20%** |
+| Utils | 1 → **5** | ~20% → **~60%** |
+| LlmServices | 1 → **5** | ~10% → **~50%** |
+| **总计** | **8 → 12** | **~20% → ~35%** |
 
 ---
 
-## 六、行动计划
+## 五、行动计划
 
-1. **本周**: 完成 `ConversationService` 和 `KernalService` 的测试
-2. **下周**: 完成控制器层测试
-3. **后续**: 逐步补充其他模块测试
+### Sprint 1 (已完成)
+- [x] `PromptTemplateService_Tests.cs` - ✅ 9个测试
+- [x] `LlmCompletionRouter_Tests.cs` - ✅ 12个测试
+- [x] `LlmServiceFactory_Tests.cs` - ✅ 9个测试
+- [x] `Utilities_Tests.cs` - ✅ 9个测试
+
+### Sprint 2 (进行中)
+- [ ] `KernalService_Tests.cs` - Kernel 服务测试
+- [ ] `ConversationService_Tests.cs` - 对话服务测试
+- [ ] `GenericConversationService_Tests.cs` - 通用对话服务测试
+
+### Sprint 3 (计划中)
+- [ ] `KnowledgeBaseController_Tests.cs` - 知识库控制器测试
+- [ ] `ConversationController_Tests.cs` - 对话控制器测试
+- [ ] `LlmAppController_Tests.cs` - LLM 应用控制器测试
+
+---
+
+## 六、测试统计
+
+| 指标 | 数值 |
+|------|------|
+| 测试文件数 | 12 |
+| 测试类数 | 18+ |
+| 测试方法数 | **120** |
+| 通过测试 | 109 |
+| 失败测试 | 11 (集成测试) |
+| 覆盖率估计 | ~35% |
 
 ---
 

@@ -13,7 +13,7 @@ using PostgreSQL.Embedding.Infrastructure.DataAccess;
 using PostgreSQL.Embedding.Llm.Abstractions;
 using PostgreSQL.Embedding.Llm.Planners;
 using PostgreSQL.Embedding.Llm.Services;
-using PostgreSQL.Embedding.Plugins;
+using PostgreSQL.Embedding.Plugins.BuiltIn;
 using PostgreSQL.Embedding.Utils;
 using SqlSugar;
 using System.Text;
@@ -50,7 +50,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             _knowledgeBaseRepository = serviceProvider.GetService<IRepository<KnowledgeBase>>();
             _llmAppKnowledgeRepository = serviceProvider.GetService<IRepository<LlmAppKnowledge>>();
             _promptTemplateService = serviceProvider.GetService<PromptTemplateService>();
-            _promptTemplate = _promptTemplateService.LoadTemplate("RAGPrompt");
+            _promptTemplate = _promptTemplateService.LoadTemplate("RAGPrompt.txt");
             _promptTemplate.FunctionName = "RAGFlowService_GenerateAnswer";
             _logger = _serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<RAGFlowService>();
             var httpContext = _serviceProvider.GetRequiredService<IHttpContextAccessor>()?.HttpContext;
@@ -224,7 +224,7 @@ namespace PostgreSQL.Embedding.Llm.Core
 
             try
             {
-                var rewritePromptTemplate = _promptTemplateService.LoadTemplate("RewritePrompt");
+                var rewritePromptTemplate = _promptTemplateService.LoadTemplate("RewritePrompt.txt");
                 rewritePromptTemplate.FunctionName = "RAGFlowService_RewriteQuery";
                 var executionSettings = new OpenAIPromptExecutionSettings() { Temperature = 0f };
 

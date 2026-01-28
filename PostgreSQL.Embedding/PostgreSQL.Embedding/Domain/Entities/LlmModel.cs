@@ -25,6 +25,8 @@ namespace PostgreSQL.Embedding.Domain.Entities
 
         [SugarColumn(ColumnName = "is_default_model", DefaultValue = "FALSE", IsNullable = true)]
         public bool IsDefaultModel { get; set; }
+
+        [SugarColumn(ColumnName = "api_format", DefaultValue = "0")]
         public int ApiFormat { get; set; }
     }
 }

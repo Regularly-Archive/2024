@@ -43,7 +43,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             _app = app;
             _serviceProvider = serviceProvider;
             _promptTemplateService = _serviceProvider.GetService<PromptTemplateService>();
-            _promptTemplate = _promptTemplateService.LoadTemplate("Default");
+            _promptTemplate = _promptTemplateService.LoadTemplate("Default.txt");
             _chatHistoriesService = chatHistoriesService;
             _userInfoService = _serviceProvider.GetService<IUserInfoService>();
             _logger = _serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<GenericConversationService>();
@@ -152,7 +152,7 @@ namespace PostgreSQL.Embedding.Llm.Core
 #pragma warning disable SKEXP0060
                 var plan = await planner.CreatePlanAsync(kernel, input);
                 var executionResult = await plan.InvokeAsync(kernel);
-                var promptTemplate = _promptTemplateService.LoadTemplate("AgentPrompt");
+                var promptTemplate = _promptTemplateService.LoadTemplate("AgentPrompt.txt");
                 promptTemplate.AddVariable("input", input);
                 promptTemplate.AddVariable("context", executionResult);
                 return await promptTemplate.InvokeAsync(kernel);

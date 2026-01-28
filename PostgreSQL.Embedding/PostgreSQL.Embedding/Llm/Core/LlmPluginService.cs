@@ -17,10 +17,15 @@ namespace PostgreSQL.Embedding.Llm.Core
         private readonly List<TypeInfo> _llmPluginTypeList;
         private readonly IServiceProvider _serviceProvider;
         private readonly CrudBaseService<LlmPlugin> _crudBaseService;
+        private readonly CrudBaseService<LlmAppPlugin> _appPluginCrudBaseService;
 
-        public LlmPluginService(CrudBaseService<LlmPlugin> crudBaseService, IServiceProvider serviceProvider)
+        public LlmPluginService(
+            CrudBaseService<LlmPlugin> crudBaseService,
+            CrudBaseService<LlmAppPlugin> appPluginCrudBaseService,
+            IServiceProvider serviceProvider)
         {
             _crudBaseService = crudBaseService;
+            _appPluginCrudBaseService = appPluginCrudBaseService;
             _serviceProvider = serviceProvider;
             _llmPluginTypeList = GetPluginTypeList();
         }
@@ -81,18 +86,20 @@ namespace PostgreSQL.Embedding.Llm.Core
         }
 
         /// <summary>
-        /// 启用或停用插件
+        /// 启用或停用插件（修改 LlmAppPlugin.Enabled）
         /// </summary>
-        /// <param name="id"></param>
+        /// <param name="id">LlmAppPlugin.Id</param>
         /// <returns></returns>
         public async Task ChangePluginStatusAsync(long id, bool status)
         {
-            var llmPlugin = await _crudBaseService.GetByIdAsync(id);
-            if ((llmPlugin.Enabled && status) || (!llmPlugin.Enabled && !status))
+            var appPlugin = await _appPluginCrudBaseService.GetByIdAsync(id);
+            if (appPlugin == null) return;
+
+            if ((appPlugin.Enabled && status) || (!appPlugin.Enabled && !status))
                 return;
 
-            llmPlugin.Enabled = status;
-            await _crudBaseService.UpdateAsync(llmPlugin);
+            appPlugin.Enabled = status;
+            await _appPluginCrudBaseService.UpdateAsync(appPlugin);
         }
 
         private LlmPluginModel ConvertToLlmPluginModel(LlmPlugin llmPlugin)
@@ -106,7 +113,9 @@ namespace PostgreSQL.Embedding.Llm.Core
                 PluginIntro = llmPlugin.PluginIntro,
                 TypeName = llmPlugin.TypeName,
                 Version = llmPlugin.PluginVersion,
-                IsEnabled = llmPlugin.Enabled,
+                // IsEnabled is determined by LlmAppPlugin.Enabled when queried per-app
+                // For single plugin queries, default to true for BuiltIn, false for Custom
+                IsEnabled = llmPlugin.IsBuiltin,
                 Parameters = ConstructPluginParameters(pluginType),
                 Functions = ConstructPluginFunctions(pluginType),
             };
