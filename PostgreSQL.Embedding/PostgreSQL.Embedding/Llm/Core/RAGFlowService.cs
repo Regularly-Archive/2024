@@ -3,6 +3,7 @@ using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Extensions;
+using PostgreSQL.Embedding.Common.Streaming;
 using PostgreSQL.Embedding.Domain.Entities;
 using PostgreSQL.Embedding.Domain.Models;
 using PostgreSQL.Embedding.Domain.Models.KernelMemory;
@@ -99,10 +100,19 @@ namespace PostgreSQL.Embedding.Llm.Core
                 if (answer.IndexOf(Common.Constants.DefaultEmptyAnswer) != -1)
                     return $"<KEEP_FORMAT>{Common.Constants.DefaultEmptyAnswer}</KEEP_FORMAT>";
 
+                // 匹配引用信息，对引用信息的索引进行重排，并收集位置信息
+                var reorderResult = ReorderReferences(citations, answer);
 
-                // 匹配引用信息，对引用信息的索引进行重排
-                var newAnswer = ReorderReferences(citations, answer);
-                return $"<KEEP_FORMAT>{newAnswer}</KEEP_FORMAT>";
+                // 通过 EventBus 发送 CitationsEvent
+                if (_agentExecutionContext.HasEventBus && reorderResult.CitationItems.Any())
+                {
+                    await _agentExecutionContext.PublishEventAsync(new CitationsEvent
+                    {
+                        Citations = reorderResult.CitationItems
+                    });
+                }
+
+                return $"<KEEP_FORMAT>{reorderResult.FormattedAnswer}</KEEP_FORMAT>";
             }
 
             return Common.Constants.DefaultEmptyAnswer;
@@ -135,10 +145,19 @@ namespace PostgreSQL.Embedding.Llm.Core
                 if (answer.IndexOf(Common.Constants.DefaultEmptyAnswer) != -1)
                     return $"<KEEP_FORMAT>{Common.Constants.DefaultEmptyAnswer}</KEEP_FORMAT>";
 
+                // 匹配引用信息，对引用信息的索引进行重排，并收集位置信息
+                var reorderResult = ReorderReferences(citations, answer);
 
-                // 匹配引用信息，对引用信息的索引进行重排
-                var newAnswer = ReorderReferences(citations, answer);
-                return $"<KEEP_FORMAT>{newAnswer}</KEEP_FORMAT>";
+                // 通过 EventBus 发送 CitationsEvent
+                if (_agentExecutionContext.HasEventBus && reorderResult.CitationItems.Any())
+                {
+                    await _agentExecutionContext.PublishEventAsync(new CitationsEvent
+                    {
+                        Citations = reorderResult.CitationItems
+                    });
+                }
+
+                return $"<KEEP_FORMAT>{reorderResult.FormattedAnswer}</KEEP_FORMAT>";
             }
 
             return Common.Constants.DefaultEmptyAnswer;
@@ -406,12 +425,20 @@ namespace PostgreSQL.Embedding.Llm.Core
 
 
         /// <summary>
-        /// 重新为引用项编号
+        /// Result of reordering references with position information
         /// </summary>
-        /// <param name="text"></param>
-        /// <returns></returns>
-        private string ReorderReferences(List<LlmCitationModel> originCitations, string generatedAnswer)
+        private class ReorderReferencesResult
         {
+            public string FormattedAnswer { get; set; } = "";
+            public List<CitationItem> CitationItems { get; set; } = new();
+        }
+
+        /// <summary>
+        /// 重新为引用项编号，并收集位置信息
+        /// </summary>
+        private ReorderReferencesResult ReorderReferences(List<LlmCitationModel> originCitations, string generatedAnswer)
+        {
+            var result = new ReorderReferencesResult();
             var markdownCitations = new HashSet<string>();
 
             var matches = _regexCitations.Matches(generatedAnswer);
@@ -419,6 +446,8 @@ namespace PostgreSQL.Embedding.Llm.Core
             var referenceOrder = new List<int>();
             var usedReferences = new HashSet<int>();
 
+            // First pass: collect all positions for each reference
+            var citationPositions = new Dictionary<int, List<CitationPosition>>();
             foreach (Match match in matches)
             {
                 var referenceNumber = int.Parse(match.Groups[1].Value);
@@ -426,15 +455,25 @@ namespace PostgreSQL.Embedding.Llm.Core
 
                 if (!referenceOrder.Contains(referenceNumber))
                     referenceOrder.Add(referenceNumber);
+
+                if (!citationPositions.ContainsKey(referenceNumber))
+                    citationPositions[referenceNumber] = new List<CitationPosition>();
+
+                citationPositions[referenceNumber].Add(new CitationPosition
+                {
+                    StartIndex = match.Index,
+                    EndIndex = match.Index + match.Length
+                });
             }
 
+            // Build reference mapping (old index -> new index)
             var referenceMapping = new Dictionary<int, int>();
             for (int i = 0; i < referenceOrder.Count; i++)
             {
                 referenceMapping[referenceOrder[i]] = i + 1;
             }
 
-            string result = _regexCitations.Replace(generatedAnswer, match =>
+            string processedAnswer = _regexCitations.Replace(generatedAnswer, match =>
             {
                 var oldNumber = int.Parse(match.Groups[1].Value);
                 var newNumber = referenceMapping[oldNumber];
@@ -443,18 +482,38 @@ namespace PostgreSQL.Embedding.Llm.Core
                 return $"<sup>[{newNumber}]</sup>";
             });
 
-            result = result.Replace("^", "")
+            processedAnswer = processedAnswer.Replace("^", "")
                 .Replace("（<sup>", "<sup>")
                 .Replace("(<sup>", "<sup>")
                 .Replace("</sup>）", "</sup>")
                 .Replace("</sup>)", "</sup>");
 
             var stringBuilder = new StringBuilder();
-            stringBuilder.AppendLine(result);
+            stringBuilder.AppendLine(processedAnswer);
             stringBuilder.AppendLine();
             stringBuilder.AppendLine($"<CITATIONS>{string.Join("\r\n", markdownCitations)}</CITATIONS>");
 
-            return stringBuilder.ToString();
+            result.FormattedAnswer = stringBuilder.ToString();
+
+            // Build citation items with positions
+            foreach (var oldNumber in referenceOrder)
+            {
+                var newNumber = referenceMapping[oldNumber];
+                var citation = originCitations.First(x => x.Index == oldNumber);
+
+                result.CitationItems.Add(new CitationItem
+                {
+                    Id = newNumber.ToString(),
+                    Positions = citationPositions[oldNumber].ToList(),
+                    Title = citation.FileName,
+                    Url = citation.Url,
+                    Text = citation.Text,
+                    Relevance = citation.Relevance,
+                    SourceType = "document"
+                });
+            }
+
+            return result;
         }
 
         private async Task EmitTracesAsync(StepTrace stepTrace, CancellationToken cancellationToken = default)
