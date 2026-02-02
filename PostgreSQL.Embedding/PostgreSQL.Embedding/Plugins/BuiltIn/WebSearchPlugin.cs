@@ -34,7 +34,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         public async Task<string> RunAsync(
             Kernel kernel,
             [Description("搜索关键词或问题")] string keyword,
-            [Description("搜索引擎名称，可选值：Bing、Brave、JinaAI、BoCha、SerpApi、DuckDuckGo，默认为 Brave")] string searchEngine = "Brave",
+            [Description("搜索引擎名称，可选值：Bing、Brave、JinaAI、BoCha、SerpApi、DuckDuckGo，默认为 Brave")] string searchEngine = "Bing",
             [Description("要排除的域名，使用英文逗号分隔，如：zhihu.com,baidu.com")] string filterDomain = "",
             [Description("是否在 Artifacts 中展示搜索结果列表，默认为 false")] bool showSearchResult = false,
             [Description("是否直接生成答案（启用 RAG 模式），默认为 false")] bool onlyReturnAnswer = false
@@ -70,7 +70,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
             return searchResult;
         }
 
-        private ISearchEngine GetSearchEngine(IServiceProvider serviceProvider, string searchEngine = "Brave")
+        private ISearchEngine GetSearchEngine(IServiceProvider serviceProvider, string searchEngine = "Bing")
         {
             switch (searchEngine)
             {
@@ -87,7 +87,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
                 case "DuckDuckGo":
                     return serviceProvider.GetRequiredService<DuckDuckGoSearchPlugin>() as ISearchEngine;
                 default:
-                    return serviceProvider.GetRequiredService<BraveSearchPlugin>() as ISearchEngine;
+                    return serviceProvider.GetRequiredService<BingSearchPlugin>() as ISearchEngine;
             }
         }
 

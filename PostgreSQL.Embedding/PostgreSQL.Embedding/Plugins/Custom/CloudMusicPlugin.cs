@@ -13,7 +13,7 @@ using System.Text.Encodings.Web;
 
 namespace PostgreSQL.Embedding.Plugins.Custom
 {
-    [KernelPlugin(Description = "网易云音乐插件")]
+    [KernelPlugin(Description = "网易云音乐插件。提供歌曲搜索和在线播放功能，可根据歌手名和歌曲名搜索并返回歌曲信息。", Version = "1.1")]
     public class CloudMusicPlugin : BasePlugin
     {
         private const string SEARCH_URL = "http://music.163.com/api/search/get/web?csrf_token=hlpretag=&hlposttag=&s={0}&type=1&offset=0&total=true&limit=2";
@@ -27,8 +27,10 @@ namespace PostgreSQL.Embedding.Plugins.Custom
         }
 
         [KernelFunction]
-        [Description("搜素歌曲")]
-        public async Task<string> SearchMusicAsync([Description("艺术家名称")] string artistName = "", [Description("歌曲名称")] string songName = "")
+        [Description("搜索网易云音乐歌曲。可通过歌手名称、歌曲名称或两者组合进行搜索，返回匹配的歌曲信息（ID、名称、艺术家、专辑等）。")]
+        public async Task<string> SearchMusicAsync(
+            [Description("歌手名称（可选）")] string artistName = "",
+            [Description("歌曲名称（可选，优先使用）")] string songName = "")
         {
             var handler = new HttpClientHandler() { AllowAutoRedirect = false, AutomaticDecompression = DecompressionMethods.GZip };
             using var httpClient = new HttpClient(handler);
@@ -43,8 +45,11 @@ namespace PostgreSQL.Embedding.Plugins.Custom
         }
 
         [KernelFunction]
-        [Description("播放歌曲")]
-        public async Task<string> PlayMusicAsync([Description("歌曲Id")] string songId, [Description("艺术家名称")] string artistName,[Description("歌曲名称")] string songName)
+        [Description("播放网易云音乐歌曲。下载并通过系统默认播放器播放音乐文件。")]
+        public async Task<string> PlayMusicAsync(
+            [Description("网易云音乐歌曲 ID")] string songId,
+            [Description("歌手名称")] string artistName,
+            [Description("歌曲名称")] string songName)
         {
             var handler = new HttpClientHandler() { AllowAutoRedirect = false, AutomaticDecompression = DecompressionMethods.GZip };
             using var httpClient = new HttpClient(handler);

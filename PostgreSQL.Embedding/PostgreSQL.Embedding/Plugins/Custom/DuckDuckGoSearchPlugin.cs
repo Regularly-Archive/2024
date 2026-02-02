@@ -11,7 +11,7 @@ using System.Text.Json;
 
 namespace PostgreSQL.Embedding.Plugins.Custom
 {
-    [KernelPlugin(Description = "DuckDuckGo 搜索插件")]
+    [KernelPlugin(Description = "DuckDuckGo 搜索引擎。隐私保护的网页搜索服务，提供 Instant Answer API 和 HTML 搜索两种方式。结果会通过 Artifacts 事件展示。", Version = "1.1")]
     public class DuckDuckGoSearchPlugin : BasePlugin, ISearchEngine
     {
         // DuckDuckGo HTML results have multiple classes: "result results_links results_links_deep web-result"
@@ -34,17 +34,20 @@ namespace PostgreSQL.Embedding.Plugins.Custom
         }
 
         [KernelFunction]
-        [Description("使用关键词进行 DuckDuckGo 检索 (使用官方 API，稳定性更高)")]
-        public async Task<SearchResult> SearchAsync([Description("关键词")] string keyword, int limit = 10, string filterDomain = "")
+        [Description("使用 DuckDuckGo Instant Answer API 搜索关键词，返回搜索结果（稳定性高，不易被识别为爬虫）。")]
+        public async Task<SearchResult> SearchAsync(
+            [Description("搜索关键词")] string keyword,
+            [Description("最大返回结果数量，默认为 10")] int limit = 10,
+            [Description("要搜索的特定域名或网站")] string filterDomain = "")
         {
             // 使用 DuckDuckGo Instant Answer API，不会被检测为爬虫
             return await SearchWithApiAsync(keyword, limit, filterDomain);
         }
 
         public async Task<SearchResult> SearchWithApiAsync(
-            [Description("关键词")] string keyword,
-            int limit = 10,
-            string filterDomain = "")
+            [Description("搜索关键词")] string keyword,
+            [Description("最大返回结果数量，默认为 10")] int limit = 10,
+            [Description("要搜索的特定域名或网站")] string filterDomain = "")
         {
             using var httpClient = _httpClientFactory.CreateClient();
             httpClient.Timeout = TimeSpan.FromSeconds(10);

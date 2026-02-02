@@ -7,7 +7,7 @@ using System.Text.Json.Serialization;
 
 namespace PostgreSQL.Embedding.Plugins.Custom
 {
-    [KernelPlugin(Description = "一个基于 JinaAI 的插件，支持信息检索及信息提取等功能")]
+    [KernelPlugin(Description = "JinaAI 服务插件。提供网页搜索（返回 JSON 格式结果）和网页内容提取（返回 Markdown 格式）两种能力。", Version = "1.1")]
     public sealed class JinaAIPlugin : BasePlugin, ISearchEngine
     {
         private readonly IHttpClientFactory _httpClientFactory;
@@ -18,8 +18,11 @@ namespace PostgreSQL.Embedding.Plugins.Custom
         }
 
         [KernelFunction]
-        [Description("一个由 JinaAI 驱动的搜索接口，返回内容格式为 JSON。")]
-        public async Task<SearchResult> SearchAsync([Description("查询关键词")] string keyword, int limit = 30, string filterDomain = "")
+        [Description("使用 JinaAI 搜索接口查询关键词，返回 JSON 格式的搜索结果（标题、URL、摘要）。")]
+        public async Task<SearchResult> SearchAsync(
+            [Description("搜索关键词")] string keyword,
+            [Description("最大返回结果数量，默认为 30")] int limit = 30,
+            [Description("要搜索的特定域名或网站")] string filterDomain = "")
         {
             using var httpClient = _httpClientFactory.CreateClient();
             httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
@@ -38,8 +41,8 @@ namespace PostgreSQL.Embedding.Plugins.Custom
         }
 
         [KernelFunction]
-        [Description("一个由 JinaAI 驱动的信息提取接口，可以返回指定网页的内容，返回格式为 Markdown。")]
-        public async Task<string> ExtractAsync([Description("网址")] string url)
+        [Description("使用 JinaAI 提取指定网页的全文内容，返回 Markdown 格式。可用于获取搜索结果页面的详细内容。")]
+        public async Task<string> ExtractAsync([Description("要提取内容的网页 URL")] string url)
         {
             using var httpClient = _httpClientFactory.CreateClient();
             return await httpClient.GetStringAsync($"https://r.jina.ai/{url}");

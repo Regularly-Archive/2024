@@ -8,7 +8,7 @@ using System.Net;
 
 namespace PostgreSQL.Embedding.Plugins.Custom
 {
-    [KernelPlugin(Description = "Brave 搜索插件")]
+    [KernelPlugin(Description = "Brave 搜索引擎。隐私优先的网页搜索服务，通过关键词搜索返回结果列表，支持分页和域名过滤。", Version = "1.1")]
     public class BraveSearchPlugin : BasePlugin, ISearchEngine
     {
         private const string SELECTOR_RESULTS = "#results";
@@ -27,8 +27,11 @@ namespace PostgreSQL.Embedding.Plugins.Custom
         }
 
         [KernelFunction]
-        [Description("使用关键词进行检索")]
-        public async Task<SearchResult> SearchAsync([Description("关键词")] string keyword, int limit = 30, string filterDomain = "")
+        [Description("使用 Brave 搜索引擎搜索关键词，返回网页结果列表（标题、URL、摘要）。支持指定返回数量限制和域名筛选（使用 site:xxx 语法）。")]
+        public async Task<SearchResult> SearchAsync(
+            [Description("搜索关键词")] string keyword,
+            [Description("最大返回结果数量，默认为 30")] int limit = 30,
+            [Description("要搜索的特定域名或网站，如：zhihu.com，表示只搜索该站点的内容")] string filterDomain = "")
         {
             using var httpClient = _httpClientFactory.CreateClient();
             httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0");

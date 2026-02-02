@@ -7,7 +7,7 @@ using ThirdParty.Json.LitJson;
 
 namespace PostgreSQL.Embedding.Plugins.Custom
 {
-    [KernelPlugin(Description = "中央气象台天气预报接口")]
+    [KernelPlugin(Description = "中央气象台天气预报插件。提供中国各省市地区的天气预报查询功能，返回详细的天气信息（温度、湿度、风力、降水等）。", Version = "1.1")]
     public class NMCWeatherPlugin : BasePlugin
     {
         private readonly Dictionary<string, string> _provincesMap = new Dictionary<string, string>()
@@ -56,7 +56,7 @@ namespace PostgreSQL.Embedding.Plugins.Custom
         }
 
         [KernelFunction]
-        [Description("获取当前所在城市天气信息")]
+        [Description("获取当前所在位置的天气信息。通过 IP 定位获取当前位置，返回实时天气数据。")]
         public async Task<string> GetCurrentWeather()
         {
             using (var httpClient = _httpClientFactory.CreateClient())
@@ -69,8 +69,10 @@ namespace PostgreSQL.Embedding.Plugins.Custom
         }
 
         [KernelFunction]
-        [Description("获取指定城市城市天气信息")]
-        public async Task<string> GetWeather([Description("省份")] string provinceName, [Description("城市")] string cityName)
+        [Description("获取指定城市的天气预报。输入省份和城市名称，返回该地区的天气信息。")]
+        public async Task<string> GetWeather(
+            [Description("省份名称，如：浙江省、广东省")] string provinceName,
+            [Description("城市名称，如：杭州市、广州市")] string cityName)
         {
             var provinceCode = _provincesMap.FirstOrDefault(x => x.Value.IndexOf(provinceName) != -1).Key;
             if (string.IsNullOrEmpty(provinceCode)) return "没有找到该省份信息";
