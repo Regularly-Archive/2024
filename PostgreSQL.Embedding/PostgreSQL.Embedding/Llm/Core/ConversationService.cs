@@ -1,4 +1,6 @@
-﻿using PostgreSQL.Embedding.Domain.Entities;
+﻿using System.Linq;
+using PostgreSQL.Embedding.Common.Streaming;
+using PostgreSQL.Embedding.Domain.Entities;
 using PostgreSQL.Embedding.Domain.Models;
 using PostgreSQL.Embedding.Infrastructure.DataAccess;
 using PostgreSQL.Embedding.Llm.Abstractions;
@@ -13,14 +15,14 @@ namespace PostgreSQL.Embedding.Llm.Core
         private readonly IRepository<LlmApp> _llmAppRepository;
         private readonly IChatHistoriesService _chatHistoryService;
         private readonly ILogger<ConversationService> _logger;
+
         public ConversationService(
             IServiceProvider serviceProvider,
             IRepository<LlmApp> llmAppRepository,
             IKernelService kernelService,
             IMemoryService memoryService,
             IChatHistoriesService chatHistoryService,
-            ILogger<ConversationService> logger
-            )
+            ILogger<ConversationService> logger)
         {
             _kernelService = kernelService;
             _memoryService = memoryService;
@@ -41,23 +43,37 @@ namespace PostgreSQL.Embedding.Llm.Core
 
                 var genericConversationService = new GenericConversationService(kernel, app, _serviceProvider, _chatHistoryService, HttpContext);
                 await genericConversationService.InvokeAsync(model, input, cancellationToken);
-
-                //switch (app.AppType)
-                //{
-                //    case (int)LlmAppType.Chat:
-                //        var genericConversationService = new GenericConversationService(kernel, app, _serviceProvider, _chatHistoryService,HttpContext);
-                //        await genericConversationService.InvokeAsync(model, input, cancellationToken);
-                //        break;
-                //    case (int)LlmAppType.Knowledge:
-                //        var ragConversationService = new RAGConversationService(kernel, app, _serviceProvider, _memoryService, _chatHistoryService, HttpContext);
-                //        await ragConversationService.InvokeAsync(model, input, cancellationToken);
-                //        break;
-                //}
             }
             catch (OperationCanceledException)
             {
                 _logger.LogWarning("The conversation is canceled.");
             }
+        }
+
+        public IAsyncEnumerable<ISseEvent> InvokeStreamingV2Async(
+            ConversationRequestModel model,
+            long appId,
+            string input,
+            string? conversationId = null,
+            CancellationToken cancellationToken = default)
+        {
+            // Get app and kernel synchronously for streaming response
+            var app = _llmAppRepository.GetAsync(appId).GetAwaiter().GetResult();
+            if (app == null)
+            {
+                return Array.Empty<ISseEvent>().ToAsyncEnumerable();
+            }
+
+            var kernel = _kernelService.GetKernel(app).GetAwaiter().GetResult();
+
+            // Create AgenticConversationService directly (not via DI)
+            var agenticConversationService = new AgenticConversationService(
+                kernel,
+                app,
+                _serviceProvider,
+                _chatHistoryService);
+
+            return agenticConversationService.InvokeAsync(model, input, conversationId, cancellationToken);
         }
     }
 }

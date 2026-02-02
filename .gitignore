@@ -121,3 +121,4 @@ code-runner/backend/sandbox/__pycache__/
 code-runner/backend/sandbox/sdks/typescript/node_modules
 code-runner/backend/sandbox/sdks/typescript/dist
 PostgreSQL.Embedding/.claude/
+PostgreSQL.Embedding/nul

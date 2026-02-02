@@ -8,6 +8,7 @@ using PostgreSQL.Embedding.Llm.Services;
 using PostgreSQL.Embedding.Plugins.BuiltIn;
 using System.Linq.Expressions;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace PostgreSQL.Embedding.Llm.Planners
 {
@@ -17,6 +18,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
         private readonly ILogger<TaskPlanner> _logger;
         private readonly CallablePromptTemplate _promptTemplate;
         private readonly PromptTemplateService _promptTemplateService = new PromptTemplateService();
+        private static readonly Regex _jsonBlockRegex = new Regex(@"```json\s*([\s\S]*?)\s*```", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         public TaskPlanner(Kernel kernel)
         {
             _kernel = kernel;
@@ -43,7 +45,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
 
             try
             {
-                functionResult = functionResult.Replace("```json", "").Replace("```", "");
+                functionResult = ExtractJson(functionResult);
                 functionResult = PreprocessJsonData(functionResult);
                 _logger.LogInformation($"Generated SubTasks: {functionResult}");
                 var planResult = JsonConvert.DeserializeObject<PlanResult>(functionResult);
@@ -52,7 +54,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Unable to create tasks for query '{query}'");
-                return new PlanResult() {  };
+                return new PlanResult() { };
             }
         }
 
@@ -84,7 +86,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Unable to create tasks for query '{query}'");
-                return new PlanResult() { }; 
+                return new PlanResult() { };
             }
         }
 
@@ -140,6 +142,12 @@ namespace PostgreSQL.Embedding.Llm.Planners
             }
 
             return jsonObj.ToString(Formatting.Indented);
+        }
+
+        public static string ExtractJson(string text)
+        {
+            Match match = _jsonBlockRegex.Match(text);
+            return match.Success ? match.Groups[1].Value.Trim() : null;
         }
     }
 }

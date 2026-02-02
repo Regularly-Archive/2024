@@ -8,7 +8,7 @@ using System.ComponentModel;
 
 namespace PostgreSQL.Embedding.Plugins.BuiltIn
 {
-    [KernelPlugin(Description = "对话历史检索插件，支持获取当前对话内容或者摘要")]
+    [KernelPlugin(Description = "检索和管理对话历史记录，支持获取历史消息列表和基于关键词的搜索。用于在上下文中引用之前的对话内容。", Version = "1.1")]
     public class ConversationHistoriesPlugin : BasePlugin
     {
         private readonly IServiceProvider _serviceProvider;
@@ -19,10 +19,10 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         }
 
         [KernelFunction]
-        [Description("获取指定应用及会话的全部历史聊天信息")]
+        [Description("获取指定应用和会话的历史聊天消息列表，返回最近 N 条消息（默认为 15 条）")]
         public async Task<string> GetHistoricalMessages(
-            [Description("当前应用ID")] long appId,
-            [Description("当前会话ID")] string conversationId,
+            [Description("应用 ID")] long appId,
+            [Description("会话 ID")] string conversationId,
             Kernel kernel
         )
         {
@@ -35,11 +35,12 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         }
 
         [KernelFunction]
-        [Description("通过关键字检索指定应用及会话的历史聊天信息")]
+        [Description("在指定应用和会话的历史消息中搜索包含关键词的消息，返回匹配的消息内容")]
         public async Task<string> SearchHistoricalMessages(
-            [Description("当前应用ID")] long appId,
-            [Description("当前会话ID")] string conversationId,
-            [Description("关键词")] string query, Kernel kernel
+            [Description("应用 ID")] long appId,
+            [Description("会话 ID")] string conversationId,
+            [Description("搜索关键词")] string query,
+            Kernel kernel
         )
         {
             using var serviceProviderScope = _serviceProvider.CreateScope();

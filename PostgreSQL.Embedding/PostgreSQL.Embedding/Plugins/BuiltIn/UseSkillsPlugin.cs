@@ -10,7 +10,7 @@ using YamlDotNet.Serialization.NamingConventions;
 
 namespace PostgreSQL.Embedding.Plugins.BuiltIn;
 
-[KernelPlugin(Description = "A plugin that supports dynamically loading and invoking Skills, including loading and reading resources as well as executing scripts", Version = "1.2")]
+[KernelPlugin(Description = "动态加载和管理 Skills（技能包）的插件。支持列出可用的技能、读取技能清单、列出技能文件、读取文件内容以及执行脚本。", Version = "1.3")]
 public class UseSkillsPlugin : BasePlugin
 {
     public UseSkillsPlugin(IServiceProvider serviceProvider) : base(serviceProvider)
@@ -19,9 +19,9 @@ public class UseSkillsPlugin : BasePlugin
     }
 
     [KernelFunction]
-    [Description("List all available skills under the given skills root folder")]
+    [Description("列出指定目录下所有可用的 Skills。每个 Skill 必须包含 SKILL.md 清单文件。")]
     public IEnumerable<LlmSkillMetadataModel> ListSkills(
-        [Description("Absolute path to the skills root folder, e.g. D:\\skills")]string skillsRootFolder)
+        [Description("Skills 根目录的绝对路径，如：D:\\skills")]string skillsRootFolder)
     {
         if (!Directory.Exists(skillsRootFolder))
             return Enumerable.Empty<LlmSkillMetadataModel>();
@@ -45,9 +45,9 @@ public class UseSkillsPlugin : BasePlugin
     }
 
     [KernelFunction]
-    [Description("Read the SKILL.md manifest file of a skill")]
+    [Description("读取指定 Skill 的 SKILL.md 清单文件内容，包含技能的名称、描述等信息")]
     public string GetSkillManifest(
-        [Description("Absolute path to SKILL.md file, obtained from ListSkills")] string skillManifestPath)
+        [Description("SKILL.md 文件的绝对路径，可从 ListSkills 获取")] string skillManifestPath)
     {
         if (!skillManifestPath.EndsWith("SKILL.md")) skillManifestPath = Path.Combine(skillManifestPath, "SKILL.md");
 
@@ -58,9 +58,9 @@ public class UseSkillsPlugin : BasePlugin
     }
 
     [KernelFunction]
-    [Description("List files inside a skill directory, grouped by type")]
+    [Description("列出 Skill 目录下的所有文件，按类型分组（scripts 脚本、references 引用、assets 资源）")]
     public SkillFileIndex ListSkillFiles(
-        [Description("Absolute path to SKILL.md file")] string skillManifestPath)
+        [Description("SKILL.md 文件的绝对路径")] string skillManifestPath)
     {
         if (string.IsNullOrWhiteSpace(skillManifestPath))
             throw new ArgumentException("The path for skill manifest file SKILL.md is required.", nameof(skillManifestPath));
@@ -81,10 +81,10 @@ public class UseSkillsPlugin : BasePlugin
     }
    
     [KernelFunction]
-    [Description("Read a text file inside a skill directory")]
+    [Description("读取 Skill 目录下的文本文件内容")]
     public string ReadSkillFile(
-        [Description("Absolute path to SKILL.md file")] string skillManifestPath, 
-        [Description("Relative file path selected from ListSkillFiles")]string fileRelativePath)
+        [Description("SKILL.md 文件的绝对路径")] string skillManifestPath,
+        [Description("文件相对路径，从 ListSkillFiles 获取")]string fileRelativePath)
     {
         if (!skillManifestPath.EndsWith("SKILL.md")) skillManifestPath = Path.Combine(skillManifestPath, "SKILL.md");
 
@@ -93,11 +93,11 @@ public class UseSkillsPlugin : BasePlugin
     }
 
     [KernelFunction]
-    [Description("Run a script under the scripts folder of a skill")]
+    [Description("执行 Skill 目录下 scripts 文件夹中的脚本文件。支持 PowerShell、Python、Bash 脚本。")]
     public ScriptExecutionResult RunSkillScript(
-        [Description("Absolute path to SKILL.md file")] string skillManifestPath,
-        [Description("Script path relative to skill root, must be under scripts/, selected from ListSkillFiles")] string scriptRelativePath,
-        [Description("Command line arguments WITHOUT script path, e.g. --input data.json")] string arguments = "")
+        [Description("SKILL.md 文件的绝对路径")] string skillManifestPath,
+        [Description("脚本文件相对路径，必须在 scripts/ 目录下，从 ListSkillFiles 获取")] string scriptRelativePath,
+        [Description("命令行参数（不含脚本路径），例如：--input data.json")] string arguments = "")
     {
         if (!skillManifestPath.EndsWith("SKILL.md")) skillManifestPath = Path.Combine(skillManifestPath, "SKILL.md");
 

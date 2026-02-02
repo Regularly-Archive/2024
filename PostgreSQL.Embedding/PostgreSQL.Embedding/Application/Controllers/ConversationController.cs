@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using PostgreSQL.Embedding.Common.Streaming;
 using PostgreSQL.Embedding.Domain.Entities;
 using PostgreSQL.Embedding.Domain.Models;
 using PostgreSQL.Embedding.Domain.Models.WebApi;
@@ -12,7 +13,10 @@ namespace PostgreSQL.Embedding.Application.Controllers.Controllers
     {
         private readonly IConversationService _conversationService;
         private readonly IChatHistoriesService _chatHistoryService;
-        public ConversationController(IConversationService conversationService, IChatHistoriesService chatHistoryService)
+
+        public ConversationController(
+            IConversationService conversationService,
+            IChatHistoriesService chatHistoryService)
         {
             _conversationService = conversationService;
             _chatHistoryService = chatHistoryService;
@@ -22,6 +26,24 @@ namespace PostgreSQL.Embedding.Application.Controllers.Controllers
         public async Task ChatAsync(ConversationRequestModel model, long appId, CancellationToken cancellationToken)
         {
             await _conversationService.InvokeAsync(model, appId, HttpContext, cancellationToken);
+        }
+
+        /// <summary>
+        /// V2 Chat endpoint with Anthropic-compatible SSE streaming format.
+        /// Returns IAsyncEnumerable{ISseEvent} for better client interoperability.
+        /// </summary>
+        [HttpPost("v2/{appId}")]
+        public IActionResult ChatV2Async(ConversationRequestModel model, long appId, CancellationToken cancellationToken)
+        {
+            var input = model.Messages.LastOrDefault()?.content;
+            var events = _conversationService.InvokeStreamingV2Async(
+                model,
+                appId,
+                input,
+                model.ConversationId,
+                cancellationToken);
+
+            return new SseResult(events);
         }
 
         [HttpGet("{appId}/histories/{conversationId}")]

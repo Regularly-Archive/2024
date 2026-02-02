@@ -10,7 +10,7 @@ using System.ComponentModel;
 
 namespace PostgreSQL.Embedding.Plugins.BuiltIn;
 
-[KernelPlugin(Description = "一个可以运行 C#、Python、JavaScript 代码的插件")]
+[KernelPlugin(Description = "在沙箱环境中运行多种编程语言的代码（Python、JavaScript、C#、Java）。执行结果和代码会通过 Artifacts 事件返回。", Version = "1.1")]
 public class CodeInterpreterPlugin : BasePlugin
 {
     private ILogger<CodeInterpreterPlugin> _logger;
@@ -28,10 +28,10 @@ public class CodeInterpreterPlugin : BasePlugin
     }
 
     [KernelFunction]
-    [Description("运行 Python 代码并输出结果")]
+    [Description("在沙箱中执行 Python 3 代码并返回执行结果")]
     public async Task<string> RunPython(
-        [Description("脚本内容")] string code, 
-        [Description("一个或多个依赖项, 使用英文逗号隔开，例如：pandas,numpy")] string dependencies = ""
+        [Description("要执行的 Python 代码")] string code,
+        [Description("Python 依赖包列表，使用英文逗号分隔，如：pandas,numpy")] string dependencies = ""
     )
     {
         var response = await RunCodeAsync("python3", code, dependencies.Split(','));
@@ -40,10 +40,10 @@ public class CodeInterpreterPlugin : BasePlugin
     }
 
     [KernelFunction()]
-    [Description("运行 JavaScript 代码并输出结果")]
+    [Description("在沙箱中执行 JavaScript 代码并返回执行结果")]
     public async Task<string> RunJavaScript(
-        [Description("脚本内容")] string code, 
-        [Description("一个或多个依赖项, 使用英文逗号隔开，例如：axios,lodash")] string dependencies = ""
+        [Description("要执行的 JavaScript 代码")] string code,
+        [Description("NPM 依赖包列表，使用英文逗号分隔，如：axios,lodash")] string dependencies = ""
     )
     {
         var response = await RunCodeAsync("javascript", code, dependencies.Split(',', StringSplitOptions.TrimEntries));
@@ -52,11 +52,11 @@ public class CodeInterpreterPlugin : BasePlugin
     }
 
     [KernelFunction()]
-    [Description("运行 C# 代码并输出结果, 你可以使用 csharp、csharp-mono、csharp-sfa 三种后端，对于前者，请使用顶级语句；对于后者，请使用常规语法")]
+    [Description("在沙箱中执行 C# 代码并返回执行结果。支持三种后端：csharp（顶级语句）、csharp-mono、csharp-sfa（标准 F# 语法）")]
     public async Task<string> RunCSharp(
-        [Description("脚本内容")] string code, 
-        [Description("一个或多个依赖项, 使用英文逗号隔开，例如：Newtonsoft.Json")] string dependencies = "", 
-        [Description("语言，可选值为：csharp、csharp-mono、csharp-sfa")] string language = "csharp-sfa")
+        [Description("要执行的 C# 代码")] string code,
+        [Description("NuGet 包依赖列表，使用英文逗号分隔，如：Newtonsoft.Json")] string dependencies = "",
+        [Description("C# 运行时后端，可选值：csharp、csharp-mono、csharp-sfa，默认为 csharp-sfa")] string language = "csharp-sfa")
     {
         var response = await RunCodeAsync("csharp", code, dependencies.Split(',', StringSplitOptions.TrimEntries));
         await SendArtifacts(code, response.Output, response.Language, response.ContentType);
@@ -64,10 +64,11 @@ public class CodeInterpreterPlugin : BasePlugin
     }
 
     [KernelFunction()]
-    [Description("运行 Java 代码并输出结果")]
+    [Description("在沙箱中执行 Java 代码并返回执行结果")]
     public async Task<string> RunJava(
-    [Description("脚本内容")] string code,
-    [Description("一个或多个依赖项, 使用英文逗号隔开，例如：Newtonsoft.Json")] string dependencies = "")
+    [Description("要执行的 Java 代码")] string code,
+    [Description("Maven 依赖列表，使用英文逗号分隔，如：com.fasterxml.jackson.core:jackson-databind")]
+    string dependencies = "")
     {
         var response = await RunCodeAsync("java", code, dependencies.Split(',', StringSplitOptions.TrimEntries));
         await SendArtifacts(code, response.Output, response.Language, response.ContentType);
@@ -75,11 +76,11 @@ public class CodeInterpreterPlugin : BasePlugin
     }
 
     [KernelFunction()]
-    [Description("使用 Jupyter Notebook 运行代码，请正确处理 Jupyter Notebook 中中文字符的显示问题")]
+    [Description("通过 Jupyter Notebook 环境执行代码，支持 Python、C# 和 R 语言，能更好地渲染图表和富文本输出")]
     public async Task<string> RunJupyter(
-        [Description("脚本内容")] string code, 
-        [Description("依赖项, 如有多个，使用英文逗号隔开")] string dependencies = "", 
-        [Description("当前语言，可选值为：python、csharp、r")] string language = "python"
+        [Description("要执行的代码脚本")] string code,
+        [Description("依赖包列表，如有多个使用英文逗号分隔")] string dependencies = "",
+        [Description("编程语言，可选值：python、csharp、r，默认为 python")] string language = "python"
     )
     {
         var response = await RunJupyterAsync(language, code, dependencies.Split(',', StringSplitOptions.TrimEntries));

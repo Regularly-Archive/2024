@@ -11,7 +11,7 @@ using System.ComponentModel;
 
 namespace PostgreSQL.Embedding.Plugins.BuiltIn
 {
-    [KernelPlugin(Description = "一个用于数据分析及可视化的插件")]
+    [KernelPlugin(Description = "加载 JSON 数据并使用 Python 进行数据分析和可视化生成。分析结果和代码会通过 Artifacts 事件返回以便展示图表。", Version = "1.1")]
     public class DataAnalysisPlugin : BasePlugin
     {
         private readonly PromptTemplateService _promptTemplateService;
@@ -26,10 +26,10 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         }
 
         [KernelFunction]
-        [Description("加载 JSON 数据并完成数据分析与可视化")]
+        [Description("加载 JSON 格式的数据数组，根据分析任务生成 Python 代码并执行，返回数据分析结果和可视化图表")]
         public async Task<string> AnalyseFromJson(
-            [Description("输入的 JSON 数据，通常为数组形式")]string json, 
-            [Description("当前执行的数据分析任务")] string task, 
+            [Description("JSON 格式的数据数组，用于分析的数据源")]string json,
+            [Description("数据分析和可视化的任务目标，如统计、趋势分析、相关性分析等")] string task,
             Kernel kernel
         )
         {
