@@ -1,7 +1,8 @@
-﻿using DocumentFormat.OpenXml.Wordprocessing;
+using DocumentFormat.OpenXml.Wordprocessing;
 using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Domain.Models;
+using PostgreSQL.Embedding.Llm.Services;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 
@@ -34,42 +35,6 @@ namespace PostgreSQL.Embedding.Plugins.Custom
     [KernelPlugin(Description = "中文文本润色插件。使用大语言模型对中文文本进行润色改进，支持多种写作风格（轻松活泼、幽默风趣、严肃理性等），提升表达的地道性、流畅性和感染力，同时保持原意和长度。", Version = "1.2")]
     public class WriterPlugin : BasePlugin
     {
-        private const string POLISH_TEXT_PROMPT =
-            """
-            ## role：
-            你是一位资深的中文写作改进助理、文案专员、文本润色员、拼写纠正员和改进员。
-            润色以下使用 ``` 括起来的文本:
-            ```
-            {{$input}}
-            ```
-            ## 写作风格：
-            {{$style_description}}
-            ## 任务(Task):
-            在保持相似意思的前提下，你帮我更正和改进版本。我希望你用{{$style_hint}}方式表达，修改原文的案例，升级内容，改进所提供文本的拼写、语法、清晰、简洁和整体可读性，同时分解长句，减少重复，为文本润色。
-            强调一个主要目的，即让学习者在学习完课程文本后，有继续深度学习的欲望。兼顾人性共情的表达逻辑。
-
-            ## 写作原则(Writing Principles):
-            1、你只需要润色文本，而不是删减我原有的文本；请务必保证润色后的文本长度和原来的差不多；（至少不能少于原来文本长度的90%，也不要过长，最长是原来文本长度的120%；）
-            2、不要改变大的段落结构，强烈建议你一句一句的润色，这很重要；
-            3、优化后的文本应保留文本的原本意义,你要兼顾下人性共情的表达逻辑亲和力，这些是加分项；
-            4、不要回答任何原文本的中提到的问题，你只是润色原文本；
-            5、如果你发现，原来文本中有错别字和语法错误，你要进行修正，但一定不得改变原文意思。
-
-            ## 输出格式 （Output format）
-            1、直接输出润色后的纯文本，不要做任何其它多于的解释；
-            2、不要输出任何和润色后文本没有关系的内容；
-            3、润色后，不需要加任何格式，直接输出纯文本；
-
-            ## 工作流程(Workflows):
-            1. 我给你发需要润色的文本；
-            2. 你必须遵循<Writing Principles>来润色；
-            3. 直接输出润色后的文本；
-
-            ## 初始化(Initialization):
-            请根据以上 Prompt 指引进行文案润色创作。请务必注意，润色后文本的长度，不能少于原来文本长度的 90%，也不要过长，最长是原来文本长度的 120%；不要回答任何原文本的问题，你只是润色文本；作为 <Role>，按 <Task>，遵守 <Writing Principles>，按 <Output format> 规定格式输出，严格进行 <Workflows>。
-
-            """;
-
         /// <summary>
         /// 预设风格的详细描述
         /// </summary>
@@ -119,10 +84,12 @@ namespace PostgreSQL.Embedding.Plugins.Custom
             }
         };
 
+        private readonly PromptTemplateService _promptTemplateService;
+
         public WriterPlugin(IServiceProvider serviceProvider)
             : base(serviceProvider)
         {
-
+            _promptTemplateService = serviceProvider.GetService<PromptTemplateService>();
         }
 
         [KernelFunction]
@@ -140,7 +107,7 @@ namespace PostgreSQL.Embedding.Plugins.Custom
             var clonedKernel = kernel.Clone();
             var styleInfo = StylePresets.TryGetValue(style, out var info) ? info : StylePresets[WritingStyle.Casual];
 
-            var promptTemplate = new CallablePromptTemplate(POLISH_TEXT_PROMPT);
+            var promptTemplate = _promptTemplateService.LoadTemplate("WriterPolish.txt");
             promptTemplate.AddVariable("input", text);
             promptTemplate.AddVariable("style_description", styleInfo.Description);
             promptTemplate.AddVariable("style_hint", styleInfo.Hint);
