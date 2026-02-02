@@ -1,4 +1,4 @@
-﻿using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Llm.Abstractions;
 using PostgreSQL.Embedding.Llm.Core;
@@ -19,8 +19,8 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         [KernelFunction]
         [Description("检索信息并生成答案")]
         private async Task<string> RetrieveAndGenerateAnswerAsync(
-            [Description("应用ID")] long appId, 
-            [Description("会话ID")] string conversationId, 
+            [Description("应用ID")] long appId,
+            [Description("会话ID")] string conversationId,
             [Description("用户输入")] string question,
             [Description("允许联网搜索")] bool enableWebSearch,
             Kernel kernel

@@ -1,5 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Threading.Channels;
+using PostgreSQL.Embedding.Common.Streaming;
 
 namespace PostgreSQL.Embedding.Llm.Planners
 {
@@ -7,6 +9,36 @@ namespace PostgreSQL.Embedding.Llm.Planners
     {
         private readonly AsyncLocal<ImmutableDictionary<string, object>> _asyncLocalContext = new AsyncLocal<ImmutableDictionary<string, object>>();
         private readonly ConcurrentDictionary<string, object> _globalContext = new ConcurrentDictionary<string, object>();
+
+        /// <summary>
+        /// EventWriter stored in AsyncLocal to ensure isolation per async flow
+        /// </summary>
+        private readonly AsyncLocal<ChannelWriter<ISseEvent>?> _eventWriter = new AsyncLocal<ChannelWriter<ISseEvent>?>();
+
+        /// <summary>
+        /// Initialize the EventBus with a ChannelWriter
+        /// </summary>
+        public void InitializeEventBus(ChannelWriter<ISseEvent> writer)
+        {
+            _eventWriter.Value = writer;
+        }
+
+        /// <summary>
+        /// Publish an event through the EventBus
+        /// </summary>
+        public async Task PublishEventAsync(ISseEvent evt, CancellationToken ct = default)
+        {
+            var writer = _eventWriter.Value;
+            if (writer != null)
+            {
+                await writer.WriteAsync(evt, ct);
+            }
+        }
+
+        /// <summary>
+        /// Check if EventBus is available
+        /// </summary>
+        public bool HasEventBus => _eventWriter.Value != null;
 
         public void SetData(string key, object value)
         {
