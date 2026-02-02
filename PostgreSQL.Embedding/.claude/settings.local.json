@@ -1,7 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dotnet build:*)"
+      "Bash(dotnet build:*)",
+      "Bash(dotnet test:*)",
+      "Bash(for:*)",
+      "Bash(do sed:*)",
+      "Bash(done:*)",
+      "Bash(del:*)",
+      "Bash(cmd:*)",
+      "Bash(dotnet clean:*)",
+      "Skill(stepsnow-write-workflow)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }

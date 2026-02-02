@@ -7,7 +7,7 @@ using System.ComponentModel;
 
 namespace PostgreSQL.Embedding.Plugins.BuiltIn
 {
-    [KernelPlugin(Description = "适用于 RAG 任务的插件", Enabled = true, Version = "1.0")]
+    [KernelPlugin(Description = "基于检索增强生成（RAG）的问答插件。从知识库中检索相关文档并生成答案，支持引用标注", Enabled = true, Version = "1.0")]
     public class RAGFlowPlugin : BasePlugin
     {
         public RAGFlowPlugin(IServiceProvider serviceProvider)
@@ -17,12 +17,12 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         }
 
         [KernelFunction]
-        [Description("检索信息并生成答案")]
+        [Description("根据用户问题检索知识库并生成答案。返回的答案中会包含引用标记（如 [1]），指向参考的文档片段。")]
         private async Task<string> RetrieveAndGenerateAnswerAsync(
-            [Description("应用ID")] long appId,
-            [Description("会话ID")] string conversationId,
-            [Description("用户输入")] string question,
-            [Description("允许联网搜索")] bool enableWebSearch,
+            [Description("应用 ID，用于定位要查询的知识库")] long appId,
+            [Description("会话 ID，用于记录对话历史")] string conversationId,
+            [Description("用户的问题")] string question,
+            [Description("是否允许联网搜索获取额外信息，默认为 false")] bool enableWebSearch,
             Kernel kernel
         )
         {

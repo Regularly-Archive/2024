@@ -6,6 +6,7 @@ using PostgreSQL.Embedding.Common.Confirguration;
 using PostgreSQL.Embedding.Llm.Abstractions;
 using PostgreSQL.Embedding.Llm.Core;
 using PostgreSQL.Embedding.Llm.Services;
+using PostgreSQL.Embedding.Plugins;
 
 namespace PostgreSQL.Embedding.Llm.Core
 {
@@ -35,6 +36,9 @@ namespace PostgreSQL.Embedding.Llm.Core
             // 注册后台服务
             services.AddSingleton<KnowledgeBaseBackgroundService>();
             services.AddHostedService<KnowledgeBaseBackgroundService>();
+
+            // 注册 Python 运行时
+            services.AddPythonRuntime(configuration);
 
             return services;
         }

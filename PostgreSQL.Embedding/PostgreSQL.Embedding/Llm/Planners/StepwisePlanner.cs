@@ -59,7 +59,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             return new StepwisePlan(systemMessage, config, logger, _kernel);
         }
 
-        public void AddVariable<T>(string key, T value)  => _config.Variables.Add(key, value);
+        public void AddVariable<T>(string key, T value) => _config.Variables.Add(key, value);
 
         private Task<string> CreateFunctionDescriptions(Kernel kernel)
         {
@@ -82,8 +82,9 @@ namespace PostgreSQL.Embedding.Llm.Planners
         private string CreateVariableDescriptions()
         {
             var stringBuilder = new StringBuilder();
-            foreach(var variable in  _config.Variables)
+            foreach (var variable in _config.Variables)
             {
+                if (variable.Value is null) continue;
                 stringBuilder.AppendLine($"{variable.Key}: {variable.Value.ToString()}");
             }
 

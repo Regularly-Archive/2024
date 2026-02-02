@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Confirguration;
 using PostgreSQL.Embedding.Common.Extensions;
+using PostgreSQL.Embedding.Utils;
 
 namespace PostgreSQL.Embedding.Plugins
 {
@@ -74,13 +75,7 @@ namespace PostgreSQL.Embedding.Plugins
             this IServiceCollection services,
             Microsoft.Extensions.Configuration.IConfiguration configuration)
         {
-            services.AddScoped(sp =>
-            {
-                var config = new PythonConfig();
-                configuration.GetSection("PythonConfig").Bind(config);
-                return config;
-            });
-
+            CSnakeExtensions.AddPythonRuntime(services, configuration);
             return services;
         }
     }

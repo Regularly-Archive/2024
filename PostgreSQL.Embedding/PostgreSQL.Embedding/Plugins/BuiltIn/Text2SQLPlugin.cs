@@ -11,7 +11,7 @@ using System.Text;
 
 namespace PostgreSQL.Embedding.Plugins.BuiltIn
 {
-    [KernelPlugin(Description = "使用自然语言查询关系型数据库的插件", Version = "v1.1")]
+    [KernelPlugin(Description = "将自然语言转换为 SQL 查询语句并在 MySQL 数据库中执行，返回 Markdown 表格格式的查询结果", Version = "1.2")]
     public class Text2SQLPlugin : BasePlugin
     {
         private IServiceProvider _serviceProvider;
@@ -19,10 +19,10 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         private PromptTemplateService _promptTemplateService;
         private ILogger<Text2SQLPlugin> _logger;
 
-        [PluginParameter(Description = "连接字符串，目前仅支持 MySQL 数据库", Required = true)]
+        [PluginParameter(Description = "MySQL 数据库连接字符串", Required = true)]
         public string ConnectionString { get; set; }
 
-        [PluginParameter(Description = "数据库名称", Required = true)]
+        [PluginParameter(Description = "要查询的数据库名称", Required = true)]
         public string Database { get; set; }
 
         public Text2SQLPlugin(IServiceProvider serviceProvider) : base(serviceProvider)
@@ -41,8 +41,8 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         }
 
         [KernelFunction]
-        [Description("根据用户的输入生成和执行 SQL 并返回 Markdown 形式的表格数据")]
-        public async Task<string> QueryAsync([Description("用户输入")] string input, Kernel kernel)
+        [Description("根据用户描述生成并执行 SQL 查询，返回 Markdown 表格形式的查询结果。同时会通过 Artifacts 事件发送原始数据表。")]
+        public async Task<string> QueryAsync([Description("用户想要查询的内容描述")] string input, Kernel kernel)
         {
             var tableDescriptor = await GetTableDescriptorsAsync(Database);
             var databaseSchema = GeneratorDatabaseSchema(tableDescriptor);

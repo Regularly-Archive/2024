@@ -14,7 +14,7 @@ using System.Text.RegularExpressions;
 
 namespace PostgreSQL.Embedding.Plugins.BuiltIn
 {
-    [KernelPlugin(Description = "网络搜索插件，支持以下搜索引擎：必应搜索，Brave 搜索, JianAI, 博查, SerpApi, DuckDuckGo")]
+    [KernelPlugin(Description = "通过网络搜索引擎获取实时信息。支持多种搜索引擎：Bing、Brave、JinaAI、博查、SerpApi、DuckDuckGo。搜索结果可通过 Artifacts 事件展示。", Version = "1.1")]
     public class WebSearchPlugin : BasePlugin
     {
         private Regex _regexCitations = new Regex(@"\[(\d+)\]");
@@ -30,14 +30,14 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         }
 
         [KernelFunction]
-        [Description("从网络中搜索信息")]
+        [Description("使用指定搜索引擎搜索关键词，返回搜索结果摘要或直接生成答案。支持结果过滤和答案生成模式。")]
         public async Task<string> RunAsync(
             Kernel kernel,
-            [Description("用户请求")] string keyword,
-            [Description("搜索引擎，可选值: Bing, Brave, JianAI, BoCha, SerpApi, DuckDuckGo")] string searchEngine = "Brave",
-            [Description("过滤域名，例如: zhihu.com")] string filterDomain = "",
-            [Description("是否向用户展示搜索结果，默认为 false ")] bool showSearchResult = false,
-            [Description("是否只需要最终答案, 默认为 false")] bool onlyReturnAnswer = false
+            [Description("搜索关键词或问题")] string keyword,
+            [Description("搜索引擎名称，可选值：Bing、Brave、JinaAI、BoCha、SerpApi、DuckDuckGo，默认为 Brave")] string searchEngine = "Brave",
+            [Description("要排除的域名，使用英文逗号分隔，如：zhihu.com,baidu.com")] string filterDomain = "",
+            [Description("是否在 Artifacts 中展示搜索结果列表，默认为 false")] bool showSearchResult = false,
+            [Description("是否直接生成答案（启用 RAG 模式），默认为 false")] bool onlyReturnAnswer = false
         )
         {
             var clonedKernel = kernel?.Clone();

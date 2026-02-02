@@ -9,7 +9,7 @@ using System.Text;
 
 namespace PostgreSQL.Embedding.Plugins.BuiltIn;
 
-[KernelPlugin(Description = "用于将智能体生成的内容发布为可访问 Artifact 的插件")]
+[KernelPlugin(Description = "将智能体生成的文件内容保存为可访问的 Artifact（静态资源），返回可在浏览器中访问的 URL。Artifact 有效期为 3 天。", Version = "1.1")]
 public class ArtifactsPlugin : BasePlugin
 {
     private readonly string _rootPath;
@@ -19,12 +19,12 @@ public class ArtifactsPlugin : BasePlugin
     }
 
     [KernelFunction]
-    [Description("Create a new text-based Artifact with the specified type, content, file name, and content type. Returns a CreateArtifactResponse representing the created Artifact.")]
+    [Description("创建文本类型的 Artifact（文件或纯文本），返回包含访问 URL 的响应对象。可用于保存生成的代码、报告等内容。")]
     public async Task<CreateArtifactResponse> CreateArtifactAsync(
-        [Description("The type of the Artifact. Optional. Defaults to 'file'. For text-based Artifacts, keep as 'file' or specify 'text'.")] string type,
-        [Description("The textual content of the Artifact. Must be a UTF-8 encoded string.")] string content,
-        [Description("The file name of the Artifact, used to identify the file in storage.")] string fileName,
-        [Description("The MIME type or content type of the Artifact, e.g., 'text/plain' for plain text content.")] string contentType,
+        [Description("Artifact 类型，可选值：file、text，默认为 file")] string type,
+        [Description("要保存的文本内容，UTF-8 编码")] string content,
+        [Description("文件名称，用于标识存储的文件，建议包含扩展名，如：report.html")] string fileName,
+        [Description("MIME 类型，如：text/plain、text/html、application/json")] string contentType,
         Kernel kernel
     )
     {
@@ -47,12 +47,12 @@ public class ArtifactsPlugin : BasePlugin
     }
 
     [KernelFunction]
-    [Description("Create a new Artifact by compressing the contents of a folder into a zip file. Returns a CreateArtifactResponse representing the created Artifact.")]
+    [Description("将指定文件夹的内容压缩为 ZIP 文件并创建为 Artifact。返回 ZIP 文件的访问 URL。")]
     public CreateArtifactResponse CreateCompressedArtifactAsync(
-        [Description("The absolute path to the folder whose contents will be compressed. Only the contents of the folder will be included, not the folder itself.")] string folderPath,
-        [Description("The desired file name of the resulting zip Artifact, e.g., 'archive.zip'.")] string fileName,
-        [Description("The type of the Artifact. Optional. Defaults to 'zip'.")] string type,
-        [Description("The MIME type or content type of the Artifact. Optional. For zip files, use 'application/zip'.")] string contentType,
+        [Description("要压缩的文件夹绝对路径，仅文件夹内容会被包含（不含文件夹本身）")] string folderPath,
+        [Description("生成的 ZIP 文件名称，如：archive.zip")] string fileName,
+        [Description("Artifact 类型，默认为 zip")] string type,
+        [Description("MIME 类型，ZIP 文件使用 application/zip")] string contentType,
         Kernel kernel
     )
     {
@@ -77,8 +77,12 @@ public class ArtifactsPlugin : BasePlugin
     }
 
     [KernelFunction]
-    [Description("读取一个 Artifact")]
-    public IEnumerable<CreateArtifactResponse> GetArtifact([Description("ArtifactId")] string artifactId, [Description("artifactName")] string artifactName, Kernel kernel)
+    [Description("查询已创建的 Artifact，返回访问 URL 列表。可用于获取之前保存的文件访问地址。")]
+    public IEnumerable<CreateArtifactResponse> GetArtifact(
+        [Description("要查询的 Artifact ID")] string artifactId,
+        [Description("Artifact 内的文件名")] string artifactName,
+        Kernel kernel
+    )
     {
         var agentExecutionContext = kernel.Services.GetService<AgentExecutionContext>();
         var runId = agentExecutionContext.GetRunId();

@@ -15,7 +15,7 @@ using System.Text.Json;
 
 namespace PostgreSQL.Embedding.Plugins.BuiltIn;
 
-[KernelPlugin(Description = "一个帮助大模型更好地使用 MCP 协议的插件，提供服务器选择、工具列举、工具调用三个能力", Version = "1.2")]
+[KernelPlugin(Description = "Model Context Protocol（MCP）客户端插件。提供 MCP 服务器管理、工具列举和调用、资源和提示词列表等功能。", Version = "1.3")]
 public class UseMCPPlugin : BasePlugin
 {
     private readonly ILogger<UseMCPPlugin> _logger;
@@ -44,7 +44,7 @@ public class UseMCPPlugin : BasePlugin
     }
 
     [KernelFunction]
-    [Description("列举当前应用可用的 MCP 服务器")]
+    [Description("列出当前应用已配置并启用的所有 MCP 服务器名称和简介")]
     public async Task<string> ListServersAsync(Kernel kernel)
     {
         var agentExecutionContext = kernel.GetAgentExecutionContext();
@@ -55,8 +55,8 @@ public class UseMCPPlugin : BasePlugin
     }
 
     [KernelFunction]
-    [Description("列举指定 MCP 服务器中支持的工具, 参数示例: {\"serverName\":\"腾讯EdgeOne\"}")]
-    public async Task<string> ListToolsAsync([Description("服务器名称")][Required] string serverName, Kernel kernel)
+    [Description("列出指定 MCP 服务器支持的所有工具（Function），包含工具名称、描述和输入参数Schema")]
+    public async Task<string> ListToolsAsync([Description("MCP 服务器名称")][Required] string serverName, Kernel kernel)
     {
         var agentExecutionContext = kernel.GetAgentExecutionContext();
         var appId = agentExecutionContext.GetAppId();
@@ -71,8 +71,8 @@ public class UseMCPPlugin : BasePlugin
     }
 
     [KernelFunction]
-    [Description("强制刷新指定 MCP 服务器的工具列表缓存, 参数示例: {\"serverName\":\"腾讯EdgeOne\"}")]
-    public async Task<string> RefreshToolsAsync([Description("服务器名称")][Required] string serverName, Kernel kernel)
+    [Description("强制刷新指定 MCP 服务器的工具列表缓存，确保获取最新的工具定义")]
+    public async Task<string> RefreshToolsAsync([Description("MCP 服务器名称")][Required] string serverName, Kernel kernel)
     {
         var agentExecutionContext = kernel.GetAgentExecutionContext();
         var appId = agentExecutionContext.GetAppId();
@@ -88,8 +88,8 @@ public class UseMCPPlugin : BasePlugin
     }
 
     [KernelFunction]
-    [Description("列举指定 MCP 服务器中支持的资源, 参数示例: {\"serverName\":\"腾讯EdgeOne\"}")]
-    public async Task<string> ListResourcesAsync([Description("服务器名称")][Required] string serverName, Kernel kernel)
+    [Description("列出指定 MCP 服务器提供的可访问资源（Resources），如文件、数据等")]
+    public async Task<string> ListResourcesAsync([Description("MCP 服务器名称")][Required] string serverName, Kernel kernel)
     {
         var agentExecutionContext = kernel.GetAgentExecutionContext();
         var appId = agentExecutionContext.GetAppId();
@@ -105,8 +105,8 @@ public class UseMCPPlugin : BasePlugin
     }
 
     [KernelFunction]
-    [Description("列举指定 MCP 服务器中支持的提示词, 参数示例: {\"serverName\":\"腾讯EdgeOne\"}")]
-    public async Task<string> ListPromptsAsync([Description("服务器名称")][Required] string serverName, Kernel kernel)
+    [Description("列出指定 MCP 服务器提供的提示词模板（Prompts），可复用这些模板生成内容")]
+    public async Task<string> ListPromptsAsync([Description("MCP 服务器名称")][Required] string serverName, Kernel kernel)
     {
         var agentExecutionContext = kernel.GetAgentExecutionContext();
         var appId = agentExecutionContext.GetAppId();
@@ -122,11 +122,11 @@ public class UseMCPPlugin : BasePlugin
     }
 
     [KernelFunction]
-    [Description("调用指定 MCP 服务器中的指定工具, 工具参数请封装到 arguments 字段中，参数示例: {\"serverName\":\"腾讯EdgeOne\",\"toolName\":\"deploy_html\",\"arguments\":{\"parameter1\":\"a\",\"parameter2\":10}}")]
+    [Description("调用指定 MCP 服务器中的指定工具，传入工具名称和参数字典，返回工具执行结果")]
     public async Task<string> CallToolAsync(
-        [Description("服务器名称")][Required] string serverName,
-        [Description("工具名称")][Required] string toolName,
-        [Description("工具参数")][Required] Dictionary<string, object> arguments,
+        [Description("MCP 服务器名称")][Required] string serverName,
+        [Description("要调用的工具名称")][Required] string toolName,
+        [Description("工具参数，键值对字典")][Required] Dictionary<string, object> arguments,
         Kernel kernel
     )
     {
@@ -151,7 +151,7 @@ public class UseMCPPlugin : BasePlugin
     }
 
     [KernelFunction]
-    [Description("获取 MCP 连接状态统计信息")]
+    [Description("获取 MCP 连接池的统计信息，包括当前连接数和工具缓存数")]
     public string GetConnectionStats()
     {
         var stats = GetRequiredFactory().GetStats();
@@ -159,8 +159,8 @@ public class UseMCPPlugin : BasePlugin
     }
 
     [KernelFunction]
-    [Description("断开并清理指定 MCP 服务器的连接")]
-    public async Task<string> DisconnectAsync([Description("服务器名称")][Required] string serverName, Kernel kernel)
+    [Description("断开与指定 MCP 服务器的连接并清理相关资源")]
+    public async Task<string> DisconnectAsync([Description("MCP 服务器名称")][Required] string serverName, Kernel kernel)
     {
         var agentExecutionContext = kernel.GetAgentExecutionContext();
         var appId = agentExecutionContext.GetAppId();

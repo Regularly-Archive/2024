@@ -10,14 +10,13 @@ using System.ComponentModel;
 
 namespace PostgreSQL.Embedding.Plugins.BuiltIn
 {
-    [KernelPlugin(Description = "使用自然语言查询 MongoDB 的插件")]
+    [KernelPlugin(Description = "将自然语言转换为 MongoDB 查询语句（JavaScript 语法）。根据集合名称和样本文档生成查询脚本。", Version = "1.1")]
     public class Text2MongoDBPlugin : BasePlugin
     {
         /// <summary>
         /// 链接字符串
         /// </summary>
-        [PluginParameter(Description = "连接字符串", Required = true)]
-        private string ConnectionString { get; set; }
+        [PluginParameter(Description = "MongoDB 连接字符串，如：mongodb://localhost:27017")] string ConnectionString { get; set; }
 
         /// <summary>
         /// 提示词模板
@@ -78,8 +77,12 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         }
 
         [KernelFunction]
-        [Description("根据用户输入生成 MongoDB 脚本")]
-        public async Task<string> GenerateScriptAsync([Description("集合名称")] string collectionName, [Description("用户输入")] string query, Kernel kernel)
+        [Description("根据用户描述生成 MongoDB 查询脚本（JavaScript 语法）。返回的脚本包含在代码块中，可直接复制执行。")]
+        public async Task<string> GenerateScriptAsync(
+            [Description("要查询的 MongoDB 集合名称")] string collectionName,
+            [Description("用户想要查询的内容描述")] string query,
+            Kernel kernel
+        )
         {
             var collectionNames = string.Join("\r\n", GetCollectionNames().Select(x => $"- {x}"));
             var exampleJson = GetExampleDocument(collectionName);
