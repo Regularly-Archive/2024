@@ -8,11 +8,10 @@ using System.ComponentModel;
 
 namespace PostgreSQL.Embedding.Plugins.Custom
 {
-    [KernelPlugin(Description = "博查 Web Search API")]
+    [KernelPlugin(Description = "博查（BoCha）Web Search API。提供高质量的中文网页搜索服务，支持返回搜索结果摘要。", Version = "1.1")]
     public class BoChaAIPlugin : BasePlugin, ISearchEngine
     {
-        [PluginParameter(Description = "API Key", Required = true)]
-        public string API_KEY { get; set; } = "sk-c4633d65488442f6af7dbb2a731fcd09";
+        [PluginParameter(Description = "博查 API Key，可在 bochaai.com 申请")] string API_KEY { get; set; } = "sk-c4633d65488442f6af7dbb2a731fcd09";
 
         private readonly IHttpClientFactory _httpClientFactory;
         public BoChaAIPlugin(IServiceProvider serviceProvider, IHttpClientFactory httpClientFactory)
@@ -22,8 +21,11 @@ namespace PostgreSQL.Embedding.Plugins.Custom
         }
 
         [KernelFunction]
-        [Description("从网络中搜索信息")]
-        public async Task<SearchResult> SearchAsync([Description("关键词")] string keyword, int limit = 30, string filterDomain = "")
+        [Description("使用博查搜索引擎搜索关键词，返回网页结果列表（标题、URL、摘要）。")]
+        public async Task<SearchResult> SearchAsync(
+            [Description("搜索关键词")] string keyword,
+            [Description("最大返回结果数量，默认为 30")] int limit = 30,
+            [Description("要搜索的特定域名或网站")] string filterDomain = "")
         {
             if (!Validate(out var errorMessages)) throw new Exception(string.Join("", errorMessages));
 

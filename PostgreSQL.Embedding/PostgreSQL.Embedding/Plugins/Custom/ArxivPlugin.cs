@@ -9,7 +9,7 @@ using System.Xml.Linq;
 
 namespace PostgreSQL.Embedding.Plugins.Custom
 {
-    [KernelPlugin(Description = "一个支持从 arXiv 上检索学术论文的插件")]
+    [KernelPlugin(Description = "arXiv 学术论文检索插件。支持通过关键词或论文 ID 搜索 arXiv 上的学术论文，返回论文标题、作者、摘要、PDF 链接等信息。搜索结果会通过 Artifacts 事件展示。", Version = "1.1")]
     public class ArxivPlugin : BasePlugin
     {
         /// <summary>
@@ -40,8 +40,11 @@ namespace PostgreSQL.Embedding.Plugins.Custom
         }
 
         [KernelFunction]
-        [Description("通过关键字查询学术论文")]
-        public async Task<string> SearchPapersByKeywordsAsync([Description("一个或多个关键词，使用空格隔开")] string keywords, Kernel kernel, int max_results = 5)
+        [Description("通过关键词搜索 arXiv 学术论文。会自动将关键词翻译为英文，返回匹配的论文列表（标题、作者、摘要、PDF 链接）。")]
+        public async Task<string> SearchPapersByKeywordsAsync(
+            [Description("搜索关键词，支持中英文，自动转换为英文搜索")] string keywords,
+            Kernel kernel,
+            [Description("最大返回论文数量，默认为 5")] int max_results = 5)
         {
             var clonedKernel = kernel.Clone();
 
@@ -68,8 +71,9 @@ namespace PostgreSQL.Embedding.Plugins.Custom
         }
 
         [KernelFunction]
-        [Description("通过 id_list 查询学术论文")]
-        public async Task<string> SearchPapersByIdAsync([Description("一个或多个id，使用英文逗号隔开")] string id_list)
+        [Description("通过 arXiv 论文 ID 查询特定论文。返回论文的完整信息（标题、作者、摘要、PDF 链接），单篇论文会触发 PDF 阅读器 Artifact。")]
+        public async Task<string> SearchPapersByIdAsync(
+            [Description("arXiv 论文 ID，一个或多个，使用英文逗号分隔，如：2310.00001")] string id_list)
         {
             var papers = await GetPapersAsync($"https://export.arxiv.org/api/query?id_list={id_list}");
             if (papers.Count() == 1)

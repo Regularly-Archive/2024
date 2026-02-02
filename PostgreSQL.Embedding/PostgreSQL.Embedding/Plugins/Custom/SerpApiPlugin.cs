@@ -11,11 +11,10 @@ using System.ComponentModel;
 
 namespace PostgreSQL.Embedding.Plugins.Custom
 {
-    [KernelPlugin(Description = "由 serpapi.com 提供的搜索服务")]
+    [KernelPlugin(Description = "SerpApi 搜索引擎服务。通过 Google 搜索返回结构化的搜索结果，结果会通过 Artifacts 事件展示。", Version = "1.1")]
     public class SerpApiPlugin : BasePlugin, ISearchEngine
     {
-        [PluginParameter(Description = "API Key", Required = true)]
-        public string API_KEY { get; set; }
+        [PluginParameter(Description = "SerpApi API Key，可在 serpapi.com 申请")] string API_KEY { get; set; }
 
         private readonly IHttpClientFactory _httpClientFactory;
         public SerpApiPlugin(IServiceProvider serviceProvider, IHttpClientFactory httpClientFactory)
@@ -25,8 +24,11 @@ namespace PostgreSQL.Embedding.Plugins.Custom
         }
 
         [KernelFunction]
-        [Description("使用关键词进行检索")]
-        public async Task<SearchResult> SearchAsync([Description("关键词")] string keyword, int limit = 30, string filterDomain = "")
+        [Description("使用 SerpApi 通过 Google 搜索引擎搜索关键词，返回网页结果列表（标题、URL、摘要）。")]
+        public async Task<SearchResult> SearchAsync(
+            [Description("搜索关键词")] string keyword,
+            [Description("最大返回结果数量，默认为 30")] int limit = 30,
+            [Description("要搜索的特定域名或网站")] string filterDomain = "")
         {
             if (!Validate(out var errorMessages)) throw new Exception(string.Join("", errorMessages));
 

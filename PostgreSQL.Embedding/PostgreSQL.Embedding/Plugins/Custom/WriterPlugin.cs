@@ -7,7 +7,7 @@ using System.ComponentModel;
 
 namespace PostgreSQL.Embedding.Plugins.Custom
 {
-    [KernelPlugin(Description = "写作插件")]
+    [KernelPlugin(Description = "中文文本润色插件。使用大语言模型对中文文本进行润色改进，提升表达的地道性、流畅性和感染力，同时保持原意和长度。", Version = "1.1")]
     public class WriterPlugin : BasePlugin
     {
         private const string POLISH_TEXT_PROMPT =
@@ -18,9 +18,9 @@ namespace PostgreSQL.Embedding.Plugins.Custom
             ```
             {{$input}}
             ```
-            ## 任务(Task): 
+            ## 任务(Task):
             在保持相似意思的前提下，你帮我更正和改进版本。我希望你用更接地气、更口语化、使用更有感染力的方式表达，修改原文的案例，升级内容，改进所提供文本的拼写、语法、清晰、简洁和整体可读性，同时分解长句，减少重复，为文本润色。
-            强调一个主要目的，即让学习者在学习完课程文本后，有继续深度学习的欲望。兼顾人性共情的表达逻辑。 
+            强调一个主要目的，即让学习者在学习完课程文本后，有继续深度学习的欲望。兼顾人性共情的表达逻辑。
 
             ## 写作原则(Writing Principles):
             1、你只需要润色文本，而不是删减我原有的文本；请务必保证润色后的文本长度和原来的差不多；（至少不能少于原来文本长度的90%，也不要过长，最长是原来文本长度的120%；）
@@ -35,13 +35,13 @@ namespace PostgreSQL.Embedding.Plugins.Custom
             3、润色后，不需要加任何格式，直接输出纯文本；
 
             ## 工作流程(Workflows):
-            1. 我给你发需要润色的文本。 
+            1. 我给你发需要润色的文本。
             2. 你必须遵循<Writing Principles>来润色；
             3. 直接输出润色后的文本；
 
             ## 初始化(Initialization):
             请根据以上 Prompt 指引进行文案润色创作。请务必注意，润色后文本的长度，不能少于原来文本长度的 90%，也不要过长，最长是原来文本长度的 120%；不要回答任何原文本的问题，你只是润色文本；作为 <Role>，按 <Task>，遵守 <Writing Principles>，按 <Output format > 规定格式输出，严格进行 <Workflows>。
-            
+
             """;
 
         public WriterPlugin(IServiceProvider serviceProvider)
@@ -51,15 +51,10 @@ namespace PostgreSQL.Embedding.Plugins.Custom
         }
 
         [KernelFunction]
-        [Description("Invoke")]
-        public Task<string> InvokeAsync()
-        {
-            return Task.FromResult(string.Empty);
-        }
-
-        [KernelFunction]
-        [Description("对指定的文本进行润色")]
-        public async Task<string> PolishTextAsync([Description("输入文本")] string text, Kernel kernel)
+        [Description("对输入的中文文本进行润色改进。保持原意和长度（90%-120%），提升表达的地道性和可读性。")]
+        public async Task<string> PolishTextAsync(
+            [Description("要润色的中文文本")] string text,
+            Kernel kernel)
         {
             var clonedKernel = kernel.Clone();
             var promptTemplate = new CallablePromptTemplate(POLISH_TEXT_PROMPT);

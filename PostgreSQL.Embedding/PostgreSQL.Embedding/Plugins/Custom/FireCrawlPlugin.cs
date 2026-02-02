@@ -6,11 +6,10 @@ using System.ComponentModel;
 
 namespace PostgreSQL.Embedding.Plugins.Custom
 {
-    [KernelPlugin(Description = "FireCrawl 网络爬虫插件")]
+    [KernelPlugin(Description = "FireCrawl 网页抓取插件。智能爬取网页并提取内容，返回格式化的 Markdown。能够处理动态网页和反爬措施。", Version = "1.1")]
     public class FireCrawlPlugin : BasePlugin
     {
-        [PluginParameter(Description = "FireCrawl 的 API KEY", Required = true)]
-        public string API_KEY { get; set; }
+        [PluginParameter(Description = "FireCrawl API Key，可在 firecrawl.dev 申请")] string API_KEY { get; set; }
 
         private readonly IHttpClientFactory _httpClientFactory;
         public FireCrawlPlugin(IHttpClientFactory httpClientFactory, IServiceProvider serviceProvider)
@@ -20,8 +19,8 @@ namespace PostgreSQL.Embedding.Plugins.Custom
         }
 
         [KernelFunction]
-        [Description("一个由 FireCraw 驱动的信息提取接口，可以返回指定网页的内容，返回格式为 Markdown。")]
-        public async Task<string> ScrapeAsync([Description("地址")] string url)
+        [Description("使用 FireCrawl 抓取指定网页的正文内容，返回 Markdown 格式。可处理动态渲染页面和需要 JavaScript 执行的网站。")]
+        public async Task<string> ScrapeAsync([Description("要抓取的网页 URL")] string url)
         {
             if (!Validate(out var errorMessages)) throw new Exception(string.Join("", errorMessages));
 
