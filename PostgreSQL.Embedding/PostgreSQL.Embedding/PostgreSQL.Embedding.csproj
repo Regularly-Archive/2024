@@ -91,6 +91,7 @@
   </ItemGroup>
 
   <ItemGroup>
+	  <PackageReference Include="Castle.Core" Version="5.1.1" />
 	  <PackageReference Include="CSnakes.Runtime" Version="1.2.0" />
     <PackageReference Include="jieba.NET" Version="0.42.2" />
     <PackageReference Include="LLamaSharp" Version="0.23.0" />

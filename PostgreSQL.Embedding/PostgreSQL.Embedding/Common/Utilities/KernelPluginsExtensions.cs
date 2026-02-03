@@ -180,7 +180,7 @@ namespace PostgreSQL.Embedding.Utils
 
                 try
                 {
-                    var pluginInstance = Activator.CreateInstance(pluginType);
+                    var pluginInstance = serviceProvider.GetService(pluginType);
                     if (pluginInstance == null) continue;
 
                     (pluginInstance as IPlugin)?.Initialize(appId);

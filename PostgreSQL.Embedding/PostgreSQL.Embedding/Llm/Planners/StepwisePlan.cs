@@ -101,7 +101,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
                     return nextStep.FinalAnswer;
                 }
 
-                _logger?.LogInformation("Action: No action to take");
+                _logger?.LogInformation("Action: No further action need to take");
 
                 if (TryGetThought(nextStep, chatHistory))
                     continue;

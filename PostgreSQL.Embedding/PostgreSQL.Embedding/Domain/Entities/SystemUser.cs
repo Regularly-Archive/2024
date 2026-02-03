@@ -29,5 +29,11 @@ namespace PostgreSQL.Embedding.Domain.Entities
 
         [SugarColumn(ColumnName = "gender")]
         public int Gender { get; set; }
+
+        /// <summary>
+        /// 角色：SA=管理员，User=普通用户
+        /// </summary>
+        [SugarColumn(ColumnName = "role", ColumnDataType = "varchar(32)", DefaultValue = "User")]
+        public string Role { get; set; } = "User";
     }
 }

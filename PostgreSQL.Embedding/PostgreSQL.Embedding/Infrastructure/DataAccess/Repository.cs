@@ -117,6 +117,8 @@ namespace PostgreSQL.Embedding.Infrastructure.DataAccess
             if (queryParameter.Filter != null)
                 queryable = queryParameter.Filter.Apply(queryable);
 
+            queryable = SetDataIsolation<T>(queryable);
+
             var total = await queryable.CountAsync();
 
             queryable = queryable.Skip((queryParameter.PageIndex - 1) * queryParameter.PageSize).Take(queryParameter.PageSize);
@@ -132,6 +134,8 @@ namespace PostgreSQL.Embedding.Infrastructure.DataAccess
         {
             queryable = queryable ?? base.AsQueryable();
             if (filter != null) queryable = filter.Apply(queryable);
+
+            queryable = SetDataIsolation<T>(queryable);
 
             return queryable.ToListAsync();
         }
@@ -150,6 +154,21 @@ namespace PostgreSQL.Embedding.Infrastructure.DataAccess
                 entity.UpdatedAt = DateTime.Now;
                 entity.UpdatedBy = _httpContextAccessor.HttpContext?.User?.Identity?.Name ?? Constants.Admin;
             }
+        }
+
+
+        private ISugarQueryable<T> SetDataIsolation<T>(ISugarQueryable<T> queryable) where T : BaseEntity
+        {
+            var dataIsolationService = new DataIsolationService(_httpContextAccessor);
+            if (!dataIsolationService.ShouldIsolate(typeof(T))) return queryable;
+
+            if (dataIsolationService.IsAdmin()) return queryable;
+
+            var currentUserId = dataIsolationService.GetCurrentUserId();
+            if (!string.IsNullOrEmpty(currentUserId))
+                queryable = queryable.Where(x => x.CreatedBy == currentUserId);
+
+            return queryable;
         }
 
 
