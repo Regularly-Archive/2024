@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PostgreSQL.Embedding.Domain.Entities;
 using SqlSugar;
@@ -17,31 +17,30 @@ namespace PostgreSQL.Embedding.Application.Controllers.Controllers
         }
 
         /// <summary>
-        /// 全局初始化
+        /// 全局初始化 - 自动扫描所有继承 BaseEntity 的实体
         /// </summary>
-        /// <returns></returns>
         [HttpGet("init")]
-        public IActionResult InitAll()
+        public async Task<IActionResult> InitAll()
         {
             _sqlSugarClient.DbMaintenance.CreateDatabase();
-            _sqlSugarClient.CodeFirst.InitTables(typeof(LlmApp));
-            _sqlSugarClient.CodeFirst.InitTables(typeof(LlmModel));
-            _sqlSugarClient.CodeFirst.InitTables(typeof(KnowledgeBase));
-            _sqlSugarClient.CodeFirst.InitTables(typeof(LlmAppKnowledge));
-            _sqlSugarClient.CodeFirst.InitTables(typeof(DocumentImportRecord));
-            _sqlSugarClient.CodeFirst.InitTables(typeof(ChatMessage));
-            _sqlSugarClient.CodeFirst.InitTables(typeof(SystemUser));
-            _sqlSugarClient.CodeFirst.InitTables(typeof(TablePrefixMapping));
-            _sqlSugarClient.CodeFirst.InitTables(typeof(AppConversation));
-            _sqlSugarClient.CodeFirst.InitTables(typeof(FileStorage));
-            _sqlSugarClient.CodeFirst.InitTables(typeof(SystemMessage));
-            _sqlSugarClient.CodeFirst.InitTables(typeof(LlmPlugin));
-            _sqlSugarClient.CodeFirst.InitTables(typeof(LlmAppPlugin));
-            _sqlSugarClient.CodeFirst.InitTables(typeof(LlmAppPluginParameter));
-            _sqlSugarClient.CodeFirst.InitTables(typeof(MCPServer));
-            _sqlSugarClient.CodeFirst.InitTables(typeof(MCPTool));
-            _sqlSugarClient.Ado.ExecuteCommandAsync($"CREATE EXTENSION IF NOT EXISTS vector;");
-            return Ok();
+
+            // 自动扫描所有继承 BaseEntity 的实体类型
+            var entityTypes = typeof(BaseEntity).Assembly.GetTypes()
+                .Where(t => t.IsClass && !t.IsAbstract && t.IsSubclassOf(typeof(BaseEntity)))
+                .ToArray();
+
+            foreach (var entityType in entityTypes)
+            {
+                _sqlSugarClient.CodeFirst.InitTables(entityType);
+            }
+
+            await _sqlSugarClient.Ado.ExecuteCommandAsync($"CREATE EXTENSION IF NOT EXISTS vector;");
+
+            return Ok(new
+            {
+                Message = "初始化成功",
+                Tables = entityTypes.Select(t => t.Name)
+            });
         }
     }
 }

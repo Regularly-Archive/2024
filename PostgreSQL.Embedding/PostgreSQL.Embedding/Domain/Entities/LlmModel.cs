@@ -1,8 +1,10 @@
-﻿using SqlSugar;
+using SqlSugar;
+using PostgreSQL.Embedding.Infrastructure.DataAccess;
 
 namespace PostgreSQL.Embedding.Domain.Entities
 {
     [SugarTable("llm_models")]
+    [DataIsolation]
     public class LlmModel : BaseEntity
     {
         [SugarColumn(ColumnName = "model_name")]

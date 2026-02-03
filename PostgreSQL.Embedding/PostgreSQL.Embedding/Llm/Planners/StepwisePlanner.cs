@@ -30,7 +30,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 ["variableDescriptions"] = variableDescriptions,
                 ["suffix"] = _config.Suffix
             };
-            var systemMessage = await _promptTemplateService.RenderTemplateAsync("Stepwise.txt", _kernel, arguments);
+            var systemMessage = await _promptTemplateService.RenderTemplateAsync("Stepwise_V2.txt", _kernel, arguments);
 
             var logger = _kernel.LoggerFactory.CreateLogger<StepwisePlan>();
 
@@ -50,7 +50,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 ["variableDescriptions"] = variableDescriptions,
                 ["suffix"] = _config.Suffix
             };
-            var systemMessage = await _promptTemplateService.RenderTemplateAsync("Stepwise.txt", _kernel, arguments);
+            var systemMessage = await _promptTemplateService.RenderTemplateAsync("Stepwise_V2.txt", _kernel, arguments);
 
             var logger = _kernel.LoggerFactory.CreateLogger<StepwisePlan>();
 

@@ -1,8 +1,10 @@
 ﻿using SqlSugar;
+using PostgreSQL.Embedding.Infrastructure.DataAccess;
 
 namespace PostgreSQL.Embedding.Domain.Entities
 {
     [SugarTable("llm_knowledgebase")]
+    [DataIsolation]
     public class KnowledgeBase : BaseEntity
     {
         [SugarColumn(ColumnName = "avatar", IsNullable = true)]

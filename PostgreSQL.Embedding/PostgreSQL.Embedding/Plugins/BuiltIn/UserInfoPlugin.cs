@@ -1,16 +1,15 @@
-﻿
 using Mapster;
 using Microsoft.SemanticKernel;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Domain.Models.User;
-using PostgreSQL.Embedding.Infrastructure;
+using PostgreSQL.Embedding.Infrastructure.UserIdentity;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 
 namespace PostgreSQL.Embedding.Plugins.BuiltIn
 {
-    [KernelPlugin(Description = "根据用户 ID 查询用户基本信息（昵称、头像等），返回 JSON 格式的用户资料。", Version = "1.1")]
+    [KernelPlugin(Description = "根据用户 ID 查询用户基本信息（昵称、头像等），返回格式化的用户资料。", Version = "1.2")]
     public class UserInfoPlugin : BasePlugin
     {
         private readonly IServiceProvider _serviceProvider;
@@ -24,11 +23,27 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         public async Task<string> GetUserInfoAsync([Description("要查询的用户 ID")] long userId)
         {
             using var serviceScope = _serviceProvider.CreateScope();
-            var userInfoService = serviceScope.ServiceProvider.GetRequiredService<IUserInfoService>();
+            var currentUserService = serviceScope.ServiceProvider.GetRequiredService<ICurrentUserService>();
 
-            var userInfo = await userInfoService.GetUserByIdAsync(userId);
-            var userInfoDto = userInfo.Adapt<UserInfo>();
-            return JsonConvert.SerializeObject(userInfoDto);
+            var user = await currentUserService.GetByIdAsync(userId);
+            if (user == null)
+            {
+                return "用户不存在";
+            }
+
+            var userInfoDto = new UserInfo
+            {
+                Id = user.Id.ToString(),
+                UserName = user.UserName,
+                NickName = user.NickName,
+                Avatar = user.Avatar,
+                Gender = user.Gender,
+                Role = string.IsNullOrEmpty(user.Role)
+                    ? new List<string>()
+                    : new List<string> { user.Role }
+            };
+
+            return JsonConvert.SerializeObject(userInfoDto, Formatting.Indented);
         }
     }
 }

@@ -14,9 +14,9 @@ using System.Text;
 using PostgreSQL.Embedding.Common;
 using TaskStatus = PostgreSQL.Embedding.Domain.Models.Planners.TaskStatus;
 using System.Runtime.CompilerServices;
-using PostgreSQL.Embedding.Infrastructure;
 using PostgreSQL.Embedding.Common.Extensions;
 using PostgreSQL.Embedding.Domain.Entities;
+using PostgreSQL.Embedding.Infrastructure.UserIdentity;
 
 
 namespace PostgreSQL.Embedding.Llm.Core
@@ -45,7 +45,7 @@ namespace PostgreSQL.Embedding.Llm.Core
         private readonly IServiceProvider _serviceProvider;
         private readonly PromptTemplateService _promptTemplateService;
         private readonly IChatHistoriesService _chatHistoriesService;
-        private readonly IUserInfoService _userInfoService;
+        private readonly ICurrentUserService _currentUserService;
         private readonly ILogger<AgenticConversationService> _logger;
         private readonly AgentExecutionContext _agentExecutionContext;
         private readonly string _defaultPrompt = "You are a helpful AI bot. You must answer the question in Chinese.";
@@ -62,7 +62,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             _serviceProvider = serviceProvider;
             _chatHistoriesService = chatHistoriesService;
             _promptTemplateService = serviceProvider.GetService<PromptTemplateService>()!;
-            _userInfoService = serviceProvider.GetService<IUserInfoService>()!;
+            _currentUserService = serviceProvider.GetService<ICurrentUserService>()!;
             _logger = serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<AgenticConversationService>();
             _agentExecutionContext = kernel.GetAgentExecutionContext();
         }
@@ -192,7 +192,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             SseBlockTracker blockTracker,
             CancellationToken ct)
         {
-            var currentUser = await _userInfoService.GetCurrentUserAsync();
+            var currentUser = await _currentUserService.GetCurrentUserAsync();
             var runId = Guid.NewGuid().ToString();
             _agentExecutionContext.SetRunId(runId);
 
@@ -237,7 +237,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             SseBlockTracker blockTracker,
             CancellationToken ct)
         {
-            var currentUser = await _userInfoService.GetCurrentUserAsync();
+            var currentUser = await _currentUserService.GetCurrentUserAsync();
             var runId = _agentExecutionContext.GetRunId();
 
             // Re-create task planner to get subtasks

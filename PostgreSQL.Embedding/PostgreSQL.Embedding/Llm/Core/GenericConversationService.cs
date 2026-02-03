@@ -8,7 +8,7 @@ using PostgreSQL.Embedding.Common.Extensions;
 using PostgreSQL.Embedding.Domain.Entities;
 using PostgreSQL.Embedding.Domain.Models;
 using PostgreSQL.Embedding.Domain.Models.Planners;
-using PostgreSQL.Embedding.Infrastructure;
+using PostgreSQL.Embedding.Infrastructure.UserIdentity;
 using PostgreSQL.Embedding.Llm.Abstractions;
 using PostgreSQL.Embedding.Llm.Planners;
 using PostgreSQL.Embedding.Llm.Services;
@@ -31,7 +31,7 @@ namespace PostgreSQL.Embedding.Llm.Core
         private string _conversationId;
         private long _messageReferenceId;
         private readonly Random _random = new Random();
-        private readonly IUserInfoService _userInfoService;
+        private readonly ICurrentUserService _currentUserService;
         private readonly HttpContext _httpContext;
         private readonly SSEEmitter _sseEmitter;
         private readonly ILogger<GenericConversationService> _logger;
@@ -45,7 +45,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             _promptTemplateService = _serviceProvider.GetService<PromptTemplateService>();
             _promptTemplate = _promptTemplateService.LoadTemplate("Default.txt");
             _chatHistoriesService = chatHistoriesService;
-            _userInfoService = _serviceProvider.GetService<IUserInfoService>();
+            _currentUserService = _serviceProvider.GetService<ICurrentUserService>();
             _logger = _serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<GenericConversationService>();
             _httpContext = httpContext;
             _sseEmitter = new SSEEmitter(_httpContext);
@@ -170,7 +170,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             try
             {
                 var stopwatch = Stopwatch.StartNew();
-                var currentUser = await _userInfoService.GetCurrentUserAsync();
+                var currentUser = await _currentUserService.GetCurrentUserAsync();
                 //var chatHistory = await GetHistoricalMessagesAsync(_app.Id, _conversationId, _app.MaxMessageRounds);
 
                 var runId = Guid.NewGuid().ToString();

@@ -11,7 +11,8 @@
       "Bash(dotnet clean:*)",
       "Skill(stepsnow-write-workflow)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git reset:*)"
     ]
   }
 }

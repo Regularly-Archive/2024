@@ -12,6 +12,7 @@ using PostgreSQL.Embedding.Common.Converters;
 using PostgreSQL.Embedding.Common.Extensions;
 using PostgreSQL.Embedding.Common.Middlewares;
 using PostgreSQL.Embedding.Common.Settings;
+using PostgreSQL.Embedding.Domain.Entities;
 using PostgreSQL.Embedding.Domain.Models.WebApi;
 using PostgreSQL.Embedding.Hubs;
 using PostgreSQL.Embedding.Infrastructure;
@@ -142,7 +143,7 @@ builder.Services
     .AddLLama()
     .AddHuggingFace()
     .AddOllama()
-    .AddScoped<IUserInfoService, UserInfoService>();
+    .AddUserIdentityServices();
 
 
 builder.Services.AddPlugins(builder.Configuration);
