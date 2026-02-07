@@ -70,7 +70,7 @@ namespace PostgreSQL.Embedding.Application.Controllers.Controllers
         [HttpPut("{appId}/histories/{conversationId}")]
         public async Task<JsonResult> UpdateConversationAsync(long appId, string conversationId, [FromBody] AppConversation conversation)
         {
-            await _chatHistoryService.UpdateConversationAsync(appId, conversationId, conversation.Summary);
+            await _chatHistoryService.UpdateConversationAsync(appId, conversationId, conversation.Title);
             return ApiResult.Success<object>(null);
         }
 

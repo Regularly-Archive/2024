@@ -126,7 +126,7 @@ namespace PostgreSQL.Embedding.Application.Controllers.Controllers
                 PluginName = lp.PluginName,
                 PluginIntro = lp.PluginIntro,
                 Version = lp.PluginVersion,
-                IsEnabled = lap.Enabled
+                Enabled = lap.Enabled
             })
             .ToList();
 
@@ -234,6 +234,22 @@ namespace PostgreSQL.Embedding.Application.Controllers.Controllers
             }
 
             return ApiResult.Success(pluginInstance.Parameters ?? []);
+        }
+
+        [HttpPut("{appId}/plugins/{pluginId}/status")]
+        public async Task<JsonResult> UpdateAppPluginStatus(long appId, long pluginId, [FromQuery]bool enabled)
+        {
+            var appPlugin = await _llmAppPluginRepository.FindAsync(x => x.AppId == appId && x.PluginId == pluginId);
+            if (appPlugin == null)
+                throw new Exception("当前应用尚未关联对应插件");
+
+            if (appPlugin.Enabled && enabled || !appPlugin.Enabled && !enabled) 
+                return ApiResult.Success(appPlugin);
+
+            appPlugin.Enabled = enabled;
+            await _llmAppPluginRepository.UpdateAsync(appPlugin);
+
+            return ApiResult.Success(appPlugin);
         }
 
         public override Task<JsonResult> GetByPageAsync(QueryParameter<LlmApp, LlmAppQueryFilter> queryParameter)

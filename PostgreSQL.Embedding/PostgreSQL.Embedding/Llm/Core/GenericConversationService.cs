@@ -71,7 +71,7 @@ namespace PostgreSQL.Embedding.Llm.Core
                 var conversation = await _chatHistoriesService.GetAppConversationAsync(_app.Id, _conversationId);
                 if (conversation == null)
                 {
-                    var conversationSummary = await GenerateConversationSummary(input);
+                    var conversationSummary = await GenerateConversationTitle(input);
                     await _chatHistoriesService.AddConversationAsync(_app.Id, _conversationId, conversationSummary);
                     await EmitConversationTitleAsync(_messageReferenceId, conversationSummary);
                     await _chatHistoriesService.UpdateConversationAsync(_app.Id, _conversationId, conversationSummary);
@@ -208,14 +208,16 @@ namespace PostgreSQL.Embedding.Llm.Core
                 planner.AddVariable("EnableSkills", true);
 
                 var graphExecutor = new DAGraphExecutor(input, subTasks, planner, kernel);
+                var reasoningContent = string.Empty;
                 graphExecutor.OnStepChanged = async (stepTrace) =>
                 {
-                    if (stepTrace.Type == "Thought") Task.Run(async() => await UpdateReasoningContent(_agentExecutionContext.GetMessageId(), stepTrace.Content));
+                    if (stepTrace.Type == "Thought") reasoningContent += stepTrace.Content;
                     await EmitTracesAsync(stepTrace);
                 };
                 await graphExecutor.ExecuteAsync();
 
                 stopwatch.Stop();
+                await UpdateReasoningContent(_agentExecutionContext.GetMessageId(), reasoningContent);
                 _logger.LogInformation($"本次任务耗时 {stopwatch.Elapsed.TotalSeconds.Round(2)} 秒");
                 await EmitTracesAsync(StepTrace.ThinkDone(_agentExecutionContext.GetMessageId(), stopwatch.Elapsed.TotalSeconds));
                 return subTasks.OrderByDescending(x => x.Id).FirstOrDefault().ExecuteResult.AsStreaming();

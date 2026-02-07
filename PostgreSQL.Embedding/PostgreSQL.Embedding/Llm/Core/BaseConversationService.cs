@@ -130,7 +130,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             return chatHistory;
         }
 
-        public async Task<string> GenerateConversationSummary(string input)
+        public async Task<string> GenerateConversationTitle(string input)
         {
             var functionResult = await _kernel.InvokePromptAsync(
                 @$"请使用简洁、概括性的文字描述用户意图，不超过10个字: 

@@ -45,7 +45,7 @@ namespace PostgreSQL.Embedding.Plugins.Custom
             httpClient.DefaultRequestHeaders.Referrer = new Uri("https://bing.com/");
 
             var query = string.IsNullOrEmpty(filterDomain) ? keyword : $"site:{filterDomain} {keyword}";
-            var searchResult = await GetAsync(httpClient, keyword, $"https://bing.com/search?q={WebUtility.UrlEncode(query)}");
+            var searchResult = await GetAsync(httpClient, keyword, $"https://bing.com/search?q={WebUtility.UrlEncode(query)}&ensearch=1");
             while (searchResult.Entries.Count < limit && searchResult.HasNextPage)
             {
                 var newSearchResult = await GetAsync(httpClient, keyword, searchResult.NextPage);

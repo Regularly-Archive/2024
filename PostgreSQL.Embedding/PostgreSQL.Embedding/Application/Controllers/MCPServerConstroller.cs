@@ -1,5 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using PostgreSQL.Embedding.Common.Extensions;
 using PostgreSQL.Embedding.Domain.Entities;
+using PostgreSQL.Embedding.Domain.Models.WebApi;
 using PostgreSQL.Embedding.Domain.Models.WebApi.QuerableFilters;
 using PostgreSQL.Embedding.Infrastructure.DataAccess;
 
@@ -9,10 +12,11 @@ namespace PostgreSQL.Embedding.Application.Controllers.Controllers
     [ApiController]
     public class MCPServerController : CrudBaseController<MCPServer, MCPServerQueryableFilter>
     {
-        public MCPServerController(CrudBaseService<MCPServer> crudBaseService) 
+        private McpConnectionFactory _mcpCientFactory;
+        public MCPServerController(CrudBaseService<MCPServer> crudBaseService, McpConnectionFactory mcpClientFactory) 
             : base(crudBaseService)
         {
-
+            _mcpCientFactory = mcpClientFactory;
         }
 
         public override async Task<JsonResult> CreateAsync(MCPServer entity)
@@ -22,6 +26,19 @@ namespace PostgreSQL.Embedding.Application.Controllers.Controllers
             if (exists) throw new Exception($"当前应用已存在名为 '{entity.Name}' 的 MCP 服务器");
             
             return await base.CreateAsync(entity);
+        }
+
+        [HttpPost("{id}/test")]
+        public async Task<JsonResult> TestAsync(long id)
+        {
+            var repository = _crudBaseService.Repository;
+            var mcpServer = await repository.GetAsync(id);
+            if (mcpServer == null) throw new Exception("指定的 MCP 服务器不存在");
+
+            var mcpConnection = _mcpCientFactory.GetOrCreate(mcpServer);
+            var tools = mcpConnection.GetTools();
+
+            return ApiResult.Success<object>(null);
         }
     }
 }

@@ -33,6 +33,6 @@ namespace PostgreSQL.Embedding.Domain.Entities
         public long AppId { get; set; }
 
         [SugarColumn(ColumnName = "anabled", DefaultValue = "TRUE")]
-        public bool Enabled { get; set; }
+        public bool Enabled { get; set; } = true;
     }
 }

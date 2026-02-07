@@ -39,6 +39,23 @@ public class MessageMetadata
 
     [JsonPropertyName("usage")]
     public UsageInfo? Usage { get; set; }
+
+    [JsonPropertyName("context")]
+    public ConversationContext Context { get; set; }
+
+
+}
+
+public class ConversationContext
+{
+    [JsonPropertyName("conversation_id")]
+    public string ConversationId { get; set; }
+
+    [JsonPropertyName("conversation_title")]
+    public string ConversationTitle { get; set; }
+
+    [JsonPropertyName("reference_message_id")]
+    public string ReferenceMessageId { get; set; }
 }
 
 /// <summary>

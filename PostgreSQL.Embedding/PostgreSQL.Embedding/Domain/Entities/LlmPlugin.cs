@@ -19,5 +19,8 @@ namespace PostgreSQL.Embedding.Domain.Entities
 
         [SugarColumn(ColumnName = "is_builtin", ColumnDataType = "boolean")]
         public bool IsBuiltin { get; set; }
+
+        [SugarColumn(ColumnName = "enabled", ColumnDataType = "boolean", DefaultValue = "TRUE")]
+        public bool Enabled { get; set; } = true;
     }
 }

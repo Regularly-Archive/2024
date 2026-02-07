@@ -73,5 +73,81 @@ namespace Wikit.Tests.Agents
                 () => step.FinalAnswer.ShouldBe("应仁之乱可以看作是日本战国时代的开端")
             );
         }
+
+        [Fact]
+        public void It_Should_Parse_Thought_With_Number_Successfully()
+        {
+            var input = """
+            [THOUGHT-1] 分析问题，这是第一步思考
+            [ACTION-1]
+            {"action":"WebSearchPlugin.Run","action_variables":{"keyword":"test"}}
+            """;
+
+            var step = SystemStep.Parse(input);
+            this.ShouldSatisfyAllConditions(
+                () => step.Thought.ShouldBe("分析问题，这是第一步思考"),
+                () => step.Action.ShouldBe("WebSearchPlugin.Run")
+            );
+        }
+
+        [Fact]
+        public void It_Should_Parse_Thought_Without_Number_Successfully()
+        {
+            var input = """
+            [THOUGHT] 直接思考，没有数字标签
+            [ACTION]
+            {"action":"WriterPlugin.PolishText","action_variables":{"text":"hello"}}
+            """;
+
+            var step = SystemStep.Parse(input);
+            this.ShouldSatisfyAllConditions(
+                () => step.Thought.ShouldBe("直接思考，没有数字标签"),
+                () => step.Action.ShouldBe("WriterPlugin.PolishText")
+            );
+        }
+
+        [Fact]
+        public void It_Should_Parse_Thought_With_Large_Number_Successfully()
+        {
+            var input = """
+            [THOUGHT-100] 第一百步思考
+            [ACTION-100]
+            {"action":"CodeInterpreterPlugin.RunPython","action_variables":{"code":"print(1)"}}
+            """;
+
+            var step = SystemStep.Parse(input);
+            this.ShouldSatisfyAllConditions(
+                () => step.Thought.ShouldBe("第一百步思考"),
+                () => step.Action.ShouldBe("CodeInterpreterPlugin.RunPython")
+            );
+        }
+
+        [Fact]
+        public void It_Should_Parse_Final_Answer_With_Underscore_Successfully()
+        {
+            var input = """
+            [FINAL_ANSWER] 这是最终答案
+            """;
+
+            var step = SystemStep.Parse(input);
+            this.ShouldSatisfyAllConditions(
+                () => step.FinalAnswer.ShouldNotBeNullOrEmpty(),
+                () => step.FinalAnswer.ShouldBe("这是最终答案")
+            );
+        }
+
+        [Fact]
+        public void It_Should_Parse_Final_Answer_With_Dash_Successfully()
+        {
+            var input = """
+            [FINAL-ANSWER] 这是最终答案带横线
+            """;
+
+            var step = SystemStep.Parse(input);
+            this.ShouldSatisfyAllConditions(
+                () => step.FinalAnswer.ShouldNotBeNullOrEmpty(),
+                () => step.FinalAnswer.ShouldBe("这是最终答案带横线")
+            );
+        }
     }
 }

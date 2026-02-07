@@ -26,7 +26,7 @@ namespace Wikit.Tests.Plugins
         private readonly Mock<ILoggerFactory> _mockLoggerFactory;
         private readonly Mock<ILogger<UseMCPPlugin>> _mockLogger;
         private readonly Mock<IRepository<MCPServer>> _mockMcpServerRepository;
-        private readonly Mock<CacheableMcpClientFactory> _mockCacheableMcpClientFactory;
+        private readonly Mock<McpConnectionFactory> _mockCacheableMcpClientFactory;
         private readonly Mock<PromptTemplateService> _mockPromptTemplateService;
 
         public When_Call_UseMCPPlugin()
@@ -34,7 +34,7 @@ namespace Wikit.Tests.Plugins
             _mockLoggerFactory = new Mock<ILoggerFactory>(MockBehavior.Loose);
             _mockLogger = new Mock<ILogger<UseMCPPlugin>>(MockBehavior.Loose);
             _mockMcpServerRepository = new Mock<IRepository<MCPServer>>(MockBehavior.Loose);
-            _mockCacheableMcpClientFactory = new Mock<CacheableMcpClientFactory>(MockBehavior.Loose, Mock.Of<IServiceProvider>());
+            _mockCacheableMcpClientFactory = new Mock<McpConnectionFactory>(MockBehavior.Loose, Mock.Of<IServiceProvider>());
             _mockPromptTemplateService = new Mock<PromptTemplateService>(MockBehavior.Loose);
 
             _mockLoggerFactory.Setup(x => x.CreateLogger(It.IsAny<string>()))
@@ -58,7 +58,7 @@ namespace Wikit.Tests.Plugins
             var realServiceProvider = new ServiceCollection()
                 .AddSingleton(realLoggerFactory.Object)
                 .BuildServiceProvider();
-            var realFactory = new CacheableMcpClientFactory(realServiceProvider);
+            var realFactory = new McpConnectionFactory(realServiceProvider);
             services.AddSingleton(realFactory);
 
             _serviceProvider = services.BuildServiceProvider();

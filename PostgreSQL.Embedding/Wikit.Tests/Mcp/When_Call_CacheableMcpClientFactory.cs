@@ -16,13 +16,13 @@ namespace Wikit.Tests.Mcp
     {
         private readonly Mock<IServiceProvider> _mockServiceProvider;
         private readonly Mock<ILoggerFactory> _mockLoggerFactory;
-        private readonly Mock<ILogger<CacheableMcpClientFactory>> _mockLogger;
+        private readonly Mock<ILogger<McpConnectionFactory>> _mockLogger;
 
         public When_Call_CacheableMcpClientFactory()
         {
             _mockServiceProvider = new Mock<IServiceProvider>(MockBehavior.Strict);
             _mockLoggerFactory = new Mock<ILoggerFactory>(MockBehavior.Loose);
-            _mockLogger = new Mock<ILogger<CacheableMcpClientFactory>>(MockBehavior.Loose);
+            _mockLogger = new Mock<ILogger<McpConnectionFactory>>(MockBehavior.Loose);
 
             _mockServiceProvider.Setup(x => x.GetService(typeof(ILoggerFactory)))
                 .Returns(_mockLoggerFactory.Object);
@@ -34,7 +34,7 @@ namespace Wikit.Tests.Mcp
         public void It_Should_CreateFactory_Successfully()
         {
             // Arrange & Act
-            var factory = new CacheableMcpClientFactory(_mockServiceProvider.Object);
+            var factory = new McpConnectionFactory(_mockServiceProvider.Object);
 
             // Assert
             factory.ShouldNotBeNull();
@@ -44,7 +44,7 @@ namespace Wikit.Tests.Mcp
         public void It_Should_GenerateServerKey_WhenGivenServer()
         {
             // Arrange
-            var factory = new CacheableMcpClientFactory(_mockServiceProvider.Object);
+            var factory = new McpConnectionFactory(_mockServiceProvider.Object);
             var server = new MCPServer
             {
                 AppId = 123,
@@ -65,7 +65,7 @@ namespace Wikit.Tests.Mcp
         public void It_Should_HandleDashesInName_WhenGeneratingServerKey()
         {
             // Arrange
-            var factory = new CacheableMcpClientFactory(_mockServiceProvider.Object);
+            var factory = new McpConnectionFactory(_mockServiceProvider.Object);
             var server = new MCPServer
             {
                 AppId = 456,
@@ -86,7 +86,7 @@ namespace Wikit.Tests.Mcp
         public void It_Should_ReturnZeroStats_WhenFactoryIsEmpty()
         {
             // Arrange
-            var factory = new CacheableMcpClientFactory(_mockServiceProvider.Object);
+            var factory = new McpConnectionFactory(_mockServiceProvider.Object);
 
             // Act
             var stats = factory.GetStats();
@@ -100,7 +100,7 @@ namespace Wikit.Tests.Mcp
         public void It_Should_ReturnFalseForHealthCheck_WhenServerUnknown()
         {
             // Arrange
-            var factory = new CacheableMcpClientFactory(_mockServiceProvider.Object);
+            var factory = new McpConnectionFactory(_mockServiceProvider.Object);
             var server = new MCPServer { AppId = 1, Name = "unknown" };
 
             // Act
@@ -114,7 +114,7 @@ namespace Wikit.Tests.Mcp
         public void It_Should_NotThrow_WhenRemovingUnknownServer()
         {
             // Arrange
-            var factory = new CacheableMcpClientFactory(_mockServiceProvider.Object);
+            var factory = new McpConnectionFactory(_mockServiceProvider.Object);
             var server = new MCPServer { AppId = 1, Name = "unknown" };
 
             // Act & Assert - Should not throw
@@ -125,7 +125,7 @@ namespace Wikit.Tests.Mcp
         public void It_Should_NotThrow_WhenClearingEmptyFactory()
         {
             // Arrange
-            var factory = new CacheableMcpClientFactory(_mockServiceProvider.Object);
+            var factory = new McpConnectionFactory(_mockServiceProvider.Object);
 
             // Act & Assert - Should not throw
             Should.NotThrow(() => factory.Clear());
@@ -135,7 +135,7 @@ namespace Wikit.Tests.Mcp
         public void It_Should_ClearAllConnections_WhenDisposing()
         {
             // Arrange
-            var factory = new CacheableMcpClientFactory(_mockServiceProvider.Object);
+            var factory = new McpConnectionFactory(_mockServiceProvider.Object);
             var statsBefore = factory.GetStats();
 
             // Act
@@ -151,7 +151,7 @@ namespace Wikit.Tests.Mcp
         public void It_Should_ReturnSameConnection_WhenSameKey()
         {
             // Arrange
-            var factory = new CacheableMcpClientFactory(_mockServiceProvider.Object);
+            var factory = new McpConnectionFactory(_mockServiceProvider.Object);
             var server = new MCPServer
             {
                 AppId = 1,
@@ -173,7 +173,7 @@ namespace Wikit.Tests.Mcp
         public void It_Should_SupportBothTransportTypes(TransportType transportType)
         {
             // Arrange
-            var factory = new CacheableMcpClientFactory(_mockServiceProvider.Object);
+            var factory = new McpConnectionFactory(_mockServiceProvider.Object);
             var server = new MCPServer
             {
                 AppId = 1,
@@ -190,7 +190,7 @@ namespace Wikit.Tests.Mcp
         public void It_Should_NotThrowForStdioTransport_WhenCallingStringVersion()
         {
             // Arrange
-            var factory = new CacheableMcpClientFactory(_mockServiceProvider.Object);
+            var factory = new McpConnectionFactory(_mockServiceProvider.Object);
 
             // Note: This test verifies the factory can be instantiated
             // Actual connection creation will fail without a real MCP server
@@ -202,7 +202,7 @@ namespace Wikit.Tests.Mcp
         public void It_Should_NotThrowForHttpTransport_WhenCallingStringVersion()
         {
             // Arrange
-            var factory = new CacheableMcpClientFactory(_mockServiceProvider.Object);
+            var factory = new McpConnectionFactory(_mockServiceProvider.Object);
 
             // Note: This test verifies the factory can be instantiated
             // Actual connection creation will fail without a real MCP server

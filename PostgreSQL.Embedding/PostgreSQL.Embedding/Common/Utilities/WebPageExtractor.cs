@@ -12,6 +12,8 @@ namespace PostgreSQL.Embedding.Utils
             {
                 using (var httpClient = new HttpClient())
                 {
+                    httpClient.Timeout = TimeSpan.FromSeconds(30);
+                    httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
                     var response = await httpClient.GetAsync(url);
                     response.EnsureSuccessStatusCode();
 
@@ -21,11 +23,29 @@ namespace PostgreSQL.Embedding.Utils
                     var context = BrowsingContext.New(config);
                     var document = await context.OpenAsync(request => request.Content(html));
 
-                    var fetchResult = new WebPageExtractionResult() { Url = url };
+                    var fetchResult = new WebPageExtractionResult()
+                    {
+                        Url = url,
+                        Metadata = new Dictionary<string, string>()
+                    };
 
+                    // 提取标题
                     var eleTitle = document.QuerySelector("title");
                     if (eleTitle != null)
                         fetchResult.Title = eleTitle.TextContent;
+
+                    // 提取 meta 标签作为元数据
+                    var metaNodes = document.QuerySelectorAll("meta");
+                    foreach (var meta in metaNodes)
+                    {
+                        var name = meta.GetAttribute("name") ?? meta.GetAttribute("property") ?? meta.GetAttribute("itemprop");
+                        var content = meta.GetAttribute("content");
+
+                        if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(content))
+                        {
+                            fetchResult.Metadata[name] = content;
+                        }
+                    }
 
                     var eleContent = document.QuerySelector(contentSelector ?? "body");
                     if (eleContent != null)
@@ -47,5 +67,6 @@ namespace PostgreSQL.Embedding.Utils
         public string Url { get; set; }
         public string Title { get; set; }
         public string Content { get; set; }
+        public Dictionary<string, string> Metadata { get; set; } = new();
     }
 }

@@ -11,7 +11,7 @@ namespace PostgreSQL.Embedding.Common.Extensions
 {
     public static class MCPExtensions
     {
-        public static async Task<IEnumerable<KernelFunction>> GetKernelFunctionsAsync(this IMcpClient client, ILoggerFactory loggerFactory, IServiceProvider serviceProvider, bool cacheToolsList = true)
+        public static async Task<IEnumerable<KernelFunction>> GetKernelFunctionsAsync(this McpClient client, ILoggerFactory loggerFactory, IServiceProvider serviceProvider, bool cacheToolsList = true)
         {
             var mcpToolResository = serviceProvider.GetRequiredService<IRepository<MCPTool>>();
 
@@ -35,7 +35,7 @@ namespace PostgreSQL.Embedding.Common.Extensions
             return tools.Select(tool => ToKernelFunction(new McpClientToolWrapper(tool), client, loggerFactory)).ToList();
         }
 
-        private static KernelFunction ToKernelFunction(this McpClientToolWrapper tool, IMcpClient client, ILoggerFactory loggerFactory)
+        private static KernelFunction ToKernelFunction(this McpClientToolWrapper tool, McpClient client, ILoggerFactory loggerFactory)
         {
             async Task<string> InvokeToolAsync(Kernel kernel, KernelFunction function, KernelArguments arguments, CancellationToken cancellationToken)
             {
@@ -51,7 +51,7 @@ namespace PostgreSQL.Embedding.Common.Extensions
 
                     var result = await client.CallToolAsync(tool.Name, mcpArguments, cancellationToken: cancellationToken).ConfigureAwait(false);
 
-                    return string.Join("\n", result.Content.Where(c => c.Type == "text").Select(c => c.Text));
+                    return string.Join("\n", result.Content.Where(c => c.Type == "text").Select(c => c.ToString()));
                 }
                 catch (Exception ex)
                 {
