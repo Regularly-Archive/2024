@@ -39,7 +39,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             var paralleTasks = sortedTaskIds.FindAll(taskId => _graph[taskId].Indegress == 0).Select(async taskId =>
             {
                 var subTask = _subTasks.FirstOrDefault(x => x.Id == taskId);
-                var taskStates = JsonConvert.SerializeObject(_subTasks.Select(x => new { Id = x.Id, Name = x.Name, Description = x.Description, State = x.Status.ToString() }));
+                var taskStates = JsonConvert.SerializeObject(_subTasks.Select(x => new { Id = x.Id, Name = x.Name, Description = x.Description, State = x.State.ToString() }));
                 await ExecuteSubTask(_query, subTask, taskStates);
             });
             await Task.WhenAll(paralleTasks);
@@ -48,7 +48,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             foreach (var taskId in serialTasks)
             {
                 var subTask = _subTasks.FirstOrDefault(x => x.Id == taskId);
-                var taskStates = JsonConvert.SerializeObject(_subTasks.Select(x => new { Id = x.Id, Name = x.Name, Description = x.Description, State = x.Status.ToString() }));
+                var taskStates = JsonConvert.SerializeObject(_subTasks.Select(x => new { Id = x.Id, Name = x.Name, Description = x.Description, State = x.State.ToString() }));
                 await ExecuteSubTask(_query, subTask, taskStates);
             }
         }
@@ -56,30 +56,22 @@ namespace PostgreSQL.Embedding.Llm.Planners
         private async Task ExecuteSubTask(string query, SubTask subTask, string taskStates)
         {
             _agentExecutionContext.SetStepId(subTask.Id.ToString());
+            if (subTask.State == TaskState.Completed && !subTask.AvailableTools.Any())
+            {
+                OnStepChanged?.Invoke(subTask.AsStepTrace(_agentExecutionContext.GetMessageId()));
+                return;
+            }
 
-            var plan = subTask.AvailableTools.Any()
-                ? await _stepwisePlanner.CreatePlanAsync(null, subTask.AvailableTools)
-                : await _stepwisePlanner.CreatePlanAsync();
+            var plan = await _stepwisePlanner.CreatePlanAsync();
+            //? await _stepwisePlanner.CreatePlanAsync(null, subTask.AvailableTools)
+            //: await _stepwisePlanner.CreatePlanAsync();
 
             plan.OnStepExecute = async (stepTrace) =>
             {
-                if (stepTrace.Type == "Thought")
-                {
-                    var streamingStepTraces = stepTrace.AsStreamingThought();
-                    foreach (var streamingStepTrace in streamingStepTraces)
-                    {
-                        await Task.Delay(100);
-                        OnStepChanged?.Invoke(streamingStepTrace);
-                    }
-                }
-                else
-                {
-                    OnStepChanged?.Invoke(stepTrace);
-                }
-                
+                OnStepChanged?.Invoke(stepTrace);
             };
 
-            subTask.Status = Domain.Models.Planners.TaskStatus.InProgress;
+            subTask.State = TaskState.InProgress;
             OnStepChanged?.Invoke(subTask.AsStepTrace(_agentExecutionContext.GetMessageId()));
 
             if (!subTask.DependsOn.Any())
@@ -91,12 +83,12 @@ namespace PostgreSQL.Embedding.Llm.Planners
 
                 var result = await plan.ExecuteAsync(subTask.Description, chatHistory);
                 subTask.ExecuteResult = result;
-                subTask.Status = string.IsNullOrEmpty(result) ? Domain.Models.Planners.TaskStatus.Failed : Domain.Models.Planners.TaskStatus.Completed;
+                subTask.State = string.IsNullOrEmpty(result) ? Domain.Models.Planners.TaskState.Failed : Domain.Models.Planners.TaskState.Completed;
             }
             else
             {
                 var dependencies = _subTasks.FindAll(x => subTask.DependsOn.Contains(x.Id));
-                if (dependencies.All(x => x.Status == Domain.Models.Planners.TaskStatus.Completed))
+                if (dependencies.All(x => x.State == Domain.Models.Planners.TaskState.Completed))
                 {
                     var chatHistory = new ChatHistory();
 
@@ -105,7 +97,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
 
                     var result = await plan.ExecuteAsync(subTask.Description, chatHistory);
                     subTask.ExecuteResult = result;
-                    subTask.Status = string.IsNullOrEmpty(result) ? Domain.Models.Planners.TaskStatus.Failed : Domain.Models.Planners.TaskStatus.Completed;
+                    subTask.State = string.IsNullOrEmpty(result) ? Domain.Models.Planners.TaskState.Failed : Domain.Models.Planners.TaskState.Completed;
                 }
             }
 
@@ -137,7 +129,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             _subTaskPromptTemplate.AddVariable("goal", query);
             _subTaskPromptTemplate.AddVariable("currentTask", subTask.Description);
             _subTaskPromptTemplate.AddVariable("taskStates", taskStates);
-            _subTaskPromptTemplate.AddVariable("dependencies", JsonConvert.SerializeObject(dependencies.Select(x => new { Id = x.Id, Name = x.Name, Description = x.Description, State = x.Status.ToString(), Output = x.ExecuteResult })));
+            _subTaskPromptTemplate.AddVariable("dependencies", JsonConvert.SerializeObject(dependencies.Select(x => new { Id = x.Id, Name = x.Name, Description = x.Description, State = x.State.ToString(), Output = x.ExecuteResult })));
             _subTaskPromptTemplate.AddVariable("requiredArtifacts", JsonConvert.SerializeObject(subTask.RequiredArtifacts));
             _subTaskPromptTemplate.AddVariable("outputArtifacts", JsonConvert.SerializeObject(subTask.OutputArtifacts));
 

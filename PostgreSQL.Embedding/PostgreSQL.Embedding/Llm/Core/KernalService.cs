@@ -55,7 +55,6 @@ namespace PostgreSQL.Embedding.Llm.Core
             if (initializeTools)
             {
                 kernel = await kernel.ImportLlmPluginsAsync(_serviceProvider, appId);
-                kernel = await kernel.ImportMCPServer(_serviceProvider, appId);
             }
 
             return kernel;

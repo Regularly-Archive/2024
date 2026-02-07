@@ -45,6 +45,7 @@ namespace PostgreSQL.Embedding.Utils
                         persistedPlugin.PluginVersion = kernelPluginAttribute.Version;
                         persistedPlugin.TypeName = pluginType.FullName;
                         persistedPlugin.IsBuiltin = isBuiltin;
+                        persistedPlugin.IsBuiltin = kernelPluginAttribute.Enabled;
                         await pluginRepository.UpdateAsync(persistedPlugin);
                     }
                 }
@@ -58,6 +59,7 @@ namespace PostgreSQL.Embedding.Utils
                         TypeName = pluginType.FullName,
                         PluginVersion = kernelPluginAttribute.Version,
                         IsBuiltin = isBuiltin,
+                        Enabled = kernelPluginAttribute.Enabled
                     };
                     await pluginRepository.AddAsync(newPlugin);
                 }
@@ -209,72 +211,6 @@ namespace PostgreSQL.Embedding.Utils
                 .SelectMany(x => x.DefinedTypes)
                 .Where(x => x.Namespace?.StartsWith("PostgreSQL.Embedding.Plugins.BuiltIn") == true)
                 .Where(x => x.GetCustomAttribute<KernelPluginAttribute>() != null);
-        }
-
-        public static async Task AddMCPServerAsync(this Kernel kernel, string name, string command, string[] args = null, Dictionary<string, string> env = null, CacheableMcpClientFactory cachedMcpClientFactory = null, IServiceProvider serviceProvider = null, bool cacheToolsList = true)
-        {
-            try
-            {
-                var validName = name.Replace("-", "_");
-                var client = cachedMcpClientFactory.GetOrCreate(name, command, args, env);
-
-                var loggerFactory = kernel.Services.GetRequiredService<ILoggerFactory>();
-                var kernelFunctions = await client.GetKernelFunctionsAsync(loggerFactory, serviceProvider, cacheToolsList);
-
-                kernel.Plugins.AddFromFunctions(validName, kernelFunctions);
-            }
-            catch (Exception ex)
-            {
-                kernel.Services.GetService<ILoggerFactory>()?.CreateLogger("MCP")
-                    .LogError(ex, "Failed to add MCP server {ServerName}", name);
-            }
-        }
-
-        public static async Task AddMCPServerAsync(this Kernel kernel, string name, string url, Dictionary<string, string> headers = null, CacheableMcpClientFactory cachedMcpClientFactory = null, IServiceProvider serviceProvider = null, bool cacheToolsList = true)
-        {
-            try
-            {
-                var validName = name.Replace("-", "_");
-                var client = cachedMcpClientFactory.GetOrCreate(name, url, headers);
-
-                var loggerFactory = kernel.Services.GetRequiredService<ILoggerFactory>();
-                var kernelFunctions = await client.GetKernelFunctionsAsync(loggerFactory, serviceProvider, cacheToolsList);
-
-                kernel.Plugins.AddFromFunctions(validName, kernelFunctions);
-            }
-            catch (Exception ex)
-            {
-                kernel.Services.GetService<ILoggerFactory>()?.CreateLogger("MCP")
-                    .LogError(ex, "Failed to add MCP server {ServerName}", name);
-            }
-        }
-
-        public static async Task AddMCPServerAsync(this Kernel kernel, MCPServer mcpServer, CacheableMcpClientFactory cacheableMcpClientFactory, IServiceProvider serviceProvider, bool cacheToolsList)
-        {
-            if (mcpServer.TransportType == (int)Common.TransportType.Stdio)
-            {
-                await kernel.AddMCPServerAsync(mcpServer.Name, mcpServer.Command, mcpServer.Arguments, mcpServer.EnvVars, cacheableMcpClientFactory, serviceProvider, cacheToolsList);
-            }
-            else
-            {
-                await kernel.AddMCPServerAsync(mcpServer.Name, mcpServer.Endpoint, mcpServer.ExtraHeaders, cacheableMcpClientFactory, serviceProvider, cacheToolsList);
-            }
-        }
-
-        public static async Task<Kernel> ImportMCPServer(this Kernel kernel, IServiceProvider serviceProvider, long? appId = null, bool cacheToolsList = true)
-        {
-            var cacheableMcpClientFactory = serviceProvider.GetService<CacheableMcpClientFactory>();
-            var mcpServerRepository = serviceProvider.GetService<IRepository<MCPServer>>();
-            var mcpServers = appId.HasValue
-                ? await mcpServerRepository.FindListAsync(x => x.AppId == appId.Value && x.Enabled == true)
-                : await mcpServerRepository.GetAllAsync();
-
-            foreach (var mcpServer in mcpServers)
-            {
-                await kernel.AddMCPServerAsync(mcpServer, cacheableMcpClientFactory, serviceProvider, cacheToolsList);
-            }
-
-            return kernel;
         }
     }
 }

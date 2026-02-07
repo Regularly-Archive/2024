@@ -12,7 +12,17 @@
       "Skill(stepsnow-write-workflow)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Bash(dotnet list package:*)",
+      "Bash(dotnet restore:*)",
+      "Bash(findstr:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(dotnet nuget list:*)",
+      "Bash(dir:*)",
+      "Bash(dotnet new:*)",
+      "WebFetch(domain:blog.yuanpei.me)",
+      "WebSearch"
     ]
   }
 }

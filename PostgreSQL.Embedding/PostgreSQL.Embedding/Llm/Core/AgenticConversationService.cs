@@ -1,22 +1,23 @@
-using System.Threading.Channels;
+using LLama.Batched;
 using Masuit.Tools;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
+using PostgreSQL.Embedding.Common;
+using PostgreSQL.Embedding.Common.Extensions;
 using PostgreSQL.Embedding.Common.Streaming;
+using PostgreSQL.Embedding.Domain.Entities;
 using PostgreSQL.Embedding.Domain.Models;
 using PostgreSQL.Embedding.Domain.Models.Planners;
+using PostgreSQL.Embedding.Infrastructure.UserIdentity;
 using PostgreSQL.Embedding.Llm.Abstractions;
 using PostgreSQL.Embedding.Llm.Planners;
 using PostgreSQL.Embedding.Llm.Services;
 using PostgreSQL.Embedding.Utils;
 using System.Diagnostics;
-using System.Text;
-using PostgreSQL.Embedding.Common;
-using TaskStatus = PostgreSQL.Embedding.Domain.Models.Planners.TaskStatus;
 using System.Runtime.CompilerServices;
-using PostgreSQL.Embedding.Common.Extensions;
-using PostgreSQL.Embedding.Domain.Entities;
-using PostgreSQL.Embedding.Infrastructure.UserIdentity;
+using System.Text;
+using System.Threading.Channels;
+using TaskState = PostgreSQL.Embedding.Domain.Models.Planners.TaskState;
 
 
 namespace PostgreSQL.Embedding.Llm.Core
@@ -29,8 +30,8 @@ namespace PostgreSQL.Embedding.Llm.Core
         public int ThinkingBlockIndex { get; private set; }
         public int TextBlockIndex { get; private set; }
 
-        public void InitializeThinkingBlock() => ThinkingBlockIndex = 0;
-        public void InitializeTextBlock() => TextBlockIndex = ThinkingBlockIndex + 1;
+        public void InitializeThinkingBlock() => ThinkingBlockIndex = ThinkingBlockIndex + 1;
+        public void InitializeTextBlock() => TextBlockIndex = 0;
     }
 
     /// <summary>
@@ -77,14 +78,32 @@ namespace PostgreSQL.Embedding.Llm.Core
             [EnumeratorCancellation] CancellationToken ct = default)
         {
             // Setup conversation context
-            var convId = conversationId ?? Guid.NewGuid().ToString("N");
+            var convId = string.IsNullOrEmpty(conversationId) ? Guid.NewGuid().ToString("N") : conversationId;
             _agentExecutionContext.SetAppId(_app.Id);
             _agentExecutionContext.SetConversationId(convId);
 
             // Add user message
-            var messageId = await _chatHistoriesService.AddUserMessageAsync(_app.Id, convId, input);
-            _agentExecutionContext.SetReferenceMessageId(messageId);
+            var refMessageId = await _chatHistoriesService.AddUserMessageAsync(_app.Id, convId, input);
+            _agentExecutionContext.SetReferenceMessageId(refMessageId);
+
+            // Add app conversation
+            var conversationTitle = string.Empty;
+            var conversation = await _chatHistoriesService.GetAppConversationAsync(_app.Id, convId);
+            if (conversation == null)
+            {
+                conversationTitle = await GenerateConversationTitle(input);
+                await _chatHistoriesService.AddConversationAsync(_app.Id, convId, conversationTitle);
+            }
+            else
+            {
+                conversationTitle = conversation.Title;
+            }
+
+            // Add system message
+            var messageId = await _chatHistoriesService.AddSystemMessageAsync(_app.Id, convId, string.Empty);
             _agentExecutionContext.SetMessageId(messageId);
+
+            var metadata = new ConversationContext { ConversationId = convId, ConversationTitle = conversationTitle, ReferenceMessageId = refMessageId.ToString() };
 
             // Create channel for event streaming
             var channel = Channel.CreateUnbounded<ISseEvent>(new UnboundedChannelOptions
@@ -97,7 +116,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             _agentExecutionContext.InitializeEventBus(channel.Writer);
 
             // Start event production in background
-            _ = ProduceEventsAsync(request, input, convId, messageId, channel.Writer, ct);
+            _ = ProduceEventsAsync(request, input, metadata, messageId, channel.Writer, ct);
 
             // Consume and yield events to the caller
             await foreach (var evt in channel.Reader.ReadAllAsync(ct))
@@ -109,15 +128,17 @@ namespace PostgreSQL.Embedding.Llm.Core
         private async Task ProduceEventsAsync(
             ConversationRequestModel request,
             string input,
-            string conversationId,
+            ConversationContext conversationContext,
             long messageId,
             ChannelWriter<ISseEvent> writer,
             CancellationToken ct)
         {
+            var conversationId = conversationContext.ConversationId;
+
             // Initialize block tracker for thinking and text blocks
             var blockTracker = new SseBlockTracker();
-            blockTracker.InitializeThinkingBlock(); // index 0
-            blockTracker.InitializeTextBlock();     // index 1
+            //blockTracker.InitializeThinkingBlock(); // index 0
+            //blockTracker.InitializeTextBlock();     // index 0
 
             try
             {
@@ -129,7 +150,8 @@ namespace PostgreSQL.Embedding.Llm.Core
                         Id = Guid.NewGuid().ToString("N"),
                         Role = "assistant",
                         Content = new(),
-                        Model = ""
+                        Model = "",
+                        Context = conversationContext
                     }
                 }, ct);
 
@@ -212,6 +234,7 @@ namespace PostgreSQL.Embedding.Llm.Core
                 return;
             }
 
+            //blockTracker.InitializeThinkingBlock();
             // Emit planning thought as content_block (thinking) - uses thinking block index
             await EmitThinkingBlockAsync(planResult.Thought, writer, blockTracker.ThinkingBlockIndex, ct);
 
@@ -247,6 +270,7 @@ namespace PostgreSQL.Embedding.Llm.Core
                 : await taskPlanner.GetRAGTasks(input);
 
             var subTasks = planResult.Tasks;
+            _logger.LogInformation($"[THOUGHT] {planResult.Thought}");
             if (!subTasks.Any()) return "无法生成任务计划";
 
             // Create planner for task execution
@@ -257,8 +281,8 @@ namespace PostgreSQL.Embedding.Llm.Core
             planner.AddVariable("userId", currentUser.Id);
             planner.AddVariable("currentTime", DateTime.Now);
             planner.AddVariable("enableWebSearch", request.AccessInternet);
-            planner.AddVariable("skillsRootFolder", "D:\\Projects\\skills\\skills");
-            planner.AddVariable("EnableMCP", false);
+            planner.AddVariable("skillsRootFolder", "C:\\Users\\Administrator\\.claude\\skills");
+            planner.AddVariable("EnableMCP", true);
             planner.AddVariable("EnableSkills", true);
 
             // Create DAG executor
@@ -273,7 +297,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             await graphExecutor.ExecuteAsync();
 
             // Return the result from the last completed subtask
-            var completedTask = subTasks.OrderByDescending(x => x.Id).FirstOrDefault(x => x.Status == TaskStatus.Completed);
+            var completedTask = subTasks.OrderByDescending(x => x.Id).FirstOrDefault(x => x.State == TaskState.Completed);
             return completedTask?.ExecuteResult ?? "";
         }
 
@@ -283,6 +307,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             {
                 case "Thought":
                     // Emit as content_block (thinking) format - uses thinking block index
+                    blockTracker.InitializeThinkingBlock();
                     await EmitThinkingBlockAsync(stepTrace.Content, writer, blockTracker.ThinkingBlockIndex, ct);
                     break;
 
@@ -324,18 +349,17 @@ namespace PostgreSQL.Embedding.Llm.Core
         /// </summary>
         private async Task EmitThinkingBlockAsync(string thinking, ChannelWriter<ISseEvent> writer, int blockIndex, CancellationToken ct)
         {
-            if (string.IsNullOrEmpty(thinking))
-            {
-                // Still emit empty thinking block to maintain block structure
-                await writer.WriteAsync(new ContentBlockStartEvent
-                {
-                    Index = blockIndex,
-                    ContentBlock = new ContentBlock { BlockType = "thinking", Thinking = "" }
-                }, ct);
-                await writer.WriteAsync(new ContentBlockStopEvent { Index = blockIndex }, ct);
-                return;
-            }
-
+            //if (string.IsNullOrEmpty(thinking))
+            //{
+            //    // Still emit empty thinking block to maintain block structure
+            //    await writer.WriteAsync(new ContentBlockStartEvent
+            //    {
+            //        Index = blockIndex,
+            //        ContentBlock = new ContentBlock { BlockType = "thinking", Thinking = "" }
+            //    }, ct);
+            //    await writer.WriteAsync(new ContentBlockStopEvent { Index = blockIndex }, ct);
+            //    return;
+            //}
             // content_block_start - thinking block
             await writer.WriteAsync(new ContentBlockStartEvent
             {
@@ -450,7 +474,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             return status?.ToLower() switch
             {
                 "pending" => "pending",
-                "in_progress" => "in_progress",
+                "inprogress" => "inprogress",
                 "completed" => "completed",
                 "failed" => "failed",
                 _ => "pending"

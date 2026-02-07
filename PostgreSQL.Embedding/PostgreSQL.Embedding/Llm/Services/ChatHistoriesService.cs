@@ -125,7 +125,7 @@ namespace PostgreSQL.Embedding.Llm.Services
             {
                 AppId = appId,
                 ConversationId = conversationId,
-                Summary = conversationName,
+                Title = conversationName,
             });
         }
 
@@ -146,14 +146,14 @@ namespace PostgreSQL.Embedding.Llm.Services
         /// </summary>
         /// <param name="appId"></param>
         /// <param name="conversationId"></param>
-        /// <param name="summary"></param>
+        /// <param name="conversationTitle"></param>
         /// <returns></returns>
-        public async Task UpdateConversationAsync(long appId, string conversationId, string summary)
+        public async Task UpdateConversationAsync(long appId, string conversationId, string conversationTitle)
         {
             var conversation = await _appConversationRepository.FindAsync(x => x.AppId == appId && x.ConversationId == conversationId);
             if (conversation == null) return;
 
-            conversation.Summary = summary;
+            conversation.Title = conversationTitle;
             await _appConversationRepository.UpdateAsync(conversation);
         }
 

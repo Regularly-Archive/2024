@@ -43,28 +43,11 @@ namespace PostgreSQL.Embedding.Plugins
         }
 
         /// <summary>
-        /// 添加内置插件（保留兼容）
-        /// </summary>
-        [Obsolete("使用 AddPlugins 替代")]
-        public static IServiceCollection AddBuiltInPlugins(this IServiceCollection services)
-        {
-            var pluginTypes = GetAllPluginTypes();
-
-            foreach (var pluginType in pluginTypes)
-            {
-                services.AddScoped(pluginType);
-            }
-
-            return services;
-        }
-
-        /// <summary>
         /// 添加 MCP 客户端工厂
         /// </summary>
         public static IServiceCollection AddMcpClientFactory(this IServiceCollection services)
         {
-            services.AddScoped<CacheableMcpClientFactory>();
-
+            services.AddScoped<McpConnectionFactory>();
             return services;
         }
 

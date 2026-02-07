@@ -1,4 +1,5 @@
-﻿using Microsoft.SemanticKernel;
+﻿using DocumentFormat.OpenXml.Math;
+using Microsoft.SemanticKernel;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using PostgreSQL.Embedding.Common.Extensions;
@@ -29,13 +30,14 @@ namespace PostgreSQL.Embedding.Llm.Planners
         public async Task<PlanResult> GetSubTasksAsync(string query, string history = null, int limit = 5)
         {
             _promptTemplate.AddVariable("input", query);
-            _promptTemplate.AddVariable("language", "chinese");
+            _promptTemplate.AddVariable("language", "Chinese");
             _promptTemplate.AddVariable("limit", limit);
             _promptTemplate.AddVariable("history", history);
 
             var functions = await CreateFunctionDescriptions(_kernel);
             _promptTemplate.AddVariable("functions", functions);
-            _promptTemplate.FunctionName = "TaskPlanner_GetSubTasks";
+            _promptTemplate.PluginName = nameof(TaskPlanner);
+            _promptTemplate.FunctionName = "GetSubTasks";
 
             var functionResult = string.Empty;
             await foreach (var content in _promptTemplate.InvokeStreamingAsync(_kernel))
@@ -45,9 +47,11 @@ namespace PostgreSQL.Embedding.Llm.Planners
 
             try
             {
+                if (string.IsNullOrEmpty(functionResult)) 
+                    return await GetSubTasksAsync(query, history, limit);
+
                 functionResult = ExtractJson(functionResult);
                 functionResult = PreprocessJsonData(functionResult);
-                _logger.LogInformation($"Generated SubTasks: {functionResult}");
                 var planResult = JsonConvert.DeserializeObject<PlanResult>(functionResult);
                 return planResult;
             }
@@ -61,13 +65,14 @@ namespace PostgreSQL.Embedding.Llm.Planners
         public async Task<PlanResult> GetRAGTasks(string query, string history = null)
         {
             _promptTemplate.AddVariable("input", query);
-            _promptTemplate.AddVariable("language", "chinese");
+            _promptTemplate.AddVariable("language", "Chinese");
             _promptTemplate.AddVariable("limit", 1);
             _promptTemplate.AddVariable("history", history);
 
             var functions = await CreateFunctionDescriptions(_kernel, x => x.PluginName == nameof(RAGFlowPlugin));
             _promptTemplate.AddVariable("functions", functions);
-            _promptTemplate.FunctionName = "TaskPlanner_GetRAGTasks";
+            _promptTemplate.PluginName = nameof(TaskPlanner);
+            _promptTemplate.FunctionName = "GetRAGTasks";
 
             var functionResult = string.Empty;
             await foreach (var content in _promptTemplate.InvokeStreamingAsync(_kernel))
@@ -77,9 +82,11 @@ namespace PostgreSQL.Embedding.Llm.Planners
 
             try
             {
-                functionResult = functionResult.Replace("```json", "").Replace("```", "");
+                if (string.IsNullOrEmpty(functionResult))
+                    return await GetRAGTasks(query, history);
+
+                functionResult = ExtractJson(functionResult);
                 functionResult = PreprocessJsonData(functionResult);
-                _logger.LogInformation($"Generated SubTasks: {functionResult}");
                 var planResult = JsonConvert.DeserializeObject<PlanResult>(functionResult);
                 return planResult;
             }
@@ -147,7 +154,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
         public static string ExtractJson(string text)
         {
             Match match = _jsonBlockRegex.Match(text);
-            return match.Success ? match.Groups[1].Value.Trim() : null;
+            return match.Success ? match.Groups[1].Value.Trim() : text;
         }
     }
 }

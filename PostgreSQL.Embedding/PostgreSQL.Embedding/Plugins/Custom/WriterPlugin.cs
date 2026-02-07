@@ -75,8 +75,11 @@ namespace PostgreSQL.Embedding.Plugins.Custom
             promptTemplate.AddVariable("input", text);
             promptTemplate.AddVariable("style_description", styleInfo.Description);
             promptTemplate.AddVariable("style_hint", styleInfo.Hint);
+            promptTemplate.PluginName = nameof(WriterPlugin);
+            promptTemplate.FunctionName = nameof(PolishTextAsync);
 
             var functionResult = await promptTemplate.InvokeAsync(clonedKernel);
+            
             var generatedText = functionResult.GetValue<string>();
             return $"下面是润色后的文本信息（风格：{style}）：\r\n```{generatedText}```";
         }

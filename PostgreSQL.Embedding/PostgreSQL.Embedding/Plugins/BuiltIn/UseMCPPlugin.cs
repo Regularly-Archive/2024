@@ -20,24 +20,19 @@ public class UseMCPPlugin : BasePlugin
 {
     private readonly ILogger<UseMCPPlugin> _logger;
     private readonly IRepository<MCPServer> _mcpServiceRepository;
-    private readonly CacheableMcpClientFactory? _cacheableMcpClientFactory;
+    private readonly McpConnectionFactory? _cacheableMcpClientFactory;
     private readonly PromptTemplateService _promptTemplateService;
-
-    // 移除实例字段，改为每次从 Factory 获取
-    // 原因：1. 多线程环境下状态污染
-    //       2. 同一个插件实例可能被多个会话共享
-    //       3. 使用 Factory 管理连接更安全
 
     public UseMCPPlugin(IServiceProvider serviceProvider)
         : base(serviceProvider)
     {
         _mcpServiceRepository = _serviceProvider.GetService<IRepository<MCPServer>>();
         _logger = _serviceProvider.GetService<ILoggerFactory>().CreateLogger<UseMCPPlugin>();
-        _cacheableMcpClientFactory = _serviceProvider.GetService<CacheableMcpClientFactory>();
+        _cacheableMcpClientFactory = _serviceProvider.GetService<McpConnectionFactory>();
         _promptTemplateService = _serviceProvider.GetService<PromptTemplateService>();
     }
 
-    private CacheableMcpClientFactory GetRequiredFactory()
+    private McpConnectionFactory GetRequiredFactory()
     {
         return _cacheableMcpClientFactory
             ?? throw new InvalidOperationException("CacheableMcpClientFactory is not registered. MCP functionality requires CacheableMcpClientFactory to be registered in DI.");
@@ -64,8 +59,8 @@ public class UseMCPPlugin : BasePlugin
         var mcpServer = await _mcpServiceRepository.FindAsync(x => x.AppId == appId && x.Name == serverName);
         if (mcpServer == null) return $"Unable to find the MCP Server '{serverName}'";
 
-        // 使用 Factory 获取工具（带缓存）
-        var tools = await GetRequiredFactory().GetToolsAsync(mcpServer, forceRefresh: false);
+        var tools = await GetRequiredFactory()
+            .GetToolsAsync(mcpServer, forceRefresh: false);
 
         return FormatTools(serverName, tools);
     }
@@ -80,11 +75,11 @@ public class UseMCPPlugin : BasePlugin
         var mcpServer = await _mcpServiceRepository.FindAsync(x => x.AppId == appId && x.Name == serverName);
         if (mcpServer == null) return $"Unable to find the MCP Server '{serverName}'";
 
-        // 强制刷新缓存
         await GetRequiredFactory().RefreshToolCacheAsync(mcpServer);
-        var tools = await GetRequiredFactory().GetToolsAsync(mcpServer, forceRefresh: true);
+        var tools = await GetRequiredFactory()
+            .GetToolsAsync(mcpServer, forceRefresh: true);
 
-        return $"# Refreshed tools for {serverName}\n\n" + FormatTools(serverName, tools);
+        return FormatTools(serverName, tools);
     }
 
     [KernelFunction]
@@ -97,9 +92,7 @@ public class UseMCPPlugin : BasePlugin
         var mcpServer = await _mcpServiceRepository.FindAsync(x => x.AppId == appId && x.Name == serverName);
         if (mcpServer == null) return $"Unable to find the MCP Server '{serverName}'";
 
-        // 从连接直接获取资源
-        var connection = GetRequiredFactory().GetOrCreate(mcpServer);
-        var resources = await connection.Client.ListResourcesAsync();
+        var resources = GetRequiredFactory().GetOrCreate(mcpServer).GetResourcesAsync();
 
         return JsonConvert.SerializeObject(resources);
     }

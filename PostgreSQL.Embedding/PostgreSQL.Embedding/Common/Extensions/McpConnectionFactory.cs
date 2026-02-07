@@ -1,22 +1,12 @@
-using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Client;
-using ModelContextProtocol.Protocol.Transport;
-using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Domain.Entities;
 using System.Collections.Concurrent;
-using System.Diagnostics;
-using System.Text.Json;
-using Newtonsoft.Json;
 
 namespace PostgreSQL.Embedding.Common.Extensions
 {
-
-    /// <summary>
-    /// MCP 连接包装类，包含连接健康状态和工具缓存
-    /// </summary>
     public class McpConnection : IDisposable
     {
-        public IMcpClient Client { get; }
+        public McpClient Client { get; }
         public string ServerKey { get; }
         public DateTime CreatedAt { get; }
         public DateTime LastUsedAt { get; private set; }
@@ -25,7 +15,7 @@ namespace PostgreSQL.Embedding.Common.Extensions
 
         private IList<McpClientTool>? _cachedTools;
 
-        public McpConnection(string serverKey, IMcpClient client, ILogger logger)
+        public McpConnection(string serverKey, McpClient client, ILogger logger)
         {
             ServerKey = serverKey;
             Client = client;
@@ -68,6 +58,12 @@ namespace PostgreSQL.Embedding.Common.Extensions
             }
         }
 
+        public async Task<IList<McpClientResource>> GetResourcesAsync()
+        {
+            var resources = await Client.ListResourcesAsync();
+            return resources;
+        }
+
         public void Touch()
         {
             LastUsedAt = DateTime.UtcNow;
@@ -83,7 +79,6 @@ namespace PostgreSQL.Embedding.Common.Extensions
             try
             {
                 Client.DisposeAsync().AsTask().GetAwaiter().GetResult();
-                _logger.LogDebug("Disposed MCP client for server {ServerKey}", ServerKey);
             }
             catch (Exception ex)
             {
@@ -92,9 +87,6 @@ namespace PostgreSQL.Embedding.Common.Extensions
         }
     }
 
-    /// <summary>
-    /// 工具列表缓存项
-    /// </summary>
     public class ToolCacheItem
     {
         public IList<McpClientTool> Tools { get; }
@@ -109,98 +101,43 @@ namespace PostgreSQL.Embedding.Common.Extensions
         }
     }
 
-    /// <summary>
-    /// 增强版 MCP 客户端工厂，支持连接池、TTL 和工具缓存
-    /// </summary>
-    public class CacheableMcpClientFactory : IDisposable
+    public class McpConnectionFactory : IDisposable
     {
         private readonly IServiceProvider _serviceProvider;
-        private readonly ILogger<CacheableMcpClientFactory> _logger;
+        private readonly ILogger<McpConnectionFactory> _logger;
 
-        // 连接池：带 TTL 和健康检查
         private readonly ConcurrentDictionary<string, McpConnection> _connections = new();
-
-        // 工具列表缓存（跨连接复用）
         private readonly ConcurrentDictionary<string, ToolCacheItem> _toolCache = new();
 
-        // 配置
         private readonly TimeSpan _connectionTTL = TimeSpan.FromMinutes(10);
         private readonly TimeSpan _toolCacheTTL = TimeSpan.FromMinutes(30);
+
         private readonly int _maxConnections = 50;
         private readonly int _maxRetryCount = 3;
         private readonly TimeSpan _retryDelay = TimeSpan.FromMilliseconds(500);
 
-        public CacheableMcpClientFactory(IServiceProvider serviceProvider)
+        public McpConnectionFactory(IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;
-            _logger = serviceProvider.GetService<ILoggerFactory>()?.CreateLogger<CacheableMcpClientFactory>()
+            _logger = serviceProvider.GetService<ILoggerFactory>()?.CreateLogger<McpConnectionFactory>()
                         ?? throw new InvalidOperationException("ILoggerFactory is not registered");
 
-            // 启动后台清理任务
             _ = Task.Run(BackgroundCleanupAsync);
         }
 
-        /// <summary>
-        /// 获取或创建连接（带重试机制）- 返回 IMcpClient
-        /// </summary>
-        public IMcpClient GetOrCreate(string name, string command, string[] args = null, Dictionary<string, string> env = null)
-        {
-            var validName = name.Replace("-", "_");
-
-            // 创建临时服务器对象用于 GetOrCreate
-            var tempServer = new MCPServer
-            {
-                Name = name,
-                Command = command,
-                Arguments = args,
-                EnvVars = env,
-                TransportType = (int)TransportType.Stdio
-            };
-
-            return GetOrCreate(validName, tempServer).Client;
-        }
-
-        /// <summary>
-        /// 获取或创建连接（带重试机制）- 返回 IMcpClient
-        /// </summary>
-        public IMcpClient GetOrCreate(string name, string url, Dictionary<string, string> headers = null)
-        {
-            var validName = name.Replace("-", "_");
-
-            // 创建临时服务器对象用于 GetOrCreate
-            var tempServer = new MCPServer
-            {
-                Name = name,
-                Endpoint = url,
-                ExtraHeaders = headers ?? new Dictionary<string, string>(),
-                TransportType = (int)TransportType.Http
-            };
-
-            return GetOrCreate(validName, tempServer).Client;
-        }
-
-        /// <summary>
-        /// 获取或创建连接（返回 McpConnection）
-        /// </summary>
         public McpConnection GetOrCreate(MCPServer server)
         {
             var serverKey = GetServerKey(server);
             return GetOrCreate(serverKey, server);
         }
 
-        /// <summary>
-        /// 获取或创建连接（带重试机制）
-        /// </summary>
         public McpConnection GetOrCreate(string serverKey, MCPServer server)
         {
             return _connections.GetOrAdd(serverKey, key =>
             {
-                _logger.LogInformation("Creating new MCP connection for server: {ServerKey}", key);
-
-                var client = CreateClientWithRetry(server);
+                var client = CreateClient(server);
                 var connection = new McpConnection(key, client, _logger);
 
-                // 尝试恢复工具缓存
                 if (_toolCache.TryGetValue(key, out var cachedItem) &&
                     cachedItem.CachedAt.Add(_toolCacheTTL) > DateTime.UtcNow)
                 {
@@ -213,14 +150,10 @@ namespace PostgreSQL.Embedding.Common.Extensions
             });
         }
 
-        /// <summary>
-        /// 获取工具列表（优先从缓存获取）
-        /// </summary>
         public async Task<IList<McpClientTool>> GetToolsAsync(MCPServer server, bool forceRefresh = false)
         {
             var serverKey = GetServerKey(server);
 
-            // 尝试从工具缓存获取
             if (!forceRefresh && _toolCache.TryGetValue(serverKey, out var cachedItem))
             {
                 if (cachedItem.CachedAt.Add(_toolCacheTTL) > DateTime.UtcNow)
@@ -231,11 +164,10 @@ namespace PostgreSQL.Embedding.Common.Extensions
                 }
             }
 
-            // 从连接获取并缓存
+
             var connection = GetOrCreate(serverKey, server);
             var tools = await connection.GetToolsAsync(forceRefresh);
 
-            // 更新缓存
             _toolCache.AddOrUpdate(serverKey,
                 new ToolCacheItem(tools),
                 (_, existing) => new ToolCacheItem(tools));
@@ -243,14 +175,10 @@ namespace PostgreSQL.Embedding.Common.Extensions
             return tools;
         }
 
-        /// <summary>
-        /// 获取工具列表（同步版本，带缓存）
-        /// </summary>
         public IList<McpClientTool> GetTools(MCPServer server, bool forceRefresh = false)
         {
             var serverKey = GetServerKey(server);
 
-            // 尝试从工具缓存获取
             if (!forceRefresh && _toolCache.TryGetValue(serverKey, out var cachedItem))
             {
                 if (cachedItem.CachedAt.Add(_toolCacheTTL) > DateTime.UtcNow)
@@ -259,11 +187,9 @@ namespace PostgreSQL.Embedding.Common.Extensions
                 }
             }
 
-            // 从连接获取
             var connection = GetOrCreate(server);
             var tools = connection.GetTools(forceRefresh);
 
-            // 更新缓存
             _toolCache.AddOrUpdate(serverKey,
                 new ToolCacheItem(tools),
                 (_, existing) => new ToolCacheItem(tools));
@@ -271,9 +197,6 @@ namespace PostgreSQL.Embedding.Common.Extensions
             return tools;
         }
 
-        /// <summary>
-        /// 调用工具（带超时和重试）
-        /// </summary>
         public async Task<string> CallToolAsync(MCPServer server, string toolName, Dictionary<string, object> arguments)
         {
             var connection = GetOrCreate(server);
@@ -282,15 +205,12 @@ namespace PostgreSQL.Embedding.Common.Extensions
             var result = await ExecuteWithRetryAsync(async () =>
             {
                 var callResult = await connection.Client.CallToolAsync(toolName, arguments);
-                return string.Join("\n", callResult.Content.Where(c => c.Type == "text").Select(c => c.Text));
+                return string.Join("\n", callResult.Content.Where(c => c.Type == "text").Select(c => c.ToString()));
             });
 
             return result;
         }
 
-        /// <summary>
-        /// 刷新服务器的工具缓存
-        /// </summary>
         public async Task RefreshToolCacheAsync(MCPServer server)
         {
             var serverKey = GetServerKey(server);
@@ -306,18 +226,12 @@ namespace PostgreSQL.Embedding.Common.Extensions
             _logger.LogInformation("Refreshed tool cache for server {ServerKey}, {Count} tools", serverKey, tools.Count);
         }
 
-        /// <summary>
-        /// 检查连接健康状态
-        /// </summary>
         public bool IsHealthy(MCPServer server)
         {
             var serverKey = GetServerKey(server);
             return _connections.TryGetValue(serverKey, out var connection) && connection.IsHealthy;
         }
 
-        /// <summary>
-        /// 移除指定服务器连接
-        /// </summary>
         public void Remove(MCPServer server)
         {
             var serverKey = GetServerKey(server);
@@ -334,9 +248,6 @@ namespace PostgreSQL.Embedding.Common.Extensions
             _toolCache.TryRemove(serverKey, out _);
         }
 
-        /// <summary>
-        /// 清除所有连接和缓存
-        /// </summary>
         public void Clear()
         {
             foreach (var kvp in _connections)
@@ -348,9 +259,6 @@ namespace PostgreSQL.Embedding.Common.Extensions
             _logger.LogInformation("Cleared all MCP connections and tool cache");
         }
 
-        /// <summary>
-        /// 获取当前连接统计
-        /// </summary>
         public (int ConnectionCount, int ToolCacheCount, Dictionary<string, TimeSpan> ConnectionAges) GetStats()
         {
             var ages = _connections.ToDictionary(
@@ -367,7 +275,7 @@ namespace PostgreSQL.Embedding.Common.Extensions
             return $"{server.AppId}_{server.Name}".Replace("-", "_");
         }
 
-        private IMcpClient CreateClientWithRetry(MCPServer server, int? maxRetryCount = null)
+        private McpClient CreateClient(MCPServer server, int? maxRetryCount = null)
         {
             maxRetryCount ??= _maxRetryCount;
             var attempt = 0;
@@ -378,18 +286,10 @@ namespace PostgreSQL.Embedding.Common.Extensions
                 try
                 {
                     attempt++;
-                    _logger.LogDebug("Attempt {Attempt}/{MaxRetry} to create MCP client for server {ServerName}",
-                        attempt, maxRetryCount, server.Name);
 
-                    var stopwatch = Stopwatch.StartNew();
-
-                    IMcpClient client = server.TransportType == (int)TransportType.Stdio
-                        ? CreateStdioClient(server)
-                        : CreateHttpClient(server);
-
-                    stopwatch.Stop();
-                    _logger.LogInformation("Created MCP client for server {ServerName} in {ElapsedMs}ms (attempt {Attempt})",
-                        server.Name, stopwatch.ElapsedMilliseconds, attempt);
+                    var client = server.TransportType == (int)TransportType.Stdio
+                        ? CreateClientWithStdioTransport(server)
+                        : CreateClientWithHttpTransport(server);
 
                     return client;
                 }
@@ -397,6 +297,7 @@ namespace PostgreSQL.Embedding.Common.Extensions
                 {
                     _logger.LogWarning(ex, "Failed to create MCP client (attempt {Attempt}/{MaxRetry}), retrying in {Delay}ms",
                         attempt, maxRetryCount, delay.TotalMilliseconds);
+
                     Thread.Sleep(delay);
                     delay = TimeSpan.FromMilliseconds(delay.TotalMilliseconds * 2); // 指数退避
                 }
@@ -405,7 +306,7 @@ namespace PostgreSQL.Embedding.Common.Extensions
             throw new InvalidOperationException($"Failed to create MCP client after {maxRetryCount} attempts");
         }
 
-        private IMcpClient CreateStdioClient(MCPServer server)
+        private McpClient CreateClientWithStdioTransport(MCPServer server)
         {
             var validName = server.Name.Replace("-", "_");
             var clientTransport = new StdioClientTransport(new StdioClientTransportOptions
@@ -413,19 +314,19 @@ namespace PostgreSQL.Embedding.Common.Extensions
                 Name = validName,
                 Command = server.Command,
                 Arguments = server.Arguments,
-                EnvironmentVariables = server.EnvVars
+                EnvironmentVariables = server.EnvVars,
             });
 
             var loggerFactory = _serviceProvider.GetRequiredService<ILoggerFactory>();
-            return McpClientFactory.CreateAsync(clientTransport, loggerFactory: loggerFactory).Result;
+            return McpClient.CreateAsync(clientTransport, loggerFactory: loggerFactory).Result;
         }
 
-        private IMcpClient CreateHttpClient(MCPServer server)
+        private McpClient CreateClientWithHttpTransport(MCPServer server)
         {
             var validName = server.Name.Replace("-", "_");
             var headers = server.ExtraHeaders ?? new Dictionary<string, string>();
 
-            var clientTransport = new SseClientTransport(new SseClientTransportOptions
+            var clientTransport = new HttpClientTransport(new HttpClientTransportOptions
             {
                 Name = validName,
                 Endpoint = new Uri(server.Endpoint),
@@ -433,7 +334,7 @@ namespace PostgreSQL.Embedding.Common.Extensions
             });
 
             var loggerFactory = _serviceProvider.GetRequiredService<ILoggerFactory>();
-            return McpClientFactory.CreateAsync(clientTransport, loggerFactory: loggerFactory).Result;
+            return McpClient.CreateAsync(clientTransport, loggerFactory: loggerFactory).Result;
         }
 
         private async Task<T> ExecuteWithRetryAsync<T>(Func<Task<T>> operation)
@@ -476,12 +377,9 @@ namespace PostgreSQL.Embedding.Common.Extensions
                         if (_connections.TryRemove(key, out var conn))
                         {
                             conn.Dispose();
-                            _logger.LogDebug("Cleaned up expired connection for server {ServerKey}, idle for {IdleTime}",
-                                key, now - conn.LastUsedAt);
                         }
                     }
 
-                    // 清理过期工具缓存
                     var expiredTools = _toolCache
                         .Where(kvp => now - kvp.Value.CachedAt > _toolCacheTTL)
                         .Select(kvp => kvp.Key)
@@ -490,10 +388,8 @@ namespace PostgreSQL.Embedding.Common.Extensions
                     foreach (var key in expiredTools)
                     {
                         _toolCache.TryRemove(key, out _);
-                        _logger.LogDebug("Cleaned up expired tool cache for server {ServerKey}", key);
                     }
 
-                    // 限制连接数量
                     while (_connections.Count > _maxConnections)
                     {
                         var oldestKey = _connections

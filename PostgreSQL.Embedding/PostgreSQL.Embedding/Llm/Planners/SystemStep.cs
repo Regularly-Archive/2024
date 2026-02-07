@@ -8,7 +8,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
     public class SystemStep
     {
         private static readonly Regex s_thoughtRegex =
-            new(@"(\[THOUGHT\])?(?<thought>.+?)(?=\[ACTION\]|$)", RegexOptions.Singleline | RegexOptions.IgnoreCase);
+            new(@"\[THOUGHT(?:-?\d+)?\](?<thought>.+?)(?=\[ACTION(?:-?\d+)?\]|$)", RegexOptions.Singleline | RegexOptions.IgnoreCase);
 
         private static readonly Regex s_finalAnswerRegex =
             new(@"\[FINAL[_\s\-]?ANSWER\](?<final_answer>.+)", RegexOptions.Singleline | RegexOptions.IgnoreCase);
@@ -20,6 +20,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             new(@"\{[^{}]*""action""\s*:\s*""[^""]*"".*?\}", RegexOptions.Singleline | RegexOptions.IgnoreCase);
 
         private const string ActionTag = "[ACTION]";
+        private const string ActionTagWithNumber = "[ACTION-"; // 用于兼容 [ACTION-1] 形式
 
         private const string ThoughtTag = "[THOUGHT]";
         private const string FinalAnswerTag = "[FINAL_ANSWER]";
@@ -42,6 +43,8 @@ namespace PostgreSQL.Embedding.Llm.Planners
         [JsonPropertyName("action_variables")]
         public Dictionary<string, object> ActionVariables { get; set; }
 
+        public int Index {  get; set; }
+
         public static SystemStep Parse(string input)
         {
             var result = new SystemStep { OriginalResponse = input };
@@ -53,21 +56,16 @@ namespace PostgreSQL.Embedding.Llm.Planners
             }
 
             var thoughtMatch = s_thoughtRegex.Match(input);
-            if (thoughtMatch.Success && !thoughtMatch.Value.Contains(ActionTag))
+            if (thoughtMatch.Success)
             {
-                result.Thought = thoughtMatch.Value.Trim();
-
+                // 非贪婪匹配已捕获 thought 内容，需要清理 THOUGHT 标签
+                result.Thought = thoughtMatch.Groups["thought"].Value.Trim();
             }
 
             result.Thought = result.Thought?.Replace(ThoughtTag, string.Empty).Trim();
             result.FinalAnswer = result.FinalAnswer?.Replace(FinalAnswerTag, string.Empty).Trim();
 
             ExtractAction(input, result);
-
-            if (!string.IsNullOrEmpty(result.Action) || !string.IsNullOrEmpty(result.Observation) || !string.IsNullOrEmpty(result.FinalAnswer))
-            {
-                result.Thought = null;
-            }
 
             return result;
         }
@@ -76,7 +74,22 @@ namespace PostgreSQL.Embedding.Llm.Planners
 
         private static void ExtractAction(string input, SystemStep step)
         {
-            int actionIndex = input.IndexOf(ActionTag, StringComparison.OrdinalIgnoreCase);
+            // 支持 [ACTION] 或 [ACTION-N] 形式
+            int actionIndex = -1;
+            if (input.Contains(ActionTag))
+            {
+                actionIndex = input.IndexOf(ActionTag, StringComparison.OrdinalIgnoreCase);
+            }
+            else
+            {
+                // 查找 [ACTION-数字] 形式
+                var actionWithNumberMatch = System.Text.RegularExpressions.Regex.Match(input, @"\[ACTION-\d+\]");
+                if (actionWithNumberMatch.Success)
+                {
+                    actionIndex = input.IndexOf(actionWithNumberMatch.Value, StringComparison.OrdinalIgnoreCase);
+                }
+            }
+
             if (actionIndex != -1)
             {
                 int jsonStartIndex = input.IndexOf("{", actionIndex, StringComparison.OrdinalIgnoreCase);

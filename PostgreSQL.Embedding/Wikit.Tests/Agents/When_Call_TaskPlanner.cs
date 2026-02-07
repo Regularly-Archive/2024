@@ -113,7 +113,7 @@ namespace Wikit.Tests.Agents
                 var kernelResult = await plan.ExecuteAsync(subTask.Description);
 
                 subTask.ExecuteResult = kernelResult;
-                subTask.Status = PostgreSQL.Embedding.Domain.Models.Planners.TaskStatus.Completed;
+                subTask.State = PostgreSQL.Embedding.Domain.Models.Planners.TaskState.Completed;
             }
 
             Console.WriteLine(JsonConvert.SerializeObject(subTasks));
@@ -147,7 +147,7 @@ namespace Wikit.Tests.Agents
             await graphExecutor.ExecuteAsync();
 
             this.ShouldSatisfyAllConditions(
-                () => subTasks.Tasks.All(x => x.Status == PostgreSQL.Embedding.Domain.Models.Planners.TaskStatus.Completed).ShouldBeTrue()
+                () => subTasks.Tasks.All(x => x.State == PostgreSQL.Embedding.Domain.Models.Planners.TaskState.Completed).ShouldBeTrue()
             );
         }
 

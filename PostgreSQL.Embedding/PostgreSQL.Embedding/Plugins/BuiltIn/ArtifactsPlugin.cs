@@ -29,9 +29,11 @@ public class ArtifactsPlugin : BasePlugin
     )
     {
         var agentExecutionContext = kernel.Services.GetService<AgentExecutionContext>();
-        var runId = agentExecutionContext.GetRunId();
+        var runId = agentExecutionContext.GetRunId() ?? Guid.NewGuid().ToString("N");
+        agentExecutionContext.SetRunId(runId);
         var artifactId = Guid.NewGuid().ToString();
 
+         
         var filePath = Path.Combine(_rootPath, runId, "artifacts", artifactId, fileName);
         Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
 
@@ -59,7 +61,8 @@ public class ArtifactsPlugin : BasePlugin
         if (!Directory.Exists(folderPath)) throw new DirectoryNotFoundException($"Folder not found: {folderPath}");
 
         var agentExecutionContext = kernel.Services.GetService<AgentExecutionContext>();
-        var runId = agentExecutionContext.GetRunId();
+        var runId = agentExecutionContext.GetRunId() ?? Guid.NewGuid().ToString("N");
+        agentExecutionContext.SetRunId(runId);
         var artifactId = Guid.NewGuid().ToString();
 
         var zipPath = Path.Combine(_rootPath, runId, "artifacts", artifactId, fileName);

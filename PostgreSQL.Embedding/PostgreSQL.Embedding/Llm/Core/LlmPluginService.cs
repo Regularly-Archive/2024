@@ -86,20 +86,20 @@ namespace PostgreSQL.Embedding.Llm.Core
         }
 
         /// <summary>
-        /// 启用或停用插件（修改 LlmAppPlugin.Enabled）
+        /// 启用或停用插件
         /// </summary>
         /// <param name="id">LlmAppPlugin.Id</param>
         /// <returns></returns>
         public async Task ChangePluginStatusAsync(long id, bool status)
         {
-            var appPlugin = await _appPluginCrudBaseService.GetByIdAsync(id);
-            if (appPlugin == null) return;
+            var llmPlugin = await _crudBaseService.GetByIdAsync(id);
+            if (llmPlugin == null) return;
 
-            if ((appPlugin.Enabled && status) || (!appPlugin.Enabled && !status))
+            if ((llmPlugin.Enabled && status) || (!llmPlugin.Enabled && !status))
                 return;
 
-            appPlugin.Enabled = status;
-            await _appPluginCrudBaseService.UpdateAsync(appPlugin);
+            llmPlugin.Enabled = status;
+            await _crudBaseService.UpdateAsync(llmPlugin);
         }
 
         private LlmPluginModel ConvertToLlmPluginModel(LlmPlugin llmPlugin)
@@ -115,7 +115,7 @@ namespace PostgreSQL.Embedding.Llm.Core
                 Version = llmPlugin.PluginVersion,
                 // IsEnabled is determined by LlmAppPlugin.Enabled when queried per-app
                 // For single plugin queries, default to true for BuiltIn, false for Custom
-                IsEnabled = llmPlugin.IsBuiltin,
+                Enabled = llmPlugin.Enabled,
                 Parameters = ConstructPluginParameters(pluginType),
                 Functions = ConstructPluginFunctions(pluginType),
             };

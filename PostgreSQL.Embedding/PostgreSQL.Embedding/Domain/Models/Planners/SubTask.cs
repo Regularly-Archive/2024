@@ -20,8 +20,8 @@ namespace PostgreSQL.Embedding.Domain.Models.Planners
         [JsonProperty("available_tools")]
         public List<string> AvailableTools { get; set; } = new List<string>();
 
-        [JsonProperty("status")]
-        public TaskStatus Status { get; set; }
+        [JsonProperty("state")]
+        public TaskState State { get; set; }
 
         [JsonProperty("execute_result")]
         public string ExecuteResult { get; set; }
@@ -34,7 +34,7 @@ namespace PostgreSQL.Embedding.Domain.Models.Planners
 
         public StepTrace AsStepTrace(long messageId)
         {
-            return StepTrace.Plan(Id.ToString(), Name, Description, ExecuteResult, Status.ToString().ToLower(), messageId);
+            return StepTrace.Plan(Id.ToString(), Name, Description, ExecuteResult, State.ToString().ToLower(), messageId);
         }
     }
 
@@ -50,7 +50,7 @@ namespace PostgreSQL.Embedding.Domain.Models.Planners
         public string OutputFormat { get; set; }
     }
 
-    public enum TaskStatus
+    public enum TaskState
     {
         Pending = 0,
         InProgress = 1,

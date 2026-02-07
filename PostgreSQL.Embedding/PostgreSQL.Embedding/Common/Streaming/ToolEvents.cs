@@ -42,7 +42,7 @@ public class PlanningEvent : ISseEvent
     public string Content { get; set; } = "";
 
     [JsonPropertyName("status")]
-    public string Status { get; set; } = "pending"; // pending, in_progress, completed, failed
+    public string Status { get; set; }
 }
 
 /// <summary>
