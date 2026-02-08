@@ -56,7 +56,7 @@ namespace PostgreSQL.Embedding.Plugins.Custom
                     searchResult.HasNextPage = newSearchResult.HasNextPage;
                 }
             }
-            await SendArtifacts(searchResult);
+
             return searchResult;
         }
 
@@ -117,21 +117,6 @@ namespace PostgreSQL.Embedding.Plugins.Custom
             .ToList();
 
             return seachResult;
-        }
-
-        private async Task SendArtifacts(SearchResult searchResult)
-        {
-            if (searchResult == null || !searchResult.Entries.Any()) return;
-
-            var artifact = new LlmArtifactResponseModel("搜索结果", ArtifactType.Search);
-            var payloads = searchResult.Entries.Select(x => new
-            {
-                link = x.Url,
-                title = x.Title,
-                description = x.Snippet
-            });
-            artifact.SetData(payloads);
-            await EmitArtifactsAsync(artifact);
         }
     }
 

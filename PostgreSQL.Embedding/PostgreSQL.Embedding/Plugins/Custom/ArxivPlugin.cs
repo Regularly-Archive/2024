@@ -55,18 +55,6 @@ namespace PostgreSQL.Embedding.Plugins.Custom
 
             // Todo: 支持分页查询
             var papers = await GetPapersAsync($"https://export.arxiv.org/api/query?search_query=all:{extractedKeywords}&max_results={max_results}");
-            if (papers.Count() > 0)
-            {
-                var artifact = new LlmArtifactResponseModel("搜索结果", ArtifactType.Search);
-                var payloads = papers.Select(x => new
-                {
-                    link = x.Link,
-                    title = x.Title,
-                    description = x.Summary
-                });
-                artifact.SetData(payloads);
-                await EmitArtifactsAsync(artifact);
-            }
             return JsonConvert.SerializeObject(papers);
         }
 
@@ -76,25 +64,6 @@ namespace PostgreSQL.Embedding.Plugins.Custom
             [Description("arXiv 论文 ID，一个或多个，使用英文逗号分隔，如：2310.00001")] string id_list)
         {
             var papers = await GetPapersAsync($"https://export.arxiv.org/api/query?id_list={id_list}");
-            if (papers.Count() == 1)
-            {
-                var paper = papers.FirstOrDefault();
-                var artifact = new LlmArtifactResponseModel("PDF 阅读器", ArtifactType.PdfView);
-                artifact.SetData(paper.PdfLink);
-                await EmitArtifactsAsync(artifact);
-            } 
-            else if(papers.Count() > 1)
-            {
-                var artifact = new LlmArtifactResponseModel("搜索结果", ArtifactType.Search);
-                var payloads = papers.Select(x => new
-                {
-                    link = x.Link,
-                    title = x.Title,
-                    description = x.Summary
-                });
-                artifact.SetData(payloads);
-                await EmitArtifactsAsync(artifact);
-            }
             return JsonConvert.SerializeObject(papers);
         }
 

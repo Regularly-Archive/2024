@@ -1,10 +1,8 @@
 ﻿using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Newtonsoft.Json;
-using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Confirguration;
-using PostgreSQL.Embedding.Domain.Models;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 
@@ -35,7 +33,6 @@ public class CodeInterpreterPlugin : BasePlugin
     )
     {
         var response = await RunCodeAsync("python3", code, dependencies.Split(','));
-        await SendArtifacts(code, response.Output, response.Language, response.ContentType);
         return response.Output;
     }
 
@@ -47,7 +44,6 @@ public class CodeInterpreterPlugin : BasePlugin
     )
     {
         var response = await RunCodeAsync("javascript", code, dependencies.Split(',', StringSplitOptions.TrimEntries));
-        await SendArtifacts(code, response.Output, response.Language, response.ContentType);
         return response.Output;
     }
 
@@ -59,7 +55,6 @@ public class CodeInterpreterPlugin : BasePlugin
         [Description("C# 运行时后端，可选值：csharp、csharp-mono、csharp-sfa，默认为 csharp-sfa")] string language = "csharp-sfa")
     {
         var response = await RunCodeAsync("csharp", code, dependencies.Split(',', StringSplitOptions.TrimEntries));
-        await SendArtifacts(code, response.Output, response.Language, response.ContentType);
         return response.Output;
     }
 
@@ -71,7 +66,6 @@ public class CodeInterpreterPlugin : BasePlugin
     string dependencies = "")
     {
         var response = await RunCodeAsync("java", code, dependencies.Split(',', StringSplitOptions.TrimEntries));
-        await SendArtifacts(code, response.Output, response.Language, response.ContentType);
         return response.Output;
     }
 
@@ -84,7 +78,6 @@ public class CodeInterpreterPlugin : BasePlugin
     )
     {
         var response = await RunJupyterAsync(language, code, dependencies.Split(',', StringSplitOptions.TrimEntries));
-        await SendArtifacts(code, response.Output, response.Language, response.ContentType);
         return response.Output;
     }
 
@@ -133,14 +126,6 @@ public class CodeInterpreterPlugin : BasePlugin
 
         var body = await response.Content.ReadAsStringAsync();
         return JsonConvert.DeserializeObject<RunCodeResponse>(body);
-    }
-
-    private async Task SendArtifacts(string code, string output, string language, string contentType = "text/plain")
-    {
-        var payload = new { code = code, output = output, contentType = contentType, language = language };
-        var artifacts = new LlmArtifactResponseModel("代码解释器", ArtifactType.Code);
-        artifacts.SetData(payload);
-        await EmitArtifactsAsync(artifacts);
     }
 }
 

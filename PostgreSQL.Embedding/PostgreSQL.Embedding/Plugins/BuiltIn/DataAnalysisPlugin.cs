@@ -43,7 +43,6 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
             sourceCode = sourceCode.Replace("```python", "").Replace("```", "").Trim();
 
             var result = await RunCodeAsync("python", sourceCode, []);
-            await SendArtifacts(sourceCode, result.Output, result.ContentType);
 
             return sourceCode;
         }
@@ -61,14 +60,6 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
 
             var body = await response.Content.ReadAsStringAsync();
             return JsonConvert.DeserializeObject<RunCodeResponse>(body);
-        }
-
-        private async Task SendArtifacts(string sourceCode, string previewCode, string previewType)
-        {
-            var payload = new { sourceCode = sourceCode, previewCode = previewCode, previewType = previewType };
-            var artifacts = new LlmArtifactResponseModel("数据分析", ArtifactType.DataAnalysis);
-            artifacts.SetData(payload);
-            await EmitArtifactsAsync(artifacts);
         }
     }
 }
