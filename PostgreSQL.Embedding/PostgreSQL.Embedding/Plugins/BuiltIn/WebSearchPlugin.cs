@@ -47,7 +47,6 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
             var serviceEngine = GetSearchEngine(serviceScope.ServiceProvider, searchEngine);
             var searchResult = await serviceEngine.SearchAsync(keyword, filterDomain: filterDomain);
 
-            if (showSearchResult) await SendArtifacts(searchResult);
             if (onlyReturnAnswer)
             {
                 var memoryService = _serviceProvider.GetService<IMemoryService>();
@@ -67,7 +66,6 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
             var serviceEngine = GetSearchEngine(serviceScope.ServiceProvider, searchEngine);
             var searchResult = await serviceEngine.SearchAsync(query);
 
-            if (showSearchResult) await SendArtifacts(searchResult);
             return searchResult;
         }
 
@@ -95,21 +93,6 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         private List<LlmCitationModel> GetCitationsFromSearchEngine(SearchResult searchResult)
         {
             return searchResult.Entries.Select((x, i) => LlmCitationModel.FromSearchEngine(i + 1, x)).ToList();
-        }
-
-        private async Task SendArtifacts(SearchResult searchResult)
-        {
-            if (searchResult == null || !searchResult.Entries.Any()) return;
-
-            var artifact = new LlmArtifactResponseModel("搜索结果", ArtifactType.Search);
-            var payloads = searchResult.Entries.Select(x => new
-            {
-                link = x.Url,
-                title = x.Title,
-                description = x.Snippet
-            });
-            artifact.SetData(payloads);
-            await EmitArtifactsAsync(artifact);
         }
 
         [KernelFunction]

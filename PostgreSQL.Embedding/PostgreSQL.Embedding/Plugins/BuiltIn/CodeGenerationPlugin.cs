@@ -28,7 +28,6 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
 
             var code = await promptTemplate.InvokeAsync<string>(clonedKernel);
             code = code.Replace("```html", "").Replace("```", "").Trim();
-            await SendArtifacts(code, "vanilla");
             return code;
         }
 
@@ -42,16 +41,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
 
             var code = await promptTemplate.InvokeAsync<string>(clonedKernel);
             code = code.Replace("```vue", "").Replace("```", "").Trim();
-            await SendArtifacts(code, "vue");
             return code;
-        }
-
-        private async Task SendArtifacts(string code, string renderer)
-        {
-            var payload = new { sourceCode = code, renderer = renderer };
-            var artifacts = new LlmArtifactResponseModel("代码预览", ArtifactType.CodePreview);
-            artifacts.SetData(payload);
-            await EmitArtifactsAsync(artifacts);
         }
     }
 

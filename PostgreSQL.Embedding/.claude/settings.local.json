@@ -22,7 +22,8 @@
       "Bash(dir:*)",
       "Bash(dotnet new:*)",
       "WebFetch(domain:blog.yuanpei.me)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(git checkout:*)"
     ]
   }
 }

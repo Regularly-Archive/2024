@@ -39,7 +39,6 @@ namespace PostgreSQL.Embedding.Plugins.Custom
             var searchResult = ExtractSearchResult(await response.Content.ReadAsStringAsync());
             searchResult.Keyword = keyword;
 
-            await SendArtifacts(searchResult);
             return searchResult;
         }
 
@@ -59,19 +58,6 @@ namespace PostgreSQL.Embedding.Plugins.Custom
             });
 
             return new SearchResult() { Entries = entries.ToList() };
-        }
-
-        private async Task SendArtifacts(SearchResult searchResult)
-        {
-            var artifact = new LlmArtifactResponseModel("搜索结果", ArtifactType.Search);
-            var payloads = searchResult.Entries.Select(x => new
-            {
-                link = x.Url,
-                title = x.Title,
-                description = x.Snippet
-            });
-            artifact.SetData(payloads);
-            await EmitArtifactsAsync(artifact);
         }
     }
 }

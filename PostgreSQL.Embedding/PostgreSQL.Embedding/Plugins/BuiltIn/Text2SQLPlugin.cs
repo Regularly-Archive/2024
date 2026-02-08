@@ -123,8 +123,6 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
             var rows = await sqlClient.Ado.SqlQueryAsync<dynamic>(sql);
             var columnNames = ((IDictionary<string, object>)rows[0]).Keys.ToList();
 
-            await SendArtifacts(rows);
-
             var maxWidths = new Dictionary<string, int>();
 
             var stringBuilder = new StringBuilder();
@@ -206,13 +204,6 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
             public string DataType { get; set; }
             public bool IsNullable { get; set; }
             public string Description { get; set; }
-        }
-
-        private async Task SendArtifacts(List<dynamic> rows)
-        {
-            var artifact = new LlmArtifactResponseModel("动态表格", ArtifactType.Table);
-            artifact.SetData(rows);
-            await EmitArtifactsAsync(artifact);
         }
     }
 }
