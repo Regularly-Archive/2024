@@ -79,6 +79,8 @@ namespace PostgreSQL.Embedding.Llm.Core
         {
             // Setup conversation context
             var convId = string.IsNullOrEmpty(conversationId) ? Guid.NewGuid().ToString("N") : conversationId;
+            var runId = Guid.NewGuid().ToString();
+            _agentExecutionContext.SetRunId(runId);
             _agentExecutionContext.SetAppId(_app.Id);
             _agentExecutionContext.SetConversationId(convId);
 
@@ -215,8 +217,6 @@ namespace PostgreSQL.Embedding.Llm.Core
             CancellationToken ct)
         {
             var currentUser = await _currentUserService.GetCurrentUserAsync();
-            var runId = Guid.NewGuid().ToString();
-            _agentExecutionContext.SetRunId(runId);
 
             // Create task planner
             var taskPlanner = new TaskPlanner(_kernel);
