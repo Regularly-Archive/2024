@@ -62,8 +62,6 @@ namespace PostgreSQL.Embedding.Plugins.Custom
 
                 var responseBody = await response.Content.ReadAsStringAsync();
                 var searchResult = await ExtractFromApi(keyword, responseBody, limit, filterDomain);
-
-                await SendArtifacts(searchResult);
                 return searchResult;
             }
             catch (Exception ex)

@@ -50,7 +50,7 @@ namespace PostgreSQL.Embedding.Domain.Models.Planners
             {
                 Id = Guid.NewGuid().ToString("N"),
                 ParentId = stepId,
-                Title = "使用工具",
+                Title = $"ToolCall|{actionName}",
                 Description = $"使用工具 {actionName}, 耗时 {duration} 秒",
                 Content = System.Text.Json.JsonSerializer.Serialize(new { input = actionVariables, output = result }),
                 Status = successful ? "success" : "failed",
