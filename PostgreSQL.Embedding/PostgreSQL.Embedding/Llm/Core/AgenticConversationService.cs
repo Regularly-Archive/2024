@@ -149,7 +149,7 @@ namespace PostgreSQL.Embedding.Llm.Core
                 {
                     Message = new MessageMetadata
                     {
-                        Id = Guid.NewGuid().ToString("N"),
+                        Id = messageId.ToString(),
                         Role = "assistant",
                         Content = new(),
                         Model = "",
@@ -317,7 +317,7 @@ namespace PostgreSQL.Embedding.Llm.Core
                     await writer.WriteAsync(new ToolCallEvent
                     {
                         Id = stepTrace.Id,
-                        Name = ExtractActionName(stepTrace.Description),
+                        Name = ExtractActionName(stepTrace.Title),
                         Input = input,
                         Output = ExtractActionOutput(stepTrace.Content),
                         Status = stepTrace.Status == "success" ? "completed" : "error",
@@ -451,10 +451,9 @@ namespace PostgreSQL.Embedding.Llm.Core
             return new Dictionary<string, object>();
         }
 
-        private static string ExtractActionName(string description)
+        private static string ExtractActionName(string title)
         {
-            var match = System.Text.RegularExpressions.Regex.Match(description, @"使用工具\s+(\w+)");
-            return match.Success ? match.Groups[1].Value : "unknown";
+            return title.Split('|', StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
         }
 
         private static string ExtractActionOutput(string content)

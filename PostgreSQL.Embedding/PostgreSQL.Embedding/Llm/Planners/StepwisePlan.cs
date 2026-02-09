@@ -193,7 +193,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
 
                 // Add [THOUGHT] and [ACTION] to chat history
                 var stringBuilder = new StringBuilder();
-                if (string.IsNullOrEmpty(step.Thought))
+                if (!string.IsNullOrEmpty(step.Thought))
                     stringBuilder.AppendLine($"{ThoughtTag} {step.Thought}");
 
                 var actionPayload = new { action = step.Action, action_variables = step.ActionVariables };
@@ -310,7 +310,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 }
 
                 // No action or thought from LLM
-                chatHistory.AddUserMessage(step.OriginalResponse);
+                chatHistory.AddUserMessage($"{ObservationTag} {step.OriginalResponse}");
                 return true;
             }
 
