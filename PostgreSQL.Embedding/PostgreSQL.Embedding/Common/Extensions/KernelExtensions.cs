@@ -45,7 +45,5 @@ namespace PostgreSQL.Embedding.Common.Extensions
         {
             return kernel.Services.GetRequiredService<AgentExecutionContext>();
         }
-
-
     }
 }

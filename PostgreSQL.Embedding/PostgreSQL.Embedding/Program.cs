@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Confirguration;
 using PostgreSQL.Embedding.Common.Converters;
@@ -21,6 +22,7 @@ using PostgreSQL.Embedding.Infrastructure.FileStorage;
 using PostgreSQL.Embedding.Infrastructure.Messaging;
 using PostgreSQL.Embedding.Llm.Abstractions;
 using PostgreSQL.Embedding.Llm.Core;
+using PostgreSQL.Embedding.Llm.Planners;
 using PostgreSQL.Embedding.Llm.Services;
 using PostgreSQL.Embedding.Plugins;
 using PostgreSQL.Embedding.Plugins.BuiltIn;
@@ -189,9 +191,13 @@ var contentTypeProvider = new FileExtensionContentTypeProvider
     }
 };
 
+var profileFolder = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+var insightaFolder = Path.Combine(profileFolder, ".insighta");
+if (!Directory.Exists(insightaFolder)) Directory.CreateDirectory(insightaFolder);
+
 app.UseStaticFiles(new StaticFileOptions
 {
-    FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.ContentRootPath)),
+    FileProvider = new PhysicalFileProvider(insightaFolder),
     RequestPath = "/api/statics",
     ServeUnknownFileTypes = true,
     ContentTypeProvider = contentTypeProvider

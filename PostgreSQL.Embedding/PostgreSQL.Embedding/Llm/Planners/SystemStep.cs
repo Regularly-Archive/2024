@@ -43,7 +43,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
         [JsonPropertyName("action_variables")]
         public Dictionary<string, object> ActionVariables { get; set; }
 
-        public int Index {  get; set; }
+        public int Index { get; set; }
 
         public static SystemStep Parse(string input)
         {
@@ -53,6 +53,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             if (finalAnswerMatch.Success)
             {
                 result.FinalAnswer = finalAnswerMatch.Groups[1].Value.Trim();
+                result.FinalAnswer = result.FinalAnswer.Replace("[/FINAL_ANSWER]", "");
             }
 
             var thoughtMatch = s_thoughtRegex.Match(input);
@@ -82,8 +83,8 @@ namespace PostgreSQL.Embedding.Llm.Planners
             }
             else
             {
-                // 查找 [ACTION-数字] 形式
-                var actionWithNumberMatch = System.Text.RegularExpressions.Regex.Match(input, @"\[ACTION-\d+\]");
+                // 查找 [ACTION-N] 形式
+                var actionWithNumberMatch = Regex.Match(input, @"\[ACTION-\d+\]");
                 if (actionWithNumberMatch.Success)
                 {
                     actionIndex = input.IndexOf(actionWithNumberMatch.Value, StringComparison.OrdinalIgnoreCase);
@@ -99,6 +100,10 @@ namespace PostgreSQL.Embedding.Llm.Planners
                     if (jsonEndIndex != -1)
                     {
                         string json = input.Substring(jsonStartIndex, jsonEndIndex + 1);
+
+                        var obseravtionStartIndex = json.IndexOf("[OBSERVATION");
+                        if (obseravtionStartIndex != -1)
+                            json = json.Substring(0, obseravtionStartIndex);
 
                         try
                         {

@@ -99,7 +99,7 @@ namespace PostgreSQL.Embedding.Plugins.Custom
                 return new Entry()
                 {
                     Title = eleTextBox?.QuerySelector(SELECTOR_RESULTS_ITEM_Title)?.TextContent,
-                    Url = eleTextBox?.QuerySelector(SELECTOR_RESULTS_ITEM_Title).QuerySelector("a")?.Attributes["href"]?.Value,
+                    Url = "https://weixin.sogou.com" + eleTextBox?.QuerySelector(SELECTOR_RESULTS_ITEM_Title).QuerySelector("a")?.Attributes["href"]?.Value,
                     Snippet = eleTextBox.QuerySelector(SELECTOR_RESULTS_ITEM_DESCRIPTION)?.TextContent
                 };
             })

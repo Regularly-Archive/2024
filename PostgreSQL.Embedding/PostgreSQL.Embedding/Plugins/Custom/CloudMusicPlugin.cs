@@ -45,11 +45,8 @@ namespace PostgreSQL.Embedding.Plugins.Custom
         }
 
         [KernelFunction]
-        [Description("播放网易云音乐歌曲。下载并通过系统默认播放器播放音乐文件。")]
-        public async Task<string> PlayMusicAsync(
-            [Description("网易云音乐歌曲 ID")] string songId,
-            [Description("歌手名称")] string artistName,
-            [Description("歌曲名称")] string songName)
+        [Description("获取歌曲下载链接")]
+        public async Task<string> GetDownloadLink(long songId)
         {
             var handler = new HttpClientHandler() { AllowAutoRedirect = false, AutomaticDecompression = DecompressionMethods.GZip };
             using var httpClient = new HttpClient(handler);
@@ -60,20 +57,7 @@ namespace PostgreSQL.Embedding.Plugins.Custom
                 if (location!.AbsoluteUri == "http://music.163.com/404")
                     return NOT_FOUND;
 
-                response = await httpClient.GetAsync(location);
-                var downloadFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Downloads", "CloudMusic");
-                if (!Directory.Exists(downloadFolder)) Directory.CreateDirectory(downloadFolder);
-                var downloadPath = Path.Combine(downloadFolder, $"{songId}.mp3");
-
-                using (var fileStream = File.OpenWrite(downloadPath))
-                await response.Content.CopyToAsync(fileStream);
-
-                var processStartInfo = new ProcessStartInfo();
-                processStartInfo.FileName = downloadPath;
-                processStartInfo.UseShellExecute = true;
-                Process.Start(processStartInfo);
-
-                return $"已为您找到 {artistName} 的歌曲《{songName}》";
+                return location.AbsoluteUri;
             }
 
             return NOT_FOUND;
