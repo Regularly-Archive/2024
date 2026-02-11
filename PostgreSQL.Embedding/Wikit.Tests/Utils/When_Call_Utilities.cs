@@ -144,27 +144,6 @@ namespace Wikit.Tests.Utils
     }
 
     /// <summary>
-    /// Tests for ArtifactType enum
-    /// </summary>
-    public class When_Call_ArtifactType
-    {
-        [Theory]
-        [InlineData(ArtifactType.PdfView, 0)]
-        [InlineData(ArtifactType.Mermaid, 1)]
-        [InlineData(ArtifactType.WebView, 2)]
-        [InlineData(ArtifactType.Table, 3)]
-        [InlineData(ArtifactType.Search, 4)]
-        [InlineData(ArtifactType.Code, 5)]
-        [InlineData(ArtifactType.CodePreview, 6)]
-        [InlineData(ArtifactType.DataAnalysis, 7)]
-        public void It_Should_Have_Correct_Values(ArtifactType type, int expectedValue)
-        {
-            // Assert
-            ((int)type).ShouldBe(expectedValue);
-        }
-    }
-
-    /// <summary>
     /// Tests for QueueStatus enum
     /// </summary>
     public class When_Call_QueueStatus

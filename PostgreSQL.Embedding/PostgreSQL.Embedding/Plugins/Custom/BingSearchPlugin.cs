@@ -8,6 +8,7 @@ using PostgreSQL.Embedding.Plugins.Abstration;
 using SqlSugar;
 using System.ComponentModel;
 using System.Net;
+using System.Text;
 
 namespace PostgreSQL.Embedding.Plugins.Custom
 {
@@ -106,10 +107,11 @@ namespace PostgreSQL.Embedding.Plugins.Custom
             seachResult.Entries = eleItems.Select(x =>
             {
                 var eleTitle = x.QuerySelector(SELECTOR_TAG_ITEM_TITLE);
+                var url = eleTitle.QuerySelector(SELECTOR_TAG_LINK)?.Attributes[SELECTOR_TAG_HREF].Value;
                 return new Entry()
                 {
                     Title = eleTitle.TextContent,
-                    Url = eleTitle.QuerySelector(SELECTOR_TAG_LINK)?.Attributes[SELECTOR_TAG_HREF].Value,
+                    Url = DecodeBingRedirectUrl(url),
                     Snippet = x.QuerySelector(SELECTOR_TAG_ITEM_DESC)?.TextContent ?? string.Empty
                 };
             })
@@ -117,6 +119,42 @@ namespace PostgreSQL.Embedding.Plugins.Custom
             .ToList();
 
             return seachResult;
+        }
+
+        /// <summary>
+        /// 解码 Bing 重定向 URL，还原真实目标地址
+        /// 格式: https://www.bing.com/ck/a?!&&p=xxx&u=Base64EncodedReversedUrl
+        /// </summary>
+        private static string? DecodeBingRedirectUrl(string? url)
+        {
+            if (string.IsNullOrEmpty(url) || !url.Contains("/ck/a"))
+                return url;
+
+            try
+            {
+                // 提取 u= 后面的 Base64 编码部分
+                var uParamStart = url.IndexOf("&u=");
+                if (uParamStart == -1)
+                    uParamStart = url.IndexOf("u=");
+                if (uParamStart == -1)
+                    return url;
+
+                var base64Part = url.Substring(uParamStart + 3);
+                // URL 解码
+                base64Part = Uri.UnescapeDataString(base64Part);
+
+                // Bing 将 Base64 编码的字符串反转了，需要反转回来
+                var reversedBytes = Convert.FromBase64String(base64Part);
+                var reversed = Encoding.UTF8.GetString(reversedBytes);
+                var original = new string(reversed.Reverse().ToArray());
+
+                return original;
+            }
+            catch
+            {
+                // 解码失败返回原 URL
+                return url;
+            }
         }
     }
 

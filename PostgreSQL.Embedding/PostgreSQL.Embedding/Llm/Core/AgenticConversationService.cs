@@ -2,6 +2,7 @@ using LLama.Batched;
 using Masuit.Tools;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
+using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Extensions;
 using PostgreSQL.Embedding.Common.Streaming;
@@ -16,6 +17,7 @@ using PostgreSQL.Embedding.Utils;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Channels;
 using TaskState = PostgreSQL.Embedding.Domain.Models.Planners.TaskState;
 
@@ -83,6 +85,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             _agentExecutionContext.SetRunId(runId);
             _agentExecutionContext.SetAppId(_app.Id);
             _agentExecutionContext.SetConversationId(convId);
+            _agentExecutionContext.InitializeSandboxContext(_app.Id, convId, runId);
 
             // Add user message
             var refMessageId = await _chatHistoriesService.AddUserMessageAsync(_app.Id, convId, input);
@@ -161,10 +164,10 @@ namespace PostgreSQL.Embedding.Llm.Core
                 await writer.WriteAsync(new PingEvent(), ct);
 
                 // 3. Planning phase - emit planning events
-                await EmitPlanningEventsAsync(request, input, conversationId, messageId, writer, blockTracker, ct);
+                var subtasks = await EmitPlanningEventsAsync(request, input, conversationId, messageId, writer, blockTracker, ct);
 
                 // 4. Execute subtasks and emit tool/action events
-                var finalResult = await ExecuteSubTasksAsync(request, input, conversationId, messageId, writer, blockTracker, ct);
+                var finalResult = await ExecuteSubTasksAsync(request, input, conversationId, messageId, writer, blockTracker, subtasks.ToList(), ct);
 
                 // 5. Generate final response with text block (thinking already emitted during planning/execution)
                 await EmitFinalResponseAsync(input, conversationId, messageId, finalResult, writer, blockTracker.TextBlockIndex, ct);
@@ -207,7 +210,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             }
         }
 
-        private async Task EmitPlanningEventsAsync(
+        private async Task<IEnumerable<SubTask>> EmitPlanningEventsAsync(
             ConversationRequestModel request,
             string input,
             string conversationId,
@@ -231,11 +234,12 @@ namespace PostgreSQL.Embedding.Llm.Core
                 {
                     Error = new ErrorDetails { ErrorType = "planning_error", Message = "No tasks generated" }
                 }, ct);
-                return;
+                return [];
             }
 
             //blockTracker.InitializeThinkingBlock();
             // Emit planning thought as content_block (thinking) - uses thinking block index
+            _logger.LogInformation($"[THOUGHT] {planResult.Thought}");
             await EmitThinkingBlockAsync(planResult.Thought, writer, blockTracker.ThinkingBlockIndex, ct);
 
             // Emit each subtask as a planning event
@@ -249,6 +253,8 @@ namespace PostgreSQL.Embedding.Llm.Core
                     Status = "pending"
                 }, ct);
             }
+
+            return subTasks;
         }
 
         private async Task<string> ExecuteSubTasksAsync(
@@ -258,20 +264,13 @@ namespace PostgreSQL.Embedding.Llm.Core
             long messageId,
             ChannelWriter<ISseEvent> writer,
             SseBlockTracker blockTracker,
+            List<SubTask> subTasks,
             CancellationToken ct)
         {
             var currentUser = await _currentUserService.GetCurrentUserAsync();
             var runId = _agentExecutionContext.GetRunId();
 
             // Re-create task planner to get subtasks
-            var taskPlanner = new TaskPlanner(_kernel);
-            var planResult = _app.AppType == (int)LlmAppType.Chat
-                ? await taskPlanner.GetSubTasksAsync(input, limit: 3)
-                : await taskPlanner.GetRAGTasks(input);
-
-            var subTasks = planResult.Tasks;
-            _logger.LogInformation($"[THOUGHT] {planResult.Thought}");
-            if (!subTasks.Any()) return "无法生成任务计划";
 
             // Create planner for task execution
             var planner = new StepwisePlanner(_kernel, _promptTemplateService, new StepwisePlannerConfig { MaxIterations = 30 });
@@ -313,13 +312,16 @@ namespace PostgreSQL.Embedding.Llm.Core
 
                 case "Action":
                     // Emit as tool call events with input/output
-                    var input = ParseActionInput(stepTrace.Content);
+                    var actionObj = JsonConvert.DeserializeObject<Dictionary<string, object>>(stepTrace.Content);
+                    var input = JsonConvert.DeserializeObject<Dictionary<string, object>>(
+                        JsonConvert.SerializeObject(actionObj["input"])
+                     );
                     await writer.WriteAsync(new ToolCallEvent
                     {
                         Id = stepTrace.Id,
                         Name = ExtractActionName(stepTrace.Title),
                         Input = input,
-                        Output = ExtractActionOutput(stepTrace.Content),
+                        Output = JsonConvert.SerializeObject(actionObj["output"]),
                         Status = stepTrace.Status == "success" ? "completed" : "error",
                         DurationMs = (long)(ExtractDuration(stepTrace.Description) * 1000)
                     }, ct);
@@ -427,41 +429,11 @@ namespace PostgreSQL.Embedding.Llm.Core
             }
             return chunks.ToArray();
         }
-
-        private static Dictionary<string, object> ParseActionInput(string content)
-        {
-            try
-            {
-                // Try to parse JSON input from content
-                var start = content.IndexOf("{\"input\":");
-                if (start >= 0)
-                {
-                    var json = content.Substring(start);
-                    var inputMatch = System.Text.RegularExpressions.Regex.Match(json, @"\{""input"":\s*(\{.*?\})");
-                    if (inputMatch.Success)
-                    {
-                        return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(inputMatch.Groups[1].Value) ?? new();
-                    }
-                }
-            }
-            catch
-            {
-                // Fallback to empty dict
-            }
-            return new Dictionary<string, object>();
-        }
-
         private static string ExtractActionName(string title)
         {
-            return title.Split('|', StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
+            var actionName = title.Split('|', StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
+            return actionName.Replace("Plugin", "");
         }
-
-        private static string ExtractActionOutput(string content)
-        {
-            var match = System.Text.RegularExpressions.Regex.Match(content, @"""output"":\s*""([^""]*)""");
-            return match.Success ? match.Groups[1].Value : "";
-        }
-
         private static double ExtractDuration(string description)
         {
             var match = System.Text.RegularExpressions.Regex.Match(description, @"耗时\s+([\d.]+)\s+秒");

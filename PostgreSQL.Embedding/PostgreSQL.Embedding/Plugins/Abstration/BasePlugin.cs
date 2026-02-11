@@ -12,7 +12,7 @@ namespace PostgreSQL.Embedding.Plugins.Abstration
     public class BasePlugin : IPlugin
     {
         private SSEEmitter _sseEmitter;
-        private readonly HttpContext _httpContext;
+        private readonly HttpContext? _httpContext;
         private readonly ILogger<BasePlugin> _logger;
         protected readonly IServiceProvider _serviceProvider;
 
@@ -21,12 +21,19 @@ namespace PostgreSQL.Embedding.Plugins.Abstration
             _serviceProvider = serviceProvider;
 
             var httpContextAccessor = serviceProvider.GetService<IHttpContextAccessor>();
-            _httpContext = httpContextAccessor.HttpContext;
+            _httpContext = httpContextAccessor?.HttpContext;
             if (_httpContext != null)
                 _sseEmitter = new SSEEmitter(_httpContext);
 
             var loggerFactory = serviceProvider.GetService<ILoggerFactory>();
             _logger = loggerFactory.CreateLogger<BasePlugin>();
+        }
+
+        protected string GetBaseUrl()
+        {
+            if (_httpContext == null)
+                return string.Empty;
+            return $"{_httpContext.Request.Scheme}://{_httpContext.Request.Host}";
         }
 
         /// <summary>

@@ -80,7 +80,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
 
                 var finalAnswer = TryGetFinalAnswer(nextStep, stepsTaken, i + 1);
 
-                if (!string.IsNullOrEmpty(finalAnswer) && string.IsNullOrEmpty(nextStep.Action) & stepsTaken.Count > 1)
+                if (!string.IsNullOrEmpty(finalAnswer) && string.IsNullOrEmpty(nextStep.Action) & string.IsNullOrEmpty(nextStep.Thought) & stepsTaken.Count > 1)
                 {
 
                     OnStepExecute?.Invoke(StepTrace.StepDone(_agentExecutionContext.GetMessageId()));

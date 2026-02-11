@@ -20,11 +20,24 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
 
         [KernelFunction]
         [Description("根据用户需求生成包含 HTML、CSS 和 JavaScript 的完整静态网页代码")]
-        public async Task<string> GenerateStaticPage([Description("用户对页面的功能、样式和内容需求描述")] string query, Kernel kernel)
+        public async Task<string> GenerateStaticPage(
+             Kernel kernel,
+            [Description("用户对页面的功能、样式和内容需求描述")] string query,
+            [Description("风格预设，可取值：minimalist, glassmorphism, corporate, playful, darkmode, retro, cyberpunk, nature")] string style = "minimalist",
+            [Description("颜色预设，可取值：ocean, forest, sunset, monochrome, berry, random")] string color = "random",
+            [Description("用途预设，可取值：landing, dashboard, form, portfolio, documentation, tool, blog, ecommerce, other")] string purpose = "other",
+            [Description("交互级别，可取值：static, dynamic, rich")] string interactionLevel = "static",
+            [Description("技术约束，可取值：vanilla-only, include-icons, include-charts, include-maps, pwa-ready, seo-optimized, i18n-ready")] string techConstraints = "vanilla-only"
+            )
         {
             var clonedKernel = kernel.Clone();
             var promptTemplate = _promptTemplateService.LoadTemplate("StaticPages.txt");
             promptTemplate.AddVariable("query", query);
+            promptTemplate.AddVariable("style_preset", style);
+            promptTemplate.AddVariable("color_scheme", color);
+            promptTemplate.AddVariable("page_purpose", purpose);
+            promptTemplate.AddVariable("interaction_level", interactionLevel);
+            promptTemplate.AddVariable("$tech_constraints", techConstraints);
 
             var code = await promptTemplate.InvokeAsync<string>(clonedKernel);
             code = code.Replace("```html", "").Replace("```", "").Trim();

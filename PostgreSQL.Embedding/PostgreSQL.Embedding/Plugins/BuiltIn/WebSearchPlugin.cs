@@ -35,7 +35,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         public async Task<string> RunAsync(
             Kernel kernel,
             [Description("搜索关键词或问题")] string keyword,
-            [Description("搜索引擎名称，可选值：Bing、Brave、JinaAI、BoCha、SerpApi、DuckDuckGo，默认为 Brave")] string searchEngine = "Bing",
+            [Description("搜索引擎名称，可选值：Bing、Brave、JinaAI、BoCha、SerpApi、DuckDuckGo, WeChat，默认为 Bing")] string searchEngine = "Bing",
             [Description("要排除的域名，使用英文逗号分隔，如：zhihu.com,baidu.com")] string filterDomain = "",
             [Description("是否在 Artifacts 中展示搜索结果列表，默认为 false")] bool showSearchResult = false,
             [Description("是否直接生成答案（启用 RAG 模式），默认为 false")] bool onlyReturnAnswer = false
@@ -85,6 +85,8 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
                     return serviceProvider.GetRequiredService<SerpApiPlugin>() as ISearchEngine;
                 case "DuckDuckGo":
                     return serviceProvider.GetRequiredService<DuckDuckGoSearchPlugin>() as ISearchEngine;
+                case "WeChat":
+                    return serviceProvider.GetRequiredService<WeiXinSearchPlugin>() as ISearchEngine;
                 default:
                     return serviceProvider.GetRequiredService<BingSearchPlugin>() as ISearchEngine;
             }
@@ -109,7 +111,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
                 var output = new
                 {
                     title = string.IsNullOrEmpty(result.Title) ? null : result.Title,
-                    url = url,
+                    url,
                     metadata = result.Metadata,
                     content = string.IsNullOrEmpty(result.Content) ? null : CleanContent(result.Content)
                 };
@@ -121,7 +123,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
                 var error = new
                 {
                     error = ex.Message,
-                    url = url
+                    url
                 };
                 return JsonConvert.SerializeObject(error, Formatting.Indented);
             }

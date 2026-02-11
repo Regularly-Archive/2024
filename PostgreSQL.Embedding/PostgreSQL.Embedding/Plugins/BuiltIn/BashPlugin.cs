@@ -1,5 +1,7 @@
 using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
+using PostgreSQL.Embedding.Common.Extensions;
+using PostgreSQL.Embedding.Llm.Planners;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -198,14 +200,12 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
     [KernelPluginAttribute(Description = "安全命令执行插件。在沙箱目录中执行预定义的可信命令，支持 Windows CMD/PowerShell 和 Linux Bash。危险命令已被列入黑名单禁止执行。", Version = "1.0")]
     public class BashPlugin : BasePlugin
     {
-        private readonly string _sandboxDirectory;
         private readonly ILogger<BashPlugin> _logger;
         private readonly bool _isWindows;
 
         public BashPlugin(IServiceProvider serviceProvider)
             : base(serviceProvider)
         {
-            _sandboxDirectory = Path.GetTempPath();
             _isWindows = OperatingSystem.IsWindows();
             _logger = _serviceProvider.GetService<ILoggerFactory>().CreateLogger<BashPlugin>();
         }
@@ -215,9 +215,10 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         /// </summary>
         [KernelFunction]
         [Description("获取当前允许执行命令的工作目录")]
-        public string GetSandboxDirectory()
+        public string GetSandboxDirectory(Kernel kernel)
         {
-            return _sandboxDirectory;
+            var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
+            return sandboxContext.ToLinuxStyleRelativePath(sandboxContext.SessionDir, sandboxContext.SessionDir);
         }
 
         /// <summary>
@@ -226,14 +227,14 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         [KernelFunction]
         [Description("执行安全的只读命令，如 ls, dir, cat, type, head, tail, grep, findstr, pwd, echo 等。命令将在沙箱目录下执行。在 Windows 环境下，Linux 命令（如 ls, cat, grep）会自动转换为对应的 Windows 命令（dir, type, findstr）。")]
         public async Task<string> ExecuteReadOnlyCommandAsync(
-            [Description("要执行的命令，例如 'ls -la', 'dir', 'cat filename.txt'。在 Windows 上使用 Linux 格式的命令会自动转换。")] string command)
+            [Description("要执行的命令，例如 'ls -la', 'dir', 'cat filename.txt'。在 Windows 上使用 Linux 格式的命令会自动转换。")] string command, Kernel kernel)
         {
             if (CommandBlacklist.ContainsForbiddenCommand(command))
             {
                 return $"错误：命令包含禁止执行的关键词。\n命令: {command}";
             }
 
-            return await ExecuteCommandAsync(command);
+            return await ExecuteCommandAsync(command, kernel);
         }
 
         /// <summary>
@@ -242,7 +243,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         [KernelFunction]
         [Description("执行可能修改文件的命令，如 echo, touch, mkdir, copy, move 等。在 Windows 环境下，Linux 命令会自动转换为对应的 Windows 命令。危险命令仍会被阻止。")]
         public async Task<string> ExecuteWriteCommandAsync(
-            [Description("要执行的写命令，例如 'echo Hello > test.txt', 'mkdir newdir', 'touch file.txt'。在 Windows 上使用 Linux 格式的命令会自动转换。")] string command)
+            [Description("要执行的写命令，例如 'echo Hello > test.txt', 'mkdir newdir', 'touch file.txt'。在 Windows 上使用 Linux 格式的命令会自动转换。")] string command, Kernel kernel)
         {
             if (CommandBlacklist.ContainsForbiddenCommand(command))
             {
@@ -256,7 +257,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
                 _logger.LogWarning("Write command executed: {Command}", command);
             }
 
-            return await ExecuteCommandAsync(command);
+            return await ExecuteCommandAsync(command, kernel);
         }
 
         /// <summary>
@@ -265,13 +266,14 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         [KernelFunction]
         [Description("列出目录中的文件和子目录，支持指定路径。")]
         public async Task<string> ListDirectoryAsync(
+            Kernel kernel,
             [Description("要列出的目录路径，默认为沙箱目录")] string? path = null)
         {
-            var targetPath = NormalizePath(path ?? _sandboxDirectory);
+            var targetPath = NormalizePath(path ?? ".", kernel);
             var isWindows = OperatingSystem.IsWindows();
             var command = isWindows ? $"dir \"{targetPath}\"" : $"ls -la \"{targetPath}\"";
 
-            return await ExecuteCommandAsync(command);
+            return await ExecuteCommandAsync(command, kernel);
         }
 
         /// <summary>
@@ -281,14 +283,15 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         [Description("读取文本文件的前N行内容，N默认为20行。")]
         public async Task<string> ReadFileHeadAsync(
             [Description("要读取的文件路径")] string filePath,
+            Kernel kernel,
             [Description("要读取的行数，默认为20")] int lines = 20)
         {
-            var targetPath = NormalizePath(filePath);
+            var targetPath = NormalizePath(filePath, kernel);
             var command = OperatingSystem.IsWindows()
                 ? $"powershell -Command \"Get-Content -Path '{targetPath}' -TotalCount {lines}\""
                 : $"head -n {lines} \"{targetPath}\"";
 
-            return await ExecuteCommandAsync(command);
+            return await ExecuteCommandAsync(command, kernel);
         }
 
         /// <summary>
@@ -298,38 +301,42 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         [Description("读取文本文件的末尾N行内容，N默认为20行。")]
         public async Task<string> ReadFileTailAsync(
             [Description("要读取的文件路径")] string filePath,
-            [Description("要读取的行数，默认为20")] int lines = 20)
+            Kernel kernel,
+            [Description("要读取的行数，默认为20")] int lines = 20
+            )
         {
-            var targetPath = NormalizePath(filePath);
+            var targetPath = NormalizePath(filePath, kernel);
             var command = OperatingSystem.IsWindows()
                 ? $"powershell -Command \"Get-Content -Path '{targetPath}' -Tail {lines}\""
                 : $"tail -n {lines} \"{targetPath}\"";
 
-            return await ExecuteCommandAsync(command);
+            return await ExecuteCommandAsync(command, kernel);
         }
 
-        private string NormalizePath(string path)
+        private string NormalizePath(string path, Kernel kernel)
         {
+            var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
+
             if (string.IsNullOrWhiteSpace(path))
-                return _sandboxDirectory;
+                return sandboxContext.SessionDir;
 
             // 处理相对路径
             if (!Path.IsPathRooted(path))
             {
-                path = Path.Combine(_sandboxDirectory, path);
+                path = Path.Combine(sandboxContext.SessionDir, path);
             }
 
             // 确保路径在沙箱目录内
             var fullPath = Path.GetFullPath(path);
-            //if (!fullPath.StartsWith(_sandboxDirectory, StringComparison.OrdinalIgnoreCase))
-            //{
-            //    throw new UnauthorizedAccessException($"路径超出沙箱目录范围: {path}");
-            //}
+            if (!fullPath.StartsWith(sandboxContext.SessionDir, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new UnauthorizedAccessException($"路径超出沙箱目录范围: {path}");
+            }
 
             return fullPath;
         }
 
-        private async Task<string> ExecuteCommandAsync(string command)
+        private async Task<string> ExecuteCommandAsync(string command, Kernel kernel)
         {
             try
             {
@@ -350,7 +357,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
                     {
                         FileName = shell,
                         Arguments = shellArgs,
-                        WorkingDirectory = _sandboxDirectory,
+                        WorkingDirectory = GetSandboxDirectory(kernel),
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
                         UseShellExecute = false,
@@ -358,7 +365,8 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
                         Environment =
                         {
                             ["HOME"] = _isWindows ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) : "/tmp",
-                            ["PATH"] = Environment.GetEnvironmentVariable("PATH") ?? ""
+                            ["PATH"] = Environment.GetEnvironmentVariable("PATH") ?? "",
+
                         }
                     }
                 };
@@ -368,7 +376,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
                 var error = await process.StandardError.ReadToEndAsync();
                 await process.WaitForExitAsync();
 
-                var result = $"命令: {command}\n工作目录: {_sandboxDirectory}\n";
+                var result = $"命令: {command}\n工作目录: {GetSandboxDirectory(kernel)}\n";
 
                 if (!string.IsNullOrWhiteSpace(output))
                     result += $"\n输出:\n{output}";

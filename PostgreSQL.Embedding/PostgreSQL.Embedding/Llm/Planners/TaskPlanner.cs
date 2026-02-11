@@ -3,6 +3,7 @@ using Microsoft.SemanticKernel;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using PostgreSQL.Embedding.Common.Extensions;
+using PostgreSQL.Embedding.Common.Utilities;
 using PostgreSQL.Embedding.Domain.Models;
 using PostgreSQL.Embedding.Domain.Models.Planners;
 using PostgreSQL.Embedding.Llm.Services;
@@ -47,10 +48,8 @@ namespace PostgreSQL.Embedding.Llm.Planners
 
             try
             {
-                if (string.IsNullOrEmpty(functionResult)) 
-                    return await GetSubTasksAsync(query, history, limit);
-
                 functionResult = ExtractJson(functionResult);
+                //functionResult = JsonRepairer.Repair(functionResult);
                 functionResult = PreprocessJsonData(functionResult);
                 var planResult = JsonConvert.DeserializeObject<PlanResult>(functionResult);
                 return planResult;
@@ -86,6 +85,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
                     return await GetRAGTasks(query, history);
 
                 functionResult = ExtractJson(functionResult);
+                //functionResult = JsonRepairer.Repair(functionResult);
                 functionResult = PreprocessJsonData(functionResult);
                 var planResult = JsonConvert.DeserializeObject<PlanResult>(functionResult);
                 return planResult;

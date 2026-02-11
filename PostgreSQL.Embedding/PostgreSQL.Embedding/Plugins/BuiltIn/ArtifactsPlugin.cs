@@ -1,4 +1,5 @@
-﻿using Microsoft.SemanticKernel;
+﻿using DocumentFormat.OpenXml.Wordprocessing;
+using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Extensions;
 using PostgreSQL.Embedding.Common.Streaming;
@@ -6,20 +7,17 @@ using PostgreSQL.Embedding.Llm.Planners;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 using System.IO.Compression;
-using System.Net.Http.Headers;
 using System.Text;
 
 namespace PostgreSQL.Embedding.Plugins.BuiltIn;
 
-[KernelPlugin(Description = "将智能体生成的内容保存为 Artifact（可下载的静态资源），返回可在浏览器中访问的 URL。Artifact 有效期为 3 天。", Version = "2.0")]
+[KernelPlugin(Description = "将智能体生成的内容保存为 Artifact（可下载的静态资源），返回可在浏览器中访问的 URL。Artifact 有效期为 3 天。", Version = "2.1")]
 public class ArtifactsPlugin : BasePlugin
 {
-    private readonly string _rootPath;
     private readonly IHttpClientFactory _httpClientFactory;
 
-    public ArtifactsPlugin(IServiceProvider serviceProvider, IWebHostEnvironment env, IHttpClientFactory httpClientFactory) : base(serviceProvider)
+    public ArtifactsPlugin(IServiceProvider serviceProvider, IHttpClientFactory httpClientFactory) : base(serviceProvider)
     {
-        _rootPath = Path.Combine(env.ContentRootPath, "runs");
         _httpClientFactory = httpClientFactory;
     }
 
@@ -32,7 +30,7 @@ public class ArtifactsPlugin : BasePlugin
         string fileName,
         Kernel kernel)
     {
-        return CreateArtifactInternalAsync(content, fileName, NewArtifactType.Text, canPreview: false, kernel);
+        return CreateArtifactInternalAsync(content, fileName, ArtifactType.Text, canPreview: false, kernel);
     }
 
     [KernelFunction]
@@ -42,7 +40,7 @@ public class ArtifactsPlugin : BasePlugin
         string fileName,
         Kernel kernel)
     {
-        return CreateArtifactInternalAsync(content, fileName, NewArtifactType.Markdown, canPreview: true, kernel);
+        return CreateArtifactInternalAsync(content, fileName, ArtifactType.Markdown, canPreview: true, kernel);
     }
 
     [KernelFunction]
@@ -52,7 +50,7 @@ public class ArtifactsPlugin : BasePlugin
         string fileName,
         Kernel kernel)
     {
-        return CreateArtifactInternalAsync(content, fileName, NewArtifactType.Code, canPreview: true, kernel);
+        return CreateArtifactInternalAsync(content, fileName, ArtifactType.Code, canPreview: true, kernel);
     }
 
     [KernelFunction]
@@ -62,7 +60,7 @@ public class ArtifactsPlugin : BasePlugin
         string fileName,
         Kernel kernel)
     {
-        return CreateArtifactInternalAsync(content, fileName, NewArtifactType.Html, canPreview: true, kernel);
+        return CreateArtifactInternalAsync(content, fileName, ArtifactType.Html, canPreview: true, kernel);
     }
 
     [KernelFunction]
@@ -72,7 +70,7 @@ public class ArtifactsPlugin : BasePlugin
         string fileName,
         Kernel kernel)
     {
-        return CreateArtifactInternalAsync(content, fileName, NewArtifactType.Json, canPreview: true, kernel);
+        return CreateArtifactInternalAsync(content, fileName, ArtifactType.Json, canPreview: true, kernel);
     }
 
     #endregion
@@ -86,7 +84,7 @@ public class ArtifactsPlugin : BasePlugin
         string fileName,
         Kernel kernel)
     {
-        return CreateArtifactInternalAsync(content, fileName, NewArtifactType.Csv, canPreview: true, kernel);
+        return CreateArtifactInternalAsync(content, fileName, ArtifactType.Csv, canPreview: true, kernel);
     }
 
     [KernelFunction]
@@ -96,7 +94,7 @@ public class ArtifactsPlugin : BasePlugin
         string fileName,
         Kernel kernel)
     {
-        return CreateArtifactInternalAsync(jsonData, fileName, NewArtifactType.Sql_Result, canPreview: true, kernel);
+        return CreateArtifactInternalAsync(jsonData, fileName, ArtifactType.Sql_Result, canPreview: true, kernel);
     }
 
     #endregion
@@ -110,7 +108,7 @@ public class ArtifactsPlugin : BasePlugin
         string fileName,
         Kernel kernel)
     {
-        return CreateArtifactInternalAsync(content, fileName, NewArtifactType.Jupyter, canPreview: true, kernel);
+        return CreateArtifactInternalAsync(content, fileName, ArtifactType.Jupyter, canPreview: true, kernel);
     }
 
     #endregion
@@ -124,7 +122,7 @@ public class ArtifactsPlugin : BasePlugin
         string fileName,
         Kernel kernel)
     {
-        return CreateArtifactFromFileAsync(filePath, fileName, NewArtifactType.Zip, canPreview: false, kernel);
+        return CreateArtifactFromFileAsync(filePath, fileName, ArtifactType.Zip, canPreview: false, kernel);
     }
 
     [KernelFunction]
@@ -158,23 +156,22 @@ public class ArtifactsPlugin : BasePlugin
     private async Task<ArtifactResponse> CreateArtifactInternalAsync(
         string content,
         string fileName,
-        NewArtifactType type,
+        ArtifactType type,
         bool canPreview,
         Kernel kernel)
     {
-        var runId = GetRunId(kernel);
-        var artifactId = Guid.NewGuid().ToString();
+        var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
 
-        var filePath = Path.Combine(_rootPath, runId, "artifacts", fileName);
+        var filePath = Path.Combine(sandboxContext.ArtifactsDir, fileName);
         Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
 
         await File.WriteAllTextAsync(filePath, content, Encoding.UTF8);
 
         var response = new ArtifactResponse
         {
-            ArtifactId = artifactId,
+            ArtifactId = Path.GetFileNameWithoutExtension(filePath),
             FileName = fileName,
-            AccessUrl = $"/api/statics/runs/{runId}/artifacts/{fileName}",
+            AccessUrl = GetAccessUrl(kernel, fileName),
             ExpiresAt = DateTime.UtcNow.AddDays(3),
             Type = type,
             CanPreview = canPreview,
@@ -189,17 +186,16 @@ public class ArtifactsPlugin : BasePlugin
     private async Task<ArtifactResponse> CreateArtifactFromFileAsync(
         string sourceFilePath,
         string fileName,
-        NewArtifactType type,
+        ArtifactType type,
         bool canPreview,
         Kernel kernel)
     {
         if (!File.Exists(sourceFilePath))
             throw new FileNotFoundException($"File not found: {sourceFilePath}");
 
-        var runId = GetRunId(kernel);
-        var artifactId = Guid.NewGuid().ToString();
+        var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
 
-        var filePath = Path.Combine(_rootPath, runId, "artifacts", fileName);
+        var filePath = Path.Combine(sandboxContext.ArtifactsDir, fileName);
         Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
 
         await Task.Run(() => File.Copy(sourceFilePath, filePath, overwrite: true));
@@ -207,9 +203,9 @@ public class ArtifactsPlugin : BasePlugin
         var fileInfo = new FileInfo(filePath);
         var response = new ArtifactResponse
         {
-            ArtifactId = artifactId,
+            ArtifactId = Path.GetFileNameWithoutExtension(fileName),
             FileName = fileName,
-            AccessUrl = $"/api/statics/runs/{runId}/artifacts/{fileName}",
+            AccessUrl = GetAccessUrl(kernel, fileName),
             ExpiresAt = DateTime.UtcNow.AddDays(3),
             Type = type,
             CanPreview = canPreview,
@@ -229,10 +225,9 @@ public class ArtifactsPlugin : BasePlugin
         if (!Directory.Exists(folderPath))
             throw new DirectoryNotFoundException($"Directory not found: {folderPath}");
 
-        var runId = GetRunId(kernel);
-        var artifactId = Guid.NewGuid().ToString();
+        var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
 
-        var zipPath = Path.Combine(_rootPath, runId, "artifacts", fileName);
+        var zipPath = Path.Combine(sandboxContext.ArtifactsDir, fileName);
         Directory.CreateDirectory(Path.GetDirectoryName(zipPath)!);
 
         await Task.Run(() => ZipFile.CreateFromDirectory(folderPath, zipPath, CompressionLevel.Optimal, includeBaseDirectory: false));
@@ -240,11 +235,11 @@ public class ArtifactsPlugin : BasePlugin
         var zipInfo = new FileInfo(zipPath);
         var response = new ArtifactResponse
         {
-            ArtifactId = artifactId,
+            ArtifactId = Path.GetFileNameWithoutExtension(fileName),
             FileName = fileName,
-            AccessUrl = $"/api/statics/runs/{runId}/artifacts/{fileName}",
+            AccessUrl = GetAccessUrl(kernel, fileName),
             ExpiresAt = DateTime.UtcNow.AddDays(3),
-            Type = NewArtifactType.Directory,
+            Type = ArtifactType.Directory,
             CanPreview = false,
             CanDownload = true,
             FileSize = zipInfo.Length
@@ -259,8 +254,7 @@ public class ArtifactsPlugin : BasePlugin
         string fileName,
         Kernel kernel)
     {
-        var runId = GetRunId(kernel);
-        var artifactId = Guid.NewGuid().ToString();
+        var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
 
         var httpClient = _httpClientFactory.CreateClient();
         httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; ArtifactsPlugin/1.0)");
@@ -272,9 +266,9 @@ public class ArtifactsPlugin : BasePlugin
         var contentType = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
 
         var extension = GetExtensionFromContentType(contentType);
-        var actualFileName = fileName ?? $"{artifactId}{extension}";
+        var actualFileName = fileName ?? $"{Guid.NewGuid().ToString("N")}{extension}";
 
-        var filePath = Path.Combine(_rootPath, runId, "artifacts", actualFileName);
+        var filePath = Path.Combine(sandboxContext.ArtifactsDir, actualFileName);
         Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
 
         await File.WriteAllBytesAsync(filePath, content);
@@ -282,9 +276,9 @@ public class ArtifactsPlugin : BasePlugin
         var artifactType = GetArtifactTypeFromContentType(contentType);
         var responseData = new ArtifactResponse
         {
-            ArtifactId = artifactId,
+            ArtifactId = Path.GetFileNameWithoutExtension(fileName),
             FileName = actualFileName,
-            AccessUrl = $"/api/statics/runs/{runId}/artifacts/{actualFileName}",
+            AccessUrl = GetAccessUrl(kernel, actualFileName),
             ExpiresAt = DateTime.UtcNow.AddDays(3),
             Type = artifactType.type,
             CanPreview = artifactType.canPreview,
@@ -319,30 +313,22 @@ public class ArtifactsPlugin : BasePlugin
         };
     }
 
-    private static (NewArtifactType type, bool canPreview) GetArtifactTypeFromContentType(string contentType)
+    private static (ArtifactType type, bool canPreview) GetArtifactTypeFromContentType(string contentType)
     {
         return contentType.ToLowerInvariant() switch
         {
-            var ct when ct.StartsWith("image/") => (NewArtifactType.Image, true),
-            "application/pdf" => (NewArtifactType.Pdf, true),
-            "application/zip" => (NewArtifactType.Zip, false),
-            "text/html" => (NewArtifactType.Html, true),
-            "text/markdown" => (NewArtifactType.Markdown, true),
-            "text/csv" => (NewArtifactType.Csv, true),
-            "text/plain" => (NewArtifactType.Text, false),
-            "application/json" => (NewArtifactType.Json, true),
-            "application/x-ipynb+json" => (NewArtifactType.Jupyter, true),
-            var ct when ct.StartsWith("application/vnd.ms-excel") || ct.StartsWith("application/vnd.openxmlformats") => (NewArtifactType.Excel, true),
-            _ => (NewArtifactType.Text, false)
+            var ct when ct.StartsWith("image/") => (ArtifactType.Image, true),
+            "application/pdf" => (ArtifactType.Pdf, true),
+            "application/zip" => (ArtifactType.Zip, false),
+            "text/html" => (ArtifactType.Html, true),
+            "text/markdown" => (ArtifactType.Markdown, true),
+            "text/csv" => (ArtifactType.Csv, true),
+            "text/plain" => (ArtifactType.Text, false),
+            "application/json" => (ArtifactType.Json, true),
+            "application/x-ipynb+json" => (ArtifactType.Jupyter, true),
+            var ct when ct.StartsWith("application/vnd.ms-excel") || ct.StartsWith("application/vnd.openxmlformats") => (ArtifactType.Excel, true),
+            _ => (ArtifactType.Text, false)
         };
-    }
-
-    private string GetRunId(Kernel kernel)
-    {
-        var agentExecutionContext = kernel.GetAgentExecutionContext();
-        var runId = agentExecutionContext.GetRunId() ?? Guid.NewGuid().ToString("N");
-        agentExecutionContext.SetRunId(runId);
-        return runId;
     }
 
     private async Task EmitArtifactAsync(ArtifactResponse response, Kernel kernel)
@@ -370,34 +356,124 @@ public class ArtifactsPlugin : BasePlugin
 
     #endregion
 
+    /// <summary>
+    /// 读取文本类型的 Artifact 内容
+    /// </summary>
+    [KernelFunction]
+    [Description("通过 artifactId 或 URL 读取文本类型 Artifact 的内容。支持的格式：文本、Markdown、代码、HTML、JSON、CSV、SQL 结果。")]
+    public async Task<string> ReadArtifactAsync(
+        [Description("ArtifactId 或者 AccessUrl 或者 FileName")] string artifactIdOrUrl,
+        Kernel kernel)
+    {
+        var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
+        string? filePath = null;
+
+        if (artifactIdOrUrl.StartsWith("/api/statics/") || artifactIdOrUrl.StartsWith("http://") || artifactIdOrUrl.StartsWith("https://"))
+        {
+            var fileName = ExtractFileNameFromUrl(artifactIdOrUrl);
+            if (string.IsNullOrEmpty(fileName))
+                throw new ArgumentException($"Unable to parse the URL: {artifactIdOrUrl}");
+
+            filePath = Path.Combine(sandboxContext.ArtifactsDir, fileName);
+        }
+        else
+        {
+            filePath = FindFileByArtifactId(sandboxContext.ArtifactsDir, artifactIdOrUrl);
+        }
+
+        if (string.IsNullOrEmpty(filePath))
+            throw new ArgumentException($"Unable to locate the artifact: {artifactIdOrUrl}");
+
+        if (!File.Exists(filePath))
+            throw new ArgumentException($"Unable to locate the artifact: {artifactIdOrUrl}");
+
+        return await File.ReadAllTextAsync(filePath);
+    }
+
+    private static string? ExtractFileNameFromUrl(string url)
+    {
+        try
+        {
+            if (url.StartsWith("/api/statics/"))
+            {
+                var parts = url.Split('/');
+                if (parts.Length >= 6)
+                {
+                    return parts[^1];
+                }
+            }
+            else if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            {
+                return Uri.UnescapeDataString(uri.Segments.LastOrDefault() ?? "");
+            }
+        }
+        catch
+        {
+            return string.Empty;
+        }
+
+        return string.Empty;
+    }
+
+    private static string? FindFileByArtifactId(string artifactsDir, string artifactId)
+    {
+        if (!Directory.Exists(artifactsDir))
+            return null;
+
+        foreach (var file in Directory.EnumerateFiles(artifactsDir))
+        {
+            var (fileName, baseName) = (Path.GetFileName(file), Path.GetFileNameWithoutExtension(file));
+            if (baseName.Equals(artifactId, StringComparison.OrdinalIgnoreCase) ||
+                fileName.Equals(artifactId, StringComparison.OrdinalIgnoreCase))
+            {
+                return file;
+            }
+        }
+
+        return null;
+    }
+
     [KernelFunction]
     [Description("列出当前运行会话中的所有 Artifact，返回访问 URL 列表。")]
     public IEnumerable<ArtifactResponse> ListArtifacts(Kernel kernel)
     {
-        var runId = GetRunId(kernel);
-        var artifactsPath = Path.Combine(_rootPath, runId, "artifacts");
+        var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
 
-        if (!Directory.Exists(artifactsPath))
+        if (!Directory.Exists(sandboxContext.ArtifactsDir))
             yield break;
 
-        foreach (var file in Directory.EnumerateFiles(artifactsPath, "*", SearchOption.TopDirectoryOnly))
+        foreach (var file in Directory.EnumerateFiles(sandboxContext.ArtifactsDir, "*", SearchOption.TopDirectoryOnly))
         {
             var fileName = Path.GetFileName(file);
             var fileInfo = new FileInfo(file);
-            var artifactId = Path.GetFileNameWithoutExtension(file);
+            var artifactId = Path.GetFileNameWithoutExtension(fileName);
             yield return new ArtifactResponse
             {
                 ArtifactId = artifactId,
                 FileName = fileName,
-                AccessUrl = $"/api/statics/runs/{runId}/artifacts/{fileName}",
+                AccessUrl = GetAccessUrl(kernel, fileName),
                 ExpiresAt = DateTime.UtcNow.AddDays(3),
                 FileSize = fileInfo.Length
             };
         }
     }
 
+    private string GetAccessUrl(Kernel kernel, string fileName)
+    {
+        var agentExecutionContext = kernel.GetAgentExecutionContext();
+
+        var appId = agentExecutionContext.GetAppId();
+        var conversationId = agentExecutionContext.GetConversationId();
+        var runId = agentExecutionContext.GetRunId();
+
+        var relativeUrl = $"/api/statics/{appId}/{conversationId}/runs/{runId}/artifacts/{fileName}";
+        var baseUrl = GetBaseUrl();
+        return string.IsNullOrEmpty(baseUrl) ? relativeUrl : $"{baseUrl}{relativeUrl}";
+    }
+
+
     #region 产物类型定义
-    public enum NewArtifactType
+    public enum ArtifactType
     {
         Text,
         Markdown,
@@ -420,7 +496,7 @@ public class ArtifactsPlugin : BasePlugin
         public string FileName { get; set; }
         public string AccessUrl { get; set; }
         public DateTime ExpiresAt { get; set; }
-        public NewArtifactType Type { get; set; }
+        public ArtifactType Type { get; set; }
         public bool CanPreview { get; set; }
         public bool CanDownload { get; set; } = true;
         public long? FileSize { get; set; }
