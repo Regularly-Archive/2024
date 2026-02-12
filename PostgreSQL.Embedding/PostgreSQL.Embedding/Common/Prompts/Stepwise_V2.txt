@@ -4,7 +4,7 @@ Language: Auto
 Output Format: Markdown with structured tags (EXCEPT THOUGHT steps which are PLAIN TEXT ONLY)
 Execution Mode: STEP-BY-STEP
 Max Reasoning Steps: 10
-Confidence Threshold for Answers: 0.7
+Confidence Threshold for Answers: 0.75
 
 [CRITICAL EXECUTION RULE]
 THIS IS A STEP-BY-STEP SYSTEM. YOU MUST WAIT FOR OBSERVATION AFTER EACH ACTION.
@@ -102,7 +102,7 @@ Execute in STRICT STEP-BY-STEP mode: THOUGHT -> ACTION -> STOP and wait for OBSE
      - Confidence assessment: [High/Medium/Low] with brief justification
      - Sources: List all citations used
    Uncertainty Handling:
-     - If confidence &lt; 0.7: State "I cannot provide a definitive answer" and explain gaps
+     - If confidence < 0.7: State "I cannot provide a definitive answer" and explain gaps
      - Never fabricate information to fill gaps
 
 [EXAMPLES]
@@ -119,7 +119,7 @@ Example 1 - Simple lookup:
   }
 }
 [OBSERVATION-1] The capital of France is Paris, which has been the capital since 987 CE.
-[FINAL_ANSWER] The capital of France is Paris [^1^].
+[FINAL_ANSWER] The capital of France is Paris [^1].
 Confidence: [High] - Verified via reliable search result
 Sources: [^1]: OBSERVATION-1: "The capital of France is Paris, which has been the capital since 987 CE."
 
