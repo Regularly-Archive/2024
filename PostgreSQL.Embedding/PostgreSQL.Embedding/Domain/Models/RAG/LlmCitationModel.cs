@@ -11,6 +11,7 @@ namespace PostgreSQL.Embedding.Domain.Models.RAG
         public float Relevance { get; set; }
         public string Text { get; set; }
         public string Url { get; set; }
+        public string Type { get; set; }
 
         public static LlmCitationModel FromKnowledgeBase(int index, KMPartition partition)
         {
@@ -20,7 +21,8 @@ namespace PostgreSQL.Embedding.Domain.Models.RAG
                 FileName = partition.FileName,
                 Relevance = partition.Relevance,
                 Text = $"[^{index}]: {partition.Text}",
-                Url = $"/api/KnowledgeBase/{partition.KnowledgeBaseId}/chunks/{partition.FileId}/{partition.PartId}?relevance={partition.Relevance}"
+                Url = $"/api/KnowledgeBase/{partition.KnowledgeBaseId}/chunks/{partition.FileId}/{partition.PartId}?relevance={partition.Relevance}",
+                Type = "doc"
             };
         }
 
@@ -31,7 +33,8 @@ namespace PostgreSQL.Embedding.Domain.Models.RAG
                 Index = index,
                 Text = entry.Snippet,
                 Url = entry.Url,
-                Relevance = entry.Relevance
+                Relevance = entry.Relevance,
+                Type = "web"
             };
         }
     }
