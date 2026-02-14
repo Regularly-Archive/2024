@@ -37,7 +37,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
             promptTemplate.AddVariable("color_scheme", color);
             promptTemplate.AddVariable("page_purpose", purpose);
             promptTemplate.AddVariable("interaction_level", interactionLevel);
-            promptTemplate.AddVariable("$tech_constraints", techConstraints);
+            promptTemplate.AddVariable("tech_constraints", techConstraints);
 
             var code = await promptTemplate.InvokeAsync<string>(clonedKernel);
             code = code.Replace("```html", "").Replace("```", "").Trim();

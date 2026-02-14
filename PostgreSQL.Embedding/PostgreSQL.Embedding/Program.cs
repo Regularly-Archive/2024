@@ -20,6 +20,7 @@ using PostgreSQL.Embedding.Infrastructure;
 using PostgreSQL.Embedding.Infrastructure.DataAccess;
 using PostgreSQL.Embedding.Infrastructure.FileStorage;
 using PostgreSQL.Embedding.Infrastructure.Messaging;
+using PostgreSQL.Embedding.Infrastructure.Sandbox;
 using PostgreSQL.Embedding.Llm.Abstractions;
 using PostgreSQL.Embedding.Llm.Core;
 using PostgreSQL.Embedding.Llm.Planners;
@@ -135,7 +136,8 @@ builder.Services.Configure<CodeInterpreterConfig>(builder.Configuration.GetSecti
 builder.Services
     .AddDataAccess(builder.Configuration)
     .AddFileStorage(builder.Configuration)
-    .AddMessaging();
+    .AddMessaging()
+    .AddDockerSandbox(builder.Configuration);
 
 
 builder.Services
