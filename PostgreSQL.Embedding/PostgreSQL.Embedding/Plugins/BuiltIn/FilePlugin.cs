@@ -46,20 +46,6 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         }
 
         /// <summary>
-        /// 获取当前沙箱目录
-        /// </summary>
-        [KernelFunction]
-        [Description("获取当前允许操作文件的工作目录")]
-        public IEnumerable<string> GetAllowedDirectories(Kernel kernel)
-        {
-            var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
-
-            yield return sandboxContext.ToLinuxStyleRelativePath(sandboxContext.SessionDir, sandboxContext.SessionDir);
-            yield return sandboxContext.ToLinuxStyleRelativePath(sandboxContext.SessionDir, sandboxContext.RunDir);
-            yield return sandboxContext.ToLinuxStyleRelativePath(sandboxContext.SessionDir, sandboxContext.ArtifactsDir);
-        }
-
-        /// <summary>
         /// 读取文件全部内容
         /// </summary>
         [KernelFunction]
@@ -69,7 +55,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
             Kernel kernel)
         {
             var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
-            var targetPath = sandboxContext.FromLinuxStyleRelativePath(sandboxContext.SessionDir, filePath);
+            var targetPath = sandboxContext.ResolvePath(filePath);
 
             if (!File.Exists(targetPath))
                 throw new ArgumentException($"The file does not exist: {filePath}");
@@ -91,7 +77,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
             Kernel kernel = null)
         {
             var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
-            var targetPath = sandboxContext.FromLinuxStyleRelativePath(sandboxContext.SessionDir, filePath);
+            var targetPath = sandboxContext.ResolvePath(filePath);
 
             if (!File.Exists(targetPath))
                 throw new ArgumentException($"The file does not exist: {filePath}");
@@ -122,7 +108,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
             Kernel kernel = null)
         {
             var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
-            var targetPath = sandboxContext.FromLinuxStyleRelativePath(sandboxContext.SessionDir, filePath);
+            var targetPath = sandboxContext.ResolvePath(filePath);
 
             if (!File.Exists(targetPath))
                 throw new ArgumentException($"The file does not exist: {filePath}");
@@ -196,7 +182,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
             Kernel kernel)
         {
             var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
-            var targetPath = sandboxContext.FromLinuxStyleRelativePath(sandboxContext.SessionDir, filePath);
+            var targetPath = sandboxContext.ResolvePath(filePath);
 
             var directory = Path.GetDirectoryName(targetPath);
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
@@ -217,7 +203,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
             Kernel kernel)
         {
             var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
-            var targetPath = sandboxContext.FromLinuxStyleRelativePath(sandboxContext.SessionDir, filePath);
+            var targetPath = sandboxContext.ResolvePath(filePath);
 
             var directory = Path.GetDirectoryName(targetPath);
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
@@ -225,42 +211,6 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
 
             await File.AppendAllTextAsync(targetPath, content);
             return true;
-        }
-
-        /// <summary>
-        /// 列出目录内容
-        /// </summary>
-        [KernelFunction]
-        [Description("列出指定目录中的所有文件和子目录。")]
-        public async Task<DirectoryListingResult> ListDirectoryAsync(
-            [Description("要列出的目录路径，默认为沙箱目录")] string? path = null,
-            Kernel kernel = null)
-        {
-            var result = new DirectoryListingResult();
-            path = path ?? ".";
-
-            var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
-            var targetPath = sandboxContext.FromLinuxStyleRelativePath(sandboxContext.SessionDir, path);
-
-            var entries = Directory.GetFileSystemEntries(targetPath);
-
-            foreach (var entry in entries)
-            {
-                if (Directory.Exists(entry))
-                {
-                    result.Directories.Add(Path.GetFileName(entry));
-                }
-                else
-                {
-                    result.Files.Add(Path.GetFileName(entry));
-                }
-            }
-
-            result.TotalFiles = result.Files.Count;
-            result.TotalDirectories = result.Directories.Count;
-            result.Path = path;
-
-            return result;
         }
 
         /// <summary>
@@ -273,33 +223,11 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
             Kernel kernel = null)
         {
             var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
-            var targetPath = sandboxContext.FromLinuxStyleRelativePath(sandboxContext.SessionDir, path);
+            var targetPath = sandboxContext?.ResolvePath(path);
             return File.Exists(targetPath) || Directory.Exists(targetPath);
         }
 
-        /// <summary>
-        /// 获取文件信息
-        /// </summary>
-        [KernelFunction]
-        [Description("获取文件的详细信息，包括大小、创建时间、修改时间、是否只读等。")]
-        public FileInfoResult GetFileInfo(
-            [Description("要查询的文件路径")] string filePath,
-            Kernel kernel = null)
-        {
-            var result = new FileInfoResult();
-            var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
-            var targetPath = sandboxContext.FromLinuxStyleRelativePath(sandboxContext.SessionDir, filePath);
 
-            if (!File.Exists(targetPath))
-                throw new InvalidOperationException($"The file does not exist: {filePath}");
-
-            var fileInfo = new FileInfo(targetPath);
-            result.Success = true;
-            result.FileSize = fileInfo.Length;
-            result.LastModified = fileInfo.LastWriteTime;
-            result.CreationDate = fileInfo.CreationTime;
-            return result;
-        }
 
         /// <summary>
         /// 创建目录
@@ -313,8 +241,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
             var result = new FileInfoResult();
 
             var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
-            var targetPath = sandboxContext.FromLinuxStyleRelativePath(sandboxContext.SessionDir, directoryPath);
-
+            var targetPath = sandboxContext.ResolvePath(directoryPath);
 
             Directory.CreateDirectory(targetPath);
             return true;

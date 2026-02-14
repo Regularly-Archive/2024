@@ -1,0 +1,42 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0-preview
+
+LABEL maintainer="sandbox" \
+      description="Sandbox image with Python, Node.js, .NET runtime"
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash \
+    curl \
+    wget \
+    git \
+    vim \
+    nano \
+    tar \
+    gzip \
+    zip \
+    unzip \
+    findutils \
+    coreutils \
+    openssh-client \
+    ca-certificates \
+    libstdc++6 \
+    python3 \
+    python3-pip \
+    nodejs \
+    npm \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m pip install --no-cache-dir --break-system-packages \
+    requests \
+    beautifulsoup4 \
+    lxml \
+    numpy \
+    pandas
+
+RUN npm install -g --no-cache \
+    typescript \
+    ts-node \
+    prettier
+
+RUN ln -s /usr/bin/python3 /usr/bin/python
+
+CMD ["bash"]

@@ -1,5 +1,7 @@
 using Google.Protobuf.WellKnownTypes;
 using LLama.Batched;
+using Microsoft.Extensions.Options;
+using PostgreSQL.Embedding.Infrastructure.Sandbox;
 using System.IO;
 using System.Runtime.CompilerServices;
 
@@ -13,9 +15,10 @@ public static class SandboxContextExtensions
         this AgentExecutionContext ctx,
         long appId,
         string conversationId,
-        string runId)
+        string runId,
+        IOptions<SandboxOptions> options)
     {
-        var sandboxContext = new SandboxContext(appId, conversationId, runId);
+        var sandboxContext = new SandboxContext(appId, conversationId, runId, options.Value.WorkingDirectory);
         ctx.SetData(SandboxContextKey, sandboxContext);
     }
 
@@ -24,7 +27,7 @@ public static class SandboxContextExtensions
         var sandboxContext = ctx.GetData<ISandboxContext>(SandboxContextKey)!;
         if (sandboxContext == null)
         {
-            sandboxContext = new SandboxContext(ctx.GetAppId(), ctx.GetConversationId(), ctx.GetRunId());
+            sandboxContext = new SandboxContext(ctx.GetAppId(), ctx.GetConversationId(), ctx.GetRunId(), "/sandbox");
             ctx.SetData(SandboxContextKey, sandboxContext);
         }
 

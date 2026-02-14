@@ -134,6 +134,7 @@
   <ItemGroup>
     <Folder Include="Application\DTOs\" />
     <Folder Include="Assets\Models\" />
+    <Folder Include="Infrastructure\Sandbox\" />
   </ItemGroup>
 
   <ItemGroup>

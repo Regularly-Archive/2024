@@ -14,21 +14,28 @@ internal class SandboxContext : ISandboxContext
     public string RunDir { get; }
     public string ArtifactsDir { get; }
 
-    internal SandboxContext(long appId, string conversationId, string runId)
+    private string _workingDir;
+
+    internal SandboxContext(long appId, string conversationId, string runId, string workDir)
     {
         AppDir = Path.Combine(BaseDir, appId.ToString());
         SessionDir = Path.Combine(AppDir, conversationId);
         RunDir = Path.Combine(SessionDir, "runs", runId);
         ArtifactsDir = Path.Combine(RunDir, "artifacts");
+        _workingDir = workDir;
     }
 
     public string ResolvePath(string relativePath)
     {
+        if (relativePath.StartsWith(_workingDir)) relativePath = relativePath.Replace(_workingDir, "").TrimStart(Path.PathSeparator);
+
         var fullPath = Path.GetFullPath(Path.Combine(SessionDir, relativePath));
+
         if (!IsPathAllowed(fullPath))
         {
             throw new UnauthorizedAccessException($"Path outside sandbox: {relativePath}");
         }
+
         return fullPath;
     }
 
@@ -37,7 +44,7 @@ internal class SandboxContext : ISandboxContext
         try
         {
             var fullPath = Path.GetFullPath(path);
-            return fullPath.StartsWith(AppDir, StringComparison.OrdinalIgnoreCase);
+            return fullPath.StartsWith(SessionDir, StringComparison.OrdinalIgnoreCase);
         }
         catch
         {

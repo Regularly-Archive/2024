@@ -1,5 +1,6 @@
 using LLama.Batched;
 using Masuit.Tools;
+using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Newtonsoft.Json;
@@ -9,6 +10,7 @@ using PostgreSQL.Embedding.Common.Streaming;
 using PostgreSQL.Embedding.Domain.Entities;
 using PostgreSQL.Embedding.Domain.Models;
 using PostgreSQL.Embedding.Domain.Models.Planners;
+using PostgreSQL.Embedding.Infrastructure.Sandbox;
 using PostgreSQL.Embedding.Infrastructure.UserIdentity;
 using PostgreSQL.Embedding.Llm.Abstractions;
 using PostgreSQL.Embedding.Llm.Planners;
@@ -52,6 +54,7 @@ namespace PostgreSQL.Embedding.Llm.Core
         private readonly ILogger<AgenticConversationService> _logger;
         private readonly AgentExecutionContext _agentExecutionContext;
         private readonly string _defaultPrompt = "You are a helpful AI bot. You must answer the question in Chinese.";
+        private readonly IOptions<SandboxOptions> _sandboxOptions;
 
         public AgenticConversationService(
             Kernel kernel,
@@ -68,6 +71,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             _currentUserService = serviceProvider.GetService<ICurrentUserService>()!;
             _logger = serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<AgenticConversationService>();
             _agentExecutionContext = kernel.GetAgentExecutionContext();
+            _sandboxOptions = serviceProvider.GetService<IOptions<SandboxOptions>>()!;
         }
 
         /// <summary>
@@ -85,7 +89,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             _agentExecutionContext.SetRunId(runId);
             _agentExecutionContext.SetAppId(_app.Id);
             _agentExecutionContext.SetConversationId(convId);
-            _agentExecutionContext.InitializeSandboxContext(_app.Id, convId, runId);
+            _agentExecutionContext.InitializeSandboxContext(_app.Id, convId, runId, _sandboxOptions);
 
             // Add user message
             var refMessageId = await _chatHistoriesService.AddUserMessageAsync(_app.Id, convId, input);
@@ -283,6 +287,9 @@ namespace PostgreSQL.Embedding.Llm.Core
             planner.AddVariable("skillsRootFolder", "C:\\Users\\Administrator\\.claude\\skills");
             planner.AddVariable("EnableMCP", true);
             planner.AddVariable("EnableSkills", true);
+            planner.AddVariable("WorkDir", $"/sandbox");
+            planner.AddVariable("ArtifactsDir", $"/sandbox/runs/{runId}/artifacts");
+
 
             // Create DAG executor
             var graphExecutor = new DAGraphExecutor(input, subTasks, planner, _kernel);
@@ -322,7 +329,7 @@ namespace PostgreSQL.Embedding.Llm.Core
                         Name = ExtractActionName(stepTrace.Title),
                         Input = input,
                         Output = JsonConvert.SerializeObject(actionObj["output"]),
-                        Status = stepTrace.Status == "success" ? "completed" : "error",
+                        Status = stepTrace.Status == "success" ? "completed" : "failed",
                         DurationMs = (long)(ExtractDuration(stepTrace.Description) * 1000)
                     }, ct);
                     break;
