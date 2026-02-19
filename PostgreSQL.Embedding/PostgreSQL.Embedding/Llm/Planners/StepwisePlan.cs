@@ -23,11 +23,9 @@ namespace PostgreSQL.Embedding.Llm.Planners
         private readonly AgentExecutionContext _agentExecutionContext;
         public string PlanId { get; private set; }
 
-        private const string ObservationTag = "[OBSERVATION]";
-        private const string ActionTag = "[ACTION]";
-        private const string ThoughtTag = "[THOUGHT]";
-        private const string QuestionTag = "[QUESTION]";
-        private const string FinalAnswerTag = "[FINAL_ANSWER]";
+        private const string ObservationTag = "<Observation";
+        private const string ThoughtTag = "[Thought]";
+        private const string QuestionTag = "<Question>";
         private const string TrimMessageFormat = "... I've removed the first {0} steps of my previous work to make room for the new stuff ...";
         private const string MainKey = "INPUT";
 
@@ -51,17 +49,17 @@ namespace PostgreSQL.Embedding.Llm.Planners
 
         public async Task<string> ExecuteAsync(string goal, ChatHistory chatHistory = null, CancellationToken cancellationToken = default)
         {
-            var stepsTaken = new List<SystemStep>();
+            var stepsTaken = new List<ReasoningStep>();
 
             if (chatHistory == null) chatHistory = new ChatHistory();
 
             chatHistory.Insert(0, new ChatMessageContent(AuthorRole.System, _systemMessage, null, null, Encoding.UTF8, null));
-            chatHistory.AddUserMessage($"{QuestionTag} {goal}");
+            chatHistory.AddUserMessage($"<Question>{goal}</Question>");
 
             var aiService = GetAIService(_kernel);
             var startingMessageCount = chatHistory.Count;
 
-            SystemStep? lastStep = null;
+            ReasoningStep? lastStep = null;
 
             for (var i = 0; i < _config.MaxIterations; i++)
             {
@@ -84,7 +82,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 {
 
                     OnStepExecute?.Invoke(StepTrace.StepDone(_agentExecutionContext.GetMessageId()));
-                    _logger.LogInformation($"{FinalAnswerTag} {finalAnswer}");
+                    _logger.LogInformation($"[FinalAnswer] {{FinalAnswer}}", finalAnswer);
                     return finalAnswer;
                 }
 
@@ -104,7 +102,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
                     return nextStep.FinalAnswer;
                 }
 
-                chatHistory.AddAssistantMessage($"{ObservationTag}{nextStep.Observation}");
+                chatHistory.AddAssistantMessage(nextStep.FormatObservation());
 
                 _logger?.LogInformation("Action: No further action need to take");
 
@@ -118,12 +116,12 @@ namespace PostgreSQL.Embedding.Llm.Planners
             return string.Empty;
         }
 
-        private bool TryGetThought(SystemStep step, ChatHistory chatHistory)
+        private bool TryGetThought(ReasoningStep step, ChatHistory chatHistory)
         {
             if (!string.IsNullOrEmpty(step.Thought))
             {
-                chatHistory.AddAssistantMessage($"{ThoughtTag} {step.Thought}");
-                if (step.Thought.IndexOf(QuestionTag) != -1)
+                chatHistory.AddAssistantMessage(step.FormatThought());
+                if (step.Thought.IndexOf(QuestionTag, StringComparison.OrdinalIgnoreCase) != -1)
                 {
                     var question = step.Thought.Split("\n\n")[0].Replace(QuestionTag, "").Replace("-", "").Trim();
                     var thought = step.Thought.Split("\n\n")[1].Replace("-", "").Trim();
@@ -185,45 +183,27 @@ namespace PostgreSQL.Embedding.Llm.Planners
             }
         }
 
-        private async Task<bool> TryGetActionObservationAsync(Kernel kernel, SystemStep step, ChatHistory chatHistory, CancellationToken cancellationToken)
+        private async Task<bool> TryGetActionObservationAsync(Kernel kernel, ReasoningStep step, ChatHistory chatHistory, CancellationToken cancellationToken)
         {
             if (!string.IsNullOrEmpty(step.Action))
             {
                 this._logger?.LogInformation("[ACTION] {Action}({ActionVariables}).", step.Action, JsonSerializerExtensions.Serialize(step.ActionVariables));
 
-                // Add [THOUGHT] and [ACTION] to chat history
-                var stringBuilder = new StringBuilder();
+                // Add <Thought> and <Action> to chat history using XML format
+                var messageBuilder = new StringBuilder();
                 if (!string.IsNullOrEmpty(step.Thought))
-                    stringBuilder.AppendLine($"{ThoughtTag} {step.Thought}");
+                    messageBuilder.AppendLine(step.FormatThought());
 
-                var actionPayload = new { action = step.Action, action_variables = step.ActionVariables };
-                stringBuilder.AppendLine($"{ActionTag} {JsonSerializerExtensions.Serialize(actionPayload)}");
-               
+                messageBuilder.AppendLine(step.FormatAction());
 
-                chatHistory.AddAssistantMessage(stringBuilder.ToString());
+                chatHistory.AddAssistantMessage(messageBuilder.ToString());
 
                 // Invoke Tool
                 try
                 {
                     var result = await InvokeActionAsync(kernel, step.Action, step.ActionVariables, cancellationToken).ConfigureAwait(false);
 
-                    // Set FinalAnswer if result starts with [FINAL_WANSWER] tag.
-                    // Return false to break loop.
-                    //if (result.StartsWith(FinalAnswerTag))
-                    //{
-                    //    step.FinalAnswer = result.Substring(FinalAnswerTag.Length);
-                    //    this._logger?.LogInformation("Final Answer: \r\n{FinalAnswer}", step.FinalAnswer);
-                    //    return false;
-                    //}
-
                     step.Observation = string.IsNullOrEmpty(result) ? $"There is no result can be found from action '{step.Action}'." : result!;
-                    //var keepFormatMatch = _regexKeepFormat.Match(step.Observation);
-                    //if (keepFormatMatch.Success)
-                    //{
-                    //    step.FinalAnswer = keepFormatMatch.Groups[1].Value.Trim();
-                    //    return false;
-                    //}
-
                 }
                 catch (Exception ex)
                 {
@@ -232,7 +212,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 }
 
                 this._logger?.LogInformation("[OBSERVATION] {Observation}", step.Observation);
-                chatHistory.AddUserMessage($"{ObservationTag} {step.Observation}");
+                chatHistory.AddUserMessage(step.FormatObservation());
 
                 return true;
             }
@@ -240,7 +220,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             return false;
         }
 
-        private SystemStep AddNextStep(SystemStep step, SystemStep lastStep, ChatHistory chatHistory, List<SystemStep> stepsTaken, int startingMessageCount)
+        private ReasoningStep AddNextStep(ReasoningStep step, ReasoningStep lastStep, ChatHistory chatHistory, List<ReasoningStep> stepsTaken, int startingMessageCount)
         {
             // If the thought is empty and the last step had no action, copy action to last step and set as new nextStep
             if (string.IsNullOrEmpty(step.Thought) && lastStep is not null && string.IsNullOrEmpty(lastStep.Action))
@@ -248,7 +228,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 lastStep.Action = step.Action;
                 lastStep.ActionVariables = step.ActionVariables;
 
-                lastStep.OriginalResponse += step.OriginalResponse;
+                lastStep.RawResponse += step.RawResponse;
                 step = lastStep;
                 if (chatHistory.Count > startingMessageCount)
                 {
@@ -257,9 +237,9 @@ namespace PostgreSQL.Embedding.Llm.Planners
             }
             else
             {
-                _logger?.LogInformation($"{ThoughtTag} {step.Thought}");
+                _logger?.LogInformation($"{ThoughtTag} {{Thought}}", step.Thought);
 
-                if (!string.IsNullOrEmpty(step.Thought) && step.Thought.IndexOf(QuestionTag) != -1)
+                if (!string.IsNullOrEmpty(step.Thought) && step.Thought.IndexOf(QuestionTag, StringComparison.OrdinalIgnoreCase) != -1)
                 {
                     var question = step.Thought?.Split("\n", StringSplitOptions.RemoveEmptyEntries)[0]?.Replace(QuestionTag, "").Replace("-", "").Trim();
                     var thought = step.Thought?.Split("\n", StringSplitOptions.RemoveEmptyEntries)[1]?.Replace("-", "").Trim();
@@ -281,7 +261,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             return step;
         }
 
-        private bool TryGetObservations(SystemStep step, ChatHistory chatHistory, List<SystemStep> stepsTaken, SystemStep lastStep)
+        private bool TryGetObservations(ReasoningStep step, ChatHistory chatHistory, List<ReasoningStep> stepsTaken, ReasoningStep lastStep)
         {
             // If no Action/Thought is found, return any already available Observation from parsing the response.
             // Otherwise, add a message to the chat history to guide LLM into returning the next thought|action.
@@ -292,7 +272,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 if (!string.IsNullOrEmpty(step.Observation))
                 {
                     this._logger?.LogWarning("Invalid response from LLM, observation: {Observation}", step.Observation);
-                    chatHistory.AddUserMessage($"{ObservationTag} {step.Observation}");
+                    chatHistory.AddUserMessage(step.FormatObservation());
                     stepsTaken.Add(step);
                     lastStep = step;
                     return true;
@@ -301,23 +281,23 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 if (lastStep is not null && string.IsNullOrEmpty(lastStep.Action))
                 {
                     this._logger?.LogWarning("No response from LLM, expected Action");
-                    chatHistory.AddUserMessage(ActionTag);
+                    chatHistory.AddUserMessage(step.FormatAction());
                 }
                 else
                 {
                     this._logger?.LogWarning("No response from LLM, expected Thought");
-                    chatHistory.AddUserMessage(ThoughtTag);
+                    chatHistory.AddUserMessage(step.FormatThought());
                 }
 
                 // No action or thought from LLM
-                chatHistory.AddUserMessage($"{ObservationTag} {step.OriginalResponse}");
+                chatHistory.AddUserMessage($"<Observation Step=\"{step.Index}\">{step.RawResponse}</Observation>");
                 return true;
             }
 
             return false;
         }
 
-        private void AddExecutionStatsToContext(List<SystemStep> stepsTaken, int iterations)
+        private void AddExecutionStatsToContext(List<ReasoningStep> stepsTaken, int iterations)
         {
             _variables["stepCount"] = stepsTaken.Count.ToString(CultureInfo.InvariantCulture);
             _variables["stepsTaken"] = System.Text.Json.JsonSerializer.Serialize(stepsTaken);
@@ -340,7 +320,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             _variables["functionCount"] = $"{functionCallTotalCount} ({functionCallListWithCounts})";
         }
 
-        private string TryGetFinalAnswer(SystemStep step, List<SystemStep> stepsTaken, int iterations)
+        private string TryGetFinalAnswer(ReasoningStep step, List<ReasoningStep> stepsTaken, int iterations)
         {
             if (!string.IsNullOrEmpty(step.FinalAnswer))
             {
@@ -368,18 +348,18 @@ namespace PostgreSQL.Embedding.Llm.Planners
             return chatCompletionService;
         }
 
-        private async Task<SystemStep> GetNextStepAsync(List<SystemStep> stepsTaken, ChatHistory chatHistory, IAIService aiService, int startingMessageCount, CancellationToken cancellationToken)
+        private async Task<ReasoningStep> GetNextStepAsync(List<ReasoningStep> stepsTaken, ChatHistory chatHistory, IAIService aiService, int startingMessageCount, CancellationToken cancellationToken)
         {
             var actionText = await GetNextStepCompletionAsync(stepsTaken, chatHistory, aiService, startingMessageCount, cancellationToken).ConfigureAwait(false);
-            return SystemStep.Parse(actionText);
+            return ReasoningStepParser.Parse(actionText);
         }
 
-        private Task<string> GetNextStepCompletionAsync(List<SystemStep> stepsTaken, ChatHistory chatHistory, IAIService aiService, int startingMessageCount, CancellationToken CancellationToken)
+        private Task<string> GetNextStepCompletionAsync(List<ReasoningStep> stepsTaken, ChatHistory chatHistory, IAIService aiService, int startingMessageCount, CancellationToken CancellationToken)
         {
             var skipStart = startingMessageCount;
             var skipCount = 0;
 
-            var lastObservation = chatHistory.LastOrDefault(m => m.Content.StartsWith(ObservationTag, StringComparison.OrdinalIgnoreCase));
+            var lastObservation = chatHistory.LastOrDefault(m => m.Content.StartsWith(ObservationTag, StringComparison.OrdinalIgnoreCase) || m.Content.Contains("<Observation"));
             var lastObservationIndex = lastObservation == null ? -1 : chatHistory.IndexOf(lastObservation);
 
             var messagesToKeep = lastObservationIndex >= 0 ? chatHistory.Count - lastObservationIndex : 0;
@@ -513,6 +493,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
 
         private Dictionary<string, object> BindFunctionParameter(Dictionary<string, object> actionVariables, KernelFunction kernelFunction)
         {
+            actionVariables = actionVariables ?? new Dictionary<string, object>();
             foreach (var parameter in kernelFunction.Metadata.Parameters)
             {
                 if (actionVariables.ContainsKey(parameter.Name) && actionVariables[parameter.Name] is JsonElement)

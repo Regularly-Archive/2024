@@ -5,6 +5,7 @@ using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Extensions;
 using PostgreSQL.Embedding.Domain.Models;
 using PostgreSQL.Embedding.Domain.Models.Planners;
+using PostgreSQL.Embedding.Llm.Core;
 using PostgreSQL.Embedding.Llm.Services;
 
 namespace PostgreSQL.Embedding.Llm.Planners
@@ -18,10 +19,11 @@ namespace PostgreSQL.Embedding.Llm.Planners
         private readonly List<SubTask> _subTasks = new List<SubTask>();
         private readonly CallablePromptTemplate _subTaskPromptTemplate;
         private readonly Kernel _kernel;
+        private readonly CitationService _citationService;
 
         public Action<StepTrace> OnStepChanged { get; set; }
 
-        public DAGraphExecutor(string query, List<SubTask> subTasks, StepwisePlanner stepwisePlanner, Kernel kernel)
+        public DAGraphExecutor(string query, List<SubTask> subTasks, StepwisePlanner stepwisePlanner, Kernel kernel, CitationService citationService)
         {
             _query = query;
             _kernel = kernel;
@@ -30,6 +32,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             _stepwisePlanner = stepwisePlanner;
             _agentExecutionContext = kernel.GetAgentExecutionContext();
             _subTaskPromptTemplate = new PromptTemplateService().LoadTemplate("SubTask.txt");
+            _citationService = citationService;
         }
 
         public async Task ExecuteAsync()
@@ -51,6 +54,8 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 var taskStates = JsonConvert.SerializeObject(_subTasks.Select(x => new { Id = x.Id, Name = x.Name, Description = x.Description, State = x.State.ToString() }));
                 await ExecuteSubTask(_query, subTask, taskStates);
             }
+
+            await PostProcessFinalOutput();
         }
 
         private async Task ExecuteSubTask(string query, SubTask subTask, string taskStates)
@@ -134,6 +139,31 @@ namespace PostgreSQL.Embedding.Llm.Planners
             _subTaskPromptTemplate.AddVariable("outputArtifacts", JsonConvert.SerializeObject(subTask.OutputArtifacts));
 
             return _subTaskPromptTemplate.RenderTemplateAsync(_kernel.Clone());
+        }
+
+        private async Task PostProcessFinalOutput()
+        {
+            var citations = _agentExecutionContext.GetCitations();
+            if (citations.Any())
+            {
+                var finalTask = _subTasks.OrderByDescending(x => x.Id).FirstOrDefault();
+                if (finalTask.State == TaskState.Completed)
+                {
+                    var plainAnswer = _citationService.RemoveCitations(finalTask.ExecuteResult);
+                    finalTask.ExecuteResult = plainAnswer;
+
+                    var uniqueCitations = citations.DistinctBy(x => x.Url).Select((x, i) =>
+                    {
+                        x.Index = i + 1;
+                        return x;
+                    }).ToList();
+
+                    var result = await _citationService.ExtractCitations(finalTask.ExecuteResult, uniqueCitations, _kernel);
+                    Console.WriteLine(JsonConvert.SerializeObject(result));
+
+                    finalTask.CitationItems = result;
+                }
+            }
         }
     }
 

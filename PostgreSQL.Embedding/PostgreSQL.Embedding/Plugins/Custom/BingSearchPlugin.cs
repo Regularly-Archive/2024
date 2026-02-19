@@ -39,14 +39,15 @@ namespace PostgreSQL.Embedding.Plugins.Custom
         public async Task<SearchResult> SearchAsync(
             [Description("搜索关键词")] string keyword,
             [Description("最大返回结果数量，默认为 30")] int limit = 30,
-            [Description("要搜索的特定域名或网站，如：zhihu.com，表示只搜索该站点的内容")] string filterDomain = "")
+            [Description("要搜索的特定域名或网站，如：zhihu.com，表示只搜索该站点的内容")] string includeDomain = "")
         {
             using var httpClient = _httpClientFactory.CreateClient();
             httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0");
-            httpClient.DefaultRequestHeaders.Referrer = new Uri("https://bing.com/");
+            httpClient.DefaultRequestHeaders.Referrer = new Uri("https://cn.bing.com/");
 
-            var query = string.IsNullOrEmpty(filterDomain) ? keyword : $"site:{filterDomain} {keyword}";
-            var searchResult = await GetAsync(httpClient, keyword, $"https://bing.com/search?q={WebUtility.UrlEncode(query)}&ensearch=1");
+            keyword = keyword.Replace(" ", "+");
+            var query = string.IsNullOrEmpty(includeDomain) ? keyword : $"site:{includeDomain}+{keyword}";
+            var searchResult = await GetAsync(httpClient, keyword, $"https://cn.bing.com/search?q={query}&ensearch=1");
             while (searchResult.Entries.Count < limit && searchResult.HasNextPage)
             {
                 var newSearchResult = await GetAsync(httpClient, keyword, searchResult.NextPage);
@@ -56,6 +57,7 @@ namespace PostgreSQL.Embedding.Plugins.Custom
                     searchResult.NextPage = newSearchResult.NextPage;
                     searchResult.HasNextPage = newSearchResult.HasNextPage;
                 }
+                await Task.Delay(500);
             }
 
             return searchResult;
@@ -97,7 +99,7 @@ namespace PostgreSQL.Embedding.Plugins.Custom
                 if (eleNextPage != null)
                 {
                     seachResult.HasNextPage = true;
-                    seachResult.NextPage = "https://bing.com" + eleNextPage.ParentElement.Attributes[SELECTOR_TAG_HREF].Value;
+                    seachResult.NextPage = "https://cn.bing.com" + eleNextPage.ParentElement.Attributes[SELECTOR_TAG_HREF].Value;
                 }
             }
 

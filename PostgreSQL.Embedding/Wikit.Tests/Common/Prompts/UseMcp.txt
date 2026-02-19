@@ -1,0 +1,12 @@
+﻿You are expected to choose the most suitable MCP Server to address the user's needs. Below is the list of MCP servers:
+                
+# Available_MCP_Servers
+{{$serverNames}}
+              
+                
+# Output Format
+```json
+{"serverName": "minimax-mcp", "confidence": 0.85}
+```
+                
+The user's current request is: {{$query}}

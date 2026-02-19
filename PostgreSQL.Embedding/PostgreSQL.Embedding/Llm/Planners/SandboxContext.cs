@@ -27,9 +27,9 @@ internal class SandboxContext : ISandboxContext
 
     public string ResolvePath(string relativePath)
     {
-        if (relativePath.StartsWith(_workingDir)) relativePath = relativePath.Replace(_workingDir, "").TrimStart(Path.PathSeparator);
+        if (relativePath.StartsWith(_workingDir)) relativePath = relativePath.Replace(_workingDir, "").TrimStart('/');
 
-        var fullPath = Path.GetFullPath(Path.Combine(SessionDir, relativePath));
+        var fullPath = Path.GetFullPath(Path.Combine(RunDir, relativePath));
 
         if (!IsPathAllowed(fullPath))
         {
@@ -44,7 +44,7 @@ internal class SandboxContext : ISandboxContext
         try
         {
             var fullPath = Path.GetFullPath(path);
-            return fullPath.StartsWith(SessionDir, StringComparison.OrdinalIgnoreCase);
+            return fullPath.StartsWith(RunDir, StringComparison.OrdinalIgnoreCase);
         }
         catch
         {

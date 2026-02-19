@@ -1,12 +1,17 @@
-﻿using Microsoft.SemanticKernel;
+﻿using DocumentFormat.OpenXml.Office.SpreadSheetML.Y2023.MsForms;
+using Google.Protobuf.WellKnownTypes;
+using LLama.Batched;
+using Microsoft.SemanticKernel;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Attributes;
+using PostgreSQL.Embedding.Common.Extensions;
 using PostgreSQL.Embedding.Domain.Models;
 using PostgreSQL.Embedding.Domain.Models.RAG;
 using PostgreSQL.Embedding.Domain.Models.Search;
 using PostgreSQL.Embedding.Llm.Abstractions;
 using PostgreSQL.Embedding.Llm.Core;
+using PostgreSQL.Embedding.Llm.Planners;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using PostgreSQL.Embedding.Plugins.Custom;
 using PostgreSQL.Embedding.Utils;
@@ -36,7 +41,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
             Kernel kernel,
             [Description("搜索关键词或问题")] string keyword,
             [Description("搜索引擎名称，可选值：Bing、Brave、JinaAI、BoCha、SerpApi、DuckDuckGo, WeChat，默认为 Bing")] string searchEngine = "Bing",
-            [Description("要排除的域名，使用英文逗号分隔，如：zhihu.com,baidu.com")] string filterDomain = "",
+            [Description("要包含的域名，使用英文逗号分隔，如：zhihu.com,baidu.com")] string includeDomain = "",
             [Description("是否在 Artifacts 中展示搜索结果列表，默认为 false")] bool showSearchResult = false,
             [Description("是否直接生成答案（启用 RAG 模式），默认为 false")] bool onlyReturnAnswer = false
         )
@@ -45,16 +50,21 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
 
             using var serviceScope = _serviceProvider.CreateScope();
             var serviceEngine = GetSearchEngine(serviceScope.ServiceProvider, searchEngine);
-            var searchResult = await serviceEngine.SearchAsync(keyword, filterDomain: filterDomain);
+
+            var searchResult = await serviceEngine.SearchAsync(keyword, filterDomain: includeDomain);
 
             if (onlyReturnAnswer)
             {
                 var memoryService = _serviceProvider.GetService<IMemoryService>();
                 var chatHistoryService = _serviceProvider.GetService<IChatHistoriesService>();
+                var citationService = _serviceProvider.GetRequiredService<CitationService>();
 
-                var ragFlowService = new RAGFlowService(clonedKernel, _serviceProvider, memoryService, chatHistoryService);
+                var ragFlowService = new RAGFlowService(clonedKernel, _serviceProvider, memoryService, chatHistoryService, citationService);
                 var citations = GetCitationsFromSearchEngine(searchResult);
-                return await ragFlowService.GenerateAnswerAsync(keyword, citations);
+                var ragResult  = await ragFlowService.GenerateAnswerAsync(keyword, citations);
+
+                kernel.GetAgentExecutionContext().AddCitations(ragResult.AnswerSources);
+                return ragResult.PlainAnswer;
             }
 
             return JsonConvert.SerializeObject(searchResult);

@@ -94,8 +94,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         [Description("获取当前允许执行命令的工作目录")]
         public string GetSandboxDirectory(Kernel kernel)
         {
-            var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
-            return sandboxContext.ToLinuxStyleRelativePath(sandboxContext.SessionDir, sandboxContext.SessionDir);
+            return "/sandbox";
         }
 
         /// <summary>
@@ -103,19 +102,14 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         /// </summary>
         [KernelFunction]
         [Description("执行命令，如 ls, dir, cat, type, head, tail, grep, findstr, pwd, echo 等。命令将在沙箱目录下执行。")]
-        public async Task<CommandResult> ExecuteCommandAsync(
+        public async Task<string> ExecuteCommandAsync(
             [Description("要执行的命令，例如 'ls -la', 'dir', 'cat filename.txt'")] string command, Kernel kernel)
         {
             if (CommandBlacklist.ContainsForbiddenCommand(command))
-            {
-                return new CommandResult()
-                {
-                    Stderr = $"Detected restricted command: {command}.",
-                    ExitCode = -1
-                };
-            }
+                throw new ArgumentException($"Detected restricted command: {command}.");
 
-            return await ExecuteCommandInSandboxAsync(command, kernel);
+            var result = await ExecuteCommandInSandboxAsync(command, kernel);
+            return result.ExitCode == 0 ? result.Stdout : result.Stderr;
         }
 
 
@@ -129,7 +123,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
             // 构建会话 ID: conversationId (从 SessionDir 中提取)
             // SessionDir = BaseDir/appId/conversationId
             var sessionId = Path.GetFileName(sandboxContext.SessionDir);
-            var localPath = sandboxContext.SessionDir;
+            var localPath = sandboxContext.RunDir;
 
             // 获取或创建会话
             var session = await _sandboxService!.GetOrCreateSessionAsync(sessionId, localPath);

@@ -65,5 +65,13 @@ namespace PostgreSQL.Embedding.Llm.Planners
         {
             _globalContext.AddOrUpdate(key, value, (k, oldValue) => value);
         }
+
+        public T GetGlobalData<T>(string key)
+        {
+            if (_globalContext.TryGetValue(key, out object value))
+                return (T)value;
+
+            return default(T);
+        }
     }
 }

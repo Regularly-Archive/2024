@@ -36,6 +36,7 @@ namespace PostgreSQL.Embedding.Llm.Core
         private readonly SSEEmitter _sseEmitter;
         private readonly ILogger<GenericConversationService> _logger;
         private readonly AgentExecutionContext _agentExecutionContext;
+        private readonly CitationService _citationService;
         public GenericConversationService(Kernel kernel, LlmApp app, IServiceProvider serviceProvider, IChatHistoriesService chatHistoriesService, HttpContext httpContext)
             : base(kernel, chatHistoriesService)
         {
@@ -50,6 +51,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             _httpContext = httpContext;
             _sseEmitter = new SSEEmitter(_httpContext);
             _agentExecutionContext = _kernel.GetAgentExecutionContext();
+            _citationService = _serviceProvider.GetRequiredService<CitationService>();
         }
 
         public async Task InvokeAsync(ConversationRequestModel conversationRequest, string input, CancellationToken cancellationToken = default)
@@ -207,7 +209,7 @@ namespace PostgreSQL.Embedding.Llm.Core
                 planner.AddVariable("EnableMCP", false);
                 planner.AddVariable("EnableSkills", true);
 
-                var graphExecutor = new DAGraphExecutor(input, subTasks, planner, kernel);
+                var graphExecutor = new DAGraphExecutor(input, subTasks, planner, kernel, _citationService);
                 var reasoningContent = string.Empty;
                 graphExecutor.OnStepChanged = async (stepTrace) =>
                 {

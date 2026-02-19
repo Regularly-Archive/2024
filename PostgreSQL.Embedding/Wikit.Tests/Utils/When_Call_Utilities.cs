@@ -75,7 +75,7 @@ namespace Wikit.Tests.Utils
         public void It_Should_Be_X_Llm_Provider_For_HttpRequestHeader_Provider()
         {
             // Assert
-            Constants.HttpRequestHeader_Provider.ShouldBe("X-Llm-Provider");
+            Constants.HttpRequestHeader_Provider.ShouldBe("x-wikit-llm-provider");
         }
     }
 

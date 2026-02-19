@@ -1,7 +1,9 @@
 using Microsoft.SemanticKernel;
 using PostgreSQL.Embedding.Common.Attributes;
+using PostgreSQL.Embedding.Common.Extensions;
 using PostgreSQL.Embedding.Llm.Abstractions;
 using PostgreSQL.Embedding.Llm.Core;
+using PostgreSQL.Embedding.Llm.Planners;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 
@@ -28,11 +30,15 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         {
             var memoryService = _serviceProvider.GetService<IMemoryService>();
             var chatHistoryService = _serviceProvider.GetService<IChatHistoriesService>();
+            var citationService = _serviceProvider.GetService<CitationService>();
 
-            var ragFlowService = new RAGFlowService(kernel, _serviceProvider, memoryService, chatHistoryService);
+            var ragFlowService = new RAGFlowService(kernel, _serviceProvider, memoryService, chatHistoryService, citationService);
             var citations = await ragFlowService.GenerateCitationsAsync(appId, question, enableWebSearch);
-            var answer = await ragFlowService.GenerateAnswerAsync(appId, conversationId, question, citations);
-            return answer;
+            var ragResult = await ragFlowService.GenerateAnswerAsync(appId, conversationId, question, citations);
+
+            kernel.GetAgentExecutionContext().AddCitations(ragResult.AnswerSources);
+
+            return ragResult.PlainAnswer;
         }
     }
 }

@@ -1,3 +1,4 @@
+using DocumentFormat.OpenXml.Bibliography;
 using LLama.Batched;
 using Masuit.Tools;
 using Microsoft.Extensions.Options;
@@ -55,6 +56,7 @@ namespace PostgreSQL.Embedding.Llm.Core
         private readonly AgentExecutionContext _agentExecutionContext;
         private readonly string _defaultPrompt = "You are a helpful AI bot. You must answer the question in Chinese.";
         private readonly IOptions<SandboxOptions> _sandboxOptions;
+        private readonly CitationService _citationService;
 
         public AgenticConversationService(
             Kernel kernel,
@@ -72,6 +74,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             _logger = serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<AgenticConversationService>();
             _agentExecutionContext = kernel.GetAgentExecutionContext();
             _sandboxOptions = serviceProvider.GetService<IOptions<SandboxOptions>>()!;
+            _citationService = serviceProvider.GetRequiredService<CitationService>();
         }
 
         /// <summary>
@@ -90,6 +93,9 @@ namespace PostgreSQL.Embedding.Llm.Core
             _agentExecutionContext.SetAppId(_app.Id);
             _agentExecutionContext.SetConversationId(convId);
             _agentExecutionContext.InitializeSandboxContext(_app.Id, convId, runId, _sandboxOptions);
+
+            // Inject context to sandbox
+            await InJectContextToSandbox(_app.Id, conversationId, _agentExecutionContext);
 
             // Add user message
             var refMessageId = await _chatHistoriesService.AddUserMessageAsync(_app.Id, convId, input);
@@ -132,6 +138,11 @@ namespace PostgreSQL.Embedding.Llm.Core
             {
                 yield return evt;
             }
+
+            Task.Run(() =>
+            {
+
+            })
         }
 
         private async Task ProduceEventsAsync(
@@ -176,7 +187,14 @@ namespace PostgreSQL.Embedding.Llm.Core
                 // 5. Generate final response with text block (thinking already emitted during planning/execution)
                 await EmitFinalResponseAsync(input, conversationId, messageId, finalResult, writer, blockTracker.TextBlockIndex, ct);
 
-                // 5. message_delta - final message state with usage
+                // 6. Citations phase - emit citations event
+                var finalTask = subtasks.OrderByDescending(x => x.Id).FirstOrDefault();
+                if (finalTask.CitationItems.Any())
+                {
+                    await EmitCitations(writer, finalTask.CitationItems, ct);
+                }
+
+                // 7. message_delta - final message state with usage
                 await writer.WriteAsync(new MessageDeltaEvent
                 {
                     Delta = new MessageDelta { StopReason = "end_turn" },
@@ -187,7 +205,7 @@ namespace PostgreSQL.Embedding.Llm.Core
                     }
                 }, ct);
 
-                // 6. message_stop - message complete
+                // 8. message_stop - message complete
                 await writer.WriteAsync(new MessageStopEvent(), ct);
 
                 // Save assistant response to history
@@ -288,11 +306,11 @@ namespace PostgreSQL.Embedding.Llm.Core
             planner.AddVariable("EnableMCP", true);
             planner.AddVariable("EnableSkills", true);
             planner.AddVariable("WorkDir", $"/sandbox");
-            planner.AddVariable("ArtifactsDir", $"/sandbox/runs/{runId}/artifacts");
+            planner.AddVariable("ArtifactsDir", $"/sandbox/artifacts");
 
 
             // Create DAG executor
-            var graphExecutor = new DAGraphExecutor(input, subTasks, planner, _kernel);
+            var graphExecutor = new DAGraphExecutor(input, subTasks, planner, _kernel, _citationService);
 
             // Hook into step changes to emit events
             graphExecutor.OnStepChanged = async (stepTrace) =>
@@ -462,6 +480,22 @@ namespace PostgreSQL.Embedding.Llm.Core
         private static int EstimateTokenCount(string text)
         {
             return (int)Math.Ceiling((text.Length / 4.0));
+        }
+
+        private async Task EmitCitations(ChannelWriter<ISseEvent> writer, List<CitationItem> citationItems, CancellationToken ct)
+        {
+            await writer.WriteAsync(new CitationsEvent { Citations = citationItems }, ct);
+        }
+
+        private async Task InJectContextToSandbox(long appId, string conversationId, AgentExecutionContext agentExecutionContext)
+        {
+            // MEMORY.md
+            var chatHitstoris = await GetHistoricalMessagesAsync(appId, conversationId, _app.MaxMessageRounds);
+            var sandboxContext = agentExecutionContext.GetSandboxContext();
+            var fullPath = Path.Combine(sandboxContext.RunDir, "MEMORY.md");
+            var directory = Path.GetDirectoryName(fullPath);
+            if (!Directory.Exists(directory)) Directory.CreateDirectory(directory);
+            await File.WriteAllTextAsync(fullPath, chatHitstoris, Encoding.UTF8);
         }
     }
 }
