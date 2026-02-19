@@ -310,7 +310,8 @@ namespace PostgreSQL.Embedding.Llm.Core
                 kernel, 
                 _serviceProvider, 
                 _serviceProvider.GetRequiredService<IMemoryService>(), 
-                _serviceProvider.GetRequiredService<IChatHistoriesService>()
+                _serviceProvider.GetRequiredService<IChatHistoriesService>(),
+                _serviceProvider.GetRequiredService<CitationService>()
             );
 
             //问题重写
@@ -340,8 +341,8 @@ namespace PostgreSQL.Embedding.Llm.Core
             .ToList();
 
             // 生成答案
-            var answer = await ragFlowService.GenerateAnswerAsync(question, citations);
-            result.Answer = answer;
+            var ragResult = await ragFlowService.GenerateAnswerAsync(question, citations);
+            result.Answer = ragResult.PlainAnswer;
 
             return result;
         }

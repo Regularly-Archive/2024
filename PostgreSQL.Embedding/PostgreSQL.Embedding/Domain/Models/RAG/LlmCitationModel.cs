@@ -22,7 +22,7 @@ namespace PostgreSQL.Embedding.Domain.Models.RAG
                 Relevance = partition.Relevance,
                 Text = $"[^{index}]: {partition.Text}",
                 Url = $"/api/KnowledgeBase/{partition.KnowledgeBaseId}/chunks/{partition.FileId}/{partition.PartId}?relevance={partition.Relevance}",
-                Type = "doc"
+                Type = "document"
             };
         }
 
@@ -34,7 +34,7 @@ namespace PostgreSQL.Embedding.Domain.Models.RAG
                 Text = entry.Snippet,
                 Url = entry.Url,
                 Relevance = entry.Relevance,
-                Type = "web"
+                Type = "website"
             };
         }
     }

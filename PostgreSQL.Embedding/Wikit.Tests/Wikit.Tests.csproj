@@ -35,6 +35,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="Common\Prompts\CitationInjection.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="Common\Prompts\DataAnalysis.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

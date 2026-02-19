@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using PostgreSQL.Embedding.Common.Streaming;
 
 namespace PostgreSQL.Embedding.Domain.Models.Planners
 {
@@ -31,6 +32,8 @@ namespace PostgreSQL.Embedding.Domain.Models.Planners
 
         [JsonProperty("output_artifacts")]
         public List<string> OutputArtifacts { get; set; } = new List<string>();
+
+        public List<CitationItem> CitationItems { get; set; } = new List<CitationItem>();
 
         public StepTrace AsStepTrace(long messageId)
         {
