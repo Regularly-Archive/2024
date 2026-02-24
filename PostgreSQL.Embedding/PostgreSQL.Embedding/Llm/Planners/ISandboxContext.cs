@@ -8,9 +8,9 @@ public interface ISandboxContext
     string RunDir { get; }
     string ArtifactsDir { get; }
 
-    string ResolvePath(string relativePath);
+    string ToLocalPath(string sandboxPath);
     bool IsPathAllowed(string path);
 
-    string ToLinuxStyleRelativePath(string basePath, string fullPath);
-    string FromLinuxStyleRelativePath(string basePath, string linuxPath);
+    string ToSandboxPath(string localFullPath);
+    Dictionary<string, string> GetVolumeMappings();
 }
