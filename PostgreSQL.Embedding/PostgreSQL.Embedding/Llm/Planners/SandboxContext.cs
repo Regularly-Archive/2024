@@ -13,8 +13,9 @@ internal class SandboxContext : ISandboxContext
     public string SessionDir { get; }
     public string RunDir { get; }
     public string ArtifactsDir { get; }
+    public string SkillsDir { get; }
 
-    private string _workingDir;
+    private string _workingDirInSandbox;
 
     internal SandboxContext(long appId, string conversationId, string runId, string workDir)
     {
@@ -22,28 +23,31 @@ internal class SandboxContext : ISandboxContext
         SessionDir = Path.Combine(AppDir, conversationId);
         RunDir = Path.Combine(SessionDir, "runs", runId);
         ArtifactsDir = Path.Combine(RunDir, "artifacts");
-        _workingDir = workDir;
+        SkillsDir = Path.Combine(AppDir, ".skills");
+        _workingDirInSandbox = workDir;
     }
 
-    public string ResolvePath(string relativePath)
+    public string ToLocalPath(string sandboxPath)
     {
-        if (relativePath.StartsWith(_workingDir)) relativePath = relativePath.Replace(_workingDir, "").TrimStart('/');
+        if (string.IsNullOrWhiteSpace(sandboxPath))
+            throw new ArgumentNullException(nameof(sandboxPath));
 
-        var fullPath = Path.GetFullPath(Path.Combine(RunDir, relativePath));
+        if (sandboxPath.StartsWith(_workingDirInSandbox))
+            sandboxPath = sandboxPath.Replace(_workingDirInSandbox, "").TrimStart('/');
+
+        var fullPath = Path.GetFullPath(Path.Combine(RunDir, sandboxPath));
 
         if (!IsPathAllowed(fullPath))
-        {
-            throw new UnauthorizedAccessException($"Path outside sandbox: {relativePath}");
-        }
+            throw new UnauthorizedAccessException($"Access denied: Cannot access path outside sandbox ({sandboxPath})");
 
         return fullPath;
     }
 
-    public bool IsPathAllowed(string path)
+    public bool IsPathAllowed(string localFullPath)
     {
         try
         {
-            var fullPath = Path.GetFullPath(path);
+            var fullPath = Path.GetFullPath(localFullPath);
             return fullPath.StartsWith(RunDir, StringComparison.OrdinalIgnoreCase);
         }
         catch
@@ -52,7 +56,7 @@ internal class SandboxContext : ISandboxContext
         }
     }
 
-    public string ToLinuxStyleRelativePath(string basePath, string fullPath)
+    private string ToSandboxPath(string basePath, string fullPath)
     {
         if (string.IsNullOrWhiteSpace(basePath))
             throw new ArgumentNullException(nameof(basePath));
@@ -69,27 +73,25 @@ internal class SandboxContext : ISandboxContext
         return relativePath;
     }
 
-    public string FromLinuxStyleRelativePath(string basePath, string linuxPath)
+    /// <summary>
+    /// 将本地完整路径转换为沙箱内的 Linux 风格路径（默认以 RunDir 为基准）
+    /// </summary>
+    public string ToSandboxPath(string localFullPath)
     {
-        if (string.IsNullOrWhiteSpace(basePath))
-            throw new ArgumentNullException(nameof(basePath));
+        return ToSandboxPath(RunDir, localFullPath);
+    }
 
-        if (string.IsNullOrWhiteSpace(linuxPath))
-            throw new ArgumentNullException(nameof(linuxPath));
-
-        var relativePath = linuxPath.TrimStart('/');
-
-        relativePath = relativePath.Replace('/', Path.DirectorySeparatorChar);
-
-        var combinedPath = Path.GetFullPath(Path.Combine(basePath, relativePath))
-            .TrimEnd(Path.DirectorySeparatorChar);
-
-        var normalizedBasePath = Path.GetFullPath(basePath)
-            .TrimEnd(Path.DirectorySeparatorChar);
-
-        if (!combinedPath.StartsWith(normalizedBasePath, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException($"A path escape detected: {linuxPath}");
-
-        return combinedPath;
+    /// <summary>
+    /// 获取 Docker 卷映射字典（本地路径 -> 容器内路径）
+    /// </summary>
+    public Dictionary<string, string> GetVolumeMappings()
+    {
+        return new Dictionary<string, string>
+        {
+            { RunDir, "/sandbox" },
+            { SkillsDir, "/sandbox/.skills" },
+            { Path.Combine(RunDir, "MEMORY.md"), "/sandbox/MEMORY.md" },
+            { Path.Combine(AppDir, "SOUL.md"), "/sandbox/SOUL.md" }
+        };
     }
 }
