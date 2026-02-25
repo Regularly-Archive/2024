@@ -151,6 +151,60 @@ public class ArtifactsPlugin : BasePlugin
 
     #endregion
 
+    #region 图表
+    [KernelFunction]
+    [Description("创建 Mermaid 类型的 Artifact（可下载，可预览）。适用于简单的图表和可视化场景。")]
+    public Task<ArtifactResponse> CreateArtifactFromMermaid(
+        string content,
+        string fileName,
+        Kernel kernel)
+    {
+        content = content.Replace("```mermaid", "").Replace("```", "").TrimStart();
+        return CreateArtifactInternalAsync(content, fileName, ArtifactType.Mermaid, true, kernel);
+    }
+    #endregion
+
+    #region 类型查询
+
+    /// <summary>
+    /// 产物类型元信息
+    /// </summary>
+    public class ArtifactTypeInfo
+    {
+        public string Type { get; set; }
+        public string Description { get; set; }
+        public bool CanPreview { get; set; }
+        public bool CanDownload { get; set; }
+        public string[] Extensions { get; set; }
+    }
+
+    [KernelFunction]
+    [Description("获取系统支持的所有 Artifact 类型及其说明，用于了解可以使用哪些类型的产物。")]
+    public List<ArtifactTypeInfo> GetSupportedArtifactTypes()
+    {
+        return new List<ArtifactTypeInfo>
+        {
+            new() { Type = "Text", Description = "纯文本文件", CanPreview = false, CanDownload = true, Extensions = new[] { ".txt" } },
+            new() { Type = "Markdown", Description = "Markdown 文档，可预览", CanPreview = true, CanDownload = true, Extensions = new[] { ".md" } },
+            new() { Type = "Code", Description = "代码文件，可预览", CanPreview = true, CanDownload = true, Extensions = new[] { ".cs", ".js", ".py", ".java", ".go", ".rs", ".ts", ".cpp", ".c" } },
+            new() { Type = "Html", Description = "HTML 页面，可预览", CanPreview = true, CanDownload = true, Extensions = new[] { ".html", ".htm" } },
+            new() { Type = "Image", Description = "图片文件，可预览", CanPreview = true, CanDownload = true, Extensions = new[] { ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg" } },
+            new() { Type = "Video", Description = "视频文件，可预览", CanPreview = true, CanDownload = true, Extensions = new[] { ".mp4", ".webm", ".ogg" } },
+            new() { Type = "Audio", Description = "音频文件，可预览", CanPreview = true, CanDownload = true, Extensions = new[] { ".mp3", ".wav", ".ogg" } },
+            new() { Type = "Pdf", Description = "PDF 文档，可预览", CanPreview = true, CanDownload = true, Extensions = new[] { ".pdf" } },
+            new() { Type = "Csv", Description = "CSV 表格文件，可预览", CanPreview = true, CanDownload = true, Extensions = new[] { ".csv" } },
+            new() { Type = "Excel", Description = "Excel 电子表格，可预览", CanPreview = true, CanDownload = true, Extensions = new[] { ".xls", ".xlsx" } },
+            new() { Type = "Json", Description = "JSON 数据，可预览", CanPreview = true, CanDownload = true, Extensions = new[] { ".json" } },
+            new() { Type = "Jupyter", Description = "Jupyter Notebook，可预览", CanPreview = true, CanDownload = true, Extensions = new[] { ".ipynb" } },
+            new() { Type = "Sql_Result", Description = "SQL 查询结果，可预览", CanPreview = true, CanDownload = true, Extensions = new[] { ".json" } },
+            new() { Type = "Mermaid", Description = "Mermaid 图表，可预览", CanPreview = true, CanDownload = true, Extensions = new[] { ".mmd", ".md" } },
+            new() { Type = "Zip", Description = "ZIP 压缩包", CanPreview = false, CanDownload = true, Extensions = new[] { ".zip" } },
+            new() { Type = "Directory", Description = "目录", CanPreview = false, CanDownload = true, Extensions = new[] { "" } }
+        };
+    }
+
+    #endregion
+
     #region 内部实现
 
     private async Task<ArtifactResponse> CreateArtifactInternalAsync(
@@ -190,15 +244,16 @@ public class ArtifactsPlugin : BasePlugin
         bool canPreview,
         Kernel kernel)
     {
-        if (!File.Exists(sourceFilePath))
-            throw new FileNotFoundException($"File not found: {sourceFilePath}");
-
         var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
+        var resolvedPath = sandboxContext.ToLocalPath(sourceFilePath);
+
+        if (!File.Exists(resolvedPath))
+            throw new FileNotFoundException($"File not found: {sourceFilePath}");
 
         var filePath = Path.Combine(sandboxContext.ArtifactsDir, fileName);
         Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
 
-        await Task.Run(() => File.Copy(sourceFilePath, filePath, overwrite: true));
+        await Task.Run(() => File.Copy(resolvedPath, filePath, overwrite: true));
 
         var fileInfo = new FileInfo(filePath);
         var response = new ArtifactResponse
@@ -299,6 +354,13 @@ public class ArtifactsPlugin : BasePlugin
             "image/gif" => ".gif",
             "image/webp" => ".webp",
             "image/svg+xml" => ".svg",
+            "video/mp4" => ".mp4",
+            "video/webm" => ".webm",
+            "video/ogg" => ".ogg",
+            "audio/mpeg" => ".mp3",
+            "audio/wav" => ".wav",
+            "audio/ogg" => ".ogg",
+            "audio/webm" => ".webm",
             "application/pdf" => ".pdf",
             "application/zip" => ".zip",
             "text/html" => ".html",
@@ -318,6 +380,8 @@ public class ArtifactsPlugin : BasePlugin
         return contentType.ToLowerInvariant() switch
         {
             var ct when ct.StartsWith("image/") => (ArtifactType.Image, true),
+            var ct when ct.StartsWith("video/") => (ArtifactType.Video, true),
+            var ct when ct.StartsWith("audio/") => (ArtifactType.Audio, true),
             "application/pdf" => (ArtifactType.Pdf, true),
             "application/zip" => (ArtifactType.Zip, false),
             "text/html" => (ArtifactType.Html, true),
@@ -487,7 +551,10 @@ public class ArtifactsPlugin : BasePlugin
         Json,
         Jupyter,
         Zip,
-        Directory
+        Directory,
+        Mermaid,
+        Audio,
+        Video
     }
 
     public class ArtifactResponse
