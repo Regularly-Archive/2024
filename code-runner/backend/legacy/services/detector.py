@@ -282,12 +282,12 @@ class ProjectDetector:
 
     def _collect_file_dependencies(self, language: str, dependencies: list[str]) -> List[Dependency]:
         languages_supporting_single_file_dependencies = [
-            'csharp', 'jupyter-csharp', 'jupyter-python', 'jupyter-r', 'java', 'python'
+            'csharp', 'jupyter-csharp', 'jupyter-python', 'jupyter-r', 'java', 'python','python3'
         ]
 
         if (not dependencies) or (not language in languages_supporting_single_file_dependencies):
             return []
-        if language == 'python':
+        if language == 'python' or language == 'python3':
             return [
                 Dependency(
                     language=language,

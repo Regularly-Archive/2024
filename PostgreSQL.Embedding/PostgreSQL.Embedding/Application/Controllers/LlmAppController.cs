@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using PostgreSQL.Embedding.Application.Services;
 using PostgreSQL.Embedding.Domain.Entities;
 using PostgreSQL.Embedding.Domain.Models.Plugin;
 using PostgreSQL.Embedding.Domain.Models.WebApi;
@@ -19,6 +20,8 @@ namespace PostgreSQL.Embedding.Application.Controllers.Controllers
         private readonly IRepository<LlmApp> _llmAppRepository;
         private readonly IRepository<LlmAppPlugin> _llmAppPluginRepository;
         private readonly IRepository<LlmAppPluginParameter> _llmAppPluginParameterRepository;
+        private readonly IRepository<LlmAppSkill> _llmAppSkillRepository;
+        private readonly ISkillService _skillService;
         public LlmAppController(
             ILlmPluginService llmPluginService,
             CrudBaseService<LlmApp> crudBaseService,
@@ -26,7 +29,9 @@ namespace PostgreSQL.Embedding.Application.Controllers.Controllers
             IRepository<LlmAppPluginParameter> llmAppPluginParameterRepository,
             IRepository<LlmAppKnowledge> appKnowledgeRepository,
             IRepository<KnowledgeBase> knowledgeBaseRepository,
-            IRepository<LlmApp> llmAppRepository
+            IRepository<LlmApp> llmAppRepository,
+            IRepository<LlmAppSkill> llmAppSkillRepository,
+            ISkillService skillService
             ) : base(crudBaseService)
         {
             _llmAppPluginRepository = llmAppPluginRepository;
@@ -35,6 +40,8 @@ namespace PostgreSQL.Embedding.Application.Controllers.Controllers
             _knowledgeBaseRepository = knowledgeBaseRepository;
             _llmAppRepository = llmAppRepository;
             _pluginService = llmPluginService;
+            _llmAppSkillRepository = llmAppSkillRepository;
+            _skillService = skillService;
         }
 
         [HttpGet("{id}/knowledges")]
@@ -251,6 +258,38 @@ namespace PostgreSQL.Embedding.Application.Controllers.Controllers
 
             return ApiResult.Success(appPlugin);
         }
+
+        #region Skills
+
+        [HttpGet("{appId}/skills/paginate")]
+        public async Task<JsonResult> GetSkillsByApp(long appId, int pageIndex = 1, int pageSize = 10)
+        {
+            var totalCount = await _llmAppSkillRepository.CountAsync(x => x.AppId == appId);
+            var skills = await _llmAppSkillRepository.PaginateAsync(x => x.AppId == appId, pageIndex, pageSize);
+            return ApiResult.Success(new PagedResult<LlmAppSkill> { Rows = skills, TotalCount = totalCount });
+        }
+
+        [HttpPost("{appId}/skills")]
+        public async Task<JsonResult> AddAppSkill(long appId, IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                throw new InvalidOperationException("请上传有效的 ZIP 文件");
+
+            if (!file.FileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("仅支持 ZIP 格式的文件");
+
+            var skill = await _skillService.ImportSkillAsync(appId, file.OpenReadStream());
+            return ApiResult.Success(skill);
+        }
+
+        [HttpDelete("{appId}/skills/{skillId}")]
+        public async Task<JsonResult> DeleteAppSkill(long appId, long skillId)
+        {
+            await _skillService.DeleteSkillAsync(appId, skillId);
+            return ApiResult.Success<object>(null);
+        }
+
+        #endregion
 
         public override Task<JsonResult> GetByPageAsync(QueryParameter<LlmApp, LlmAppQueryFilter> queryParameter)
         {

@@ -50,7 +50,10 @@ public class SandboxTests : IAsyncLifetime
     [Fact]
     public async Task CreateContainer_ShouldReturnContainerId()
     {
-        var containerId = await _containerManager.CreateContainerAsync(_testSessionId, _testLocalPath);
+        var containerId = await _containerManager.CreateContainerAsync(_testSessionId, new Dictionary<string, string>
+        {
+            { _testLocalPath, "/sandbox" }
+        });
 
         this.ShouldSatisfyAllConditions(
             () => containerId.ShouldNotBeNullOrEmpty()
@@ -62,7 +65,10 @@ public class SandboxTests : IAsyncLifetime
     [Fact]
     public async Task ExecuteCommand_ShouldReturnSuccess()
     {
-        var containerId = await _containerManager.CreateContainerAsync(_testSessionId, _testLocalPath);
+        var containerId = await _containerManager.CreateContainerAsync(_testSessionId, new Dictionary<string, string>
+        {
+            { _testLocalPath, "/sandbox" }
+        });
         var result = await _containerManager.ExecuteCommandAsync(containerId, "echo 'Hello World'");
 
         this.ShouldSatisfyAllConditions(
@@ -76,7 +82,10 @@ public class SandboxTests : IAsyncLifetime
     [Fact]
     public async Task ExecutePython_ShouldWork()
     {
-        var containerId = await _containerManager.CreateContainerAsync(_testSessionId, _testLocalPath);
+        var containerId = await _containerManager.CreateContainerAsync(_testSessionId, new Dictionary<string, string>
+        {
+            { _testLocalPath, "/sandbox" }
+        });
         var result = await _containerManager.ExecuteCommandAsync(containerId, "python3 -c 'print(2 + 2)'");
 
         this.ShouldSatisfyAllConditions(
@@ -90,7 +99,10 @@ public class SandboxTests : IAsyncLifetime
     [Fact]
     public async Task ExecuteNode_ShouldWork()
     {
-        var containerId = await _containerManager.CreateContainerAsync(_testSessionId, _testLocalPath);
+        var containerId = await _containerManager.CreateContainerAsync(_testSessionId, new Dictionary<string, string>
+        {
+            { _testLocalPath, "/sandbox" }
+        });
         var result = await _containerManager.ExecuteCommandAsync(containerId, "node -e 'console.log(2 + 2)'");
 
         this.ShouldSatisfyAllConditions(
@@ -104,7 +116,10 @@ public class SandboxTests : IAsyncLifetime
     [Fact]
     public async Task ExecuteDotnet_ShouldWork()
     {
-        var containerId = await _containerManager.CreateContainerAsync(_testSessionId, _testLocalPath);
+        var containerId = await _containerManager.CreateContainerAsync(_testSessionId, new Dictionary<string, string>
+        {
+            { _testLocalPath, "/sandbox" }
+        });
         var result = await _containerManager.ExecuteCommandAsync(containerId, "dotnet --version");
 
         this.ShouldSatisfyAllConditions(
@@ -118,10 +133,13 @@ public class SandboxTests : IAsyncLifetime
     [Fact]
     public async Task WriteFile_ShouldBePersisted()
     {
-        var containerId = await _containerManager.CreateContainerAsync(_testSessionId, _testLocalPath);
+        var containerId = await _containerManager.CreateContainerAsync(_testSessionId, new Dictionary<string, string>
+        {
+            { _testLocalPath, "/sandbox" }
+        });
         var testFile = Path.Combine(_testLocalPath, "test.txt");
 
-        await _containerManager.ExecuteCommandAsync(containerId, $"echo 'test content' > /workspace/{_testSessionId}/test.txt");
+        await _containerManager.ExecuteCommandAsync(containerId, $"echo 'test content' > /sandbox/test.txt");
 
         this.ShouldSatisfyAllConditions(
             () => File.Exists(testFile).ShouldBeTrue(),
@@ -134,7 +152,10 @@ public class SandboxTests : IAsyncLifetime
     [Fact]
     public async Task IsContainerRunning_ShouldReturnTrue()
     {
-        var containerId = await _containerManager.CreateContainerAsync(_testSessionId, _testLocalPath);
+        var containerId = await _containerManager.CreateContainerAsync(_testSessionId, new Dictionary<string, string>
+        {
+            { _testLocalPath, "/sandbox" }
+        });
         var isRunning = await _containerManager.IsContainerRunningAsync(containerId);
 
         this.ShouldSatisfyAllConditions(
@@ -147,7 +168,10 @@ public class SandboxTests : IAsyncLifetime
     [Fact]
     public async Task DisposeContainer_ShouldRemoveContainer()
     {
-        var containerId = await _containerManager.CreateContainerAsync(_testSessionId, _testLocalPath);
+        var containerId = await _containerManager.CreateContainerAsync(_testSessionId, new Dictionary<string, string>
+        {
+            { _testLocalPath, "/sandbox" }
+        });
         await _containerManager.DisposeContainerAsync(containerId);
         var isRunning = await _containerManager.IsContainerRunningAsync(containerId);
 
@@ -159,10 +183,13 @@ public class SandboxTests : IAsyncLifetime
     [Fact]
     public async Task ExecuteMultipleCommands_ShouldCreateAndRunDotnetProgram()
     {
-        var containerId = await _containerManager.CreateContainerAsync(_testSessionId, _testLocalPath);
+        var containerId = await _containerManager.CreateContainerAsync(_testSessionId, new Dictionary<string, string>
+        {
+            { _testLocalPath, "/sandbox" }
+        });
         var outputFile = Path.Combine(_testLocalPath, "output.txt");
 
-        // Step 1: Create project (当前目录是 /workspace)
+        // Step 1: Create project (当前目录是 /sandbox)
         await _containerManager.ExecuteCommandAsync(containerId,
             "dotnet new console -o . --force");
 

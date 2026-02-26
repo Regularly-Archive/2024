@@ -27,7 +27,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         private string GetSandboxPath(Kernel kernel, string filePath)
         {
             var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
-            var resolvedPath = sandboxContext.ResolvePath(filePath);
+            var resolvedPath = sandboxContext.ToLocalPath(filePath);
             var relativePath = Path.GetRelativePath(sandboxContext.RunDir, resolvedPath);
             return $"/sandbox/{relativePath.Replace('\\', '/')}";
         }
@@ -38,6 +38,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         private async Task<CommandResult> ExecuteInSandboxAsync(Kernel kernel, string command)
         {
             var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
+
             var sessionId = Path.GetFileName(sandboxContext.SessionDir);
             var volumeMappings = sandboxContext.GetVolumeMappings();
 

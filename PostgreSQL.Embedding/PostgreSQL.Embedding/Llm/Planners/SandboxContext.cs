@@ -1,3 +1,4 @@
+using Amazon.Runtime.Internal.Transform;
 using System.IO;
 
 namespace PostgreSQL.Embedding.Llm.Planners;
@@ -6,7 +7,8 @@ internal class SandboxContext : ISandboxContext
 {
     public string BaseDir => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        ".insighta"
+        ".insighta",
+        "1769635011574763520"
     );
 
     public string AppDir { get; }
@@ -20,11 +22,25 @@ internal class SandboxContext : ISandboxContext
     internal SandboxContext(long appId, string conversationId, string runId, string workDir)
     {
         AppDir = Path.Combine(BaseDir, appId.ToString());
-        SessionDir = Path.Combine(AppDir, conversationId);
+        SessionDir = Path.Combine(AppDir, "conversations", conversationId);
         RunDir = Path.Combine(SessionDir, "runs", runId);
         ArtifactsDir = Path.Combine(RunDir, "artifacts");
         SkillsDir = Path.Combine(AppDir, ".skills");
         _workingDirInSandbox = workDir;
+
+        foreach (var volume in GetVolumeMappings())
+        {
+            if (volume.Key.EndsWith(".md") && !File.Exists(volume.Key))
+            {
+                File.WriteAllText(volume.Key, string.Empty);
+            }
+            else if (!volume.Key.EndsWith(".md") && !Directory.Exists(volume.Key))
+            {
+                {
+                    Directory.CreateDirectory(volume.Key);
+                }
+            }
+        }
     }
 
     public string ToLocalPath(string sandboxPath)
@@ -90,8 +106,9 @@ internal class SandboxContext : ISandboxContext
         {
             { RunDir, "/sandbox" },
             { SkillsDir, "/sandbox/.skills" },
-            { Path.Combine(RunDir, "MEMORY.md"), "/sandbox/MEMORY.md" },
-            { Path.Combine(AppDir, "SOUL.md"), "/sandbox/SOUL.md" }
+            { Path.Combine(SessionDir, "MEMORY.md"), "/sandbox/MEMORY.md" },
+            { Path.Combine(AppDir, "SOUL.md"), "/sandbox/SOUL.md" },
+            { Path.Combine(RunDir, "SHORT_TERM.md"), "/sandbox/SHORT_TERM.md" }
         };
     }
 }

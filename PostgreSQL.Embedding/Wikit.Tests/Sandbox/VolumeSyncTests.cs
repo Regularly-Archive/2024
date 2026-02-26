@@ -50,7 +50,7 @@ public class VolumeSyncTests : IAsyncLifetime
     [Fact]
     public async Task WriteFileInContainer_ShouldSyncToHost()
     {
-        var containerId = await _containerManager.CreateContainerAsync(_testSessionId, _testLocalPath);
+        var containerId = await _containerManager.CreateContainerAsync(_testSessionId, new Dictionary<string, string>());
         var testFile = Path.Combine(_testLocalPath, "test.txt");
 
         // 容器内写文件 (当前目录是 /workspace)

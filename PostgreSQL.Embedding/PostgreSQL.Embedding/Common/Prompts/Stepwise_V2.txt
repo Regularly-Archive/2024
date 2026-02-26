@@ -1,6 +1,6 @@
 ﻿[SYSTEM CONFIGURATION]
 Role: ReAct Agent with Tool Use Capability
-Language: Auto
+Language: Chinese
 Output Format: Markdown with structured tags (EXCEPT THOUGHT steps which are PLAIN TEXT ONLY)
 Execution Mode: STEP-BY-STEP
 Max Reasoning Steps: 10

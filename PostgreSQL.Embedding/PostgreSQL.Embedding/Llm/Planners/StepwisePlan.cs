@@ -203,12 +203,12 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 {
                     var result = await InvokeActionAsync(kernel, step.Action, step.ActionVariables, cancellationToken).ConfigureAwait(false);
 
-                    step.Observation = string.IsNullOrEmpty(result) ? $"There is no result can be found from action '{step.Action}'." : result!;
+                    step.Observation = string.IsNullOrEmpty(result) ? $"There is no result can be found from tool call '{step.Action}'." : result!;
                 }
                 catch (Exception ex)
                 {
-                    step.Observation = $"An error occurs when invoking action '{step.Action} ': {ex.Message}";
-                    this._logger?.LogWarning(ex, "An error occurs when invoking action '{Action}'", step.Action);
+                    step.Observation = $"An error occurs when calling tool '{step.Action}': {ex.Message}";
+                    this._logger?.LogWarning(ex, "An error occurs when calling tool '{Action}'", step.Action);
                 }
 
                 this._logger?.LogInformation("[OBSERVATION] {Observation}", step.Observation);
@@ -281,16 +281,16 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 if (lastStep is not null && string.IsNullOrEmpty(lastStep.Action))
                 {
                     this._logger?.LogWarning("No response from LLM, expected Action");
-                    chatHistory.AddUserMessage(step.FormatAction());
+                    //chatHistory.AddUserMessage(step.FormatAction());
                 }
                 else
                 {
                     this._logger?.LogWarning("No response from LLM, expected Thought");
-                    chatHistory.AddUserMessage(step.FormatThought());
+                    //chatHistory.AddUserMessage(step.FormatThought());
                 }
 
                 // No action or thought from LLM
-                chatHistory.AddUserMessage($"<Observation Step=\"{step.Index}\">{step.RawResponse}</Observation>");
+                //chatHistory.AddUserMessage($"<Observation Step=\"{step.Index}\">{step.RawResponse}</Observation>");
                 return true;
             }
 

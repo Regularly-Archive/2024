@@ -150,7 +150,7 @@ namespace PostgreSQL.Embedding.Utils
                 if (appId.HasValue)
                     (pluginInstance as IPlugin)?.Initialize(appId.Value);
 
-                if (!kernel.Plugins.TryGetPlugin(pluginType.Name, out _))
+                if (!kernel.Plugins.TryGetPlugin(pluginType.Name, out _) && kernelPluginAttribute.Enabled)
                 {
                     kernel.Plugins.AddFromObject(pluginInstance, pluginType.Name);
                 }

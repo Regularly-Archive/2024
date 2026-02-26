@@ -143,7 +143,7 @@ namespace Wikit.Tests.Agents
             var planner = new StepwisePlanner(_kernel, _promptTemplateService, new StepwisePlannerConfig() { MaxIterations = 10 });
             planner.AddVariable("currentTime", DateTime.Now);
 
-            var graphExecutor = new DAGraphExecutor(input, subTasks.Tasks, planner, _kernel);
+            var graphExecutor = new DAGraphExecutor(input, subTasks.Tasks, planner, _kernel, null);
             await graphExecutor.ExecuteAsync();
 
             this.ShouldSatisfyAllConditions(

@@ -1,8 +1,10 @@
 ﻿using DocumentFormat.OpenXml.Wordprocessing;
 using Microsoft.SemanticKernel;
+using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Extensions;
 using PostgreSQL.Embedding.Common.Streaming;
+using PostgreSQL.Embedding.Infrastructure.UserIdentity;
 using PostgreSQL.Embedding.Llm.Planners;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
@@ -15,10 +17,13 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn;
 public class ArtifactsPlugin : BasePlugin
 {
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ICurrentUserService _currentUserService;
 
-    public ArtifactsPlugin(IServiceProvider serviceProvider, IHttpClientFactory httpClientFactory) : base(serviceProvider)
+    public ArtifactsPlugin(IServiceProvider serviceProvider, IHttpClientFactory httpClientFactory, ICurrentUserService currentUserService)
+        : base(serviceProvider)
     {
         _httpClientFactory = httpClientFactory;
+        _currentUserService = currentUserService;
     }
 
     #region 文本与文档
@@ -525,12 +530,13 @@ public class ArtifactsPlugin : BasePlugin
     private string GetAccessUrl(Kernel kernel, string fileName)
     {
         var agentExecutionContext = kernel.GetAgentExecutionContext();
+        var currentUser = _currentUserService.GetCurrentIdentityAsync().GetAwaiter().GetResult();
 
         var appId = agentExecutionContext.GetAppId();
         var conversationId = agentExecutionContext.GetConversationId();
         var runId = agentExecutionContext.GetRunId();
 
-        var relativeUrl = $"/api/statics/{appId}/{conversationId}/runs/{runId}/artifacts/{fileName}";
+        var relativeUrl = $"/api/statics/{currentUser.Id}/{appId}/conversations/{conversationId}/runs/{runId}/artifacts/{fileName}";
         var baseUrl = GetBaseUrl();
         return string.IsNullOrEmpty(baseUrl) ? relativeUrl : $"{baseUrl}{relativeUrl}";
     }
@@ -559,6 +565,7 @@ public class ArtifactsPlugin : BasePlugin
 
     public class ArtifactResponse
     {
+        [JsonProperty("artifact_id")]
         public string ArtifactId { get; set; }
         public string FileName { get; set; }
         public string AccessUrl { get; set; }
