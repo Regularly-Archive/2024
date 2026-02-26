@@ -135,7 +135,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             var functionResult = await _kernel.InvokePromptAsync(
                 @$"请使用简洁、概括性的文字描述用户意图，不超过10个字: 
                 {input}
-                ");
+                ").ConfigureAwait(false);
 
             return functionResult.GetValue<string>();
         }

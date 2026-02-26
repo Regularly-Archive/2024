@@ -23,9 +23,13 @@ public class DockerContainerManager
     /// <summary>
     /// 创建并启动容器
     /// </summary>
+    /// <param name="sessionId">会话 ID</param>
+    /// <param name="volumeMappings">卷映射字典：本地路径 -> 容器内路径</param>
+    /// <param name="cancellationToken">取消令牌</param>
+    /// <returns>容器 ID</returns>
     public async Task<string> CreateContainerAsync(
         string sessionId,
-        string localPath,
+        Dictionary<string, string> volumeMappings,
         CancellationToken cancellationToken = default)
     {
         var containerId = $"{sessionId}-container";
@@ -58,12 +62,14 @@ public class DockerContainerManager
             $"pull {_options.DefaultImage}",
             cancellationToken: cancellationToken);
 
+        var volumeArgs = volumeMappings
+            .Select(kv => $"-v {kv.Key}:{kv.Value}");
+
         // 创建并启动容器
-        // - 本地目录直接映射到容器的 /workspace
         var createCommand = $"run -d " +
             $"--name {containerId} " +
             $"{cpuArgs} {memoryArgs} " +
-            $"-v {localPath}:{_options.WorkingDirectory} " +
+            string.Join(" ", volumeArgs) + " " +
             $"--workdir {_options.WorkingDirectory} " +
             $"{_options.DefaultImage} sleep infinity";
 

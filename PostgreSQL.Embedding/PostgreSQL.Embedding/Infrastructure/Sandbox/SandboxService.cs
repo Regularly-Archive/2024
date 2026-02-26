@@ -31,9 +31,13 @@ public class SandboxService
     /// <summary>
     /// 获取或创建会话
     /// </summary>
+    /// <param name="sessionId">会话 ID</param>
+    /// <param name="volumeMappings">卷映射字典：本地路径 -> 容器内路径</param>
+    /// <param name="cancellationToken">取消令牌</param>
+    /// <returns>沙箱会话</returns>
     public async Task<SandboxSession> GetOrCreateSessionAsync(
         string sessionId,
-        string localPath,
+        Dictionary<string, string> volumeMappings,
         CancellationToken cancellationToken = default)
     {
         // 先检查内存中是否存在
@@ -56,13 +60,13 @@ public class SandboxService
         var session = new SandboxSession
         {
             SessionId = sessionId,
-            ContainerId = await _containerManager.CreateContainerAsync(sessionId, localPath, cancellationToken),
+            ContainerId = await _containerManager.CreateContainerAsync(sessionId, volumeMappings, cancellationToken),
             Status = SandboxSessionStatus.Running,
             CreatedAt = DateTime.UtcNow,
             LastActiveAt = DateTime.UtcNow,
             ExpiresAt = DateTime.UtcNow.Add(_options.MaxLifetime),
-            LocalPath = localPath,
-            ContainerWorkDir = $"{_options.WorkingDirectory}/{sessionId}"
+            LocalPath = volumeMappings.Keys.FirstOrDefault() ?? string.Empty,
+            ContainerWorkDir = _options.WorkingDirectory
         };
 
         _sessions.TryAdd(sessionId, session);

@@ -38,10 +38,10 @@ namespace PostgreSQL.Embedding.Plugins.Custom
         public async Task<SearchResult> SearchAsync(
             [Description("搜索关键词")] string keyword,
             [Description("最大返回结果数量，默认为 10")] int limit = 10,
-            [Description("要搜索的特定域名或网站")] string filterDomain = "")
+            [Description("要搜索的特定域名或网站")] string includeDomain = "")
         {
             // 使用 DuckDuckGo Instant Answer API，不会被检测为爬虫
-            return await SearchWithApiAsync(keyword, limit, filterDomain);
+            return await SearchWithApiAsync(keyword, limit, includeDomain);
         }
 
         public async Task<SearchResult> SearchWithApiAsync(
@@ -62,6 +62,9 @@ namespace PostgreSQL.Embedding.Plugins.Custom
 
                 var responseBody = await response.Content.ReadAsStringAsync();
                 var searchResult = await ExtractFromApi(keyword, responseBody, limit, filterDomain);
+                if (!searchResult.Entries.Any())
+                    return await SearchWithHtmlAsync(keyword, limit, filterDomain);
+
                 return searchResult;
             }
             catch (Exception ex)
@@ -126,12 +129,15 @@ namespace PostgreSQL.Embedding.Plugins.Custom
                         if (root.TryGetProperty("AbstractURL", out var abstractUrl))
                         {
                             var abstractUrlStr = abstractUrl.GetString();
-                            searchResult.Entries.Add(new Entry()
+                            if (!string.IsNullOrEmpty(abstractUrlStr) && !string.IsNullOrEmpty(abstractText))
                             {
-                                Title = keyword,
-                                Url = abstractUrlStr ?? string.Empty,
-                                Snippet = abstractText ?? string.Empty
-                            });
+                                searchResult.Entries.Add(new Entry()
+                                {
+                                    Title = keyword,
+                                    Url = abstractUrlStr ?? string.Empty,
+                                    Snippet = abstractText ?? string.Empty
+                                });
+                            }
                         }
                     }
                 }
@@ -293,26 +299,6 @@ namespace PostgreSQL.Embedding.Plugins.Custom
         }
 
         /// <summary>
-        /// Extract the vqd token from HTML for POST pagination requests
-        /// </summary>
-        private string ExtractVqdToken(string html)
-        {
-            try
-            {
-                var config = Configuration.Default.WithDefaultLoader();
-                var context = BrowsingContext.New(config);
-                var document = context.OpenAsync(request => request.Content(html)).Result;
-
-                var vqdInput = document.QuerySelector("input[name='vqd']");
-                return vqdInput?.GetAttribute("value") ?? string.Empty;
-            }
-            catch
-            {
-                return string.Empty;
-            }
-        }
-
-        /// <summary>
         /// DuckDuckGo uses redirect URLs like: https://duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2F
         /// Extract the actual URL from the redirect
         /// </summary>
@@ -322,6 +308,7 @@ namespace PostgreSQL.Embedding.Plugins.Custom
 
             try
             {
+                redirectUrl = redirectUrl.StartsWith("//") ? "https:" + redirectUrl : redirectUrl;
                 var uri = new Uri(redirectUrl);
                 var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
 

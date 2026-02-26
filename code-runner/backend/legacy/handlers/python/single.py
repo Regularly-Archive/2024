@@ -9,7 +9,7 @@ class PythonSingleFileHandler(BaseHandler):
         }
         
         dependencies = self.ctx.project_info.get_inline_cmd_dependencies()
-        if dependencies:
+        if dependencies and len(dependencies) > 0:
             deps = " ".join(list(map(lambda x:x.name, dependencies)))
             pipeline['install'] = f"uv venv && uv pip install {deps}"
         

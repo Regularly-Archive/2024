@@ -5,15 +5,18 @@ using MongoDB.Driver;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Plugins.Abstration;
+using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text.Encodings.Web;
 
 namespace PostgreSQL.Embedding.Plugins.Custom
 {
-    [KernelPlugin(Description = "网易云音乐插件。提供歌曲搜索和在线播放功能，可根据歌手名和歌曲名搜索并返回歌曲信息。", Version = "1.1")]
+    [KernelPlugin(Description = "网易云音乐插件。提供歌曲搜索和在线播放功能，可根据歌手名和歌曲名搜索并返回歌曲信息。", Version = "1.2")]
     public class CloudMusicPlugin : BasePlugin
     {
         private const string SEARCH_URL = "http://music.163.com/api/search/get/web?csrf_token=hlpretag=&hlposttag=&s={0}&type=1&offset=0&total=true&limit=2";
@@ -28,9 +31,9 @@ namespace PostgreSQL.Embedding.Plugins.Custom
 
         [KernelFunction]
         [Description("搜索网易云音乐歌曲。可通过歌手名称、歌曲名称或两者组合进行搜索，返回匹配的歌曲信息（ID、名称、艺术家、专辑等）。")]
-        public async Task<string> SearchMusicAsync(
-            [Description("歌手名称（可选）")] string artistName = "",
-            [Description("歌曲名称（可选，优先使用）")] string songName = "")
+        public async Task<IEnumerable<Song>> SearchMusicAsync(
+            [Description("歌曲名称（优先使用）")] string songName,
+            [Description("歌手名称（可选）")] string artistName = "")
         {
             var handler = new HttpClientHandler() { AllowAutoRedirect = false, AutomaticDecompression = DecompressionMethods.GZip };
             using var httpClient = new HttpClient(handler);
@@ -38,15 +41,14 @@ namespace PostgreSQL.Embedding.Plugins.Custom
             var keyword = songName ?? artistName;
             var searchResult = await SearchByKeyword(httpClient, keyword);
             if (searchResult!.code != 200 || searchResult.result.songs.Length == 0)
-                return JsonConvert.SerializeObject(Enumerable.Empty<Song>());
+                return Enumerable.Empty<Song>();
 
-            var song = FilterSong(searchResult.result, artistName, songName);
-            return JsonConvert.SerializeObject(new List<Song>() { song });
+            return FilterSongs(searchResult.result, artistName, songName);
         }
 
         [KernelFunction]
         [Description("获取歌曲下载链接")]
-        public async Task<string> GetDownloadLink(long songId)
+        public async Task<string> GetSongUrl(long songId)
         {
             var handler = new HttpClientHandler() { AllowAutoRedirect = false, AutomaticDecompression = DecompressionMethods.GZip };
             using var httpClient = new HttpClient(handler);
@@ -85,23 +87,12 @@ namespace PostgreSQL.Embedding.Plugins.Custom
         /// <param name="artistName"></param>
         /// <param name="songName"></param>
         /// <returns></returns>
-        private Song FilterSong(SongsResult songsResult, string artistName, string songName)
+        private IEnumerable<Song> FilterSongs(SongsResult songsResult, string artistName, string songName)
         {
-            Song song = null;
-
-            // 当指定艺术家时，优先选择指定艺术家的歌曲
             if (!string.IsNullOrEmpty(artistName))
-                song = songsResult.songs.FirstOrDefault(x => x.artists[0].name == artistName);
+                return songsResult.songs.Where(x => x.artists[0].name == artistName);
 
-            // 否则随机返回一首歌曲
-            if (song == null || string.IsNullOrEmpty(artistName))
-            {
-                var random = new Random();
-                var idx = random.Next(0, songsResult.songs.Length);
-                song = songsResult.songs[idx];
-            }
-
-            return song;
+            return songsResult.songs;
         }
 
         #region Models
@@ -117,7 +108,7 @@ namespace PostgreSQL.Embedding.Plugins.Custom
             public int songCount { get; set; }
         }
 
-        class Song
+        public class Song
         {
             public long id { get; set; }
             public string name { get; set; }
@@ -135,7 +126,7 @@ namespace PostgreSQL.Embedding.Plugins.Custom
             public long mark { get; set; }
         }
 
-        class Album
+        public class Album
         {
             public long id { get; set; }
             public string name { get; set; }
@@ -148,7 +139,7 @@ namespace PostgreSQL.Embedding.Plugins.Custom
             public long mark { get; set; }
         }
 
-        class Artist
+        public class Artist
         {
             public int id { get; set; }
             public string name { get; set; }
