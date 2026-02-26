@@ -138,11 +138,6 @@ namespace PostgreSQL.Embedding.Llm.Core
             {
                 yield return evt;
             }
-
-            Task.Run(() =>
-            {
-
-            })
         }
 
         private async Task ProduceEventsAsync(
