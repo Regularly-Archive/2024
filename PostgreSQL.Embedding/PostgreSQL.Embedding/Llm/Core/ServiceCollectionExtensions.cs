@@ -3,8 +3,12 @@ using LLama.Common;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PostgreSQL.Embedding.Common.Confirguration;
+using PostgreSQL.Embedding.Domain.Entities;
+using PostgreSQL.Embedding.Infrastructure.DataAccess;
 using PostgreSQL.Embedding.Llm.Abstractions;
 using PostgreSQL.Embedding.Llm.Core;
+using PostgreSQL.Embedding.Llm.Core.ChatHistory.Models;
+using PostgreSQL.Embedding.Llm.Core.ChatHistory.Services;
 using PostgreSQL.Embedding.Llm.Services;
 using PostgreSQL.Embedding.Plugins;
 
@@ -22,9 +26,24 @@ namespace PostgreSQL.Embedding.Llm.Core
             // 注册核心服务
             services.AddScoped<IKernelService, KernalService>();
             services.AddScoped<IMemoryService, MemoryService>();
+            services.AddScoped<ISkillService, SkillService>();
             services.AddScoped<IConversationService, ConversationService>();
             services.AddScoped<IChatHistoriesService, ChatHistoriesService>();
             services.AddScoped<PromptTemplateService>();
+
+            services.AddScoped(sp =>
+            {
+                var config = new ChatHistoryConfig
+                {
+                    ActiveRounds = 5,
+                    BufferRounds = 3
+                };
+
+                var kernel = sp.GetRequiredService<Microsoft.SemanticKernel.Kernel>();
+                var chatHistoriesService = sp.GetRequiredService<IChatHistoriesService>();
+                var stateRepository = sp.GetRequiredService<IRepository<AppConversationState>>();
+                return new ChatHistoryManager(config, kernel, chatHistoriesService, stateRepository);
+            });
 
             // 注册知识库服务
             services.AddScoped<IKnowledgeBaseService, KnowledgeBaseService>();

@@ -12,6 +12,7 @@ using PostgreSQL.Embedding.Domain.Models.RAG;
 using PostgreSQL.Embedding.Domain.Models.Search;
 using PostgreSQL.Embedding.Infrastructure.DataAccess;
 using PostgreSQL.Embedding.Llm.Abstractions;
+using PostgreSQL.Embedding.Llm.Core.ChatHistory.Services;
 using PostgreSQL.Embedding.Llm.Planners;
 using PostgreSQL.Embedding.Llm.Services;
 using PostgreSQL.Embedding.Plugins.BuiltIn;
@@ -41,8 +42,9 @@ namespace PostgreSQL.Embedding.Llm.Core
             IServiceProvider serviceProvider,
             IMemoryService memoryService,
             IChatHistoriesService chatHistoriesService,
-            CitationService citationService
-        ) : base(kernel, chatHistoriesService)
+            CitationService? citationService = null,
+            ChatHistoryManager? chatHistoryManager = null
+        ) : base(kernel, chatHistoriesService, serviceProvider)
         {
             _kernel = kernel;
             _serviceProvider = serviceProvider;

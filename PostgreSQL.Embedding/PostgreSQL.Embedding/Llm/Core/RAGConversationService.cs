@@ -9,6 +9,7 @@ using PostgreSQL.Embedding.Domain.Models.KernelMemory;
 using PostgreSQL.Embedding.Domain.Models.RAG;
 using PostgreSQL.Embedding.Infrastructure.DataAccess;
 using PostgreSQL.Embedding.Llm.Abstractions;
+using PostgreSQL.Embedding.Llm.Core.ChatHistory.Services;
 using PostgreSQL.Embedding.Llm.Services;
 using SqlSugar;
 using System.Text;
@@ -43,9 +44,10 @@ namespace PostgreSQL.Embedding.Llm.Core
             IServiceProvider serviceProvider,
             IMemoryService memoryService,
             IChatHistoriesService chatHistoriesService,
-            HttpContext httpContext
+            HttpContext httpContext,
+            ChatHistoryManager? chatHistoryManager = null
         )
-            : base(kernel, chatHistoriesService)
+            : base(kernel, chatHistoriesService, serviceProvider)
         {
             _kernel = kernel;
             _app = app;
