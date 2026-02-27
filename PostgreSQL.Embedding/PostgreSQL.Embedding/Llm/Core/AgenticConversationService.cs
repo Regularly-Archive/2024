@@ -1,9 +1,7 @@
-using DocumentFormat.OpenXml.Bibliography;
-using LLama.Batched;
-using Masuit.Tools;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.Connectors.OpenAI;
+using Microsoft.SemanticKernel.ChatCompletion;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Extensions;
@@ -16,11 +14,8 @@ using PostgreSQL.Embedding.Infrastructure.UserIdentity;
 using PostgreSQL.Embedding.Llm.Abstractions;
 using PostgreSQL.Embedding.Llm.Planners;
 using PostgreSQL.Embedding.Llm.Services;
-using PostgreSQL.Embedding.Utils;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
-using System.Text.Json;
 using System.Threading.Channels;
 using TaskState = PostgreSQL.Embedding.Domain.Models.Planners.TaskState;
 
@@ -63,7 +58,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             LlmApp app,
             IServiceProvider serviceProvider,
             IChatHistoriesService chatHistoriesService)
-            : base(kernel, chatHistoriesService)
+            : base(kernel, chatHistoriesService, serviceProvider)
         {
             _kernel = kernel;
             _app = app;
@@ -93,9 +88,6 @@ namespace PostgreSQL.Embedding.Llm.Core
             _agentExecutionContext.SetAppId(_app.Id);
             _agentExecutionContext.SetConversationId(convId);
             _agentExecutionContext.InitializeSandboxContext(_app.Id, convId, runId, _sandboxOptions);
-
-            // Inject context to sandbox
-            await InJectContextToSandbox(_app.Id, conversationId, _agentExecutionContext);
 
             // Add user message
             var refMessageId = await _chatHistoriesService.AddUserMessageAsync(_app.Id, convId, input);
@@ -237,12 +229,13 @@ namespace PostgreSQL.Embedding.Llm.Core
             CancellationToken ct)
         {
             var currentUser = await _currentUserService.GetCurrentUserAsync();
+            var historyContext = await GetOrCreateContextAsync(_app.Id, conversationId);
 
             // Create task planner
             var taskPlanner = new TaskPlanner(_kernel);
             var planResult = _app.AppType == (int)LlmAppType.Chat
-                ? await taskPlanner.GetSubTasksAsync(input, limit: 3)
-                : await taskPlanner.GetRAGTasks(input);
+                ? await taskPlanner.GetSubTasksAsync(input, limit: 3, history: historyContext)
+                : await taskPlanner.GetRAGTasks(input, history: historyContext);
 
             var subTasks = planResult.Tasks;
             if (!subTasks.Any())
@@ -287,8 +280,6 @@ namespace PostgreSQL.Embedding.Llm.Core
             var currentUser = await _currentUserService.GetCurrentUserAsync();
             var runId = _agentExecutionContext.GetRunId();
 
-            // Re-create task planner to get subtasks
-
             // Create planner for task execution
             var planner = new StepwisePlanner(_kernel, _promptTemplateService, new StepwisePlannerConfig { MaxIterations = 30 });
             planner.AddVariable("appId", _app.Id);
@@ -297,7 +288,6 @@ namespace PostgreSQL.Embedding.Llm.Core
             planner.AddVariable("userId", currentUser.Id);
             planner.AddVariable("currentTime", DateTime.Now);
             planner.AddVariable("enableWebSearch", request.AccessInternet);
-            planner.AddVariable("skillsRootFolder", "C:\\Users\\Administrator\\.claude\\skills");
             planner.AddVariable("EnableMCP", true);
             planner.AddVariable("EnableSkills", true);
             planner.AddVariable("WorkDir", $"/sandbox");
@@ -341,7 +331,7 @@ namespace PostgreSQL.Embedding.Llm.Core
                         Id = stepTrace.Id,
                         Name = ExtractActionName(stepTrace.Title),
                         Input = input,
-                        Output = JsonConvert.SerializeObject(actionObj["output"]),
+                        Output = actionObj["output"]?.ToString(),
                         Status = stepTrace.Status == "success" ? "completed" : "failed",
                         DurationMs = (long)(ExtractDuration(stepTrace.Description) * 1000)
                     }, ct);

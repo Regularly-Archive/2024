@@ -26,13 +26,11 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         private Regex _regexCitations = new Regex(@"\[(\d+)\]");
         private const string FINAL_ANSWER_TAG = "[FINAL_ANSWER]";
 
-        private readonly IServiceProvider _serviceProvider;
-        private readonly IHttpClientFactory _httpClientFactory;
 
-        public WebSearchPlugin(IServiceProvider serviceProvider, IHttpClientFactory httpClientFactory)
+        public WebSearchPlugin(IServiceProvider serviceProvider)
             : base(serviceProvider)
         {
-            _serviceProvider = serviceProvider;
+
         }
 
         [KernelFunction]
@@ -49,7 +47,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
             var clonedKernel = kernel?.Clone();
 
             using var serviceScope = _serviceProvider.CreateScope();
-            var serviceEngine = GetSearchEngine(serviceScope.ServiceProvider, searchEngine);
+            var serviceEngine = GetSearchEngine(serviceScope.ServiceProvider, searchEngine.ToLower());
 
             var searchResult = await serviceEngine.SearchAsync(keyword, filterDomain: includeDomain);
 
@@ -79,23 +77,23 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
             return searchResult;
         }
 
-        private ISearchEngine GetSearchEngine(IServiceProvider serviceProvider, string searchEngine = "Bing")
+        private ISearchEngine GetSearchEngine(IServiceProvider serviceProvider, string searchEngine = "bing")
         {
             switch (searchEngine)
             {
-                case "Bing":
+                case "bing":
                     return serviceProvider.GetRequiredService<BingSearchPlugin>() as ISearchEngine;
-                case "Brave":
+                case "brave":
                     return serviceProvider.GetRequiredService<BraveSearchPlugin>() as ISearchEngine;
-                case "JinaAI":
+                case "jinaai":
                     return serviceProvider.GetRequiredService<JinaAIPlugin>() as ISearchEngine;
-                case "BoCha":
+                case "bocha":
                     return serviceProvider.GetRequiredService<BoChaAIPlugin>() as ISearchEngine;
-                case "SerpApi":
+                case "serpapi":
                     return serviceProvider.GetRequiredService<SerpApiPlugin>() as ISearchEngine;
-                case "DuckDuckGo":
+                case "duckduckgo":
                     return serviceProvider.GetRequiredService<DuckDuckGoSearchPlugin>() as ISearchEngine;
-                case "WeChat":
+                case "wechat":
                     return serviceProvider.GetRequiredService<WeiXinSearchPlugin>() as ISearchEngine;
                 default:
                     return serviceProvider.GetRequiredService<BingSearchPlugin>() as ISearchEngine;

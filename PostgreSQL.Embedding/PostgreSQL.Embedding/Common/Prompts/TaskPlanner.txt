@@ -7,7 +7,9 @@ You are a Task Decomposition Expert. Your core goal is to break down complex use
 {{$functions}}
 - **Maximum Subtasks**: {{$limit}} (non-negotiable upper bound; task count must not exceed this value)
 - **Conversation History**: 
-Read `MEMORY.md` or use `ConversationHistoriesPlugin` to retrieve context from histories
+{{$history}}
+
+Read `MEMORY.md` or use `ConversationHistoriesPlugin` to retrieve more context from histories
 
 ---
 
