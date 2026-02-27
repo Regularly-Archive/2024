@@ -10,6 +10,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Application\DTOs\**" />
+    <Compile Remove="Application\Services\**" />
     <Compile Remove="Llm\Abstractions\Upload\06d309e4ead54d3da16a1e4ec649b80a\**" />
     <Compile Remove="Llm\Abstractions\Upload\1a8d4bfaf29044b6898cbe96fbe8996c\**" />
     <Compile Remove="Llm\Abstractions\Upload\320ea86db3414c99af4881453c8fe0b2\**" />
@@ -25,6 +27,8 @@
     <Compile Remove="Llm\Abstractions\Upload\f5dc8a79c3564130b1d848c45d73192e\**" />
     <Compile Remove="Llm\Connectors\OpenAI\**" />
     <Compile Remove="Llm\Connectors\OpenAI\**" />
+    <Content Remove="Application\DTOs\**" />
+    <Content Remove="Application\Services\**" />
     <Content Remove="Llm\Abstractions\Upload\06d309e4ead54d3da16a1e4ec649b80a\**" />
     <Content Remove="Llm\Abstractions\Upload\1a8d4bfaf29044b6898cbe96fbe8996c\**" />
     <Content Remove="Llm\Abstractions\Upload\320ea86db3414c99af4881453c8fe0b2\**" />
@@ -40,6 +44,8 @@
     <Content Remove="Llm\Abstractions\Upload\f5dc8a79c3564130b1d848c45d73192e\**" />
     <Content Remove="Llm\Connectors\OpenAI\**" />
     <Content Remove="Llm\Connectors\OpenAI\**" />
+    <EmbeddedResource Remove="Application\DTOs\**" />
+    <EmbeddedResource Remove="Application\Services\**" />
     <EmbeddedResource Remove="Llm\Abstractions\Upload\06d309e4ead54d3da16a1e4ec649b80a\**" />
     <EmbeddedResource Remove="Llm\Abstractions\Upload\1a8d4bfaf29044b6898cbe96fbe8996c\**" />
     <EmbeddedResource Remove="Llm\Abstractions\Upload\320ea86db3414c99af4881453c8fe0b2\**" />
@@ -55,6 +61,8 @@
     <EmbeddedResource Remove="Llm\Abstractions\Upload\f5dc8a79c3564130b1d848c45d73192e\**" />
     <EmbeddedResource Remove="Llm\Connectors\OpenAI\**" />
     <EmbeddedResource Remove="Llm\Connectors\OpenAI\**" />
+    <None Remove="Application\DTOs\**" />
+    <None Remove="Application\Services\**" />
     <None Remove="Llm\Abstractions\Upload\06d309e4ead54d3da16a1e4ec649b80a\**" />
     <None Remove="Llm\Abstractions\Upload\1a8d4bfaf29044b6898cbe96fbe8996c\**" />
     <None Remove="Llm\Abstractions\Upload\320ea86db3414c99af4881453c8fe0b2\**" />
@@ -132,7 +140,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Application\DTOs\" />
     <Folder Include="Assets\Models\" />
     <Folder Include="Infrastructure\Sandbox\" />
   </ItemGroup>

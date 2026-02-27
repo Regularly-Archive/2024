@@ -10,9 +10,9 @@ public class WebSearchRetrievalService
     public string SearchEngine { get; set; } = "Bing";
 
     private WebSearchPlugin _webSearchPlugin;
-    public WebSearchRetrievalService(IServiceProvider serviceProvider, IHttpClientFactory httpClientFactory)
+    public WebSearchRetrievalService(IServiceProvider serviceProvider)
     {
-        _webSearchPlugin = new WebSearchPlugin(serviceProvider, httpClientFactory);
+        _webSearchPlugin = new WebSearchPlugin(serviceProvider);
     }
 
     public async Task<List<LlmCitationModel>> SearchAsync(long knowledgeBaseId, string question, double minRelevance, int limit)

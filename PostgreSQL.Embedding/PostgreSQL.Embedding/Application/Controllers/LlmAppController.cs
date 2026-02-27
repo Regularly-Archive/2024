@@ -1,11 +1,11 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using PostgreSQL.Embedding.Application.Services;
 using PostgreSQL.Embedding.Domain.Entities;
 using PostgreSQL.Embedding.Domain.Models.Plugin;
 using PostgreSQL.Embedding.Domain.Models.WebApi;
 using PostgreSQL.Embedding.Domain.Models.WebApi.QuerableFilters;
 using PostgreSQL.Embedding.Infrastructure.DataAccess;
 using PostgreSQL.Embedding.Llm.Abstractions;
+using PostgreSQL.Embedding.Llm.Services;
 using SqlSugar;
 
 namespace PostgreSQL.Embedding.Application.Controllers.Controllers
