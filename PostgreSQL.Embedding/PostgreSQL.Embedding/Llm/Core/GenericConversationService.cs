@@ -10,6 +10,7 @@ using PostgreSQL.Embedding.Domain.Models;
 using PostgreSQL.Embedding.Domain.Models.Planners;
 using PostgreSQL.Embedding.Infrastructure.UserIdentity;
 using PostgreSQL.Embedding.Llm.Abstractions;
+using PostgreSQL.Embedding.Llm.Core.ChatHistory.Services;
 using PostgreSQL.Embedding.Llm.Planners;
 using PostgreSQL.Embedding.Llm.Services;
 using PostgreSQL.Embedding.Utils;
@@ -37,8 +38,14 @@ namespace PostgreSQL.Embedding.Llm.Core
         private readonly ILogger<GenericConversationService> _logger;
         private readonly AgentExecutionContext _agentExecutionContext;
         private readonly CitationService _citationService;
-        public GenericConversationService(Kernel kernel, LlmApp app, IServiceProvider serviceProvider, IChatHistoriesService chatHistoriesService, HttpContext httpContext)
-            : base(kernel, chatHistoriesService)
+        public GenericConversationService(
+            Kernel kernel,
+            LlmApp app,
+            IServiceProvider serviceProvider,
+            IChatHistoriesService chatHistoriesService,
+            HttpContext httpContext,
+            ChatHistoryManager? chatHistoryManager = null)
+            : base(kernel, chatHistoriesService, serviceProvider)
         {
             _kernel = kernel;
             _app = app;
