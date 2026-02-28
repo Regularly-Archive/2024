@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using PostgreSQL.Embedding.Common.Streaming;
 using PostgreSQL.Embedding.Domain.Entities;
 using PostgreSQL.Embedding.Domain.Models;

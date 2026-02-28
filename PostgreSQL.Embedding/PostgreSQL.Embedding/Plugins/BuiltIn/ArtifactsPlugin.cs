@@ -4,6 +4,8 @@ using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Extensions;
 using PostgreSQL.Embedding.Common.Streaming;
+using PostgreSQL.Embedding.Domain.Entities;
+using PostgreSQL.Embedding.Infrastructure.DataAccess;
 using PostgreSQL.Embedding.Infrastructure.UserIdentity;
 using PostgreSQL.Embedding.Llm.Planners;
 using PostgreSQL.Embedding.Plugins.Abstration;
@@ -18,12 +20,14 @@ public class ArtifactsPlugin : BasePlugin
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IRepository<ChatMessageArtifact> _artifactRepository;
 
     public ArtifactsPlugin(IServiceProvider serviceProvider, IHttpClientFactory httpClientFactory, ICurrentUserService currentUserService)
         : base(serviceProvider)
     {
         _httpClientFactory = httpClientFactory;
         _currentUserService = currentUserService;
+        _artifactRepository = serviceProvider.GetRequiredService<IRepository<ChatMessageArtifact>>();
     }
 
     #region 文本与文档
@@ -403,6 +407,21 @@ public class ArtifactsPlugin : BasePlugin
     private async Task EmitArtifactAsync(ArtifactResponse response, Kernel kernel)
     {
         var agentExecutionContext = kernel.GetAgentExecutionContext();
+
+        // 持久化产物
+        await _artifactRepository.AddAsync(new ChatMessageArtifact
+        {
+            RunId = agentExecutionContext.GetRunId(),
+            MessageId = agentExecutionContext.GetMessageId(),
+            ArtifactId = response.ArtifactId,
+            FileName = response.FileName,
+            ArtifactType = (int)response.Type,
+            Url = response.AccessUrl,
+            CanPreview = response.CanPreview,
+            CanDownload = response.CanDownload,
+            FileSize = response.FileSize
+        });
+
         if (agentExecutionContext.HasEventBus)
         {
             var @event = new ArtifactEvent
