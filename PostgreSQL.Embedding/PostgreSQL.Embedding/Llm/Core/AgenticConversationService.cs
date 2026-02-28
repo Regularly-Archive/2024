@@ -9,6 +9,7 @@ using PostgreSQL.Embedding.Common.Streaming;
 using PostgreSQL.Embedding.Domain.Entities;
 using PostgreSQL.Embedding.Domain.Models;
 using PostgreSQL.Embedding.Domain.Models.Planners;
+using PostgreSQL.Embedding.Infrastructure.DataAccess;
 using PostgreSQL.Embedding.Infrastructure.Sandbox;
 using PostgreSQL.Embedding.Infrastructure.UserIdentity;
 using PostgreSQL.Embedding.Llm.Abstractions;
@@ -53,6 +54,11 @@ namespace PostgreSQL.Embedding.Llm.Core
         private readonly IOptions<SandboxOptions> _sandboxOptions;
         private readonly CitationService _citationService;
 
+        // Repositories for trace persistence (lazy loaded)
+        private IRepository<ChatMessageReasoning>? _reasoningRepository;
+        private IRepository<ChatMessageToolCall>? _toolCallRepository;
+        private IRepository<ChatMessagePlan>? _planRepository;
+
         public AgenticConversationService(
             Kernel kernel,
             LlmApp app,
@@ -70,6 +76,9 @@ namespace PostgreSQL.Embedding.Llm.Core
             _agentExecutionContext = kernel.GetAgentExecutionContext();
             _sandboxOptions = serviceProvider.GetService<IOptions<SandboxOptions>>()!;
             _citationService = serviceProvider.GetRequiredService<CitationService>();
+            _reasoningRepository = _serviceProvider.GetRequiredService<IRepository<ChatMessageReasoning>>();
+            _toolCallRepository = _serviceProvider.GetRequiredService<IRepository<ChatMessageToolCall>>();
+            _planRepository = _serviceProvider.GetRequiredService<IRepository<ChatMessagePlan>>();
         }
 
         /// <summary>
@@ -251,6 +260,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             // Emit planning thought as content_block (thinking) - uses thinking block index
             _logger.LogInformation($"[THOUGHT] {planResult.Thought}");
             await EmitThinkingBlockAsync(planResult.Thought, writer, blockTracker.ThinkingBlockIndex, ct);
+            await SaveReasoningAsync(planResult.Thought);
 
             // Emit each subtask as a planning event
             foreach (var subTask in subTasks)
@@ -317,6 +327,7 @@ namespace PostgreSQL.Embedding.Llm.Core
                 case "Thought":
                     // Emit as content_block (thinking) format - uses thinking block index
                     blockTracker.InitializeThinkingBlock();
+                    await SaveReasoningAsync(stepTrace.Content);
                     await EmitThinkingBlockAsync(stepTrace.Content, writer, blockTracker.ThinkingBlockIndex, ct);
                     break;
 
@@ -326,9 +337,16 @@ namespace PostgreSQL.Embedding.Llm.Core
                     var input = JsonConvert.DeserializeObject<Dictionary<string, object>>(
                         JsonConvert.SerializeObject(actionObj["input"])
                      );
+                    var toolCallId = await SaveToolCallAsync(
+                        ExtractActionName(stepTrace.Title),
+                        input,
+                        actionObj["output"]?.ToString(),
+                        stepTrace.Status == "success" ? 0 : -1,
+                        (long)(ExtractDuration(stepTrace.Description) * 1000)
+                    );
                     await writer.WriteAsync(new ToolCallEvent
                     {
-                        Id = stepTrace.Id,
+                        Id = toolCallId.ToString(),
                         Name = ExtractActionName(stepTrace.Title),
                         Input = input,
                         Output = actionObj["output"]?.ToString(),
@@ -347,6 +365,13 @@ namespace PostgreSQL.Embedding.Llm.Core
                         Content = stepTrace.Content,
                         Status = MapPlanStatus(stepTrace.Status)
                     }, ct);
+                    await SavePlanAsync(
+                        int.Parse(stepTrace.Id), 
+                        stepTrace.Title, 
+                        stepTrace.Description, 
+                        stepTrace.Content, 
+                        (int)MapTaskState(stepTrace.Status)
+                    );
                     break;
 
                 case "MessageStatus":
@@ -462,6 +487,18 @@ namespace PostgreSQL.Embedding.Llm.Core
             };
         }
 
+        private static TaskState MapTaskState(string status)
+        {
+            return status?.ToLower() switch
+            {
+                "pending" => TaskState.Pending,
+                "inprogress" => TaskState.InProgress,
+                "completed" => TaskState.Completed,
+                "failed" => TaskState.Failed,
+                _ => TaskState.Pending
+            };
+        }
+
         private static int EstimateTokenCount(string text)
         {
             return (int)Math.Ceiling((text.Length / 4.0));
@@ -482,5 +519,80 @@ namespace PostgreSQL.Embedding.Llm.Core
             if (!Directory.Exists(directory)) Directory.CreateDirectory(directory);
             await File.WriteAllTextAsync(fullPath, chatHitstoris, Encoding.UTF8);
         }
+
+        #region Trace Persistence
+
+        /// <summary>
+        /// 持久化推理过程
+        /// </summary>
+        private async Task SaveReasoningAsync(string content)
+        {
+            await _reasoningRepository.AddAsync(new ChatMessageReasoning
+            {
+                RunId = _agentExecutionContext.GetRunId(),
+                MessageId = _agentExecutionContext.GetMessageId(),
+                Content = content
+            });
+        }
+
+        /// <summary>
+        /// 持久化工具调用
+        /// </summary>
+        private async Task<long> SaveToolCallAsync(string name, Dictionary<string, object>? input, string? output, int status, long? durationMs)
+        {
+            var toolCall = await _toolCallRepository.AddAsync(new ChatMessageToolCall
+            {
+                RunId = _agentExecutionContext.GetRunId(),
+                MessageId = _agentExecutionContext.GetMessageId(),
+                Name = name,
+                Input = input,
+                Output = output,
+                Status = status,
+                DurationMs = durationMs
+            });
+
+            return toolCall.Id;
+        }
+
+        /// <summary>
+        /// 保存或更新计划/子任务
+        /// </summary>
+        private async Task SavePlanAsync(int planId, string title, string description, string? output, int status)
+        {
+            var runId = _agentExecutionContext.GetRunId();
+            var messageId = _agentExecutionContext.GetMessageId();
+
+            try
+            {
+                var existing = await _planRepository.FindAsync(x => x.RunId == runId && x.MessageId == messageId && x.PlanId == planId);
+                if (existing != null)
+                {
+                    existing.Title = title;
+                    existing.Description = description;
+                    existing.Output = output ?? "";
+                    existing.Status = status;
+                    await _planRepository.UpdateAsync(existing);
+                }
+                else
+                {
+                    await _planRepository.AddAsync(new ChatMessagePlan
+                    {
+                        RunId = runId,
+                        MessageId = messageId,
+                        PlanId = planId,
+                        Title = title,
+                        Description = description,
+                        Output = output ?? "",
+                        Status = status
+                    });
+                }
+            }
+            catch
+            {
+
+            }
+            
+        }
+        #endregion
     }
 }
