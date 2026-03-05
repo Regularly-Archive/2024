@@ -6,7 +6,12 @@ namespace PostgreSQL.Embedding.Infrastructure.Sandbox;
 public class SandboxOptions
 {
     /// <summary>
-    /// Docker 可执行文件路径
+    /// Docker 端点 URI（默认：Linux 下使用 unix:///var/run/docker.sock，Windows 下使用 npipe:////./pipe/docker_engine）
+    /// </summary>
+    public string DockerUri { get; set; } = "";
+
+    /// <summary>
+    /// Docker 可执行文件路径（CLI 备用）
     /// </summary>
     public string DockerPath { get; set; } = "docker";
 

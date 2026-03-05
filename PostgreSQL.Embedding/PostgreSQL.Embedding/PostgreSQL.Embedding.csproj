@@ -102,6 +102,7 @@
 	  <PackageReference Include="Anthropic.SDK" Version="5.10.0" />
 	  <PackageReference Include="Castle.Core" Version="5.1.1" />
 	  <PackageReference Include="CSnakes.Runtime" Version="1.2.0" />
+    <PackageReference Include="Docker.DotNet" Version="3.125.15" />
     <PackageReference Include="jieba.NET" Version="0.42.2" />
     <PackageReference Include="LLamaSharp" Version="0.23.0" />
     <PackageReference Include="LLamaSharp.Backend.Cpu" Version="0.23.0" />
