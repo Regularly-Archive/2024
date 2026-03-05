@@ -1,10 +1,10 @@
+using Docker.DotNet;
+using Docker.DotNet.Models;
+using DocumentFormat.OpenXml.Drawing.Charts;
+using Microsoft.Extensions.Options;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
-using Docker.DotNet;
-using Docker.DotNet.Models;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace PostgreSQL.Embedding.Infrastructure.Sandbox;
 
@@ -34,6 +34,8 @@ public class DockerContainerManager
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 // 使用 TCP 连接 WSL2 里的 Docker (需要先在 WSL2 里运行 socat)
+                // sudo apt install socat
+                // sudo socat TCP - LISTEN:2375,fork UNIX-CONNECT:/ var / run / docker.sock &
                 dockerUri = "tcp://localhost:2375";
             }
             else
