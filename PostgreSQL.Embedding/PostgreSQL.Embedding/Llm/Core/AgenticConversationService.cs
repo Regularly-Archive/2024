@@ -179,6 +179,7 @@ namespace PostgreSQL.Embedding.Llm.Core
 
                 // 3. Planning phase - emit planning events
                 var subtasks = await EmitPlanningEventsAsync(request, input, conversationId, messageId, writer, blockTracker, ct);
+                if (!subtasks.Any()) return;
 
                 // 4. Execute subtasks and emit tool/action events
                 var finalResult = await ExecuteSubTasksAsync(request, input, conversationId, messageId, writer, blockTracker, subtasks.ToList(), ct);
@@ -408,14 +409,14 @@ namespace PostgreSQL.Embedding.Llm.Core
             }, ct);
 
             // content_block_delta - thinking_delta chunks
-            foreach (var chunk in SplitText(thinking, 50))
+            foreach (var chunk in SplitText(thinking, Random.Shared.Next(10, 30)))
             {
                 await writer.WriteAsync(new ContentBlockDeltaEvent
                 {
                     Index = blockIndex,
                     Delta = new ContentBlockDelta { DeltaType = "thinking_delta", Thinking = chunk }
                 }, ct);
-                await Task.Delay(20, ct);
+                await Task.Delay(200, ct);
             }
 
             // content_block_stop - thinking complete
@@ -441,14 +442,14 @@ namespace PostgreSQL.Embedding.Llm.Core
             // Emit final response in chunks
             if (!string.IsNullOrEmpty(result))
             {
-                foreach (var chunk in SplitText(result, 50))
+                foreach (var chunk in SplitText(result, Random.Shared.Next(10, 30)))
                 {
                     await writer.WriteAsync(new ContentBlockDeltaEvent
                     {
                         Index = blockIndex,
                         Delta = new ContentBlockDelta { DeltaType = "text_delta", Text = chunk }
                     }, ct);
-                    await Task.Delay(20, ct);
+                    await Task.Delay(200, ct);
                 }
             }
 
@@ -470,7 +471,7 @@ namespace PostgreSQL.Embedding.Llm.Core
         private static string ExtractActionName(string title)
         {
             var actionName = title.Split('|', StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
-            return actionName.Replace("Plugin", "");
+            return actionName;
         }
         private static double ExtractDuration(string description)
         {
