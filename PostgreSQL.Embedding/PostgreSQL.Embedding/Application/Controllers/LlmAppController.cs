@@ -4,6 +4,7 @@ using PostgreSQL.Embedding.Domain.Models.Plugin;
 using PostgreSQL.Embedding.Domain.Models.WebApi;
 using PostgreSQL.Embedding.Domain.Models.WebApi.QuerableFilters;
 using PostgreSQL.Embedding.Infrastructure.DataAccess;
+using PostgreSQL.Embedding.Infrastructure.Text2DB;
 using PostgreSQL.Embedding.Llm.Abstractions;
 using PostgreSQL.Embedding.Llm.Services;
 using SqlSugar;
@@ -22,6 +23,7 @@ namespace PostgreSQL.Embedding.Application.Controllers.Controllers
         private readonly IRepository<LlmAppPluginParameter> _llmAppPluginParameterRepository;
         private readonly IRepository<LlmAppSkill> _llmAppSkillRepository;
         private readonly ISkillService _skillService;
+        private readonly IRepository<DataSource> _dataSourceRepository;
         public LlmAppController(
             ILlmPluginService llmPluginService,
             CrudBaseService<LlmApp> crudBaseService,
@@ -31,6 +33,7 @@ namespace PostgreSQL.Embedding.Application.Controllers.Controllers
             IRepository<KnowledgeBase> knowledgeBaseRepository,
             IRepository<LlmApp> llmAppRepository,
             IRepository<LlmAppSkill> llmAppSkillRepository,
+            IRepository<DataSource> dataSourceRepository,
             ISkillService skillService
             ) : base(crudBaseService)
         {
@@ -42,6 +45,7 @@ namespace PostgreSQL.Embedding.Application.Controllers.Controllers
             _pluginService = llmPluginService;
             _llmAppSkillRepository = llmAppSkillRepository;
             _skillService = skillService;
+            _dataSourceRepository = dataSourceRepository;
         }
 
         [HttpGet("{id}/knowledges")]
@@ -287,6 +291,88 @@ namespace PostgreSQL.Embedding.Application.Controllers.Controllers
         {
             await _skillService.DeleteSkillAsync(appId, skillId);
             return ApiResult.Success<object>(null);
+        }
+
+        #endregion
+
+        #region DataSources
+
+        [HttpGet("{appId}/datasources/paginate")]
+        public async Task<JsonResult> GetDataSourcesByApp(long appId, int pageIndex = 1, int pageSize = 10)
+        {
+            var totalCount = await _dataSourceRepository.CountAsync(x => x.AppId == appId);
+            var dataSources = await _dataSourceRepository.PaginateAsync(x => x.AppId == appId, pageIndex, pageSize);
+            return ApiResult.Success(new PagedResult<DataSource> { Rows = dataSources, TotalCount = totalCount });
+        }
+
+        [HttpGet("{appId}/datasources")]
+        public async Task<JsonResult> GetDataSourcesByApp(long appId)
+        {
+            var dataSources = await _dataSourceRepository.FindListAsync(x => x.AppId == appId && x.IsEnabled == true);
+            return ApiResult.Success(dataSources);
+        }
+
+        [HttpGet("{appId}/datasources/{id}")]
+        public async Task<JsonResult> GetDataSourceById(long appId, long id)
+        {
+            var dataSource = await _dataSourceRepository.FindAsync(x => x.Id == id && x.AppId == appId);
+            return ApiResult.Success(dataSource);
+        }
+
+        [HttpPost("{appId}/datasources")]
+        public async Task<JsonResult> AddDataSource(long appId, [FromBody] DataSource dataSource)
+        {
+            dataSource.AppId = appId;
+            dataSource.IsEnabled = true;
+            await _dataSourceRepository.AddAsync(dataSource);
+            return ApiResult.Success(dataSource);
+        }
+
+        [HttpPut("{appId}/datasources/{id}")]
+        public async Task<JsonResult> UpdateDataSource(long appId, long id, [FromBody] DataSource dataSource)
+        {
+            var existing = await _dataSourceRepository.FindAsync(x => x.Id == id && x.AppId == appId);
+            if (existing == null)
+            {
+                return ApiResult.Failure("数据源不存在");
+            }
+
+            existing.Name = dataSource.Name;
+            existing.Type = dataSource.Type;
+            existing.ConnectionString = dataSource.ConnectionString;
+            existing.Description = dataSource.Description;
+
+            await _dataSourceRepository.UpdateAsync(existing);
+            return ApiResult.Success(existing);
+        }
+
+        [HttpDelete("{appId}/datasources/{id}")]
+        public async Task<JsonResult> DeleteDataSource(long appId, long id)
+        {
+            var dataSource = await _dataSourceRepository.FindAsync(x => x.Id == id && x.AppId == appId);
+            if (dataSource == null)
+            {
+                return ApiResult.Failure("数据源不存在");
+            }
+
+            await _dataSourceRepository.DeleteAsync(x => x.Id == id && x.AppId == appId);
+            return ApiResult.Success<object>(null);
+        }
+
+        [HttpPut("{appId}/datasources/{id}/toggle")]
+        public async Task<JsonResult> ToggleDataSource(long appId, long id)
+        {
+            var dataSource = await _dataSourceRepository.FindAsync(x => x.Id == id && x.AppId == appId);
+            if (dataSource == null)
+            {
+                return ApiResult.Failure("数据源不存在");
+            }
+
+            dataSource.IsEnabled = !dataSource.IsEnabled;
+            dataSource.UpdatedAt = DateTime.UtcNow;
+
+            await _dataSourceRepository.UpdateAsync(dataSource);
+            return ApiResult.Success(dataSource);
         }
 
         #endregion

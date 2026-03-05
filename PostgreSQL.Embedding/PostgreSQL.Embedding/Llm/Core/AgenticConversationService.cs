@@ -54,6 +54,9 @@ namespace PostgreSQL.Embedding.Llm.Core
         private readonly IOptions<SandboxOptions> _sandboxOptions;
         private readonly CitationService _citationService;
 
+        // Database operation lock to prevent concurrent access issues
+        private readonly SemaphoreSlim _dbLock = new(1, 1);
+
         // Repositories for trace persistence (lazy loaded)
         private IRepository<ChatMessageReasoning>? _reasoningRepository;
         private IRepository<ChatMessageToolCall>? _toolCallRepository;
@@ -366,10 +369,10 @@ namespace PostgreSQL.Embedding.Llm.Core
                         Status = MapPlanStatus(stepTrace.Status)
                     }, ct);
                     await SavePlanAsync(
-                        int.Parse(stepTrace.Id), 
-                        stepTrace.Title, 
-                        stepTrace.Description, 
-                        stepTrace.Content, 
+                        int.Parse(stepTrace.Id),
+                        stepTrace.Title,
+                        stepTrace.Description,
+                        stepTrace.Content,
                         (int)MapTaskState(stepTrace.Status)
                     );
                     break;
@@ -527,12 +530,22 @@ namespace PostgreSQL.Embedding.Llm.Core
         /// </summary>
         private async Task SaveReasoningAsync(string content)
         {
-            await _reasoningRepository.AddAsync(new ChatMessageReasoning
+            if (string.IsNullOrEmpty(content)) return;
+
+            await _dbLock.WaitAsync();
+            try
             {
-                RunId = _agentExecutionContext.GetRunId(),
-                MessageId = _agentExecutionContext.GetMessageId(),
-                Content = content
-            });
+                await _reasoningRepository.AddAsync(new ChatMessageReasoning
+                {
+                    RunId = _agentExecutionContext.GetRunId(),
+                    MessageId = _agentExecutionContext.GetMessageId(),
+                    Content = content
+                });
+            }
+            finally
+            {
+                _dbLock.Release();
+            }
         }
 
         /// <summary>
@@ -540,18 +553,26 @@ namespace PostgreSQL.Embedding.Llm.Core
         /// </summary>
         private async Task<long> SaveToolCallAsync(string name, Dictionary<string, object>? input, string? output, int status, long? durationMs)
         {
-            var toolCall = await _toolCallRepository.AddAsync(new ChatMessageToolCall
+            await _dbLock.WaitAsync();
+            try
             {
-                RunId = _agentExecutionContext.GetRunId(),
-                MessageId = _agentExecutionContext.GetMessageId(),
-                Name = name,
-                Input = input,
-                Output = output,
-                Status = status,
-                DurationMs = durationMs
-            });
+                var toolCall = await _toolCallRepository.AddAsync(new ChatMessageToolCall
+                {
+                    RunId = _agentExecutionContext.GetRunId(),
+                    MessageId = _agentExecutionContext.GetMessageId(),
+                    Name = name,
+                    Input = input,
+                    Output = output,
+                    Status = status,
+                    DurationMs = durationMs
+                });
 
-            return toolCall.Id;
+                return toolCall.Id;
+            }
+            finally
+            {
+                _dbLock.Release();
+            }
         }
 
         /// <summary>
@@ -559,11 +580,12 @@ namespace PostgreSQL.Embedding.Llm.Core
         /// </summary>
         private async Task SavePlanAsync(int planId, string title, string description, string? output, int status)
         {
-            var runId = _agentExecutionContext.GetRunId();
-            var messageId = _agentExecutionContext.GetMessageId();
-
+            await _dbLock.WaitAsync();
             try
             {
+                var runId = _agentExecutionContext.GetRunId();
+                var messageId = _agentExecutionContext.GetMessageId();
+
                 var existing = await _planRepository.FindAsync(x => x.RunId == runId && x.MessageId == messageId && x.PlanId == planId);
                 if (existing != null)
                 {
@@ -587,11 +609,10 @@ namespace PostgreSQL.Embedding.Llm.Core
                     });
                 }
             }
-            catch
+            finally
             {
-
+                _dbLock.Release();
             }
-            
         }
         #endregion
     }

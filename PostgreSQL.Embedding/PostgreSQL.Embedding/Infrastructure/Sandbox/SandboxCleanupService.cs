@@ -53,7 +53,7 @@ public class SandboxCleanupService : BackgroundService
     /// </summary>
     private async Task CleanupExpiredSessionsAsync(CancellationToken cancellationToken)
     {
-        var expiredSessions = _sandboxService.GetExpiredSessions().ToList();
+        var expiredSessions = await _sandboxService.GetExpiredSessionsAsync();
 
         if (expiredSessions.Count == 0)
         {
@@ -92,16 +92,16 @@ public class SandboxCleanupService : BackgroundService
     {
         _logger.LogInformation("Sandbox cleanup service stopping, disposing all sessions...");
 
-        var sessions = _sandboxService.GetAllSessions();
-        foreach (var kvp in sessions)
+        var sessions = await _sandboxService.GetAllSessionsAsync();
+        foreach (var session in sessions)
         {
             try
             {
-                await _sandboxService.DisposeSessionAsync(kvp.Key, cancellationToken);
+                await _sandboxService.DisposeSessionAsync(session.SessionId, cancellationToken);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to dispose session {SessionId} on shutdown", kvp.Key);
+                _logger.LogError(ex, "Failed to dispose session {SessionId} on shutdown", session.SessionId);
             }
         }
 

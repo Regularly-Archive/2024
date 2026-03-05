@@ -11,6 +11,7 @@ using PostgreSQL.Embedding.Llm.Planners;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
 using System.IO.Compression;
+using System.Linq;
 using System.Text;
 
 namespace PostgreSQL.Embedding.Plugins.BuiltIn;
@@ -234,7 +235,7 @@ public class ArtifactsPlugin : BasePlugin
         {
             ArtifactId = Path.GetFileNameWithoutExtension(filePath),
             FileName = fileName,
-            AccessUrl = GetAccessUrl(kernel, fileName),
+            AccessUrl = GetArtifactAccessUrl(kernel, fileName),
             ExpiresAt = DateTime.UtcNow.AddDays(3),
             Type = type,
             CanPreview = canPreview,
@@ -269,7 +270,7 @@ public class ArtifactsPlugin : BasePlugin
         {
             ArtifactId = Path.GetFileNameWithoutExtension(fileName),
             FileName = fileName,
-            AccessUrl = GetAccessUrl(kernel, fileName),
+            AccessUrl = GetArtifactAccessUrl(kernel, fileName),
             ExpiresAt = DateTime.UtcNow.AddDays(3),
             Type = type,
             CanPreview = canPreview,
@@ -301,7 +302,7 @@ public class ArtifactsPlugin : BasePlugin
         {
             ArtifactId = Path.GetFileNameWithoutExtension(fileName),
             FileName = fileName,
-            AccessUrl = GetAccessUrl(kernel, fileName),
+            AccessUrl = GetArtifactAccessUrl(kernel, fileName),
             ExpiresAt = DateTime.UtcNow.AddDays(3),
             Type = ArtifactType.Directory,
             CanPreview = false,
@@ -342,7 +343,7 @@ public class ArtifactsPlugin : BasePlugin
         {
             ArtifactId = Path.GetFileNameWithoutExtension(fileName),
             FileName = actualFileName,
-            AccessUrl = GetAccessUrl(kernel, actualFileName),
+            AccessUrl = GetArtifactAccessUrl(kernel, actualFileName),
             ExpiresAt = DateTime.UtcNow.AddDays(3),
             Type = artifactType.type,
             CanPreview = artifactType.canPreview,
@@ -413,6 +414,7 @@ public class ArtifactsPlugin : BasePlugin
         {
             RunId = agentExecutionContext.GetRunId(),
             MessageId = agentExecutionContext.GetMessageId(),
+            ConversationId = agentExecutionContext.GetConversationId(),
             ArtifactId = response.ArtifactId,
             FileName = response.FileName,
             ArtifactType = (int)response.Type,
@@ -448,105 +450,47 @@ public class ArtifactsPlugin : BasePlugin
     /// 读取文本类型的 Artifact 内容
     /// </summary>
     [KernelFunction]
-    [Description("通过 artifactId 或 URL 读取文本类型 Artifact 的内容。支持的格式：文本、Markdown、代码、HTML、JSON、CSV、SQL 结果。")]
+    [Description("通过 ArtifactId 读取文本类型 Artifact 的内容。支持的格式：文本、Markdown、代码、HTML、JSON、CSV、SQL 结果。")]
     public async Task<string> ReadArtifactAsync(
-        [Description("ArtifactId 或者 AccessUrl 或者 FileName")] string artifactIdOrUrl,
+        [Description("ArtifactId")] string artifactId,
         Kernel kernel)
     {
-        var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
-        string? filePath = null;
+        // 从数据库查询 Artifact
+        var artifact = await _artifactRepository.FindAsync(x => x.ArtifactId == artifactId || x.FileName == artifactId);
+        if (artifact == null)
+            throw new ArgumentException($"The Artifact not found: {artifactId}");
 
-        if (artifactIdOrUrl.StartsWith("/api/statics/") || artifactIdOrUrl.StartsWith("http://") || artifactIdOrUrl.StartsWith("https://"))
-        {
-            var fileName = ExtractFileNameFromUrl(artifactIdOrUrl);
-            if (string.IsNullOrEmpty(fileName))
-                throw new ArgumentException($"Unable to parse the URL: {artifactIdOrUrl}");
-
-            filePath = Path.Combine(sandboxContext.ArtifactsDir, fileName);
-        }
-        else
-        {
-            filePath = FindFileByArtifactId(sandboxContext.ArtifactsDir, artifactIdOrUrl);
-        }
-
-        if (string.IsNullOrEmpty(filePath))
-            throw new ArgumentException($"Unable to locate the artifact: {artifactIdOrUrl}");
-
+        var filePath = GetArtifactFilePath(kernel, artifact.RunId, artifact.FileName);
         if (!File.Exists(filePath))
-            throw new ArgumentException($"Unable to locate the artifact: {artifactIdOrUrl}");
+            throw new ArgumentException($"The Artifact not found: {artifactId}");
 
         return await File.ReadAllTextAsync(filePath);
     }
 
-    private static string? ExtractFileNameFromUrl(string url)
-    {
-        try
-        {
-            if (url.StartsWith("/api/statics/"))
-            {
-                var parts = url.Split('/');
-                if (parts.Length >= 6)
-                {
-                    return parts[^1];
-                }
-            }
-            else if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
-            {
-                return Uri.UnescapeDataString(uri.Segments.LastOrDefault() ?? "");
-            }
-        }
-        catch
-        {
-            return string.Empty;
-        }
-
-        return string.Empty;
-    }
-
-    private static string? FindFileByArtifactId(string artifactsDir, string artifactId)
-    {
-        if (!Directory.Exists(artifactsDir))
-            return null;
-
-        foreach (var file in Directory.EnumerateFiles(artifactsDir))
-        {
-            var (fileName, baseName) = (Path.GetFileName(file), Path.GetFileNameWithoutExtension(file));
-            if (baseName.Equals(artifactId, StringComparison.OrdinalIgnoreCase) ||
-                fileName.Equals(artifactId, StringComparison.OrdinalIgnoreCase))
-            {
-                return file;
-            }
-        }
-
-        return null;
-    }
-
     [KernelFunction]
-    [Description("列出当前运行会话中的所有 Artifact，返回访问 URL 列表。")]
-    public IEnumerable<ArtifactResponse> ListArtifacts(Kernel kernel)
+    [Description("列出当前会话中的所有 Artifact，返回访问 URL 列表。")]
+    public async Task<IEnumerable<ArtifactResponse>> ListArtifacts(Kernel kernel)
     {
-        var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
+        var agentExecutionContext = kernel.GetAgentExecutionContext();
+        var conversationId = agentExecutionContext.GetConversationId();
 
-        if (!Directory.Exists(sandboxContext.ArtifactsDir))
-            yield break;
+        // 从数据库查询当前会话的所有 Artifact
+        var artifacts = await _artifactRepository.FindListAsync(x => x.ConversationId == conversationId);
 
-        foreach (var file in Directory.EnumerateFiles(sandboxContext.ArtifactsDir, "*", SearchOption.TopDirectoryOnly))
+        return artifacts.Select(artifact => new ArtifactResponse
         {
-            var fileName = Path.GetFileName(file);
-            var fileInfo = new FileInfo(file);
-            var artifactId = Path.GetFileNameWithoutExtension(fileName);
-            yield return new ArtifactResponse
-            {
-                ArtifactId = artifactId,
-                FileName = fileName,
-                AccessUrl = GetAccessUrl(kernel, fileName),
-                ExpiresAt = DateTime.UtcNow.AddDays(3),
-                FileSize = fileInfo.Length
-            };
-        }
+            ArtifactId = artifact.ArtifactId,
+            FileName = artifact.FileName,
+            AccessUrl = artifact.Url ?? "",
+            ExpiresAt = DateTime.UtcNow.AddDays(3),
+            Type = (ArtifactType)artifact.ArtifactType,
+            CanPreview = artifact.CanPreview,
+            CanDownload = artifact.CanDownload,
+            FileSize = artifact.FileSize
+        });
     }
 
-    private string GetAccessUrl(Kernel kernel, string fileName)
+    private string GetArtifactAccessUrl(Kernel kernel, string fileName)
     {
         var agentExecutionContext = kernel.GetAgentExecutionContext();
         var currentUser = _currentUserService.GetCurrentIdentityAsync().GetAwaiter().GetResult();
@@ -558,6 +502,12 @@ public class ArtifactsPlugin : BasePlugin
         var relativeUrl = $"/api/statics/{currentUser.Id}/{appId}/conversations/{conversationId}/runs/{runId}/artifacts/{fileName}";
         var baseUrl = GetBaseUrl();
         return string.IsNullOrEmpty(baseUrl) ? relativeUrl : $"{baseUrl}{relativeUrl}";
+    }
+
+    private string GetArtifactFilePath(Kernel kernel, string runId, string fileName)
+    {
+        var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
+        return Path.Combine(sandboxContext.SessionDir, "runs", runId, "artifacts", fileName);
     }
 
 

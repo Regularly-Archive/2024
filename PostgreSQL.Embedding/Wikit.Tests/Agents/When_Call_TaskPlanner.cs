@@ -109,7 +109,7 @@ namespace Wikit.Tests.Agents
                 planner.AddVariable("currentTime", DateTime.Now);
 
                 var plan = await planner.CreatePlanAsync();
-                plan.OnStepExecute += (trace) => Console.WriteLine(JsonConvert.SerializeObject(trace));
+                plan.OnStepExecute += (trace) => Task.Run(() => Console.WriteLine(JsonConvert.SerializeObject(trace)));
                 var kernelResult = await plan.ExecuteAsync(subTask.Description);
 
                 subTask.ExecuteResult = kernelResult;

@@ -94,7 +94,7 @@ namespace PostgreSQL.Embedding.Llm.Routers
 
                 var payload = new
                 {
-                    model = dynamicObject["model"].Value<string>(),
+                    model = dynamicObject.ContainsKey("model") ? dynamicObject["model"].Value<string>() : "",
                     messages = messageList,
                     stream = dynamicObject.ContainsKey("stream") ? dynamicObject["stream"] : false,
                 };

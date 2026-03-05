@@ -11,7 +11,7 @@ using System.ComponentModel;
 
 namespace PostgreSQL.Embedding.Plugins.BuiltIn
 {
-    [KernelPlugin(Description = "加载 JSON 数据并使用 Python 进行数据分析和可视化生成。分析结果和代码会通过 Artifacts 事件返回以便展示图表。", Version = "1.1")]
+    [KernelPlugin(Description = "加载 JSON 数据并使用 Python 进行数据分析和可视化生成。分析结果和代码会通过 Artifacts 事件返回以便展示图表。", Version = "1.1", Enabled = false)]
     public class DataAnalysisPlugin : BasePlugin
     {
         private readonly PromptTemplateService _promptTemplateService;

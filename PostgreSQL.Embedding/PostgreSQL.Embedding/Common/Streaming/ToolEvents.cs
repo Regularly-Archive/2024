@@ -46,28 +46,6 @@ public class PlanningEvent : ISseEvent
 }
 
 /// <summary>
-/// Reasoning event - internal thought/reasoning process
-/// Maps to StepTrace.Type == "Thought"
-/// </summary>
-public class ReasoningEvent : ISseEvent
-{
-    [JsonPropertyName("type")]
-    public string Type => "reasoning";
-
-    [JsonPropertyName("id")]
-    public string Id { get; set; } = Guid.NewGuid().ToString("N");
-
-    [JsonPropertyName("question")]
-    public string? Question { get; set; }
-
-    [JsonPropertyName("content")]
-    public string Content { get; set; } = "";
-
-    [JsonPropertyName("status")]
-    public string Status { get; set; } = "success";
-}
-
-/// <summary>
 /// Tool result event - result from tool execution
 /// </summary>
 public class ToolResultEvent : ISseEvent
