@@ -21,7 +21,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
         private readonly Kernel _kernel;
         private readonly CitationService _citationService;
 
-        public Action<StepTrace> OnStepChanged { get; set; }
+        public Func<StepTrace, Task> OnStepChanged { get; set; }
 
         public DAGraphExecutor(string query, List<SubTask> subTasks, StepwisePlanner stepwisePlanner, Kernel kernel, CitationService citationService)
         {
@@ -63,7 +63,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             _agentExecutionContext.SetStepId(subTask.Id.ToString());
             if (subTask.State == TaskState.Completed && !subTask.AvailableTools.Any())
             {
-                OnStepChanged?.Invoke(subTask.AsStepTrace(_agentExecutionContext.GetMessageId()));
+                await OnStepChanged?.Invoke(subTask.AsStepTrace(_agentExecutionContext.GetMessageId()));
                 return;
             }
 
@@ -73,11 +73,11 @@ namespace PostgreSQL.Embedding.Llm.Planners
 
             plan.OnStepExecute = async (stepTrace) =>
             {
-                OnStepChanged?.Invoke(stepTrace);
+                await OnStepChanged?.Invoke(stepTrace);
             };
 
             subTask.State = TaskState.InProgress;
-            OnStepChanged?.Invoke(subTask.AsStepTrace(_agentExecutionContext.GetMessageId()));
+            await OnStepChanged?.Invoke(subTask.AsStepTrace(_agentExecutionContext.GetMessageId()));
 
             if (!subTask.DependsOn.Any())
             {
@@ -106,7 +106,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 }
             }
 
-            OnStepChanged?.Invoke(subTask.AsStepTrace(_agentExecutionContext.GetMessageId()));
+            await OnStepChanged?.Invoke(subTask.AsStepTrace(_agentExecutionContext.GetMessageId()));
         }
 
         private DAGraph<int> BuildDAGraph(List<SubTask> subTasks)

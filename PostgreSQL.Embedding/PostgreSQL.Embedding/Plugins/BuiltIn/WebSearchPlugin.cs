@@ -1,12 +1,8 @@
-﻿using DocumentFormat.OpenXml.Office.SpreadSheetML.Y2023.MsForms;
-using Google.Protobuf.WellKnownTypes;
-using LLama.Batched;
+﻿using Anthropic.SDK.Messaging;
 using Microsoft.SemanticKernel;
 using Newtonsoft.Json;
-using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Extensions;
-using PostgreSQL.Embedding.Domain.Models;
 using PostgreSQL.Embedding.Domain.Models.RAG;
 using PostgreSQL.Embedding.Domain.Models.Search;
 using PostgreSQL.Embedding.Llm.Abstractions;
@@ -23,10 +19,6 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
     [KernelPlugin(Description = "通过网络搜索引擎获取实时信息。支持多种搜索引擎：Bing、Brave、JinaAI、博查、SerpApi、DuckDuckGo。搜索结果可通过 Artifacts 事件展示。", Version = "1.1")]
     public class WebSearchPlugin : BasePlugin
     {
-        private Regex _regexCitations = new Regex(@"\[(\d+)\]");
-        private const string FINAL_ANSWER_TAG = "[FINAL_ANSWER]";
-
-
         public WebSearchPlugin(IServiceProvider serviceProvider)
             : base(serviceProvider)
         {
@@ -38,9 +30,8 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         public async Task<string> RunAsync(
             Kernel kernel,
             [Description("搜索关键词或问题")] string keyword,
-            [Description("搜索引擎名称，可选值：Bing、Brave、JinaAI、BoCha、SerpApi、DuckDuckGo, WeChat，默认为 Bing")] string searchEngine = "Bing",
+            [Description("搜索引擎名称，可选值：Bing、Brave、JinaAI、BoCha、SerpApi、DuckDuckGo, WeChat, Tavily，默认为 Bing")] string searchEngine = "Bing",
             [Description("要包含的域名，使用英文逗号分隔，如：zhihu.com,baidu.com")] string includeDomain = "",
-            [Description("是否在 Artifacts 中展示搜索结果列表，默认为 false")] bool showSearchResult = false,
             [Description("是否直接生成答案（启用 RAG 模式），默认为 false")] bool onlyReturnAnswer = false
         )
         {
@@ -51,7 +42,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
 
             var searchResult = await serviceEngine.SearchAsync(keyword, filterDomain: includeDomain);
 
-            if (onlyReturnAnswer)
+            if (onlyReturnAnswer && searchEngine.ToLower() != "tavily")
             {
                 var memoryService = _serviceProvider.GetService<IMemoryService>();
                 var chatHistoryService = _serviceProvider.GetService<IChatHistoriesService>();
@@ -63,6 +54,15 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
 
                 kernel.GetAgentExecutionContext().AddCitations(ragResult.AnswerSources);
                 return ragResult.PlainAnswer;
+            }
+            else if (onlyReturnAnswer && searchEngine.ToLower() == "tavily")
+            {
+                var answer = searchResult.Entries.FirstOrDefault(x => x.Title == "AI_Summary").Snippet;
+                searchResult.Entries = searchResult.Entries.Where(x => x.Title != "AI_Summary").ToList();
+                var citations = GetCitationsFromSearchEngine(searchResult);
+
+                kernel.GetAgentExecutionContext().AddCitations(citations);
+                return answer;
             }
 
             return JsonConvert.SerializeObject(searchResult);
@@ -95,6 +95,8 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
                     return serviceProvider.GetRequiredService<DuckDuckGoSearchPlugin>() as ISearchEngine;
                 case "wechat":
                     return serviceProvider.GetRequiredService<WeiXinSearchPlugin>() as ISearchEngine;
+                case "tavily":
+                    return serviceProvider.GetRequiredService<TavilySearchPlugin>() as ISearchEngine;
                 default:
                     return serviceProvider.GetRequiredService<BingSearchPlugin>() as ISearchEngine;
             }

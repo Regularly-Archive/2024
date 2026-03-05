@@ -32,6 +32,7 @@ public class DockerContainerManager
         Dictionary<string, string> volumeMappings,
         CancellationToken cancellationToken = default)
     {
+        var totalStopwatch = Stopwatch.StartNew();
         var containerId = $"{sessionId}-container";
 
         // 构建 CPU 限制参数
@@ -45,22 +46,28 @@ public class DockerContainerManager
             : "";
 
         // 检查容器是否已存在
+        var sw = Stopwatch.StartNew();
         var inspectResult = await RunDockerCommandAsync(
             $"inspect {containerId}",
             cancellationToken: cancellationToken);
+        _logger.LogInformation("[Docker] Inspect container: {ElapsedMs}ms", sw.ElapsedMilliseconds);
 
         if (inspectResult.ExitCode == 0)
         {
             // 容器已存在，先删除
+            sw.Restart();
             await RunDockerCommandAsync(
                 $"rm -f {containerId}",
                 cancellationToken: cancellationToken);
+            _logger.LogInformation("[Docker] Remove existing container: {ElapsedMs}ms", sw.ElapsedMilliseconds);
         }
 
         // 拉取镜像（如果需要）
+        sw.Restart();
         await RunDockerCommandAsync(
             $"pull {_options.DefaultImage}",
             cancellationToken: cancellationToken);
+        _logger.LogInformation("[Docker] Pull image: {ElapsedMs}ms", sw.ElapsedMilliseconds);
 
         var volumeArgs = volumeMappings
             .Select(kv => $"-v {kv.Key}:{kv.Value}");
@@ -73,16 +80,20 @@ public class DockerContainerManager
             $"--workdir {_options.WorkingDirectory} " +
             $"{_options.DefaultImage} sleep infinity";
 
+        sw.Restart();
         var createResult = await RunDockerCommandAsync(
             createCommand,
             cancellationToken: cancellationToken);
+        _logger.LogInformation("[Docker] Create and start container: {ElapsedMs}ms", sw.ElapsedMilliseconds);
 
         if (createResult.ExitCode != 0)
         {
             throw new InvalidOperationException($"Failed to create container: {createResult.Stderr}");
         }
 
-        _logger.LogInformation("Container {ContainerId} started for session {SessionId}", containerId, sessionId);
+        totalStopwatch.Stop();
+        _logger.LogInformation("Container {ContainerId} started for session {SessionId}, total time: {TotalMs}ms",
+            containerId, sessionId, totalStopwatch.ElapsedMilliseconds);
 
         return containerId;
     }
@@ -95,13 +106,20 @@ public class DockerContainerManager
         string command,
         CancellationToken cancellationToken = default)
     {
+        var sw = Stopwatch.StartNew();
         var escapedCommand = command.Replace("\"", "\\\"");
         var execCommand = $"exec {containerId} sh -c \"{escapedCommand}\"";
 
-        return await RunDockerCommandAsync(
+        var result = await RunDockerCommandAsync(
             execCommand,
             _options.CommandTimeout,
             cancellationToken);
+
+        sw.Stop();
+        _logger.LogInformation("[Docker] Execute command in {ContainerId}: {ElapsedMs}ms, exitCode={ExitCode}",
+            containerId, sw.ElapsedMilliseconds, result.ExitCode);
+
+        return result;
     }
 
     /// <summary>
@@ -111,11 +129,11 @@ public class DockerContainerManager
     {
         try
         {
+            var sw = Stopwatch.StartNew();
             await RunDockerCommandAsync(
                 $"rm -f {containerId}",
                 cancellationToken: cancellationToken);
-
-            _logger.LogInformation("Container {ContainerId} disposed", containerId);
+            _logger.LogInformation("[Docker] Dispose container {ContainerId}: {ElapsedMs}ms", containerId, sw.ElapsedMilliseconds);
         }
         catch (Exception ex)
         {
@@ -128,11 +146,13 @@ public class DockerContainerManager
     /// </summary>
     public async Task<bool> IsContainerRunningAsync(string containerId, CancellationToken cancellationToken = default)
     {
+        var sw = Stopwatch.StartNew();
         var result = await RunDockerCommandAsync(
             $"inspect -f '{{{{.State.Running}}}}' {containerId}",
             cancellationToken: cancellationToken);
+        _logger.LogInformation("[Docker] IsContainerRunning: {ElapsedMs}ms", sw.ElapsedMilliseconds);
 
-        return result.ExitCode == 0 && result.Stdout.Replace("\n","").Trim() == "'true'";
+        return result.ExitCode == 0 && result.Stdout.Replace("\n","").Trim().IndexOf("true") != -1;
     }
 
     /// <summary>

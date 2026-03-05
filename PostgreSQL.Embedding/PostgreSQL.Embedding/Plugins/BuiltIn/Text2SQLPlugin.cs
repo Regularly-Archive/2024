@@ -1,209 +1,199 @@
-﻿using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel;
+using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common;
 using PostgreSQL.Embedding.Common.Attributes;
+using PostgreSQL.Embedding.Domain.Entities;
 using PostgreSQL.Embedding.Domain.Models;
 using PostgreSQL.Embedding.Domain.Models.Plugin;
+using PostgreSQL.Embedding.Infrastructure.DataAccess;
+using PostgreSQL.Embedding.Infrastructure.Text2DB;
 using PostgreSQL.Embedding.Llm.Services;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using SqlSugar;
 using System.ComponentModel;
-using System.Text;
 
 namespace PostgreSQL.Embedding.Plugins.BuiltIn
 {
-    [KernelPlugin(Description = "将自然语言转换为 SQL 查询语句并在 MySQL 数据库中执行，返回 Markdown 表格格式的查询结果", Version = "1.2")]
+    [KernelPlugin(Description = "将自然语言转换为 SQL 查询语句并在关系型数据库（MySQL/PostgreSQL/SQLServer等）中执行，返回 Markdown 表格格式的查询结果", Version = "2.0")]
     public class Text2SQLPlugin : BasePlugin
     {
-        private IServiceProvider _serviceProvider;
-        private ConnectionConfig _connectionConfig;
-        private PromptTemplateService _promptTemplateService;
-        private ILogger<Text2SQLPlugin> _logger;
+        private readonly IServiceProvider _serviceProvider;
+        private readonly Text2DBService _text2DbService;
+        private readonly PromptTemplateService _promptTemplateService;
+        private readonly ILogger<Text2SQLPlugin> _logger;
 
-        [PluginParameter(Description = "MySQL 数据库连接字符串", Required = true)]
-        public string ConnectionString { get; set; }
+        /// <summary>
+        /// 支持的关系型数据库类型
+        /// </summary>
+        private static readonly DataSourceType[] SupportedTypes =
+        {
+            DataSourceType.MySQL,
+            DataSourceType.PostgreSQL,
+            DataSourceType.SQLServer,
+            DataSourceType.Oracle,
+            DataSourceType.SQLite,
+            DataSourceType.DuckDB
+        };
 
-        [PluginParameter(Description = "要查询的数据库名称", Required = true)]
-        public string Database { get; set; }
-
-        public Text2SQLPlugin(IServiceProvider serviceProvider) : base(serviceProvider)
+        public Text2SQLPlugin(
+            IServiceProvider serviceProvider,
+            Text2DBService text2DbService,
+            PromptTemplateService promptTemplateService) : base(serviceProvider)
         {
             _serviceProvider = serviceProvider;
-            _promptTemplateService = _serviceProvider.GetService<PromptTemplateService>();
+            _text2DbService = text2DbService;
+            _promptTemplateService = promptTemplateService;
 
             var loggerFactory = _serviceProvider.GetService<ILoggerFactory>();
             _logger = loggerFactory.CreateLogger<Text2SQLPlugin>();
         }
 
-        public override void Initialize(long appId)
+        /// <summary>
+        /// 根据 DataSource 获取连接配置
+        /// </summary>
+        private async Task<(DataSource DataSource, IDataSourceConnector Connector)> GetConnectorAsync(long dataSourceId)
         {
-            base.Initialize(appId);
-            _connectionConfig = new ConnectionConfig() { DbType = DbType.MySql, ConnectionString = ConnectionString, IsAutoCloseConnection = true };
+            using var scope = _serviceProvider.CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IRepository<DataSource>>();
+
+            var dataSource = await repo.FindAsync(x => x.Id == dataSourceId);
+            if (dataSource == null)
+            {
+                throw new ArgumentException($"DataSource with ID {dataSourceId} not found");
+            }
+
+            if (!SupportedTypes.Contains(dataSource.Type))
+            {
+                throw new ArgumentException($"DataSource type {dataSource.Type} is not supported by Text2SQLPlugin");
+            }
+
+            // 通过 Text2DBService 创建对应类型的 Connector
+            var connector = _text2DbService.CreateConnector(dataSource.Type);
+            await connector.ConnectAsync(dataSource.ConnectionString);
+
+            return (dataSource, connector);
+        }
+
+        [KernelFunction]
+        [Description("查询当前应用下所有可用的关系型数据库（MySQL/PostgreSQL/SQLServer/Oracle/SQLite/DuckDB）数据源")]
+        public async Task<List<DataSourceDto>> ListDataSourcesAsync([Description("所属应用 ID")] long appId)
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IRepository<DataSource>>();
+
+            var dataSources = await repo.FindListAsync(x =>
+                x.AppId == appId &&
+                x.IsEnabled == true &&
+                x.Type != DataSourceType.MongoDB
+            );
+
+            return dataSources.Select(ds => new DataSourceDto
+            {
+                Id = ds.Id,
+                Name = ds.Name,
+                Type = ds.Type,
+                TypeName = GetTypeName(ds.Type),
+                Description = ds.Description,
+                AppId = ds.AppId,
+                IsEnabled = ds.IsEnabled
+            }).ToList();
         }
 
         [KernelFunction]
         [Description("根据用户描述生成并执行 SQL 查询，返回 Markdown 表格形式的查询结果。同时会通过 Artifacts 事件发送原始数据表。")]
-        public async Task<string> QueryAsync([Description("用户想要查询的内容描述")] string input, Kernel kernel)
+        public async Task<string> QueryAsync(
+            [Description("数据源 ID")] long dataSourceId,
+            [Description("用户想要查询的内容描述")] string input,
+            Kernel kernel)
         {
-            var tableDescriptor = await GetTableDescriptorsAsync(Database);
-            var databaseSchema = GeneratorDatabaseSchema(tableDescriptor);
-
-            var promptTemplate = _promptTemplateService.LoadTemplate("Text2SQL.txt");
-            promptTemplate.AddVariable("input", input);
-            promptTemplate.AddVariable("schema", databaseSchema);
-
-            var functionResult = await promptTemplate.InvokeAsync(kernel);
-            var generatedSQL = functionResult.GetValue<string>().Replace("```sql", "").Replace("```", "");
-            _logger.LogInformation("Generated SQL: {0}", generatedSQL);
-
-            var queryResult = await ExecuteSQLAsync(generatedSQL);
-            return queryResult;
-        }
-
-        private async Task<IEnumerable<TableDescriptor>> GetTableDescriptorsAsync(string databaseName)
-        {
-            var sqlText =
-                @"SELECT t.TABLE_NAME,
-                     t.TABLE_COMMENT,
-                     c.COLUMN_NAME,
-                     c.COLUMN_COMMENT,
-                     c.DATA_TYPE,
-                     c.IS_NULLABLE
-                FROM INFORMATION_SCHEMA.TABLES t
-                LEFT JOIN INFORMATION_SCHEMA.COLUMNS c
-                    ON c.TABLE_NAME = t.TABLE_NAME
-                WHERE t.TABLE_SCHEMA = '{0}'";
-
-            using var sqlClient = new SqlSugarClient(_connectionConfig);
-            var rows = await sqlClient.Ado.SqlQueryAsync<dynamic>(string.Format(sqlText, databaseName));
-            if (rows.Count == 0) return Enumerable.Empty<TableDescriptor>();
-
-            return rows.GroupBy(x => x.TABLE_NAME).Select(g =>
+            IDataSourceConnector? connector = null;
+            try
             {
-                return new TableDescriptor()
+                var (dataSource, conn) = await GetConnectorAsync(dataSourceId);
+                connector = conn;
+
+                // 通过 Connector 获取 Schema
+                var schema = await connector.GetSchemaAsync();
+
+                // 构建 Schema 描述
+                var schemaText = BuildSchemaDescription(schema);
+
+                var promptTemplate = _promptTemplateService.LoadTemplate("Text2SQL.txt");
+                promptTemplate.AddVariable("input", input);
+                promptTemplate.AddVariable("schema", schemaText);
+                promptTemplate.AddVariable("dbType", dataSource.Type.ToString());
+
+                var functionResult = await promptTemplate.InvokeAsync(kernel);
+                var generatedSQL = functionResult.GetValue<string>().Replace("```sql", "").Replace("```", "");
+                _logger.LogInformation("Generated SQL: {0}", generatedSQL);
+
+                // 通过 Connector 执行查询
+                var queryResult = await connector.ExecuteQueryAsync(generatedSQL);
+
+                // 通过 Generator 格式化结果
+                var generator = _text2DbService.CreateQueryGenerator(dataSource.Type);
+
+                return JsonConvert.SerializeObject(new
                 {
-                    Name = g.ToList()[0].TABLE_NAME,
-                    Description = g.ToList()[0].TABLE_COMMENT,
-                    Columns = AsColumnDescriptors(g.ToList())
-                };
-            }).ToList();
+                    sql = generatedSQL,
+                    result = JsonConvert.SerializeObject(queryResult.Data),
+                    rowCount = queryResult.RowCount,
+                    executionTimeMs = queryResult.ExecutionTimeMs
+                });
+            }
+            finally
+            {
+                connector?.Dispose();
+            }
         }
 
-        private IEnumerable<ColumnDescriptor> AsColumnDescriptors(List<dynamic> rows)
+        private static string GetTypeName(DataSourceType type)
         {
-            return rows.Select(x => new ColumnDescriptor()
+            return type switch
             {
-                Name = x.COLUMN_NAME,
-                DataType = x.DATA_TYPE,
-                Description = x.COLUMN_COMMENT,
-                IsNullable = x.IS_NULLABLE == "YES"
-            });
+                DataSourceType.MySQL => "MySQL",
+                DataSourceType.PostgreSQL => "PostgreSQL",
+                DataSourceType.SQLServer => "SQL Server",
+                DataSourceType.Oracle => "Oracle",
+                DataSourceType.SQLite => "SQLite",
+                DataSourceType.DuckDB => "DuckDB",
+                DataSourceType.MongoDB => "MongoDB",
+                DataSourceType.Excel => "Excel",
+                DataSourceType.CSV => "CSV",
+                DataSourceType.JSON => "JSON",
+                _ => type.ToString()
+            };
         }
 
-        private string GeneratorDatabaseSchema(IEnumerable<TableDescriptor> tableDescriptors)
+        private static string BuildSchemaDescription(DatabaseSchema schema)
         {
-            var stringBuilder = new StringBuilder();
-            foreach (var tableDescriptor in tableDescriptors)
+            var sb = new System.Text.StringBuilder();
+
+            foreach (var table in schema.Tables)
             {
-                stringBuilder.AppendLine($"{tableDescriptor.Name}, {tableDescriptor.Description}");
-                foreach (var columnDescriptor in tableDescriptor.Columns)
+                sb.AppendLine($"{table.Name} - {table.Description}");
+
+                foreach (var column in table.Columns)
                 {
-                    stringBuilder.AppendLine($" - {columnDescriptor.Name}, {columnDescriptor.DataType}, {columnDescriptor.Description}");
+                    var nullable = column.IsNullable ? "NULL" : "NOT NULL";
+                    sb.AppendLine($"  - {column.Name}: {column.DataType} ({nullable}) - {column.Description}");
                 }
 
-                stringBuilder.AppendLine();
-            }
-
-            return stringBuilder.ToString();
-        }
-
-        private async Task<string> ExecuteSQLAsync(string sql)
-        {
-            using var sqlClient = new SqlSugarClient(_connectionConfig);
-
-            var rows = await sqlClient.Ado.SqlQueryAsync<dynamic>(sql);
-            var columnNames = ((IDictionary<string, object>)rows[0]).Keys.ToList();
-
-            var maxWidths = new Dictionary<string, int>();
-
-            var stringBuilder = new StringBuilder();
-            stringBuilder.AppendLine(RenderMarkdownTableHeader(rows, columnNames, ref maxWidths));
-            stringBuilder.AppendLine(RenderMarkdownTableBody(rows, columnNames,maxWidths));
-            return stringBuilder.ToString();
-        }
-
-        private string RenderMarkdownTableHeader(List<dynamic> rows, List<string> columnNames, ref Dictionary<string, int> maxWidths)
-        {
-            var stringBuilder = new StringBuilder();
-
-            // 初始化每列的最大宽度
-            foreach (var columnName in columnNames)
-            {
-                maxWidths[columnName] = columnName.Length; // 初始化为列名长度
-            }
-
-            // 遍历数据行，更新每列的最大宽度
-            foreach (var row in rows)
-            {
-                foreach (var columnName in columnNames)
+                // 添加样例数据（如果有）
+                if (table.SampleData.Count > 0)
                 {
-                    var value = ((IDictionary<string, object>)row)[columnName]?.ToString() ?? "NULL";
-                    int currentLength = value.Length;
-
-                    // 更新最大宽度
-                    if (currentLength > maxWidths[columnName])
+                    sb.AppendLine("  样例数据:");
+                    foreach (var sample in table.SampleData.Take(2))
                     {
-                        maxWidths[columnName] = currentLength;
+                        var sampleJson = System.Text.Json.JsonSerializer.Serialize(sample);
+                        sb.AppendLine($"    {sampleJson}");
                     }
                 }
+
+                sb.AppendLine();
             }
 
-            // 构建表头
-            stringBuilder.AppendLine(" | " + string.Join(" | ", columnNames) + " | ");
-
-            // 使用局部变量来构建分隔线
-            var headerDividers = new List<string>();
-            foreach (var columnName in columnNames)
-            {
-                headerDividers.Add(new string('-', maxWidths[columnName] + 2)); // 加上两边的空格
-            }
-
-            stringBuilder.AppendLine(" | " + string.Join(" | ", headerDividers) + " | ");
-
-            return stringBuilder.ToString();
-        }
-
-        private string RenderMarkdownTableBody(List<dynamic> rows, List<string> columnNames, Dictionary<string, int> maxWidths)
-        {
-            var stringBuilder = new StringBuilder();
-
-            foreach (var row in rows)
-            {
-                var rowValues = new List<string>();
-                foreach (var columnName in columnNames)
-                {
-                    var value = ((IDictionary<string, object>)row)[columnName]?.ToString() ?? "NULL";
-                    // 根据最大宽度格式化每个值
-                    rowValues.Add(value.PadRight(maxWidths[columnName]));
-                }
-                stringBuilder.AppendLine(" | " + string.Join(" | ", rowValues) + " | ");
-            }
-
-            return stringBuilder.ToString();
-        }
-
-        internal record TableDescriptor
-        {
-            public string Name { get; set; }
-            public string Description { get; set; }
-            public IEnumerable<ColumnDescriptor> Columns { get; set; }
-        }
-
-        internal record ColumnDescriptor
-        {
-            public string Name { get; set; }
-            public string DataType { get; set; }
-            public bool IsNullable { get; set; }
-            public string Description { get; set; }
+            return sb.ToString();
         }
     }
 }

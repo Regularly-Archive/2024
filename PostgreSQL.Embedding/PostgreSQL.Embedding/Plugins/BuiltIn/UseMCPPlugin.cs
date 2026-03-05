@@ -92,7 +92,7 @@ public class UseMCPPlugin : BasePlugin
         var mcpServer = await _mcpServiceRepository.FindAsync(x => x.AppId == appId && x.Name == serverName);
         if (mcpServer == null) return $"Unable to find the MCP Server '{serverName}'";
 
-        var resources = GetRequiredFactory().GetOrCreate(mcpServer).GetResourcesAsync();
+        var resources = await GetRequiredFactory().GetOrCreate(mcpServer).GetResourcesAsync();
 
         return JsonConvert.SerializeObject(resources);
     }

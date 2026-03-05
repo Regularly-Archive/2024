@@ -33,7 +33,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
 
         private readonly Dictionary<string, string> _variables = new Dictionary<string, string>();
 
-        public Action<StepTrace> OnStepExecute { get; set; }
+        public Func<StepTrace, Task> OnStepExecute { get; set; }
 
         private Stopwatch _stopwatch;
 
@@ -81,7 +81,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 if (!string.IsNullOrEmpty(finalAnswer) && string.IsNullOrEmpty(nextStep.Action) & string.IsNullOrEmpty(nextStep.Thought) & stepsTaken.Count > 1)
                 {
 
-                    OnStepExecute?.Invoke(StepTrace.StepDone(_agentExecutionContext.GetMessageId()));
+                    await OnStepExecute?.Invoke(StepTrace.StepDone(_agentExecutionContext.GetMessageId()));
                     _logger.LogInformation($"[FinalAnswer] {{FinalAnswer}}", finalAnswer);
                     return finalAnswer;
                 }
@@ -89,7 +89,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 if (TryGetObservations(nextStep, chatHistory, stepsTaken, lastStep))
                     continue;
 
-                nextStep = AddNextStep(nextStep, lastStep, chatHistory, stepsTaken, startingMessageCount);
+                nextStep = await AddNextStep(nextStep, lastStep, chatHistory, stepsTaken, startingMessageCount);
 
 
                 if (await TryGetActionObservationAsync(_kernel, nextStep, chatHistory, cancellationToken).ConfigureAwait(false))
@@ -98,7 +98,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 // Check FinalAnswer Again
                 if (!string.IsNullOrEmpty(nextStep.FinalAnswer))
                 {
-                    OnStepExecute?.Invoke(StepTrace.StepDone(_agentExecutionContext.GetMessageId()));
+                    await OnStepExecute?.Invoke(StepTrace.StepDone(_agentExecutionContext.GetMessageId()));
                     return nextStep.FinalAnswer;
                 }
 
@@ -106,7 +106,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
 
                 _logger?.LogInformation("Action: No further action need to take");
 
-                if (TryGetThought(nextStep, chatHistory))
+                if (await TryGetThought(nextStep, chatHistory))
                     continue;
             }
 
@@ -116,7 +116,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             return string.Empty;
         }
 
-        private bool TryGetThought(ReasoningStep step, ChatHistory chatHistory)
+        private async Task<bool> TryGetThought(ReasoningStep step, ChatHistory chatHistory)
         {
             if (!string.IsNullOrEmpty(step.Thought))
             {
@@ -126,13 +126,13 @@ namespace PostgreSQL.Embedding.Llm.Planners
                     var question = step.Thought.Split("\n\n")[0].Replace(QuestionTag, "").Replace("-", "").Trim();
                     var thought = step.Thought.Split("\n\n")[1].Replace("-", "").Trim();
                     if (!string.IsNullOrEmpty(thought))
-                        OnStepExecute?.Invoke(StepTrace.Thought(question, thought, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
+                        await OnStepExecute?.Invoke(StepTrace.Thought(question, thought, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
                 }
                 else
                 {
                     var trimedThought = step.Thought.Replace("-", "").Trim();
                     if (!string.IsNullOrEmpty(trimedThought))
-                        OnStepExecute?.Invoke(StepTrace.Thought("", trimedThought, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
+                        await OnStepExecute?.Invoke(StepTrace.Thought("", trimedThought, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
                 }
             }
 
@@ -171,13 +171,13 @@ namespace PostgreSQL.Embedding.Llm.Planners
 
                 _stopwatch.Stop();
                 this._logger?.LogTrace($"Invoked {actionName}. Result: {result}");
-                OnStepExecute?.Invoke(StepTrace.Action(actionName, actionVariables, result, _stopwatch.Elapsed.TotalSeconds, true, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
+                await OnStepExecute?.Invoke(StepTrace.Action(actionName, actionVariables, result, _stopwatch.Elapsed.TotalSeconds, true, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
                 return result;
             }
             catch (Exception e)
             {
                 _stopwatch.Stop();
-                OnStepExecute?.Invoke(StepTrace.Action(actionName, actionVariables, e.Message, _stopwatch.Elapsed.TotalSeconds, false, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
+                await OnStepExecute?.Invoke(StepTrace.Action(actionName, actionVariables, e.Message, _stopwatch.Elapsed.TotalSeconds, false, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
                 this._logger?.LogError(e, "Something went wrong in system step: {Plugin}.{Function}. Error: {Error}", targetFunction.PluginName, targetFunction.Name, e.Message);
                 throw;
             }
@@ -220,7 +220,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             return false;
         }
 
-        private ReasoningStep AddNextStep(ReasoningStep step, ReasoningStep lastStep, ChatHistory chatHistory, List<ReasoningStep> stepsTaken, int startingMessageCount)
+        private async Task<ReasoningStep> AddNextStep(ReasoningStep step, ReasoningStep lastStep, ChatHistory chatHistory, List<ReasoningStep> stepsTaken, int startingMessageCount)
         {
             // If the thought is empty and the last step had no action, copy action to last step and set as new nextStep
             if (string.IsNullOrEmpty(step.Thought) && lastStep is not null && string.IsNullOrEmpty(lastStep.Action))
@@ -238,21 +238,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             else
             {
                 _logger?.LogInformation($"{ThoughtTag} {{Thought}}", step.Thought);
-
-                if (!string.IsNullOrEmpty(step.Thought) && step.Thought.IndexOf(QuestionTag, StringComparison.OrdinalIgnoreCase) != -1)
-                {
-                    var question = step.Thought?.Split("\n", StringSplitOptions.RemoveEmptyEntries)[0]?.Replace(QuestionTag, "").Replace("-", "").Trim();
-                    var thought = step.Thought?.Split("\n", StringSplitOptions.RemoveEmptyEntries)[1]?.Replace("-", "").Trim();
-
-                    if (!string.IsNullOrEmpty(thought))
-                        OnStepExecute?.Invoke(StepTrace.Thought(question, thought, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
-                }
-                else
-                {
-                    var trimedThought = step.Thought?.Replace("-", "").Trim();
-                    if (!string.IsNullOrEmpty(trimedThought))
-                        OnStepExecute?.Invoke(StepTrace.Thought("", trimedThought, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
-                }
+                await OnStepExecute?.Invoke(StepTrace.Thought("", step.Thought, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
 
                 stepsTaken.Add(step);
                 lastStep = step;

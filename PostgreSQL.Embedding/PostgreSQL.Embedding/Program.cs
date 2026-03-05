@@ -21,6 +21,7 @@ using PostgreSQL.Embedding.Infrastructure.DataAccess;
 using PostgreSQL.Embedding.Infrastructure.FileStorage;
 using PostgreSQL.Embedding.Infrastructure.Messaging;
 using PostgreSQL.Embedding.Infrastructure.Sandbox;
+using PostgreSQL.Embedding.Infrastructure.Text2DB;
 using PostgreSQL.Embedding.Llm.Abstractions;
 using PostgreSQL.Embedding.Llm.Core;
 using PostgreSQL.Embedding.Llm.Planners;
@@ -137,8 +138,8 @@ builder.Services
     .AddDataAccess(builder.Configuration)
     .AddFileStorage(builder.Configuration)
     .AddMessaging()
-    .AddDockerSandbox(builder.Configuration);
-
+    .AddDockerSandbox(builder.Configuration)
+    .AddText2DB();
 
 builder.Services
     .AddLlmCore(builder.Configuration)
@@ -172,7 +173,7 @@ builder.Services.AddCors(options =>
     });
 });
 
-var app = builder.Build();
+ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

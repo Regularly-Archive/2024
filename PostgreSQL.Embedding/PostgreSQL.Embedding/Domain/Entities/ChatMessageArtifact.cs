@@ -15,6 +15,12 @@ namespace PostgreSQL.Embedding.Domain.Entities
         public string RunId { get; set; } = "";
 
         /// <summary>
+        /// 会话ID
+        /// </summary>
+        [SugarColumn(ColumnName = "conversation_id")]
+        public string ConversationId { get; set; }
+
+        /// <summary>
         /// 消息ID
         /// </summary>
         [SugarColumn(ColumnName = "message_id")]

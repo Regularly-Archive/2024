@@ -19,7 +19,7 @@ namespace PostgreSQL.Embedding.Plugins.Custom
     [KernelPlugin(Description = "网易云音乐插件。提供歌曲搜索和在线播放功能，可根据歌手名和歌曲名搜索并返回歌曲信息。", Version = "1.2")]
     public class CloudMusicPlugin : BasePlugin
     {
-        private const string SEARCH_URL = "http://music.163.com/api/search/get/web?csrf_token=hlpretag=&hlposttag=&s={0}&type=1&offset=0&total=true&limit=2";
+        private const string SEARCH_URL = "http://music.163.com/api/search/get/web?csrf_token=hlpretag=&hlposttag=&s={0}&type=1&offset=0&total=true&limit={1}";
         private const string MUSIC_URL = "http://music.163.com/song/media/outer/url?id={0}";
 
         private const string NOT_FOUND = "抱歉，没有为您找到相关歌曲";
@@ -32,14 +32,15 @@ namespace PostgreSQL.Embedding.Plugins.Custom
         [KernelFunction]
         [Description("搜索网易云音乐歌曲。可通过歌手名称、歌曲名称或两者组合进行搜索，返回匹配的歌曲信息（ID、名称、艺术家、专辑等）。")]
         public async Task<IEnumerable<Song>> SearchMusicAsync(
-            [Description("歌曲名称（优先使用）")] string songName,
-            [Description("歌手名称（可选）")] string artistName = "")
+            [Description("歌曲名称（优先使用）")] string songName = "",
+            [Description("歌手名称（可选）")] string artistName = "",
+            [Description("最多返回歌曲数目，默认为 5 首")] int limit = 5)
         {
             var handler = new HttpClientHandler() { AllowAutoRedirect = false, AutomaticDecompression = DecompressionMethods.GZip };
             using var httpClient = new HttpClient(handler);
 
-            var keyword = songName ?? artistName;
-            var searchResult = await SearchByKeyword(httpClient, keyword);
+            var keyword = $"{artistName} {songName}".Trim();
+            var searchResult = await SearchByKeyword(httpClient, keyword, 5);
             if (searchResult!.code != 200 || searchResult.result.songs.Length == 0)
                 return Enumerable.Empty<Song>();
 
@@ -71,9 +72,9 @@ namespace PostgreSQL.Embedding.Plugins.Custom
         /// <param name="httpClient"></param>
         /// <param name="keyword"></param>
         /// <returns></returns>
-        private async Task<MusicSearchApiResult> SearchByKeyword(HttpClient httpClient, string keyword)
+        private async Task<MusicSearchApiResult> SearchByKeyword(HttpClient httpClient, string keyword, int limit = 5)
         {
-            var response = await httpClient.GetAsync(string.Format(SEARCH_URL, UrlEncoder.Default.Encode(keyword)));
+            var response = await httpClient.GetAsync(string.Format(SEARCH_URL, UrlEncoder.Default.Encode(keyword), limit));
             response.EnsureSuccessStatusCode();
 
             var responseConent = await response.Content.ReadAsStringAsync();
