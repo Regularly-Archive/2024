@@ -37,6 +37,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 if (finalAnswer != null)
                 {
                     var content = finalAnswer.Element("Content")?.Value ?? finalAnswer.Value;
+                    content = ExtractValue(content);
 
                     var confidence = finalAnswer.Element("Confidence");
                     var level = confidence?.Attribute("Level")?.Value ?? "Medium";

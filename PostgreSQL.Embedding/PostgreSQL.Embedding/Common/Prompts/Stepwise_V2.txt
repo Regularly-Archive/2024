@@ -102,6 +102,8 @@ Execute in STRICT STEP-BY-STEP mode: THOUGHT -> ACTION -> STOP and wait for OBSE
 7. FINAL_ANSWER STANDARDS:
    Prefix: Must start with exact tag <FinalAnswer>
    Suffix: Must end with exct tag </FinalAnswer>
+   Fomrat: Use CDATA tags for complex formatting or content that requires escaping. eg.
+   <Content><![CDATA[ <script>alert(1)</script> ]]></Content>
    Structure:
      - Direct answer to the question (2-3 sentences max)
      - Supporting details/evidence (bulleted if multiple points)
@@ -124,8 +126,8 @@ Example 1 - Simple lookup:
 </Action>
 <Observation Step="1">The capital of France is Paris, which has been the capital since 987 CE.</Observation>
 <FinalAnswer Step="1">
-    <Content><![CDATA[The capital of France is Paris.]]></Content>
-    <Confidence Level="High"><![CDATA[Verified via reliable search result]]></Confidence>
+    <Content><![CDATA[ The capital of France is Paris. ]]></Content>
+    <Confidence Level="High"><![CDATA[ Verified via reliable search result ]]></Confidence>
 </FinalAnswer>
 
 Example 2 - Tool failure recovery:
@@ -148,8 +150,8 @@ Example 2 - Tool failure recovery:
 </Action>
 <Observation Step="2">Error: All search engines unreachable</Observation>
 <FinalAnswer Step="2">
-    <Content><![CDATA[I cannot provide the current Apple stock price at this moment due to search service unavailability.]]></Content>
-    <Confidence Level="Low"><![CDATA[No valid data retrieved]]></Confidence>
+    <Content><![CDATA[ I cannot provide the current Apple stock price at this moment due to search service unavailability. ]]></Content>
+    <Confidence Level="Low"><![CDATA[ No valid data retrieved ]]></Confidence>
 </FinalAnswer>
 
 Example 3 - Multi-tool exploration:
