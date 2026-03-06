@@ -28,7 +28,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             _promptTemplate = _promptTemplateService.LoadTemplate("TaskPlanner.txt");
         }
 
-        public async Task<PlanResult> GetSubTasksAsync(string query, string history = null, int limit = 5)
+        public async Task<PlanResult> GetSubTasksAsync(string query, string history = null, int limit = 5, CancellationToken cancellationToken = default)
         {
             _promptTemplate.AddVariable("input", query);
             _promptTemplate.AddVariable("language", "Chinese");
@@ -41,8 +41,9 @@ namespace PostgreSQL.Embedding.Llm.Planners
             _promptTemplate.FunctionName = "GetSubTasks";
 
             var functionResult = string.Empty;
-            await foreach (var content in _promptTemplate.InvokeStreamingAsync(_kernel))
+            await foreach (var content in _promptTemplate.InvokeStreamingAsync(_kernel, cancellationToken: cancellationToken))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 functionResult += content.Content;
             }
 
@@ -61,7 +62,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             }
         }
 
-        public async Task<PlanResult> GetRAGTasks(string query, string history = null)
+        public async Task<PlanResult> GetRAGTasks(string query, string history = null, CancellationToken cancellationToken = default)
         {
             _promptTemplate.AddVariable("input", query);
             _promptTemplate.AddVariable("language", "Chinese");
@@ -74,8 +75,9 @@ namespace PostgreSQL.Embedding.Llm.Planners
             _promptTemplate.FunctionName = "GetRAGTasks";
 
             var functionResult = string.Empty;
-            await foreach (var content in _promptTemplate.InvokeStreamingAsync(_kernel))
+            await foreach (var content in _promptTemplate.InvokeStreamingAsync(_kernel, cancellationToken: cancellationToken))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 functionResult += content.Content;
             }
 

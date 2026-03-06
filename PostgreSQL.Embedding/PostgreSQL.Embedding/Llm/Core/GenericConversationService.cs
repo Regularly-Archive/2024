@@ -223,7 +223,7 @@ namespace PostgreSQL.Embedding.Llm.Core
                     if (stepTrace.Type == "Thought") reasoningContent += stepTrace.Content;
                     await EmitTracesAsync(stepTrace);
                 };
-                await graphExecutor.ExecuteAsync();
+                await graphExecutor.ExecuteAsync(cancellationToken);
 
                 stopwatch.Stop();
                 await UpdateReasoningContent(_agentExecutionContext.GetMessageId(), reasoningContent);

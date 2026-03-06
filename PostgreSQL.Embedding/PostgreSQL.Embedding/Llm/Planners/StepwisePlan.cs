@@ -11,6 +11,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace PostgreSQL.Embedding.Llm.Planners
 {
@@ -63,12 +64,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
 
             for (var i = 0; i < _config.MaxIterations; i++)
             {
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    var output = $"The task '{PlanId}' is cancelled by user.";
-                    _logger.LogInformation(output);
-                    return output;
-                }
+                cancellationToken.ThrowIfCancellationRequested();
 
                 if (i > 0) await Task.Delay(_config.MinIterationTimeSpan, cancellationToken).ConfigureAwait(false);
 
@@ -340,7 +336,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             return ReasoningStepParser.Parse(actionText);
         }
 
-        private Task<string> GetNextStepCompletionAsync(List<ReasoningStep> stepsTaken, ChatHistory chatHistory, IAIService aiService, int startingMessageCount, CancellationToken CancellationToken)
+        private Task<string> GetNextStepCompletionAsync(List<ReasoningStep> stepsTaken, ChatHistory chatHistory, IAIService aiService, int startingMessageCount, CancellationToken cancellationToken)
         {
             var skipStart = startingMessageCount;
             var skipCount = 0;
@@ -363,15 +359,15 @@ namespace PostgreSQL.Embedding.Llm.Planners
             }
 
             var addThought = stepsTaken.Count == 0;
-            return GetStreamingCompletionAsync(aiService, reducedChatHistory, addThought, CancellationToken);
+            return GetStreamingCompletionAsync(aiService, reducedChatHistory, addThought, cancellationToken);
         }
 
-        private async Task<string> GetCompletionAsync(IAIService aiService, ChatHistory chatHistory, bool addThought, CancellationToken CancellationToken)
+        private async Task<string> GetCompletionAsync(IAIService aiService, ChatHistory chatHistory, bool addThought, CancellationToken cancellationToken)
         {
             var promptExecutionSettings = new PromptExecutionSettings() { FunctionChoiceBehavior = FunctionChoiceBehavior.None() };
             if (aiService is IChatCompletionService chatCompletionService)
             {
-                var chatMessageContent = await chatCompletionService.GetChatMessageContentAsync(chatHistory, promptExecutionSettings);
+                var chatMessageContent = await chatCompletionService.GetChatMessageContentAsync(chatHistory, promptExecutionSettings, cancellationToken: cancellationToken);
                 return chatMessageContent.Content;
             }
             else if (aiService is ITextGenerationService textGenerationService)
@@ -386,7 +382,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
 
                 thoughtProcess = $"{thoughtProcess}\n";
 
-                var textContent = await textGenerationService.GetTextContentAsync(thoughtProcess);
+                var textContent = await textGenerationService.GetTextContentAsync(thoughtProcess, cancellationToken: cancellationToken);
                 return textContent.InnerContent.ToString();
             }
 
@@ -399,7 +395,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             if (aiService is IChatCompletionService chatCompletionService)
             {
                 var content = string.Empty;
-                await foreach (var chatMessageContent in chatCompletionService.GetStreamingChatMessageContentsAsync(chatHistory, promptExecutionSettings))
+                await foreach (var chatMessageContent in chatCompletionService.GetStreamingChatMessageContentsAsync(chatHistory, promptExecutionSettings, cancellationToken: cancellationToken))
                 {
                     content += chatMessageContent.Content;
                 }
@@ -418,7 +414,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 thoughtProcess = $"{thoughtProcess}\n";
 
                 var content = string.Empty;
-                await foreach (var textContent in textGenerationService.GetStreamingTextContentsAsync(thoughtProcess))
+                await foreach (var textContent in textGenerationService.GetStreamingTextContentsAsync(thoughtProcess, cancellationToken: cancellationToken))
                 {
                     content += textContent.InnerContent.ToString();
                 }

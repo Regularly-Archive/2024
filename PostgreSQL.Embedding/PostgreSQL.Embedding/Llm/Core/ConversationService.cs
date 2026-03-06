@@ -1,5 +1,4 @@
-﻿using System.Linq;
-using PostgreSQL.Embedding.Common.Streaming;
+﻿using PostgreSQL.Embedding.Common.Streaming;
 using PostgreSQL.Embedding.Domain.Entities;
 using PostgreSQL.Embedding.Domain.Models;
 using PostgreSQL.Embedding.Infrastructure.DataAccess;
