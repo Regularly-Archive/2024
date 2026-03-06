@@ -35,7 +35,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             _citationService = citationService;
         }
 
-        public async Task ExecuteAsync()
+        public async Task ExecuteAsync(CancellationToken cancellationToken)
         {
             var sortedTaskIds = _graph.TopologicalSort();
 
@@ -43,7 +43,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             {
                 var subTask = _subTasks.FirstOrDefault(x => x.Id == taskId);
                 var taskStates = JsonConvert.SerializeObject(_subTasks.Select(x => new { Id = x.Id, Name = x.Name, Description = x.Description, State = x.State.ToString() }));
-                await ExecuteSubTask(_query, subTask, taskStates);
+                await ExecuteSubTask(_query, subTask, taskStates, cancellationToken);
             });
             await Task.WhenAll(paralleTasks);
 
@@ -52,13 +52,13 @@ namespace PostgreSQL.Embedding.Llm.Planners
             {
                 var subTask = _subTasks.FirstOrDefault(x => x.Id == taskId);
                 var taskStates = JsonConvert.SerializeObject(_subTasks.Select(x => new { Id = x.Id, Name = x.Name, Description = x.Description, State = x.State.ToString() }));
-                await ExecuteSubTask(_query, subTask, taskStates);
+                await ExecuteSubTask(_query, subTask, taskStates, cancellationToken);
             }
 
             await PostProcessFinalOutput();
         }
 
-        private async Task ExecuteSubTask(string query, SubTask subTask, string taskStates)
+        private async Task ExecuteSubTask(string query, SubTask subTask, string taskStates, CancellationToken cancellationToken)
         {
             _agentExecutionContext.SetStepId(subTask.Id.ToString());
             if (subTask.State == TaskState.Completed && !subTask.AvailableTools.Any())
@@ -86,7 +86,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 var context = await BuildSubTaskContext(query, subTask, taskStates, []);
                 chatHistory.AddAssistantMessage($"{context}");
 
-                var result = await plan.ExecuteAsync(subTask.Description, chatHistory);
+                var result = await plan.ExecuteAsync(subTask.Description, chatHistory, cancellationToken);
                 subTask.ExecuteResult = result;
                 subTask.State = string.IsNullOrEmpty(result) ? Domain.Models.Planners.TaskState.Failed : Domain.Models.Planners.TaskState.Completed;
             }

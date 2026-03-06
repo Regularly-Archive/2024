@@ -140,6 +140,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             // Consume and yield events to the caller
             await foreach (var evt in channel.Reader.ReadAllAsync(ct))
             {
+                ct.ThrowIfCancellationRequested();
                 yield return evt;
             }
         }
@@ -247,8 +248,8 @@ namespace PostgreSQL.Embedding.Llm.Core
             // Create task planner
             var taskPlanner = new TaskPlanner(_kernel);
             var planResult = _app.AppType == (int)LlmAppType.Chat
-                ? await taskPlanner.GetSubTasksAsync(input, limit: 3, history: historyContext)
-                : await taskPlanner.GetRAGTasks(input, history: historyContext);
+                ? await taskPlanner.GetSubTasksAsync(query: input, history: historyContext, limit: 3, ct)
+                : await taskPlanner.GetRAGTasks(query: input, history: historyContext, ct);
 
             var subTasks = planResult.Tasks;
             if (!subTasks.Any())
@@ -317,7 +318,7 @@ namespace PostgreSQL.Embedding.Llm.Core
                 await EmitStepTraceAsync(stepTrace, writer, blockTracker, ct);
             };
 
-            await graphExecutor.ExecuteAsync();
+            await graphExecutor.ExecuteAsync(ct);
 
             // Return the result from the last completed subtask
             var completedTask = subTasks.OrderByDescending(x => x.Id).FirstOrDefault(x => x.State == TaskState.Completed);
