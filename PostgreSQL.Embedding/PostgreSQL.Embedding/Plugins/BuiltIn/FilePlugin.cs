@@ -8,7 +8,7 @@ using System.ComponentModel;
 
 namespace PostgreSQL.Embedding.Plugins.BuiltIn
 {
-    [KernelPlugin(Description = "沙箱内文件操作插件。通过命令行提供安全的文件读写功能，支持读取文件头部、尾部或全部内容，以及创建和写入文件。", Version = "2.0")]
+    [KernelPlugin(Description = "沙箱内文件操作插件。通过命令行提供安全的文件读写功能，支持读取文件头部、尾部或全部内容，以及创建和写入文件。", Version = "2.1")]
     public class FilePlugin : BasePlugin
     {
         private readonly ILogger<FilePlugin> _logger;
@@ -207,8 +207,8 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         /// 搜索文件内容（基于 grep）
         /// </summary>
         [KernelFunction]
-        [Description("在文件中搜索指定的关键词或正则表达式（使用 grep 命令）。支持递归搜索、忽略大小写、正则表达式匹配等选项。")]
-        public async Task<string> SearchAsync(
+        [Description("在文件中搜索关键词或正则表达式，返回匹配的行的内容（包含行号）。")]
+        public async Task<string> GrepAsync(
             [Description("要搜索的关键词或正则表达式")] string pattern,
             [Description("要搜索的文件或目录路径")] string filePath,
             [Description("是否递归搜索子目录，默认 true")] bool recursive = true,
@@ -240,6 +240,30 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
             // grep 返回 1 表示没有匹配，这是正常的
             if (result.ExitCode != 0 && result.ExitCode != 1)
                 throw new ArgumentException($"Failed to search: {result.Stderr}");
+
+            return string.IsNullOrEmpty(result.Stdout) ? "No matches found." : result.Stdout;
+        }
+
+        /// <summary>
+        /// 按文件名模式搜索（基于 glob）
+        /// </summary>
+        [KernelFunction]
+        [Description("按文件名模式搜索文件或目录。支持通配符 * 和 ?，可递归搜索。")]
+        public async Task<string> GlobAsync(
+            [Description("文件搜索模式，如 *.cs、**/*.txt、src/**/*.js")] string pattern,
+            [Description("搜索的目录路径，默认当前目录")] string directoryPath = ".",
+            [Description("是否递归搜索子目录，默认 true")] bool recursive = true,
+            Kernel kernel = null)
+        {
+            var sandboxPath = GetSandboxPath(kernel, directoryPath);
+            var command = recursive
+                ? $"find \"{sandboxPath}\" -type f -name \"{pattern}\""
+                : $"find \"{sandboxPath}\" -maxdepth 1 -type f -name \"{pattern}\"";
+
+            var result = await ExecuteInSandboxAsync(kernel, command);
+
+            if (result.ExitCode != 0)
+                throw new ArgumentException($"Failed to glob: {result.Stderr}");
 
             return string.IsNullOrEmpty(result.Stdout) ? "No matches found." : result.Stdout;
         }
