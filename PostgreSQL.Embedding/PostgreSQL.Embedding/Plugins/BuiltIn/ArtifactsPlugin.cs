@@ -150,13 +150,30 @@ public class ArtifactsPlugin : BasePlugin
     #region URL
 
     [KernelFunction]
-    [Description("从 URL 下载内容并创建为 Artifact（自动推断类型）。适用于将网页、图片、PDF 等转为持久化产物。")]
+    [Description("从远程 URL 下载内容并创建为 Artifact（自动推断类型）。适用于将网页、图片、PDF 等转为持久化产物。")]
     public Task<ArtifactResponse> CreateArtifactFromUrl(
         string url,
         string fileName,
         Kernel kernel)
     {
         return CreateArtifactFromUrlInternalAsync(url, fileName, kernel);
+    }
+
+    #endregion
+
+    #region 文件推断类型
+
+    [KernelFunction]
+    [Description("根据文件扩展名自动推断 Artifact 类型并创建产物。适用于将本地文件转换为 Artifact，默认视为文本类型。")]
+    public Task<ArtifactResponse> CreateArtifactFromFile(
+        string filePath,
+        Kernel kernel)
+    {
+        var extension = Path.GetExtension(filePath).ToLowerInvariant();
+        var (artifactType, canPreview) = GetArtifactTypeFromExtension(extension);
+        var fileName = Path.GetFileName(filePath);
+
+        return CreateArtifactFromFileAsync(filePath, fileName, artifactType, canPreview, kernel);
     }
 
     #endregion
@@ -405,6 +422,48 @@ public class ArtifactsPlugin : BasePlugin
         };
     }
 
+    private static (ArtifactType type, bool canPreview) GetArtifactTypeFromExtension(string extension)
+    {
+        return extension switch
+        {
+            // 代码文件
+            ".cs" or ".js" or ".ts" or ".jsx" or ".tsx" or ".py" or ".pyw" or ".java" or
+            ".go" or ".rs" or ".rb" or ".php" or ".cpp" or ".c" or ".h" or ".hpp" or
+            ".swift" or ".kt" or ".scala" or ".r" or ".sh" or ".bash" or ".zsh" or
+            ".ps1" or ".psm1" or ".sql" or ".xml" or ".yaml" or ".yml" or ".toml" or
+            ".vue" or ".svelte" or ".jsx" or ".tsx" or ".dart" or ".lua" or ".pl" =>
+                (ArtifactType.Code, true),
+
+            // 文档
+            ".md" or ".markdown" => (ArtifactType.Markdown, true),
+            ".html" or ".htm" => (ArtifactType.Html, true),
+
+            // 数据格式
+            ".json" => (ArtifactType.Json, true),
+            ".csv" => (ArtifactType.Csv, true),
+            ".ipynb" => (ArtifactType.Jupyter, true),
+
+            // 压缩
+            ".zip" => (ArtifactType.Zip, false),
+            ".tar" or ".tar.gz" or ".tgz" => (ArtifactType.Zip, false),
+
+            // 图表
+            ".mmd" => (ArtifactType.Mermaid, true),
+
+            // 文档格式
+            ".pdf" => (ArtifactType.Pdf, true),
+            ".xls" or ".xlsx" => (ArtifactType.Excel, true),
+
+            // 媒体
+            ".png" or ".jpg" or ".jpeg" or ".gif" or ".webp" or ".svg" or ".ico" => (ArtifactType.Image, true),
+            ".mp4" or ".webm" or ".ogg" or ".avi" or ".mov" => (ArtifactType.Video, true),
+            ".mp3" or ".wav" or ".ogg" or ".flac" => (ArtifactType.Audio, true),
+
+            // 默认文本
+            _ => (ArtifactType.Text, false)
+        };
+    }
+
     private async Task EmitArtifactAsync(ArtifactResponse response, Kernel kernel)
     {
         var agentExecutionContext = kernel.GetAgentExecutionContext();
@@ -537,11 +596,25 @@ public class ArtifactsPlugin : BasePlugin
         [JsonProperty("artifact_id")]
         public string ArtifactId { get; set; }
         public string FileName { get; set; }
+
+        [JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
         public string AccessUrl { get; set; }
+
+        [JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
         public DateTime ExpiresAt { get; set; }
+
         public ArtifactType Type { get; set; }
+
+        [JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
         public bool CanPreview { get; set; }
+
+        [JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
         public bool CanDownload { get; set; } = true;
+
         public long? FileSize { get; set; }
     }
     #endregion
