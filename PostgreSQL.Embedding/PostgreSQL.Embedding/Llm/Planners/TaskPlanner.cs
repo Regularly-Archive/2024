@@ -28,7 +28,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             _promptTemplate = _promptTemplateService.LoadTemplate("TaskPlanner.txt");
         }
 
-        public async Task<PlanResult> GetSubTasksAsync(string query, string history = null, int limit = 5, CancellationToken cancellationToken = default)
+        public async Task<PlanResult> GetSubTasksAsync(string query, string history = null, int limit = 10, CancellationToken cancellationToken = default)
         {
             _promptTemplate.AddVariable("input", query);
             _promptTemplate.AddVariable("language", "Chinese");
