@@ -129,7 +129,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 if (confidenceMatch.Success)
                 {
                     var confidenceContent = confidenceMatch.Groups[1].Value;
-                    var levelMatch = Regex.Match(confidenceMatch.Value, @"Level\s*=\s[""']([^""']+)[""']", RegexOptions.IgnoreCase);
+                    var levelMatch = Regex.Match(confidenceMatch.Value, "Level=\"([^\"]+)\"", RegexOptions.IgnoreCase);
                     level = levelMatch.Success ? levelMatch.Groups[1].Value : "Medium";
                     reason = ExtractValue(confidenceContent);
                 }
@@ -152,7 +152,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
             if (actionMatch.Success)
             {
                 var actionContent = ExtractValue(actionMatch.Groups[1].Value);
-                var toolMatch = Regex.Match(actionMatch.Value, @"Tool\s*=\s[""']([^""']+)[""']", RegexOptions.IgnoreCase);
+                var toolMatch = Regex.Match(actionMatch.Value, "Tool=\"([^\"]+)\"", RegexOptions.IgnoreCase);
                 result.Action = toolMatch.Success ? toolMatch.Groups[1].Value : "";
 
                 if (!string.IsNullOrEmpty(actionContent))

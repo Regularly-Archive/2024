@@ -59,6 +59,9 @@ public class ToolResultEvent : ISseEvent
     [JsonPropertyName("content")]
     public object Content { get; set; } = "";
 
+    [JsonPropertyName("duration_ms")]
+    public decimal? DurationMs { get; set; }
+
     [JsonPropertyName("is_error")]
     public bool IsError { get; set; }
 }
@@ -88,7 +91,7 @@ public class ToolCallEvent : ISseEvent
     public string Status { get; set; } = "pending"; // pending, running, completed, error
 
     [JsonPropertyName("duration_ms")]
-    public long? DurationMs { get; set; }
+    public decimal? DurationMs { get; set; }
 }
 
 /// <summary>

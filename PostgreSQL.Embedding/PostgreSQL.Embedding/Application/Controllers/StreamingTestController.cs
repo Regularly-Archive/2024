@@ -122,7 +122,7 @@ namespace PostgreSQL.Embedding.Application.Controllers
             await Task.Delay(500, ct);
 
             // 工具结果
-            yield return evt.ToolResult(toolId, new
+            yield return evt.ToolResult(toolId, new 
             {
                 results = new[]
                 {

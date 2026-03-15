@@ -37,6 +37,24 @@ namespace PostgreSQL.Embedding.Llm.Planners
             return new StepwisePlan(systemMessage, _config, logger, _kernel);
         }
 
+        public async Task<ReActAgent> CreateReActAgentAsync()
+        {
+            var functionDescriptions = await CreateFunctionDescriptions(_kernel);
+            var variableDescriptions = CreateVariableDescriptions();
+
+            var arguments = new KernelArguments()
+            {
+                ["functionDescriptions"] = functionDescriptions,
+                ["variableDescriptions"] = variableDescriptions,
+                ["suffix"] = _config.Suffix
+            };
+            var systemMessage = await _promptTemplateService.RenderTemplateAsync("Stepwise_V2.txt", _kernel, arguments);
+
+            var logger = _kernel.LoggerFactory.CreateLogger<StepwisePlan>();
+
+            return new ReActAgent(systemMessage, _config, logger, _kernel);
+        }
+
         public async Task<StepwisePlan> CreatePlanAsync(string instruction, List<string> functions)
         {
             var kernelFunctions = functions.Select(x => _kernel.GetKernelFunction(x)).ToList();

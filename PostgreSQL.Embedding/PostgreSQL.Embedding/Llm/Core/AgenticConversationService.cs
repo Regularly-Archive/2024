@@ -100,6 +100,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             _agentExecutionContext.SetAppId(_app.Id);
             _agentExecutionContext.SetConversationId(convId);
             _agentExecutionContext.InitializeSandboxContext(_app.Id, convId, runId, _sandboxOptions);
+            _agentExecutionContext.SetAgentState(AgentState.Running);
 
             // Add user message
             var refMessageId = await _chatHistoriesService.AddUserMessageAsync(_app.Id, convId, input);
@@ -248,7 +249,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             // Create task planner
             var taskPlanner = new TaskPlanner(_kernel);
             var planResult = _app.AppType == (int)LlmAppType.Chat
-                ? await taskPlanner.GetSubTasksAsync(query: input, history: historyContext, limit: 3, ct)
+                ? await taskPlanner.GetSubTasksAsync(query: input, history: historyContext, limit: 10, ct)
                 : await taskPlanner.GetRAGTasks(query: input, history: historyContext, ct);
 
             var subTasks = planResult.Tasks;
@@ -296,7 +297,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             var runId = _agentExecutionContext.GetRunId();
 
             // Create planner for task execution
-            var planner = new StepwisePlanner(_kernel, _promptTemplateService, new StepwisePlannerConfig { MaxIterations = 30 });
+            var planner = new StepwisePlanner(_kernel, _promptTemplateService, new StepwisePlannerConfig { MaxIterations = 30, ToolCallMode = ToolCallMode.Async });
             planner.AddVariable("appId", _app.Id);
             planner.AddVariable("runId", runId);
             planner.AddVariable("conversationId", conversationId);
@@ -337,13 +338,15 @@ namespace PostgreSQL.Embedding.Llm.Core
                     break;
 
                 case "Action":
+                    var toolCallName = ExtractActionName(stepTrace.Title);
+                    if (toolCallName.IndexOf("AskUser") != -1) break;
                     // Emit as tool call events with input/output
                     var actionObj = JsonConvert.DeserializeObject<Dictionary<string, object>>(stepTrace.Content);
                     var input = JsonConvert.DeserializeObject<Dictionary<string, object>>(
                         JsonConvert.SerializeObject(actionObj["input"])
                      );
                     var toolCallId = await SaveToolCallAsync(
-                        ExtractActionName(stepTrace.Title),
+                        toolCallName,
                         input,
                         actionObj["output"]?.ToString(),
                         stepTrace.Status == "success" ? 0 : -1,
@@ -352,11 +355,11 @@ namespace PostgreSQL.Embedding.Llm.Core
                     await writer.WriteAsync(new ToolCallEvent
                     {
                         Id = toolCallId.ToString(),
-                        Name = ExtractActionName(stepTrace.Title),
+                        Name = toolCallName,
                         Input = input,
                         Output = actionObj["output"]?.ToString(),
                         Status = stepTrace.Status == "success" ? "completed" : "failed",
-                        DurationMs = (long)(ExtractDuration(stepTrace.Description) * 1000)
+                        DurationMs = ExtractDuration(stepTrace.Description) * 1000
                     }, ct);
                     break;
 
@@ -377,6 +380,46 @@ namespace PostgreSQL.Embedding.Llm.Core
                         stepTrace.Content,
                         (int)MapTaskState(stepTrace.Status)
                     );
+                    break;
+                case "ToolUse":
+                    var toolUseName = ExtractActionName(stepTrace.Title);
+                    if (toolUseName.IndexOf("AskUser") != -1) break;
+                    // Emit as tool call events with input/output
+                    var toolUseObj = JsonConvert.DeserializeObject<Dictionary<string, object>>(stepTrace.Content);
+                    var toolUseInput = JsonConvert.DeserializeObject<Dictionary<string, object>>(
+                        JsonConvert.SerializeObject(toolUseObj["input"])
+                     );
+                    var toolUseId = await SaveToolUseAsync(
+                        toolUseName,
+                        toolUseInput,
+                        stepTrace.Id
+                    );
+                    await writer.WriteAsync(new ToolUseEvent
+                    {
+                        Id = toolUseId.ToString(),
+                        Name = toolUseName,
+                        Input = toolUseInput,
+                    }, ct);
+                    break;
+
+                case "ToolResult":
+                    var toolResultName = ExtractActionName(stepTrace.Title);
+                    if (toolResultName.IndexOf("AskUser") != -1) break;
+
+                    var toolResultObj = JsonConvert.DeserializeObject<Dictionary<string, object>>(stepTrace.Content);
+                    var toolResultId = await SaveToolResultAsync(
+                        stepTrace.Id,
+                        stepTrace.Status == "success" ? 1 : 2,
+                        toolResultObj["output"]?.ToString(),
+                        ExtractDuration(stepTrace.Description) * 1000
+                    );
+                    await writer.WriteAsync(new ToolResultEvent()
+                    {
+                        ToolUseId = toolResultId.ToString(),
+                        Content = toolResultObj["output"]?.ToString(),
+                        DurationMs = ExtractDuration(stepTrace.Description) * 1000,
+                        IsError = !(stepTrace.Status == "success")
+                    });
                     break;
 
                 case "MessageStatus":
@@ -474,10 +517,10 @@ namespace PostgreSQL.Embedding.Llm.Core
             var actionName = title.Split('|', StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
             return actionName;
         }
-        private static double ExtractDuration(string description)
+        private static decimal ExtractDuration(string description)
         {
             var match = System.Text.RegularExpressions.Regex.Match(description, @"耗时\s+([\d.]+)\s+秒");
-            return match.Success ? double.Parse(match.Groups[1].Value) : 0;
+            return match.Success ? decimal.Parse(match.Groups[1].Value) : 0;
         }
 
         private static string MapPlanStatus(string status)
@@ -566,7 +609,8 @@ namespace PostgreSQL.Embedding.Llm.Core
                     Input = input,
                     Output = output,
                     Status = status,
-                    DurationMs = durationMs
+                    DurationMs = durationMs,
+                    TraceId = Guid.NewGuid().ToString("N")
                 });
 
                 return toolCall.Id;
@@ -576,6 +620,43 @@ namespace PostgreSQL.Embedding.Llm.Core
                 _dbLock.Release();
             }
         }
+
+        private async Task<long> SaveToolUseAsync(string name, Dictionary<string, object>? input, string traceId)
+        {
+            await _dbLock.WaitAsync();
+            try
+            {
+                var toolCall = await _toolCallRepository.AddAsync(new ChatMessageToolCall
+                {
+                    RunId = _agentExecutionContext.GetRunId(),
+                    MessageId = _agentExecutionContext.GetMessageId(),
+                    Name = name,
+                    Input = input,
+                    Output = string.Empty,
+                    Status = 0,
+                    DurationMs = 0,
+                    TraceId = traceId
+                });
+
+                return toolCall.Id;
+            }
+            finally
+            {
+                _dbLock.Release();
+            }
+        }
+
+        private async Task<long> SaveToolResultAsync(string traceId, int status, string result, decimal? durationMs)
+        {
+            var toolCall = await _toolCallRepository.FindAsync(x => x.TraceId == traceId);
+            toolCall.Output = result;
+            toolCall.Status = status;
+            toolCall.DurationMs = durationMs;
+
+            await _toolCallRepository.UpdateAsync(toolCall);
+            return toolCall.Id;
+        }
+
 
         /// <summary>
         /// 保存或更新计划/子任务

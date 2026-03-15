@@ -26,7 +26,11 @@ internal class SandboxContext : ISandboxContext
         RunDir = Path.Combine(SessionDir, "runs", runId);
         ArtifactsDir = Path.Combine(RunDir, "artifacts");
         SkillsDir = Path.Combine(AppDir, ".skills");
+
+        EnsureDirectoriesExisit([AppDir, SessionDir, RunDir, ArtifactsDir, SkillsDir]);
+
         _workingDirInSandbox = workDir;
+
 
         foreach (var volume in GetVolumeMappings())
         {
@@ -106,9 +110,19 @@ internal class SandboxContext : ISandboxContext
         {
             { RunDir, "/sandbox" },
             { SkillsDir, "/sandbox/.skills" },
-            { Path.Combine(SessionDir, "MEMORY.md"), "/sandbox/MEMORY.md" },
-            { Path.Combine(AppDir, "SOUL.md"), "/sandbox/SOUL.md" },
-            { Path.Combine(RunDir, "SHORT_TERM.md"), "/sandbox/SHORT_TERM.md" }
+            { ArtifactsDir, "/sandbox/artifacts" },
+            //{ Path.Combine(SessionDir, "MEMORY.md"), "/sandbox/MEMORY.md" },
+            //{ Path.Combine(AppDir, "SOUL.md"), "/sandbox/SOUL.md" },
+            //{ Path.Combine(RunDir, "SHORT_TERM.md"), "/sandbox/SHORT_TERM.md" }
         };
+    }
+
+    private void EnsureDirectoriesExisit(IEnumerable<string> dirs)
+    {
+        foreach (var dir in dirs)
+        {
+            if (Directory.Exists(dir)) continue;
+            Directory.CreateDirectory(dir);
+        }
     }
 }

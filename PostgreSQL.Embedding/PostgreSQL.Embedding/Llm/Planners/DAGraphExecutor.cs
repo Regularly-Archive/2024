@@ -1,4 +1,5 @@
-﻿using Microsoft.SemanticKernel;
+﻿using DocumentFormat.OpenXml.Drawing.Diagrams;
+using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using MongoDB.Driver.Linq;
 using Newtonsoft.Json;
@@ -60,6 +61,9 @@ namespace PostgreSQL.Embedding.Llm.Planners
 
         private async Task ExecuteSubTask(string query, SubTask subTask, string taskStates, CancellationToken cancellationToken)
         {
+            if (_kernel.GetAgentExecutionContext().GetAgentState() != AgentState.Running) 
+                return;
+
             _agentExecutionContext.SetStepId(subTask.Id.ToString());
             if (subTask.State == TaskState.Completed && !subTask.AvailableTools.Any())
             {
@@ -67,7 +71,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 return;
             }
 
-            var plan = await _stepwisePlanner.CreatePlanAsync();
+            var plan = await _stepwisePlanner.CreateReActAgentAsync();
             //? await _stepwisePlanner.CreatePlanAsync(null, subTask.AvailableTools)
             //: await _stepwisePlanner.CreatePlanAsync();
 
@@ -162,6 +166,15 @@ namespace PostgreSQL.Embedding.Llm.Planners
                     Console.WriteLine(JsonConvert.SerializeObject(result));
 
                     finalTask.CitationItems = result;
+                }
+            }
+            else
+            {
+                var finalTask = _subTasks.OrderByDescending(x => x.Id).FirstOrDefault();
+                if (finalTask.State == TaskState.Completed)
+                {
+                    var plainAnswer = _citationService.RemoveCitations(finalTask.ExecuteResult);
+                    finalTask.ExecuteResult = plainAnswer;
                 }
             }
         }

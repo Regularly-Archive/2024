@@ -1,4 +1,5 @@
-﻿using Microsoft.SemanticKernel;
+﻿using DocumentFormat.OpenXml.Office.SpreadSheetML.Y2023.MsForms;
+using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Services;
 using Microsoft.SemanticKernel.TextGeneration;
@@ -15,7 +16,7 @@ using System.Threading;
 
 namespace PostgreSQL.Embedding.Llm.Planners
 {
-    public class StepwisePlan
+    public class ReActAgent
     {
         private readonly string _systemMessage;
         private readonly StepwisePlannerConfig _config;
@@ -26,19 +27,13 @@ namespace PostgreSQL.Embedding.Llm.Planners
 
         private const string ObservationTag = "<Observation";
         private const string ThoughtTag = "[Thought]";
-        private const string QuestionTag = "<Question>";
         private const string TrimMessageFormat = "... I've removed the first {0} steps of my previous work to make room for the new stuff ...";
-        private const string MainKey = "INPUT";
-
-        private readonly Regex _regexKeepFormat = new Regex(@"<KEEP_FORMAT>([\s\S]*?)<\/KEEP_FORMAT>", RegexOptions.Compiled);
-
-        private readonly Dictionary<string, string> _variables = new Dictionary<string, string>();
 
         public Func<StepTrace, Task> OnStepExecute { get; set; }
 
         private Stopwatch _stopwatch;
 
-        public StepwisePlan(string systemMessage, StepwisePlannerConfig config, ILogger<StepwisePlan> logger, Kernel kernel)
+        public ReActAgent(string systemMessage, StepwisePlannerConfig config, ILogger<StepwisePlan> logger, Kernel kernel)
         {
             _config = config;
             _systemMessage = systemMessage;
@@ -72,72 +67,32 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 nextStep.Index = i;
                 _logger.LogTrace($"Step {i + 1}: {nextStep.ToString()}");
 
-                var finalAnswer = TryGetFinalAnswer(nextStep, stepsTaken, i + 1);
-
-                if (!string.IsNullOrEmpty(finalAnswer) && string.IsNullOrEmpty(nextStep.Action) & string.IsNullOrEmpty(nextStep.Thought) & stepsTaken.Count > 1)
+                if (!string.IsNullOrEmpty(nextStep.Action))
                 {
+                    if (!string.IsNullOrEmpty(nextStep.Thought))
+                    {
+                        await OnStepExecute?.Invoke(StepTrace.Thought(goal, nextStep.Thought, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
+                    }
 
-                    await OnStepExecute?.Invoke(StepTrace.StepDone(_agentExecutionContext.GetMessageId()));
-                    _logger.LogInformation($"[FinalAnswer] {{FinalAnswer}}", finalAnswer);
-                    return finalAnswer;
-                }
-
-                if (TryGetObservations(nextStep, chatHistory, stepsTaken, lastStep))
-                    continue;
-
-                nextStep = await AddNextStep(nextStep, lastStep, chatHistory, stepsTaken, startingMessageCount);
-
-
-                if (await TryGetActionObservationAsync(_kernel, nextStep, chatHistory, cancellationToken).ConfigureAwait(false))
-                    continue;
-
-                if (_kernel.GetAgentExecutionContext().GetAgentState() != AgentState.Running)
-                {
-                    return nextStep.Observation;
-                }
-
-                // Check FinalAnswer Again
-                if (!string.IsNullOrEmpty(nextStep.FinalAnswer))
-                {
-                    await OnStepExecute?.Invoke(StepTrace.StepDone(_agentExecutionContext.GetMessageId()));
-                    return nextStep.FinalAnswer;
-                }
-
-                chatHistory.AddAssistantMessage(nextStep.FormatObservation());
-
-                _logger?.LogInformation("Action: No further action need to take");
-
-                if (await TryGetThought(nextStep, chatHistory))
-                    continue;
-            }
-
-            AddExecutionStatsToContext(stepsTaken, _config.MaxIterations);
-            _variables[MainKey] = "Result not found, review 'stepsTaken' to see what happened.";
-
-            return string.Empty;
-        }
-
-        private async Task<bool> TryGetThought(ReasoningStep step, ChatHistory chatHistory)
-        {
-            if (!string.IsNullOrEmpty(step.Thought))
-            {
-                chatHistory.AddAssistantMessage(step.FormatThought());
-                if (step.Thought.IndexOf(QuestionTag, StringComparison.OrdinalIgnoreCase) != -1)
-                {
-                    var question = step.Thought.Split("\n\n")[0].Replace(QuestionTag, "").Replace("-", "").Trim();
-                    var thought = step.Thought.Split("\n\n")[1].Replace("-", "").Trim();
-                    if (!string.IsNullOrEmpty(thought))
-                        await OnStepExecute?.Invoke(StepTrace.Thought(question, thought, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
+                    await TryGetActionObservationAsync(_kernel, nextStep, chatHistory, cancellationToken).ConfigureAwait(false);
                 }
                 else
                 {
-                    var trimedThought = step.Thought.Replace("-", "").Trim();
-                    if (!string.IsNullOrEmpty(trimedThought))
-                        await OnStepExecute?.Invoke(StepTrace.Thought("", trimedThought, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
+                    if (!string.IsNullOrEmpty(nextStep.FinalAnswer))
+                    {
+                        await OnStepExecute?.Invoke(StepTrace.StepDone(_agentExecutionContext.GetMessageId()));
+                        return nextStep.FinalAnswer;
+                    }
+
+                    if (!string.IsNullOrEmpty(nextStep.Thought))
+                    {
+                        chatHistory.AddAssistantMessage(nextStep.FormatThought());
+                        await OnStepExecute?.Invoke(StepTrace.Thought(goal, nextStep.Thought, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
+                    }
                 }
             }
 
-            return false;
+            return string.Empty;
         }
 
         private async Task<string?> InvokeActionAsync(Kernel kernel, string actionName, Dictionary<string, object> actionVariables, CancellationToken cancellationToken)
@@ -150,6 +105,8 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 return $"The tool '{actionName}' is not in [AVAILABLE FUNCTIONS]. Please try again using one of the [AVAILABLE FUNCTIONS].";
             }
 
+            StepTrace _toolUseTrace = null;
+
             try
             {
                 _stopwatch = Stopwatch.StartNew();
@@ -158,6 +115,12 @@ namespace PostgreSQL.Embedding.Llm.Planners
 
                 var kernelArguments = new KernelArguments(actionVariables);
                 kernelArguments = kernelArguments.MergeArguments(_config.Variables);
+
+                if (_config.ToolCallMode == ToolCallMode.Async)
+                {
+                    _toolUseTrace = StepTrace.ToolUse(actionName, actionVariables, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId());
+                    await OnStepExecute?.Invoke(_toolUseTrace);
+                }
 
                 var kernelResult = await kernel.InvokeAsync(kernelFunction, kernelArguments, cancellationToken);
                 var result = string.Empty;
@@ -172,13 +135,29 @@ namespace PostgreSQL.Embedding.Llm.Planners
 
                 _stopwatch.Stop();
                 this._logger?.LogTrace($"Invoked {actionName}. Result: {result}");
-                await OnStepExecute?.Invoke(StepTrace.ToolCall(actionName, actionVariables, result, _stopwatch.Elapsed.TotalSeconds, true, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
+                if (_config.ToolCallMode == ToolCallMode.Sync)
+                {
+                    await OnStepExecute?.Invoke(StepTrace.ToolCall(actionName, actionVariables, result, _stopwatch.Elapsed.TotalSeconds, true, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
+                }
+                else
+                {
+                    await OnStepExecute?.Invoke(StepTrace.ToolResult(_toolUseTrace, actionName, actionVariables, result, _stopwatch.Elapsed.TotalSeconds, true));
+                }
+
                 return result;
             }
             catch (Exception e)
             {
                 _stopwatch.Stop();
-                await OnStepExecute?.Invoke(StepTrace.ToolCall(actionName, actionVariables, e.Message, _stopwatch.Elapsed.TotalSeconds, false, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
+                if (_config.ToolCallMode == ToolCallMode.Sync)
+                {
+                    await OnStepExecute?.Invoke(StepTrace.ToolCall(actionName, actionVariables, e.Message, _stopwatch.Elapsed.TotalSeconds, false, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
+                }
+                else
+                {
+                    await OnStepExecute?.Invoke(StepTrace.ToolResult(_toolUseTrace, actionName, actionVariables, e.Message, _stopwatch.Elapsed.TotalSeconds, false));
+                }
+
                 this._logger?.LogError(e, "Something went wrong in system step: {Plugin}.{Function}. Error: {Error}", targetFunction.PluginName, targetFunction.Name, e.Message);
                 throw;
             }
@@ -204,11 +183,6 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 {
                     var result = await InvokeActionAsync(kernel, step.Action, step.ActionVariables, cancellationToken).ConfigureAwait(false);
                     step.Observation = string.IsNullOrEmpty(result) ? $"There is no result can be found from tool call '{step.Action}'." : result!;
-                    if (step.Action.IndexOf("AskUser") != -1)
-                    {
-                        kernel.GetAgentExecutionContext().SetAgentState(AgentState.Paused);
-                        return false;
-                    }
                 }
                 catch (Exception ex)
                 {
@@ -225,107 +199,11 @@ namespace PostgreSQL.Embedding.Llm.Planners
             return false;
         }
 
-        private async Task<ReasoningStep> AddNextStep(ReasoningStep step, ReasoningStep lastStep, ChatHistory chatHistory, List<ReasoningStep> stepsTaken, int startingMessageCount)
-        {
-            // If the thought is empty and the last step had no action, copy action to last step and set as new nextStep
-            if (string.IsNullOrEmpty(step.Thought) && lastStep is not null && string.IsNullOrEmpty(lastStep.Action))
-            {
-                lastStep.Action = step.Action;
-                lastStep.ActionVariables = step.ActionVariables;
 
-                lastStep.RawResponse += step.RawResponse;
-                step = lastStep;
-                if (chatHistory.Count > startingMessageCount)
-                {
-                    chatHistory.RemoveAt(chatHistory.Count - 1);
-                }
-            }
-            else
-            {
-                _logger?.LogInformation($"{ThoughtTag} {{Thought}}", step.Thought);
-                await OnStepExecute?.Invoke(StepTrace.Thought("", step.Thought, _agentExecutionContext.GetStepId(), _agentExecutionContext.GetMessageId()));
 
-                stepsTaken.Add(step);
-                lastStep = step;
-            }
 
-            return step;
-        }
 
-        private bool TryGetObservations(ReasoningStep step, ChatHistory chatHistory, List<ReasoningStep> stepsTaken, ReasoningStep lastStep)
-        {
-            // If no Action/Thought is found, return any already available Observation from parsing the response.
-            // Otherwise, add a message to the chat history to guide LLM into returning the next thought|action.
-            if (string.IsNullOrEmpty(step.Action) &&
-                string.IsNullOrEmpty(step.Thought))
-            {
-                // If there is an observation, add it to the chat history
-                if (!string.IsNullOrEmpty(step.Observation))
-                {
-                    this._logger?.LogWarning("Invalid response from LLM, observation: {Observation}", step.Observation);
-                    chatHistory.AddUserMessage(step.FormatObservation());
-                    stepsTaken.Add(step);
-                    lastStep = step;
-                    return true;
-                }
 
-                if (lastStep is not null && string.IsNullOrEmpty(lastStep.Action))
-                {
-                    this._logger?.LogWarning("No response from LLM, expected Action");
-                    //chatHistory.AddUserMessage(step.FormatAction());
-                }
-                else
-                {
-                    this._logger?.LogWarning("No response from LLM, expected Thought");
-                    //chatHistory.AddUserMessage(step.FormatThought());
-                }
-
-                // No action or thought from LLM
-                //chatHistory.AddUserMessage($"<Observation Step=\"{step.Index}\">{step.RawResponse}</Observation>");
-                return true;
-            }
-
-            return false;
-        }
-
-        private void AddExecutionStatsToContext(List<ReasoningStep> stepsTaken, int iterations)
-        {
-            _variables["stepCount"] = stepsTaken.Count.ToString(CultureInfo.InvariantCulture);
-            _variables["stepsTaken"] = System.Text.Json.JsonSerializer.Serialize(stepsTaken);
-            _variables["iterations"] = iterations.ToString(CultureInfo.InvariantCulture);
-
-            var actionCounts = new Dictionary<string, int>();
-            foreach (var step in stepsTaken)
-            {
-                if (string.IsNullOrEmpty(step.Action)) { continue; }
-
-                _ = actionCounts.TryGetValue(step.Action, out int currentCount);
-                actionCounts[step.Action!] = ++currentCount;
-            }
-
-            var functionCallListWithCounts = string.Join(", ", actionCounts.Keys.Select(function =>
-                $"{function}({actionCounts[function]})"));
-
-            var functionCallTotalCount = actionCounts.Values.Sum().ToString(CultureInfo.InvariantCulture);
-
-            _variables["functionCount"] = $"{functionCallTotalCount} ({functionCallListWithCounts})";
-        }
-
-        private string TryGetFinalAnswer(ReasoningStep step, List<ReasoningStep> stepsTaken, int iterations)
-        {
-            if (!string.IsNullOrEmpty(step.FinalAnswer))
-            {
-                _variables["INPUT"] = step.FinalAnswer;
-                stepsTaken.Add(step);
-
-                AddExecutionStatsToContext(stepsTaken, iterations);
-
-                //OnStepExecute?.Invoke($"{FinalAnswerEmoji} {step.FinalAnswer}");
-                return step.FinalAnswer;
-            }
-
-            return null;
-        }
 
         private IAIService GetAIService(Kernel kernel)
         {
@@ -371,32 +249,6 @@ namespace PostgreSQL.Embedding.Llm.Planners
             return GetStreamingCompletionAsync(aiService, reducedChatHistory, addThought, cancellationToken);
         }
 
-        private async Task<string> GetCompletionAsync(IAIService aiService, ChatHistory chatHistory, bool addThought, CancellationToken cancellationToken)
-        {
-            var promptExecutionSettings = new PromptExecutionSettings() { FunctionChoiceBehavior = FunctionChoiceBehavior.None() };
-            if (aiService is IChatCompletionService chatCompletionService)
-            {
-                var chatMessageContent = await chatCompletionService.GetChatMessageContentAsync(chatHistory, promptExecutionSettings, cancellationToken: cancellationToken);
-                return chatMessageContent.Content;
-            }
-            else if (aiService is ITextGenerationService textGenerationService)
-            {
-                var thoughtProcess = string.Join("\n", chatHistory.Select(m => m.Content));
-
-                if (addThought)
-                {
-                    thoughtProcess = $"{thoughtProcess}\n{ThoughtTag}";
-                    addThought = false;
-                }
-
-                thoughtProcess = $"{thoughtProcess}\n";
-
-                var textContent = await textGenerationService.GetTextContentAsync(thoughtProcess, cancellationToken: cancellationToken);
-                return textContent.InnerContent.ToString();
-            }
-
-            throw new Exception("No available AIService for getting completions.");
-        }
 
         private async Task<string> GetStreamingCompletionAsync(IAIService aiService, ChatHistory chatHistory, bool addThought, CancellationToken cancellationToken)
         {

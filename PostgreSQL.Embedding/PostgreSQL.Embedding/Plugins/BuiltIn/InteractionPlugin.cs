@@ -1,16 +1,15 @@
-using DocumentFormat.OpenXml.Bibliography;
 using DocumentFormat.OpenXml.Office.SpreadSheetML.Y2023.MsForms;
 using Microsoft.SemanticKernel;
+using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Extensions;
 using PostgreSQL.Embedding.Common.Streaming;
 using PostgreSQL.Embedding.Domain.Entities;
-using PostgreSQL.Embedding.Domain.Models.Planners;
 using PostgreSQL.Embedding.Infrastructure.DataAccess;
 using PostgreSQL.Embedding.Llm.Planners;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
-using System.Text.Json;
+using static Org.BouncyCastle.Crypto.Engines.SM2Engine;
 
 namespace PostgreSQL.Embedding.Plugins.BuiltIn
 {
@@ -87,7 +86,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
             var traceId = Guid.NewGuid().ToString("N");
 
             var toolName = "InteractionPlugin.AskUser";
-            var input = new Dictionary<string, object> { { "request", approveRequest } };
+            var input = ToDictionry(approveRequest);
             
             var toolUseId = await SaveToolUseAsync(toolName, input, traceId, context);
             await PublishToolUseEvent(context, toolUseId, toolName, input);
@@ -121,7 +120,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
                     // 得到结果
                     var userSelectedOptions = string.IsNullOrEmpty(toolCall.Output)
                         ? new List<string>()
-                        : JsonSerializer.Deserialize<List<string>>(toolCall.Output) ?? new List<string>();
+                        : JsonConvert.DeserializeObject<List<string>>(toolCall.Output) ?? new List<string>();
 
                     await PublishToolResultEvent(context, toolCall.Id, userSelectedOptions);
 
@@ -147,11 +146,12 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
                 Options = options,
                 MultiSelect = multiSelect,
                 IsPending = true,
-                PendingMessage = "等待用户选择..."
+                PendingMessage = "等待用户做出选择..."
             };
 
             var traceId = Guid.NewGuid().ToString("N");
-            var input = new Dictionary<string, object> { { "request", choiceRequest } };
+            var input = ToDictionry(choiceRequest);
+
             var toolName = "InteractionPlugin.AskUser";
             var toolUseId = await SaveToolUseAsync(toolName, input, traceId, context);
             await PublishToolUseEvent(context, toolUseId, toolName, input);
@@ -183,7 +183,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
                 {
                     var userSelectedOptions = string.IsNullOrEmpty(toolCall.Output)
                         ? new List<string>()
-                        : JsonSerializer.Deserialize<List<string>>(toolCall.Output) ?? new List<string>();
+                        : JsonConvert.DeserializeObject<List<string>>(toolCall.Output) ?? new List<string>();
 
                     await PublishToolResultEvent(context, toolCall.Id, userSelectedOptions);
 
@@ -220,7 +220,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
                 await context.PublishEventAsync(new ToolResultEvent()
                 {
                     ToolUseId = toolUseId.ToString(),
-                    Content = JsonSerializer.Serialize(userSelectedOptions),
+                    Content = JsonConvert.SerializeObject(userSelectedOptions),
                     IsError = false,
                 });
             }
@@ -242,6 +242,20 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
 
             return toolCall.Id;
         }
+
+        private Dictionary<string,object> ToDictionry(UserInteractionRequest request)
+        {
+            return new Dictionary<string, object>()
+            {
+                { "mode", request.Mode },
+                { "question", request.Question  },
+                { "options", request.Options },
+                { "multiSelect", request.MultiSelect },
+                { "isPending", request.IsPending },
+                { "pendingMessage", request.PendingMessage }
+            };
+        }
+
     }
 
     public class UserInteractionRequest
@@ -249,31 +263,37 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         /// <summary>
         /// 交互模式：approve 或 choice
         /// </summary>
+        [JsonProperty("mode")]
         public string Mode { get; set; } = string.Empty;
 
         /// <summary>
         /// 询问的问题或操作描述
-        /// </summary>
+        /// </summary> 
+        [JsonProperty("question")]
         public string Question { get; set; } = string.Empty;
 
         /// <summary>
         /// 选项列表
         /// </summary>
+        [JsonProperty("options")]
         public List<string> Options { get; set; } = new();
 
         /// <summary>
         /// 是否允许多选
         /// </summary>
+        [JsonProperty("multiSelect")]
         public bool MultiSelect { get; set; }
 
         /// <summary>
         /// 是否等待用户响应
         /// </summary>
+        [JsonProperty("isPending")]
         public bool IsPending { get; set; }
 
         /// <summary>
         /// 等待时的提示信息
         /// </summary>
+        [JsonProperty("pendingMessage")]
         public string? PendingMessage { get; set; }
     }
 
@@ -282,6 +302,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         /// <summary>
         /// 用户选择的答案（响应后填充）
         /// </summary>
+        [JsonProperty("selectedOptions")]
         public List<string>? SelectedOptions { get; set; }
     }
 }
