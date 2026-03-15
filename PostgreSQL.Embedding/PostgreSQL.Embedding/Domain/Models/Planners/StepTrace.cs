@@ -44,7 +44,7 @@ namespace PostgreSQL.Embedding.Domain.Models.Planners
                 Type = "Thought"
             };
 
-        public static StepTrace Action(string actionName, Dictionary<string, object> actionVariables, string result, double duration, bool successful, string stepId, long messageId)
+        public static StepTrace ToolCall(string actionName, Dictionary<string, object> actionVariables, string result, double duration, bool successful, string stepId, long messageId)
         {
             return new StepTrace()
             {
@@ -58,6 +58,37 @@ namespace PostgreSQL.Embedding.Domain.Models.Planners
                 Type = "Action"
             };
         }
+
+        public static StepTrace ToolUse(string actionName, Dictionary<string, object> actionVariables, string stepId, long messageId)
+        {
+            return new StepTrace()
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                ParentId = stepId,
+                Title = $"ToolCall|{actionName}",
+                Description = $"使用工具 {actionName}",
+                Content = System.Text.Json.JsonSerializer.Serialize(new { input = actionVariables, output = string.Empty }),
+                Status = "pending",
+                MessageId = messageId,
+                Type = "ToolUse"
+            };
+        }
+
+        public static StepTrace ToolResult(StepTrace stepTrace, string actionName, Dictionary<string, object> actionVariables, string result, double duration, bool successful)
+        {
+            return new StepTrace()
+            {
+                Id = stepTrace.Id,
+                ParentId = stepTrace.ParentId,
+                Title = $"ToolCall|{actionName}",
+                Description = $"使用工具 {actionName}, 耗时 {duration} 秒",
+                Content = System.Text.Json.JsonSerializer.Serialize(new { input = actionVariables, output = result }),
+                Status = successful ? "success" : "failed",
+                MessageId = stepTrace.MessageId,
+                Type = "ToolResult"
+            };
+        }
+
 
         public static StepTrace Plan(string planId, string planName, string planDescription, string executeResult, string status, long messageId)
         {

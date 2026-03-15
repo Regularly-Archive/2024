@@ -23,5 +23,13 @@ namespace PostgreSQL.Embedding.Llm.Planners
         };
 
         public Dictionary<string, object> Variables { get; set; } = new Dictionary<string, object>();
+
+        public ToolCallMode ToolCallMode = ToolCallMode.Sync;
+    }
+
+    public enum ToolCallMode
+    {
+        Sync = 0,  // 同步调用
+        Async = 1, // 异步调用
     }
 }

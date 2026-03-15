@@ -6,6 +6,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
     public static class AgentExecutionContextExtensions
     {
         private const string CitationsKey = "G_Citations";
+        private const string AgentSateKey = "G_AgentState";
 
         public static void SetReferenceMessageId(this AgentExecutionContext context, long value)
         {
@@ -81,5 +82,22 @@ namespace PostgreSQL.Embedding.Llm.Planners
         {
             context.SetGlobalData(CitationsKey, new ConcurrentBag<LlmCitationModel>());
         }
+
+        public static AgentState GetAgentState(this AgentExecutionContext context)
+        {
+            return (AgentState)context.GetGlobalData<int>(AgentSateKey);
+        }
+
+        public static void SetAgentState(this AgentExecutionContext context, AgentState agentState)
+        {
+            context.SetGlobalData(AgentSateKey, (int)agentState);
+        }
+    }
+
+    public enum AgentState
+    {
+        Running = 0,
+        Paused = 1,
+        Idle =2,
     }
 }

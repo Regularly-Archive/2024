@@ -48,6 +48,12 @@ namespace PostgreSQL.Embedding.Domain.Entities
         /// 持续时长（毫秒）
         /// </summary>
         [SugarColumn(ColumnName = "duration_ms", IsNullable = true)]
-        public long? DurationMs { get; set; }
+        public decimal? DurationMs { get; set; }
+
+        /// <summary>
+        /// 持续时长（毫秒）
+        /// </summary>
+        [SugarColumn(ColumnName = "trace_id", IsNullable = false)]
+        public string TraceId { get; set; }
     }
 }

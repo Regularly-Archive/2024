@@ -1,7 +1,13 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0-preview
+FROM mcr.microsoft.com/dotnet/sdk:10.0-noble
 
 LABEL maintainer="sandbox" \
       description="Sandbox image with Python, Node.js, .NET runtime"
+
+# Replace sources.list with Aliyun mirror
+RUN echo 'deb https://mirrors.aliyun.com/ubuntu/ noble main restricted universe multiverse' > /etc/apt/sources.list && \
+    echo 'deb https://mirrors.aliyun.com/ubuntu/ noble-updates main restricted universe multiverse' >> /etc/apt/sources.list && \
+    echo 'deb https://mirrors.aliyun.com/ubuntu/ noble-security main restricted universe multiverse' >> /etc/apt/sources.list && \
+    echo 'deb https://mirrors.aliyun.com/ubuntu/ noble-backports main restricted universe multiverse' >> /etc/apt/sources.list
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
@@ -23,6 +29,27 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     nodejs \
     npm \
+    libglib2.0-0 \
+    libglib2.0-dev \
+    # Playwright/Chromium dependencies
+    libnss3 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libpango-1.0-0 \
+    libcairo2 \
+    libasound2t64 \
+    fonts-wqy-zenhei \
+    fonts-wqy-microhei \ 
+    fonts-noto-cjk \
+    fonts-noto-color-emoji \
     && rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m pip install --no-cache-dir --break-system-packages \
@@ -36,5 +63,7 @@ RUN npm install -g --no-cache \
     typescript \
     ts-node \
     prettier
+
+RUN npm install -g agent-browser && agent-browser install --with-deps
 
 CMD ["bash"]

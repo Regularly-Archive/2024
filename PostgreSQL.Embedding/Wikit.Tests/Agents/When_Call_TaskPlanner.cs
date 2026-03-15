@@ -144,7 +144,7 @@ namespace Wikit.Tests.Agents
             planner.AddVariable("currentTime", DateTime.Now);
 
             var graphExecutor = new DAGraphExecutor(input, subTasks.Tasks, planner, _kernel, null);
-            await graphExecutor.ExecuteAsync();
+            await graphExecutor.ExecuteAsync(CancellationToken.None);
 
             this.ShouldSatisfyAllConditions(
                 () => subTasks.Tasks.All(x => x.State == PostgreSQL.Embedding.Domain.Models.Planners.TaskState.Completed).ShouldBeTrue()

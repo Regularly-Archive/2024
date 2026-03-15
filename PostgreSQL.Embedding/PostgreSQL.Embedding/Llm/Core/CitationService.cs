@@ -149,6 +149,8 @@ public class CitationService
     /// <returns>Plain text without citation markers</returns>
     public string RemoveCitations(string text)
     {
+        if (string.IsNullOrEmpty(text)) return text;
+
         return _regexCitations.Replace(text, "");
     }
 }
