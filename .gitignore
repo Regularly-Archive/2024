@@ -127,3 +127,6 @@ PostgreSQL.Embedding/PostgreSQL.Embedding/.claude/settings.local.json
 code-runner/backend/legacy/static/projects/1kvmlz5l/executions/exec_b1ae1d6421ee/artifacts/sales_report.xlsx
 code-runner/backend/legacy/services/__pycache__/detector.cpython-39.pyc
 code-runner/backend/legacy/static/projects/mkqb8wf6/executions/exec_ad13189d73fc/artifacts/sales_report.xlsx
+code-runner/backend/legacy/__pycache__/
+code-runner/backend/legacy/handlers/__pycache__/
+code-runner/backend/legacy/services/__pycache__/
