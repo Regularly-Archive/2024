@@ -517,7 +517,7 @@ public class ArtifactsPlugin : BasePlugin
         // 从数据库查询 Artifact
         var artifact = await _artifactRepository.FindAsync(x => x.ArtifactId == artifactId || x.FileName == artifactId);
         if (artifact == null)
-            throw new ArgumentException($"The Artifact not found: {artifactId}");
+            throw new ArgumentException($"The artifact not found: {artifactId}");
 
         var filePath = GetArtifactFilePath(kernel, artifact.RunId, artifact.FileName);
         if (!File.Exists(filePath))
@@ -527,14 +527,17 @@ public class ArtifactsPlugin : BasePlugin
     }
 
     [KernelFunction]
-    [Description("列出当前会话中的所有 Artifact，返回访问 URL 列表。")]
-    public async Task<IEnumerable<ArtifactResponse>> ListArtifacts(Kernel kernel)
+    [Description("列出当前会话或任务中的所有 artifact，返回访问 URL 列表。")]
+    public async Task<IEnumerable<ArtifactResponse>> ListArtifacts(Kernel kernel, [Description("产物隔离级别，取值为：session|run")] string isolationLevel = "run")
     {
         var agentExecutionContext = kernel.GetAgentExecutionContext();
         var conversationId = agentExecutionContext.GetConversationId();
+        var runId = agentExecutionContext.GetRunId();
 
         // 从数据库查询当前会话的所有 Artifact
-        var artifacts = await _artifactRepository.FindListAsync(x => x.ConversationId == conversationId);
+        var artifacts = isolationLevel == "run"
+            ? await _artifactRepository.FindListAsync(x => x.RunId == runId)
+            : await _artifactRepository.FindListAsync(x => x.ConversationId == conversationId);
 
         return artifacts.Select(artifact => new ArtifactResponse
         {
@@ -558,7 +561,7 @@ public class ArtifactsPlugin : BasePlugin
         var conversationId = agentExecutionContext.GetConversationId();
         var runId = agentExecutionContext.GetRunId();
 
-        var relativeUrl = $"/api/statics/{currentUser.Id}/{appId}/conversations/{conversationId}/runs/{runId}/artifacts/{fileName}";
+        var relativeUrl = $"/api/statics/apps/{appId}/conversations/{conversationId}/artifacts/{fileName}";
         var baseUrl = GetBaseUrl();
         return string.IsNullOrEmpty(baseUrl) ? relativeUrl : $"{baseUrl}{relativeUrl}";
     }
@@ -566,7 +569,7 @@ public class ArtifactsPlugin : BasePlugin
     private string GetArtifactFilePath(Kernel kernel, string runId, string fileName)
     {
         var sandboxContext = kernel.GetAgentExecutionContext().GetSandboxContext();
-        return Path.Combine(sandboxContext.SessionDir, "runs", runId, "artifacts", fileName);
+        return Path.Combine(sandboxContext.SessionDir, "artifacts", fileName);
     }
 
 

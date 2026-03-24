@@ -164,4 +164,9 @@ namespace PostgreSQL.Embedding.Plugins.Custom
     {
         Task<SearchResult> SearchAsync(string keyword, int limit = 30, string filterDomain = "");
     }
+
+    public interface IImageSearchEngine
+    {
+        Task<ImageSearchResult> SearchImagesAsync(string keyword, int limit = 5);
+    }
 }

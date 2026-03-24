@@ -100,6 +100,22 @@ namespace PostgreSQL.Embedding.Llm.Planners
         /// </summary>
         private static string ExtractValue(string value)
         {
+            if (value.StartsWith("<![CDATA[") && !value.EndsWith("]]>"))
+            {
+                if (value.EndsWith("]"))
+                {
+                    value += "]>";
+                }
+                else if (value.EndsWith("]]"))
+                {
+                    value += ">";
+                }
+                else
+                {
+                    value += "]]>";
+                }
+            }
+
             if (value.StartsWith("<![CDATA[") && value.EndsWith("]]>"))
                 return value[9..^3];
             return value;

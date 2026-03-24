@@ -8,7 +8,7 @@ internal class SandboxContext : ISandboxContext
     public string BaseDir => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         ".insighta",
-        "1769635011574763520"
+        "apps"
     );
 
     public string AppDir { get; }
@@ -23,8 +23,8 @@ internal class SandboxContext : ISandboxContext
     {
         AppDir = Path.Combine(BaseDir, appId.ToString());
         SessionDir = Path.Combine(AppDir, "conversations", conversationId);
+        ArtifactsDir = Path.Combine(SessionDir, "artifacts");
         RunDir = Path.Combine(SessionDir, "runs", runId);
-        ArtifactsDir = Path.Combine(RunDir, "artifacts");
         SkillsDir = Path.Combine(AppDir, ".skills");
 
         EnsureDirectoriesExisit([AppDir, SessionDir, RunDir, ArtifactsDir, SkillsDir]);
@@ -108,7 +108,6 @@ internal class SandboxContext : ISandboxContext
     {
         return new Dictionary<string, string>
         {
-            { RunDir, "/sandbox" },
             { SkillsDir, "/sandbox/.skills" },
             { ArtifactsDir, "/sandbox/artifacts" },
             //{ Path.Combine(SessionDir, "MEMORY.md"), "/sandbox/MEMORY.md" },

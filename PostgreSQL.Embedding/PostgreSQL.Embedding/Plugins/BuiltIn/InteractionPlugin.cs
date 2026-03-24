@@ -1,4 +1,3 @@
-using DocumentFormat.OpenXml.Office.SpreadSheetML.Y2023.MsForms;
 using Microsoft.SemanticKernel;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Attributes;
@@ -9,7 +8,6 @@ using PostgreSQL.Embedding.Infrastructure.DataAccess;
 using PostgreSQL.Embedding.Llm.Planners;
 using PostgreSQL.Embedding.Plugins.Abstration;
 using System.ComponentModel;
-using static Org.BouncyCastle.Crypto.Engines.SM2Engine;
 
 namespace PostgreSQL.Embedding.Plugins.BuiltIn
 {
@@ -44,6 +42,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
             [Description("要询问的问题或操作描述")] string question,
             [Description("选项列表。approve 模式下留空使用默认选项[同意/拒绝]；choice 模式下必填")] List<string>? options = null,
             [Description("是否允许多选，仅 mode=choice 时有效，默认 false")] bool multiSelect = false,
+            [Description("是否允许输入自定义内容, 仅 mode=choice 时有效，默认 true")] bool allowCustomInput = true,
             Kernel? kernel = null
         )
         {
@@ -55,13 +54,10 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
             }
             else if (mode.ToLower() == "choice")
             {
-                // 选择模式
                 if (options == null || options.Count == 0)
-                {
                     throw new ArgumentException("choice 模式需要提供选项列表");
-                }
 
-                return await HandleUserChoice(question, options, multiSelect, context);
+                return await HandleUserChoice(question, options, multiSelect, allowCustomInput, context);
             }
             else
             {
@@ -80,14 +76,15 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
                 Options = approvalOptions,
                 MultiSelect = false,
                 IsPending = true,
-                PendingMessage = "等待用户批准..."
+                PendingMessage = "等待用户批准...",
+                AllowCustomInput = false,
             };
 
             var traceId = Guid.NewGuid().ToString("N");
 
             var toolName = "InteractionPlugin.AskUser";
             var input = ToDictionry(approveRequest);
-            
+
             var toolUseId = await SaveToolUseAsync(toolName, input, traceId, context);
             await PublishToolUseEvent(context, toolUseId, toolName, input);
 
@@ -98,15 +95,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
                 // 检查超时
                 if ((DateTime.UtcNow - startTime).TotalSeconds > DefaultTimeoutSeconds)
                 {
-                    return new UserInteractionResponse
-                    {
-                        Mode = "approve",
-                        Question = question,
-                        Options = approvalOptions,
-                        MultiSelect = false,
-                        IsPending = false,
-                        SelectedOptions = new List<string> { "超时" }
-                    };
+                    throw new TimeoutException("The operation has timed out due to prolonged user inactivity");
                 }
 
                 var toolCall = await _toolCallRepository.GetAsync(toolUseId);
@@ -124,20 +113,12 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
 
                     await PublishToolResultEvent(context, toolCall.Id, userSelectedOptions);
 
-                    return new UserInteractionResponse
-                    {
-                        Mode = "approve",
-                        Question = question,
-                        Options = approvalOptions,
-                        MultiSelect = false,
-                        IsPending = false,
-                        SelectedOptions = userSelectedOptions
-                    };
+                    return new UserInteractionResponse(approveRequest, userSelectedOptions);
                 }
             }
         }
 
-        private async Task<UserInteractionResponse> HandleUserChoice(string question, List<string> options, bool multiSelect, AgentExecutionContext context)
+        private async Task<UserInteractionResponse> HandleUserChoice(string question, List<string> options, bool multiSelect, bool allowCustomInput, AgentExecutionContext context)
         {
             var choiceRequest = new UserInteractionRequest
             {
@@ -146,7 +127,8 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
                 Options = options,
                 MultiSelect = multiSelect,
                 IsPending = true,
-                PendingMessage = "等待用户做出选择..."
+                PendingMessage = "等待用户做出选择...",
+                AllowCustomInput = allowCustomInput
             };
 
             var traceId = Guid.NewGuid().ToString("N");
@@ -163,15 +145,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
                 // 检查超时
                 if ((DateTime.UtcNow - startTime).TotalSeconds > DefaultTimeoutSeconds)
                 {
-                    return new UserInteractionResponse
-                    {
-                        Mode = "choice",
-                        Question = question,
-                        Options = options,
-                        MultiSelect = multiSelect,
-                        IsPending = false,
-                        SelectedOptions = new List<string> { "超时" }
-                    };
+                    throw new TimeoutException("The operation has timed out due to prolonged user inactivity");
                 }
 
                 var toolCall = await _toolCallRepository.GetAsync(toolUseId);
@@ -187,15 +161,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
 
                     await PublishToolResultEvent(context, toolCall.Id, userSelectedOptions);
 
-                    return new UserInteractionResponse
-                    {
-                        Mode = "choice",
-                        Question = question,
-                        Options = options,
-                        MultiSelect = multiSelect,
-                        IsPending = false,
-                        SelectedOptions = userSelectedOptions
-                    };
+                    return new UserInteractionResponse(choiceRequest, userSelectedOptions);
                 }
             }
         }
@@ -243,7 +209,7 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
             return toolCall.Id;
         }
 
-        private Dictionary<string,object> ToDictionry(UserInteractionRequest request)
+        private Dictionary<string, object> ToDictionry(UserInteractionRequest request)
         {
             return new Dictionary<string, object>()
             {
@@ -252,7 +218,8 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
                 { "options", request.Options },
                 { "multiSelect", request.MultiSelect },
                 { "isPending", request.IsPending },
-                { "pendingMessage", request.PendingMessage }
+                { "pendingMessage", request.PendingMessage },
+                { "allowCustomInput",  request.AllowCustomInput }
             };
         }
 
@@ -295,6 +262,12 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         /// </summary>
         [JsonProperty("pendingMessage")]
         public string? PendingMessage { get; set; }
+
+        /// <summary>
+        /// 是否允许自定义输入内容
+        /// </summary>
+        [JsonProperty("allowCustomInput")]
+        public bool AllowCustomInput { get; set; }
     }
 
     public class UserInteractionResponse : UserInteractionRequest
@@ -304,5 +277,17 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
         /// </summary>
         [JsonProperty("selectedOptions")]
         public List<string>? SelectedOptions { get; set; }
+
+        public UserInteractionResponse(UserInteractionRequest request, List<string> selectedOptions)
+        {
+            Mode = request.Mode;
+            Question = request.Question;
+            Options = request.Options;
+            MultiSelect = request.MultiSelect;
+            IsPending = false;
+            PendingMessage = null;
+            AllowCustomInput = request.AllowCustomInput;
+            SelectedOptions = selectedOptions;
+        }
     }
 }
