@@ -54,7 +54,8 @@ namespace PostgreSQL.Embedding.Application.Controllers
 
             // 更新 tool call 状态和输出
             toolCall.Status = 1; // success
-            toolCall.Output = JsonSerializer.Serialize(request.SelectedOptions);
+            toolCall.Output = JsonSerializer.Serialize(request.SelectedOptions, JsonSerializerOptions.Default);
+            toolCall.DurationMs = (decimal)DateTime.Now.Subtract(toolCall.CreatedAt.Value).TotalMilliseconds;
 
             await _toolCallRepository.UpdateAsync(toolCall);
 

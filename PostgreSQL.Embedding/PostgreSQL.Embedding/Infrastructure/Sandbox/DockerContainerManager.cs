@@ -85,14 +85,15 @@ public class DockerContainerManager
 
         // 构建卷映射 (使用字符串格式 "source:target:mode")
         // 自动转换路径格式：Windows 路径 → WSL2/Linux 路径
-        var binds = volumeMappings.Select(kv => $"{ConvertToContainerPath(kv.Key)}:{kv.Value}:rw").ToList();
+        var binds = volumeMappings.Select(kv => $"{kv.Key}:{kv.Value}:rw").ToList();
+        //var binds = volumeMappings.Select(kv => $"{ConvertToContainerPath(kv.Key)}:{kv.Value}:rw").ToList();
 
         // 构建资源限制
         var hostConfig = new HostConfig
         {
             Binds = binds,
             Memory = _options.MemoryLimitMb.HasValue ? (long)(_options.MemoryLimitMb.Value * 1024 * 1024) : 0,
-            NanoCPUs = _options.CpuLimit.HasValue ? (long)(_options.CpuLimit.Value * 1_000_000_000) : 0
+            NanoCPUs = _options.CpuLimit.HasValue ? (long)(_options.CpuLimit.Value * 1_000_000_000) : 0,
         };
 
         // 创建容器

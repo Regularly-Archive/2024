@@ -21,7 +21,6 @@ public class UseMCPPlugin : BasePlugin
     private readonly ILogger<UseMCPPlugin> _logger;
     private readonly IRepository<MCPServer> _mcpServiceRepository;
     private readonly McpConnectionFactory? _cacheableMcpClientFactory;
-    private readonly PromptTemplateService _promptTemplateService;
 
     public UseMCPPlugin(IServiceProvider serviceProvider)
         : base(serviceProvider)
@@ -29,7 +28,6 @@ public class UseMCPPlugin : BasePlugin
         _mcpServiceRepository = _serviceProvider.GetService<IRepository<MCPServer>>();
         _logger = _serviceProvider.GetService<ILoggerFactory>().CreateLogger<UseMCPPlugin>();
         _cacheableMcpClientFactory = _serviceProvider.GetService<McpConnectionFactory>();
-        _promptTemplateService = _serviceProvider.GetService<PromptTemplateService>();
     }
 
     private McpConnectionFactory GetRequiredFactory()
@@ -50,7 +48,7 @@ public class UseMCPPlugin : BasePlugin
     }
 
     [KernelFunction]
-    [Description("列出指定 MCP 服务器支持的所有工具（Function），包含工具名称、描述和输入参数Schema")]
+    [Description("列出指定 MCP 服务器支持的所有工具（Function），展示工具名称、描述和输入参数 Schema")]
     public async Task<string> ListToolsAsync([Description("MCP 服务器名称")][Required] string serverName, Kernel kernel)
     {
         var agentExecutionContext = kernel.GetAgentExecutionContext();

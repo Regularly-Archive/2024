@@ -1,18 +1,14 @@
-﻿using DocumentFormat.OpenXml.Office.SpreadSheetML.Y2023.MsForms;
-using Microsoft.SemanticKernel;
+﻿using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Services;
 using Microsoft.SemanticKernel.TextGeneration;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Extensions;
-using PostgreSQL.Embedding.Common.Json;
 using PostgreSQL.Embedding.Domain.Models.Planners;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
-using System.Threading;
 
 namespace PostgreSQL.Embedding.Llm.Planners
 {
@@ -80,6 +76,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 {
                     if (!string.IsNullOrEmpty(nextStep.FinalAnswer))
                     {
+                        _logger.LogInformation($"[FinalAnswer]{nextStep.FinalAnswer}");
                         await OnStepExecute?.Invoke(StepTrace.StepDone(_agentExecutionContext.GetMessageId()));
                         return nextStep.FinalAnswer;
                     }
@@ -167,7 +164,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
         {
             if (!string.IsNullOrEmpty(step.Action))
             {
-                this._logger?.LogInformation("[ACTION] {Action}({ActionVariables}).", step.Action, JsonSerializerExtensions.Serialize(step.ActionVariables));
+                this._logger?.LogInformation("[ACTION] {Action}({ActionVariables}).", step.Action, JsonConvert.SerializeObject(step.ActionVariables));
 
                 // Add <Thought> and <Action> to chat history using XML format
                 var messageBuilder = new StringBuilder();

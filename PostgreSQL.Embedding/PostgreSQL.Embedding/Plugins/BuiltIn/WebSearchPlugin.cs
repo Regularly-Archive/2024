@@ -1,5 +1,4 @@
-﻿using Anthropic.SDK.Messaging;
-using Microsoft.SemanticKernel;
+﻿using Microsoft.SemanticKernel;
 using Newtonsoft.Json;
 using PostgreSQL.Embedding.Common.Attributes;
 using PostgreSQL.Embedding.Common.Extensions;
@@ -12,7 +11,6 @@ using PostgreSQL.Embedding.Plugins.Abstration;
 using PostgreSQL.Embedding.Plugins.Custom;
 using PostgreSQL.Embedding.Utils;
 using System.ComponentModel;
-using System.Text.RegularExpressions;
 
 namespace PostgreSQL.Embedding.Plugins.BuiltIn
 {
@@ -75,6 +73,31 @@ namespace PostgreSQL.Embedding.Plugins.BuiltIn
             var searchResult = await serviceEngine.SearchAsync(query);
 
             return searchResult;
+        }
+
+        [KernelFunction]
+        [Description("使用搜索引擎搜索关键词，返回图片结果列表（图片URL、标题、描述）。适用于查找相关图片素材。当前仅支持 Tavily 搜索引擎。")]
+        public async Task<ImageSearchResult> SearchImagesAsync(
+            [Description("搜索关键词")] string keyword,
+            [Description("搜索引擎名称，当前仅支持 Tavily")] string searchEngine = "Tavily",
+            [Description("最大返回结果数量，默认为 5")] int limit = 5)
+        {
+            using var serviceScope = _serviceProvider.CreateScope();
+            var imageSearchEngine = GetImageSearchEngine(serviceScope.ServiceProvider, searchEngine);
+
+            var imageSearchResult = await imageSearchEngine.SearchImagesAsync(keyword, limit);
+            return imageSearchResult;
+        }
+
+        private IImageSearchEngine GetImageSearchEngine(IServiceProvider serviceProvider, string searchEngine = "tavily")
+        {
+            switch (searchEngine.ToLower())
+            {
+                case "tavily":
+                    return serviceProvider.GetRequiredService<TavilySearchPlugin>() as IImageSearchEngine;
+                default:
+                    throw new NotSupportedException($"搜索引擎 {searchEngine} 不支持图片搜索，目前仅支持 Tavily");
+            }
         }
 
         private ISearchEngine GetSearchEngine(IServiceProvider serviceProvider, string searchEngine = "bing")

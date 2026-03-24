@@ -1,18 +1,9 @@
 using Anthropic.SDK;
-using Anthropic.SDK.Constants;
 using Anthropic.SDK.Messaging;
-using Azure;
-using DocumentFormat.OpenXml.Bibliography;
-using DocumentFormat.OpenXml.Spreadsheet;
-using Microsoft.Extensions.AI;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.TextGeneration;
 using SqlSugar;
-using SqlSugar.DistributedSystem.Snowflake;
-using System.Linq;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 
 
 namespace PostgreSQL.Embedding.Llm.Connectors.Anthropic
@@ -107,7 +98,7 @@ namespace PostgreSQL.Embedding.Llm.Connectors.Anthropic
             var parameters = new MessageParameters()
             {
                 Messages = messages,
-                MaxTokens = 4096,
+                MaxTokens = 4096 * 4,
                 Model = _modelId,
                 Stream = true,
                 Temperature = 1.0m,

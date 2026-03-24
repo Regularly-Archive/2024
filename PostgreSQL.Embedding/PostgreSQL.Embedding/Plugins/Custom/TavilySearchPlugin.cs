@@ -10,7 +10,7 @@ using System.Text.Json.Serialization;
 namespace PostgreSQL.Embedding.Plugins.Custom
 {
     [KernelPlugin(Description = "Tavily 搜索引擎服务。一个专为 AI 智能体设计的搜索引擎，支持高级搜索深度和答案提取。", Version = "1.0")]
-    public class TavilySearchPlugin : BasePlugin, ISearchEngine
+    public class TavilySearchPlugin : BasePlugin, ISearchEngine, IImageSearchEngine
     {
         [PluginParameter(Description = "Tavily API Key，可在 tavily.com 申请")] string API_KEY { get; set; }
 
@@ -59,6 +59,61 @@ namespace PostgreSQL.Embedding.Plugins.Custom
 
             var content = await response.Content.ReadAsStringAsync();
             return ExtractSearchResult(keyword, content);
+        }
+
+        [KernelFunction]
+        [Description("使用 Tavily 搜索引擎搜索关键词，返回图片结果列表（图片URL、标题、描述）。适用于查找相关图片素材。")]
+        public async Task<ImageSearchResult> SearchImagesAsync(
+            [Description("搜索关键词")] string keyword,
+            [Description("最大返回结果数量，默认为 5")] int limit = 5)
+        {
+            if (!Validate(out var errorMessages)) throw new Exception(string.Join("", errorMessages));
+
+            using var httpClient = _httpClientFactory.CreateClient();
+
+            var requestBody = new Dictionary<string, object>
+            {
+                { "query", keyword },
+                { "search_depth", "advanced" },
+                { "include_images", true },
+                { "include_image_descriptions", true },
+                { "max_results", limit }
+            };
+
+            var jsonContent = new StringContent(
+                System.Text.Json.JsonSerializer.Serialize(requestBody),
+                System.Text.Encoding.UTF8,
+                "application/json"
+            );
+
+            httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", API_KEY);
+
+            var response = await httpClient.PostAsync("https://api.tavily.com/search", jsonContent);
+            response.EnsureSuccessStatusCode();
+
+            var content = await response.Content.ReadAsStringAsync();
+            return ExtractImageSearchResult(keyword, content);
+        }
+
+        private ImageSearchResult ExtractImageSearchResult(string keyword, string content)
+        {
+            var imageSearchResult = new ImageSearchResult { Keyword = keyword };
+            var jObject = JObject.Parse(content);
+
+            var images = jObject["images"]?.Value<JArray>();
+            if (images != null && images.Count > 0)
+            {
+                var entries = images.Select(x => new ImageEntry
+                {
+                    Url = x["url"]?.Value<string>() ?? "",
+                    Title = x["title"]?.Value<string>() ?? "",
+                    Description = x["description"]?.Value<string>() ?? ""
+                });
+
+                imageSearchResult.Entries.AddRange(entries);
+            }
+
+            return imageSearchResult;
         }
 
         private SearchResult ExtractSearchResult(string keyword, string content)
