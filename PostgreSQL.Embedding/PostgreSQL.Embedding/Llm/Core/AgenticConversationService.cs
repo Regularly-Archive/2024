@@ -61,6 +61,7 @@ namespace PostgreSQL.Embedding.Llm.Core
         private IRepository<ChatMessageReasoning>? _reasoningRepository;
         private IRepository<ChatMessageToolCall>? _toolCallRepository;
         private IRepository<ChatMessagePlan>? _planRepository;
+        private IRepository<AgentRun>? _agentRunsRepository;
 
         public AgenticConversationService(
             Kernel kernel,
@@ -82,29 +83,39 @@ namespace PostgreSQL.Embedding.Llm.Core
             _reasoningRepository = _serviceProvider.GetRequiredService<IRepository<ChatMessageReasoning>>();
             _toolCallRepository = _serviceProvider.GetRequiredService<IRepository<ChatMessageToolCall>>();
             _planRepository = _serviceProvider.GetRequiredService<IRepository<ChatMessagePlan>>();
+            _agentRunsRepository = _serviceProvider.GetRequiredService<IRepository<AgentRun>>();
         }
 
         /// <summary>
         /// Main entry point - returns an async enumerable of SSE events following Anthropic format.
         /// </summary>
         public async IAsyncEnumerable<ISseEvent> InvokeAsync(
-            ConversationRequestModel request,
             string input,
             string? conversationId = null,
+            string? runId = null,
+            IEnumerable<UserInputFile> userInputFiles = null,
             [EnumeratorCancellation] CancellationToken ct = default)
         {
             // Setup conversation context
             var convId = string.IsNullOrEmpty(conversationId) ? Guid.NewGuid().ToString("N") : conversationId;
-            var runId = Guid.NewGuid().ToString();
+
+            if (string.IsNullOrEmpty(runId)) runId = Guid.NewGuid().ToString("N");
+
             _agentExecutionContext.SetRunId(runId);
             _agentExecutionContext.SetAppId(_app.Id);
             _agentExecutionContext.SetConversationId(convId);
             _agentExecutionContext.InitializeSandboxContext(_app.Id, convId, runId, _sandboxOptions);
             _agentExecutionContext.SetAgentState(AgentState.Running);
 
+            var agentRun = await _agentRunsRepository.FindAsync(x => x.RunId == runId);
+
             // Add user message
-            var refMessageId = await _chatHistoriesService.AddUserMessageAsync(_app.Id, convId, input);
+            var refMessageId = agentRun == null
+                ? await _chatHistoriesService.AddUserMessageAsync(_app.Id, convId, input)
+                : agentRun.RefMessageId;
+
             _agentExecutionContext.SetReferenceMessageId(refMessageId);
+
 
             // Add app conversation
             var conversationTitle = string.Empty;
@@ -120,10 +131,18 @@ namespace PostgreSQL.Embedding.Llm.Core
             }
 
             // Add system message
-            var messageId = await _chatHistoriesService.AddSystemMessageAsync(_app.Id, convId, string.Empty);
+            var messageId = agentRun == null
+                ? await _chatHistoriesService.AddSystemMessageAsync(_app.Id, convId, string.Empty)
+                : agentRun.MessageId;
             _agentExecutionContext.SetMessageId(messageId);
 
-            var metadata = new ConversationContext { ConversationId = convId, ConversationTitle = conversationTitle, ReferenceMessageId = refMessageId.ToString() };
+            if (agentRun == null)
+            {
+                agentRun = new AgentRun() { RunId = runId, ConversationId = convId, RefMessageId = refMessageId, MessageId = messageId };
+                await _agentRunsRepository.AddAsync(agentRun);
+            }
+
+            var metadata = new ConversationContext { ConversationId = convId, ConversationTitle = conversationTitle, ReferenceMessageId = refMessageId.ToString(), RunId = runId };
 
             // Create channel for event streaming
             var channel = Channel.CreateUnbounded<ISseEvent>(new UnboundedChannelOptions
@@ -136,7 +155,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             _agentExecutionContext.InitializeEventBus(channel.Writer);
 
             // Start event production in background
-            _ = ProduceEventsAsync(request, input, metadata, messageId, channel.Writer, ct);
+            _ = ProduceEventsAsync(input, metadata, messageId, channel.Writer, ct);
 
             // Consume and yield events to the caller
             await foreach (var evt in channel.Reader.ReadAllAsync(ct))
@@ -147,7 +166,6 @@ namespace PostgreSQL.Embedding.Llm.Core
         }
 
         private async Task ProduceEventsAsync(
-            ConversationRequestModel request,
             string input,
             ConversationContext conversationContext,
             long messageId,
@@ -180,11 +198,11 @@ namespace PostgreSQL.Embedding.Llm.Core
                 await writer.WriteAsync(new PingEvent(), ct);
 
                 // 3. Planning phase - emit planning events
-                var subtasks = await EmitPlanningEventsAsync(request, input, conversationId, messageId, writer, blockTracker, ct);
+                var subtasks = await EmitPlanningEventsAsync(input, conversationId, messageId, writer, blockTracker, ct);
                 if (!subtasks.Any()) return;
 
                 // 4. Execute subtasks and emit tool/action events
-                var finalResult = await ExecuteSubTasksAsync(request, input, conversationId, messageId, writer, blockTracker, subtasks.ToList(), ct);
+                var finalResult = await ExecuteSubTasksAsync(input, conversationId, messageId, writer, blockTracker, subtasks.ToList(), ct);
 
                 // 5. Generate final response with text block (thinking already emitted during planning/execution)
                 await EmitFinalResponseAsync(input, conversationId, messageId, finalResult, writer, blockTracker.TextBlockIndex, ct);
@@ -235,7 +253,6 @@ namespace PostgreSQL.Embedding.Llm.Core
         }
 
         private async Task<IEnumerable<SubTask>> EmitPlanningEventsAsync(
-            ConversationRequestModel request,
             string input,
             string conversationId,
             long messageId,
@@ -244,13 +261,14 @@ namespace PostgreSQL.Embedding.Llm.Core
             CancellationToken ct)
         {
             var currentUser = await _currentUserService.GetCurrentUserAsync();
-            var historyContext = await GetOrCreateContextAsync(_app.Id, conversationId);
+            var taskMemory = await GetOrCreateContextAsync(_app.Id, conversationId);
+            await InjectTaskMemory(taskMemory);
 
             // Create task planner
             var taskPlanner = new TaskPlanner(_kernel);
             var planResult = _app.AppType == (int)LlmAppType.Chat
-                ? await taskPlanner.GetSubTasksAsync(query: input, history: historyContext, limit: 10, ct)
-                : await taskPlanner.GetRAGTasks(query: input, history: historyContext, ct);
+                ? await taskPlanner.GetSubTasksAsync(query: input, history: taskMemory, limit: 10, ct)
+                : await taskPlanner.GetRAGTasks(query: input, history: taskMemory, ct);
 
             var subTasks = planResult.Tasks;
             if (!subTasks.Any())
@@ -284,7 +302,6 @@ namespace PostgreSQL.Embedding.Llm.Core
         }
 
         private async Task<string> ExecuteSubTasksAsync(
-            ConversationRequestModel request,
             string input,
             string conversationId,
             long messageId,
@@ -303,7 +320,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             planner.AddVariable("conversationId", conversationId);
             planner.AddVariable("userId", currentUser.Id);
             planner.AddVariable("currentTime", DateTime.Now);
-            planner.AddVariable("enableWebSearch", request.AccessInternet);
+            planner.AddVariable("enableWebSearch", true);
             planner.AddVariable("EnableMCP", true);
             planner.AddVariable("EnableSkills", true);
             planner.AddVariable("WorkDir", $"/sandbox");
@@ -557,15 +574,13 @@ namespace PostgreSQL.Embedding.Llm.Core
             await writer.WriteAsync(new CitationsEvent { Citations = citationItems }, ct);
         }
 
-        private async Task InJectContextToSandbox(long appId, string conversationId, AgentExecutionContext agentExecutionContext)
+        private async Task InjectTaskMemory(string taskMemory)
         {
-            // MEMORY.md
-            var chatHitstoris = await GetHistoricalMessagesAsync(appId, conversationId, _app.MaxMessageRounds);
-            var sandboxContext = agentExecutionContext.GetSandboxContext();
-            var fullPath = Path.Combine(sandboxContext.RunDir, "MEMORY.md");
+            var sandboxContext = _agentExecutionContext.GetSandboxContext();
+            var fullPath = Path.Combine(sandboxContext.SessionDir, "MEMORY.md");
             var directory = Path.GetDirectoryName(fullPath);
             if (!Directory.Exists(directory)) Directory.CreateDirectory(directory);
-            await File.WriteAllTextAsync(fullPath, chatHitstoris, Encoding.UTF8);
+            await File.WriteAllTextAsync(fullPath, taskMemory, Encoding.UTF8);
         }
 
         #region Trace Persistence

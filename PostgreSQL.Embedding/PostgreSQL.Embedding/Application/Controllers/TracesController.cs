@@ -1,8 +1,11 @@
+using Azure;
 using Microsoft.AspNetCore.Mvc;
+using PostgreSQL.Embedding.Common.Streaming;
 using PostgreSQL.Embedding.Domain.Entities;
 using PostgreSQL.Embedding.Domain.Models.WebApi;
 using PostgreSQL.Embedding.Infrastructure.DataAccess;
 using System.Text.Json;
+using static PostgreSQL.Embedding.Plugins.BuiltIn.ArtifactsPlugin;
 
 namespace PostgreSQL.Embedding.Application.Controllers
 {
@@ -79,7 +82,18 @@ namespace PostgreSQL.Embedding.Application.Controllers
         public async Task<JsonResult> GetArtifactsAsync(long messageId)
         {
             var artifacts = await _artifactRepository.FindListAsync(x => x.MessageId == messageId);
-            return ApiResult.Success(artifacts);
+            var artifactData = artifacts.Select(x => new ArtifactData()
+            {
+                Id = x.ArtifactId,
+                FileName = x.FileName,
+                AccessUrl = x.Url,
+                Type = ((ArtifactType)x.ArtifactType).ToString().ToLowerInvariant(),
+                CanPreview = x.CanPreview,
+                CanDownload = x.CanDownload,
+                FileSize = x.FileSize,
+                CreatedAt = x.CreatedAt.Value
+            }).ToList();
+            return ApiResult.Success(artifactData);
         }
     }
 

@@ -15,10 +15,10 @@ namespace PostgreSQL.Embedding.Llm.Abstractions
         /// Returns IAsyncEnumerable{ISseEvent} for better client interoperability.
         /// </summary>
         IAsyncEnumerable<ISseEvent> InvokeStreamingV2Async(
-            ConversationRequestModel model,
+            ConversationRequestModel request,
             long appId,
-            string input,
             string? conversationId = null,
+            string? runId = null,
             CancellationToken cancellationToken = default);
     }
 }

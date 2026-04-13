@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace PostgreSQL.Embedding.Domain.Models
 {
@@ -28,5 +29,23 @@ namespace PostgreSQL.Embedding.Domain.Models
     {
         public string model { get; set; }
         public string prompt { get; set; }
+    }
+
+    public class UserInputFile
+    {
+        [JsonPropertyName("contentType")]
+        public string ContentType { get; set; }
+
+        [JsonPropertyName("name")]
+        public string FileName { get; set; }
+
+        [JsonPropertyName("size")]
+        public long Size { get; set; }
+
+        [JsonPropertyName("type")]
+        public string Type {  get; set; }
+
+        [JsonPropertyName("url")]
+        public string Url { get; set; }
     }
 }

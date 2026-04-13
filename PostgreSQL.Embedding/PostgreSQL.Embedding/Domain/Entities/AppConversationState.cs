@@ -17,13 +17,13 @@ namespace PostgreSQL.Embedding.Domain.Entities
         /// <summary>
         /// 压缩块主题
         /// </summary>
-        [SugarColumn(ColumnName = "block_topic", IsNullable = true)]
+        [SugarColumn(ColumnName = "block_topic", IsNullable = true, ColumnDataType = "varchar(1000)")]
         public string? BlockTopic { get; set; }
 
         /// <summary>
         /// 压缩块摘要
         /// </summary>
-        [SugarColumn(ColumnName = "block_summary", IsNullable = true)]
+        [SugarColumn(ColumnName = "block_summary", IsNullable = true, ColumnDataType = "varchar(1000)")]
         public string? BlockSummary { get; set; }
 
         /// <summary>

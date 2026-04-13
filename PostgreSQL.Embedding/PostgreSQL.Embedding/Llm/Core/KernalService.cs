@@ -8,6 +8,7 @@ using PostgreSQL.Embedding.Llm.Abstractions;
 using PostgreSQL.Embedding.Llm.Connectors.Anthropic;
 using PostgreSQL.Embedding.Llm.Planners;
 using PostgreSQL.Embedding.Llm.Routers;
+using PostgreSQL.Embedding.Plugins.Custom;
 using PostgreSQL.Embedding.Utils;
 
 namespace PostgreSQL.Embedding.Llm.Core
@@ -49,7 +50,7 @@ namespace PostgreSQL.Embedding.Llm.Core
             var kernel = kernelBuilder.Build();
 
             kernel.Plugins.AddFromType<ConversationSummaryPlugin>();
-            kernel.Plugins.AddFromType<TimePlugin>();
+            kernel.Plugins.AddFromObject(_serviceProvider.GetService<DateTimePlugin>());
             kernel.Plugins.AddFromType<MathPlugin>();
 
             if (initializeTools)

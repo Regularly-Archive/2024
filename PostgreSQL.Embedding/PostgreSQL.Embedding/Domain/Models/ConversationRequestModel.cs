@@ -16,7 +16,13 @@ namespace PostgreSQL.Embedding.Domain.Models
         [JsonPropertyName("conversationId")]
         public string ConversationId { get; set; }
 
+        [JsonPropertyName("runId")]
+        public string RunId { get; set; }
+
         [JsonPropertyName("messages")]
         public List<OpenAIMessage> Messages { get; set; }
+
+        [JsonPropertyName("attachments")]
+        public List<UserInputFile> Attachments { get; set; }
     }
 }

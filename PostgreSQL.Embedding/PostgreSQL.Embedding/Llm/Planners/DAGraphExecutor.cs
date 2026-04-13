@@ -1,5 +1,4 @@
-﻿using DocumentFormat.OpenXml.Drawing.Diagrams;
-using Microsoft.SemanticKernel;
+﻿using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using MongoDB.Driver.Linq;
 using Newtonsoft.Json;
@@ -65,7 +64,7 @@ namespace PostgreSQL.Embedding.Llm.Planners
                 return;
 
             _agentExecutionContext.SetStepId(subTask.Id.ToString());
-            if (subTask.State == TaskState.Completed && !subTask.AvailableTools.Any())
+            if (subTask.State == TaskState.Completed && !subTask.AvailableTools.Any() && !string.IsNullOrEmpty(subTask.ExecuteResult))
             {
                 await OnStepChanged?.Invoke(subTask.AsStepTrace(_agentExecutionContext.GetMessageId()));
                 return;
