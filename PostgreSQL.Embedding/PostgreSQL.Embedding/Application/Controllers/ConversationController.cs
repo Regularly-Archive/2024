@@ -33,20 +33,9 @@ namespace PostgreSQL.Embedding.Application.Controllers.Controllers
         /// Returns IAsyncEnumerable{ISseEvent} for better client interoperability.
         /// </summary>
         [HttpPost("v2/{appId}")]
-        public Task<SseResult> ChatV2Async(ConversationRequestModel model, long appId, CancellationToken cancellationToken)
+        public Task<SseResult> ChatV2Async(ConversationRequestModel request, long appId, CancellationToken cancellationToken)
         {
-            var input = model.Messages.LastOrDefault()?.content;
-            var events = _conversationService.InvokeStreamingV2Async(
-                model,
-                appId,
-                input,
-                model.ConversationId,
-                HttpContext.RequestAborted);
-
-            HttpContext.RequestAborted.Register(() =>
-            {
-                Console.WriteLine("hahahah");
-            });
+            var events = _conversationService.InvokeStreamingV2Async(request, appId, request.ConversationId, request.RunId, HttpContext.RequestAborted);
             return Task.FromResult(new SseResult(events));
         }
 

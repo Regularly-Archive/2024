@@ -56,6 +56,9 @@ public class ConversationContext
 
     [JsonPropertyName("reference_message_id")]
     public string ReferenceMessageId { get; set; }
+
+    [JsonPropertyName("run_id")]
+    public string RunId { get; set; }
 }
 
 /// <summary>

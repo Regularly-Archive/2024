@@ -110,7 +110,7 @@ internal class SandboxContext : ISandboxContext
         {
             { SkillsDir, "/sandbox/.skills" },
             { ArtifactsDir, "/sandbox/artifacts" },
-            //{ Path.Combine(SessionDir, "MEMORY.md"), "/sandbox/MEMORY.md" },
+            { Path.Combine(SessionDir, "MEMORY.md"), "/sandbox/MEMORY.md" },
             //{ Path.Combine(AppDir, "SOUL.md"), "/sandbox/SOUL.md" },
             //{ Path.Combine(RunDir, "SHORT_TERM.md"), "/sandbox/SHORT_TERM.md" }
         };

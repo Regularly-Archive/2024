@@ -50,12 +50,14 @@ namespace PostgreSQL.Embedding.Llm.Core
         }
 
         public IAsyncEnumerable<ISseEvent> InvokeStreamingV2Async(
-            ConversationRequestModel model,
+            ConversationRequestModel request,
             long appId,
-            string input,
             string? conversationId = null,
+            string? runId = null,
             CancellationToken cancellationToken = default)
         {
+            var input = request.Messages.LastOrDefault()?.content;
+
             // Get app and kernel synchronously for streaming response
             var app = _llmAppRepository.GetAsync(appId).GetAwaiter().GetResult();
             if (app == null)
@@ -66,13 +68,9 @@ namespace PostgreSQL.Embedding.Llm.Core
             var kernel = _kernelService.GetKernel(app).GetAwaiter().GetResult();
 
             // Create AgenticConversationService directly (not via DI)
-            var agenticConversationService = new AgenticConversationService(
-                kernel,
-                app,
-                _serviceProvider,
-                _chatHistoryService);
+            var agenticConversationService = new AgenticConversationService(kernel, app, _serviceProvider, _chatHistoryService);
 
-            return agenticConversationService.InvokeAsync(model, input, conversationId, cancellationToken);
+            return agenticConversationService.InvokeAsync(input, conversationId, runId,  request.Attachments, cancellationToken);
         }
     }
 }
