@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Options;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Plugins.Core;
 using PostgreSQL.Embedding.Common;
@@ -6,6 +7,7 @@ using PostgreSQL.Embedding.Domain.Entities;
 using PostgreSQL.Embedding.Infrastructure.DataAccess;
 using PostgreSQL.Embedding.Llm.Abstractions;
 using PostgreSQL.Embedding.Llm.Connectors.Anthropic;
+using PostgreSQL.Embedding.Llm.Handlers;
 using PostgreSQL.Embedding.Llm.Planners;
 using PostgreSQL.Embedding.Llm.Routers;
 using PostgreSQL.Embedding.Plugins.Custom;
@@ -35,7 +37,9 @@ namespace PostgreSQL.Embedding.Llm.Core
 
         public async Task<Kernel> GetKernel(LlmModel llmModel, long? appId, bool initializeTools = true)
         {
-            var httpClient = new HttpClient(new LlmCompletionRouter(llmModel, _serviceProvider.GetRequiredService<IOptions<LlmConfig>>()))
+            var routerHandler = new LlmCompletionRouter(llmModel, _serviceProvider.GetRequiredService<IOptions<LlmConfig>>());
+            var retryHandler = new PollyRetryHandler(routerHandler, _serviceProvider.GetRequiredService<ILogger<PollyRetryHandler>>());
+            var httpClient = new HttpClient(retryHandler)
             {
                 Timeout = Timeout.InfiniteTimeSpan
             };

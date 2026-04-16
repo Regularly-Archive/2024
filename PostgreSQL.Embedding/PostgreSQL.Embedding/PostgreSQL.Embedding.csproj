@@ -131,6 +131,7 @@
     <PackageReference Include="MongoDB.Driver" Version="2.28.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Pgvector.EntityFrameworkCore" Version="0.2.0" />
+	  <PackageReference Include="Polly" Version="8.5.0" />
     <PackageReference Include="SqlSugarCore" Version="5.1.4.145" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.4.1" />
