@@ -48,7 +48,20 @@ public class BashPlugin : BasePlugin
         [Description("要执行的命令，例如 'ls -la', 'dir', 'cat filename.txt'")] string command, Kernel kernel)
     {
         var result = await ExecuteCommandInSandboxAsync(command, kernel);
-        return result.ExitCode == 0 ? result.Stdout : result.Stderr;
+        var ret = result.ExitCode == 0 ? result.Stdout : result.Stderr;
+        if (ret.Length > 500)
+        {
+            return $@"The output of the current command has exceeded the context window length. Please use the following options as alternatives:
+            1. `bash('{command} | tail -n 100')` - last 100 lines
+            2. `bash('{command} | head -n 100')` - first 100 lines
+            3. `bash('{command} | grep KEYWORD')` - filter by keyword
+            4. `bash('{command} > /tmp/out.txt')` - save to file, then read
+            ";
+        }
+        else
+        {
+            return ret;
+        }
     }
 
 
