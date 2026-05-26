@@ -38,7 +38,7 @@ namespace PostgreSQL.Embedding.Llm.Core
         public async Task<Kernel> GetKernel(LlmModel llmModel, long? appId, bool initializeTools = true)
         {
             var routerHandler = new LlmCompletionRouter(llmModel, _serviceProvider.GetRequiredService<IOptions<LlmConfig>>());
-            var retryHandler = new PollyRetryHandler(routerHandler, _serviceProvider.GetRequiredService<ILogger<PollyRetryHandler>>());
+            var retryHandler = new ResiliencePipelineHandler(routerHandler, _serviceProvider.GetRequiredService<ILogger<ResiliencePipelineHandler>>());
             var httpClient = new HttpClient(retryHandler)
             {
                 Timeout = Timeout.InfiniteTimeSpan

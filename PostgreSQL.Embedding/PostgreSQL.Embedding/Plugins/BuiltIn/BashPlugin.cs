@@ -49,13 +49,13 @@ public class BashPlugin : BasePlugin
     {
         var result = await ExecuteCommandInSandboxAsync(command, kernel);
         var ret = result.ExitCode == 0 ? result.Stdout : result.Stderr;
-        if (ret.Length > 500)
+        if (ret.Length > 1500)
         {
             return $@"The output of the current command has exceeded the context window length. Please use the following options as alternatives:
-            1. `bash('{command} | tail -n 100')` - last 100 lines
-            2. `bash('{command} | head -n 100')` - first 100 lines
-            3. `bash('{command} | grep KEYWORD')` - filter by keyword
-            4. `bash('{command} > /tmp/out.txt')` - save to file, then read
+            - `bash('{command} | tail -n 100')` - last 100 lines
+            - `bash('{command} | head -n 100')` - first 100 lines
+            - `bash('{command} | grep KEYWORD')` - filter by keyword
+            - `bash('{command} > /sandbox/tmp/out.txt')` - save to file, then read
             ";
         }
         else
