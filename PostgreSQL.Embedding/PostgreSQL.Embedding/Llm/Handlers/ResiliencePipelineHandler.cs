@@ -4,20 +4,20 @@ using Polly.Retry;
 
 namespace PostgreSQL.Embedding.Llm.Handlers
 {
-    public class PollyRetryHandler : DelegatingHandler
+    public class ResiliencePipelineHandler : DelegatingHandler
     {
         private readonly ResiliencePipeline<HttpResponseMessage> _pipeline;
-        private readonly ILogger<PollyRetryHandler> _logger;
+        private readonly ILogger<ResiliencePipelineHandler> _logger;
 
-        public PollyRetryHandler(HttpClientHandler innerHandler, ILogger<PollyRetryHandler> logger)
+        public ResiliencePipelineHandler(HttpClientHandler innerHandler, ILogger<ResiliencePipelineHandler> logger)
             : this(innerHandler, CreateDefaultOptions(logger))
         {
         }
 
-        public PollyRetryHandler(HttpClientHandler innerHandler, RetryStrategyOptions<HttpResponseMessage> options, ILogger<PollyRetryHandler>? logger = null)
+        public ResiliencePipelineHandler(HttpClientHandler innerHandler, RetryStrategyOptions<HttpResponseMessage> options, ILogger<ResiliencePipelineHandler>? logger = null)
         {
             InnerHandler = innerHandler;
-            _logger = logger ?? LoggerFactory.Create(b => b.AddConsole()).CreateLogger<PollyRetryHandler>();
+            _logger = logger ?? LoggerFactory.Create(b => b.AddConsole()).CreateLogger<ResiliencePipelineHandler>();
 
             options.ShouldHandle = new PredicateBuilder<HttpResponseMessage>()
                 .Handle<HttpRequestException>()
@@ -54,7 +54,7 @@ namespace PostgreSQL.Embedding.Llm.Handlers
                 cancellationToken);
         }
 
-        private static RetryStrategyOptions<HttpResponseMessage> CreateDefaultOptions(ILogger<PollyRetryHandler> logger)
+        private static RetryStrategyOptions<HttpResponseMessage> CreateDefaultOptions(ILogger<ResiliencePipelineHandler> logger)
         {
             return new RetryStrategyOptions<HttpResponseMessage>
             {
