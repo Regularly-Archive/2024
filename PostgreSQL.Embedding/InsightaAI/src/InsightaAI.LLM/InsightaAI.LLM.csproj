@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>InsightaAI.LLM</RootNamespace>
+
+    <!-- NuGet Package Info -->
+    <PackageId>InsightaAI.LLM</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>Insighta</Authors>
+    <Description>LLM abstraction layer with unified streaming events and tool support</Description>
+    <PackageTags>llm;ai;openai;anthropic;streaming</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Text.Json" Version="9.0.0" />
+  </ItemGroup>
+
+</Project>

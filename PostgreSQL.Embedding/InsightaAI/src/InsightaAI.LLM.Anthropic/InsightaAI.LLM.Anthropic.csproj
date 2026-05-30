@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>InsightaAI.LLM.Anthropic</RootNamespace>
+
+    <!-- NuGet Package Info -->
+    <PackageId>InsightaAI.LLM.Anthropic</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>Insighta</Authors>
+    <Description>Anthropic Claude adapter for InsightaAI with Extended Thinking support</Description>
+    <PackageTags>llm;ai;anthropic;claude</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\InsightaAI.LLM\InsightaAI.LLM.csproj" />
+  </ItemGroup>
+
+</Project>
