@@ -11,11 +11,8 @@ public sealed record TokenUsage
     /// <summary>输出 token 数</summary>
     public int OutputTokens { get; init; }
 
-    /// <summary>缓存读取 token 数</summary>
-    public int CacheReadTokens { get; init; }
-
-    /// <summary>缓存写入 token 数</summary>
-    public int CacheWriteTokens { get; init; }
+    /// <summary>缓存命中 token 数</summary>
+    public int CacheHitTokens { get; init; }
 
     /// <summary>总 token 数</summary>
     public int TotalTokens => InputTokens + OutputTokens;

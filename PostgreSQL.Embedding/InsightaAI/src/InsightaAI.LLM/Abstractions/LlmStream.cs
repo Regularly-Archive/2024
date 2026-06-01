@@ -166,12 +166,12 @@ public class LlmStreamImpl : LlmStream
                     finalToolCalls.Add(toolCallEnd.ToolCall);
                     break;
 
-                case UsageEvent usageEvent:
-                    usage = usageEvent.Usage;
-                    break;
-
                 case DoneEvent done:
                     finishReason = done.Reason;
+                    if (done.Usage != null)
+                    {
+                        usage = done.Usage;
+                    }
                     FinalizePendingToolCalls(finalToolCalls, pendingToolCalls);
                     break;
             }

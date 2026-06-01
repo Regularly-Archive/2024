@@ -245,6 +245,12 @@ public static class ToolScanner
         // 处理 Nullable<T>
         var underlyingType = Nullable.GetUnderlyingType(targetType) ?? targetType;
 
+        // 处理 JsonElement 类型（来自 LLM 工具调用参数）
+        if (value is JsonElement jsonElement)
+        {
+            return ConvertJsonElement(jsonElement, underlyingType);
+        }
+
         // 类型转换
         if (underlyingType == typeof(string))
             return value.ToString();
@@ -268,6 +274,34 @@ public static class ToolScanner
         }
 
         return value;
+    }
+
+    private static object ConvertJsonElement(JsonElement element, Type targetType)
+    {
+        if (targetType == typeof(string))
+            return element.ValueKind == JsonValueKind.String ? element.GetString()! : element.GetRawText();
+        if (targetType == typeof(int))
+            return element.ValueKind == JsonValueKind.Number ? element.GetInt32() : int.Parse(element.GetRawText());
+        if (targetType == typeof(long))
+            return element.ValueKind == JsonValueKind.Number ? element.GetInt64() : long.Parse(element.GetRawText());
+        if (targetType == typeof(float))
+            return element.ValueKind == JsonValueKind.Number ? element.GetSingle() : float.Parse(element.GetRawText());
+        if (targetType == typeof(double))
+            return element.ValueKind == JsonValueKind.Number ? element.GetDouble() : double.Parse(element.GetRawText());
+        if (targetType == typeof(bool))
+            return element.ValueKind == JsonValueKind.True || (element.ValueKind != JsonValueKind.False && bool.Parse(element.GetRawText()));
+        if (targetType.IsEnum)
+        {
+            var strValue = element.ValueKind == JsonValueKind.String ? element.GetString()! : element.GetRawText();
+            if (Enum.TryParse(targetType, strValue, true, out var enumValue))
+                return enumValue!;
+            throw new ArgumentException($"Cannot convert '{strValue}' to enum type {targetType.Name}");
+        }
+        if (targetType == typeof(JsonElement))
+            return element;
+
+        // 对于复杂类型，尝试反序列化
+        return JsonSerializer.Deserialize(element.GetRawText(), targetType)!;
     }
 
     /// <summary>

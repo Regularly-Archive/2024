@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
+using InsightaAI.Agent.Hooks;
 using InsightaAI.Agent.Models;
 using InsightaAI.LLM;
 using InsightaAI.LLM.Abstractions;
@@ -16,6 +17,8 @@ public class Agent
     private readonly AgentConfig _config;
     private readonly ILlmClient _llmClient;
     private readonly ToolRegistry _toolRegistry;
+    private readonly List<IToolHook> _hooks = [];
+    private readonly HashSet<string> _alwaysAllowedTools = [];
 
     /// <summary>
     /// 创建 Agent 实例
@@ -35,6 +38,60 @@ public class Agent
     /// Agent 配置
     /// </summary>
     public AgentConfig Config => _config;
+
+    /// <summary>
+    /// 添加工具调用钩子
+    /// </summary>
+    public Agent AddHook(IToolHook hook)
+    {
+        ArgumentNullException.ThrowIfNull(hook);
+        _hooks.Add(hook);
+        return this;
+    }
+
+    /// <summary>
+    /// 执行钩子检查
+    /// </summary>
+    private async Task<bool> CheckHooksAsync(
+        string toolName,
+        string arguments,
+        ToolExecutionContext context)
+    {
+        // 如果工具已被标记为始终允许，跳过检查
+        if (_alwaysAllowedTools.Contains(toolName))
+        {
+            return true;
+        }
+
+        foreach (var hook in _hooks)
+        {
+            // 检查钩子是否适用于该工具
+            if (hook.TargetTools != null && !hook.TargetTools.Contains(toolName))
+            {
+                continue; // 跳过不适用的钩子
+            }
+
+            var result = await hook.OnBeforeExecutionAsync(toolName, arguments, context);
+
+            switch (result)
+            {
+                case ToolHookResult.Allow:
+                    continue; // 检查下一个钩子
+
+                case ToolHookResult.AllowAlways:
+                    _alwaysAllowedTools.Add(toolName);
+                    return true; // 标记为始终允许，继续执行
+
+                case ToolHookResult.Deny:
+                    return false; // 拒绝执行
+
+                default:
+                    continue;
+            }
+        }
+
+        return true; // 所有钩子都允许
+    }
 
     /// <summary>
     /// 执行 Agent (流式)
@@ -181,16 +238,17 @@ public class Agent
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
+                    var arguments = toolCall.Arguments.GetRawText();
+
                     // 发送工具开始事件
                     await toolEvents.Writer.WriteAsync(new AgentToolStartEvent
                     {
                         AgentId = _config.Id,
                         ToolCallId = toolCall.Id,
                         ToolName = toolCall.Name,
-                        Arguments = toolCall.Arguments.GetRawText()
+                        Arguments = arguments
                     }, cancellationToken);
 
-                    // 执行工具
                     var toolContext = new ToolExecutionContext
                     {
                         AgentId = _config.Id,
@@ -199,7 +257,20 @@ public class Agent
                         CancellationToken = cancellationToken
                     };
 
-                    var toolResult = await _toolRegistry.ExecuteAsync(toolCall, toolContext);
+                    // 检查钩子
+                    var allowed = await CheckHooksAsync(toolCall.Name, arguments, toolContext);
+
+                    ToolResult toolResult;
+                    if (allowed)
+                    {
+                        // 执行工具
+                        toolResult = await _toolRegistry.ExecuteAsync(toolCall, toolContext);
+                    }
+                    else
+                    {
+                        // 用户拒绝执行
+                        toolResult = ToolResult.FromError("Tool execution denied by user.");
+                    }
 
                     // 发送工具完成事件
                     var resultText = toolResult.Content.OfType<TextBlock>().FirstOrDefault()?.Text;
@@ -251,16 +322,6 @@ public class Agent
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    // 发送工具开始事件
-                    yield return new AgentToolStartEvent
-                    {
-                        AgentId = _config.Id,
-                        ToolCallId = toolCall.Id,
-                        ToolName = toolCall.Name,
-                        Arguments = toolCall.Arguments.GetRawText()
-                    };
-
-                    // 执行工具
                     var toolContext = new ToolExecutionContext
                     {
                         AgentId = _config.Id,
@@ -269,7 +330,31 @@ public class Agent
                         CancellationToken = cancellationToken
                     };
 
-                    var toolResult = await _toolRegistry.ExecuteAsync(toolCall, toolContext);
+                    var arguments = toolCall.Arguments.GetRawText();
+
+                    // 发送工具开始事件
+                    yield return new AgentToolStartEvent
+                    {
+                        AgentId = _config.Id,
+                        ToolCallId = toolCall.Id,
+                        ToolName = toolCall.Name,
+                        Arguments = arguments
+                    };
+
+                    // 检查钩子
+                    var allowed = await CheckHooksAsync(toolCall.Name, arguments, toolContext);
+
+                    ToolResult toolResult;
+                    if (allowed)
+                    {
+                        // 执行工具
+                        toolResult = await _toolRegistry.ExecuteAsync(toolCall, toolContext);
+                    }
+                    else
+                    {
+                        // 用户拒绝执行
+                        toolResult = ToolResult.FromError("Tool execution denied by user.");
+                    }
 
                     // 发送工具完成事件
                     var resultText = toolResult.Content.OfType<TextBlock>().FirstOrDefault()?.Text;
@@ -295,11 +380,52 @@ public class Agent
             }
         }
 
-        // 超过最大轮次
-        stopwatch.Stop();
+        // 超过最大轮次，尝试让 LLM 生成最终回复
+        // 添加提示让 LLM 总结当前结果
+        messages.Add(Message.FromSystem(
+            "You have reached the maximum number of tool rounds. " +
+            "Please provide a final response to the user based on the information gathered so far. " +
+            "Do not attempt to use any more tools."));
 
-        var lastMessage = messages.LastOrDefault(m => m.Role == MessageRole.Assistant)
-            ?? Message.FromAssistant("Agent reached maximum tool rounds.");
+        // 最后一次调用 LLM 获取总结
+        var finalRequest = new LlmRequest
+        {
+            Model = _config.Model,
+            Messages = messages.ToArray(),
+            Tools = [],  // 不提供工具，强制生成文本
+            Temperature = _config.Temperature,
+            MaxTokens = _config.MaxTokens
+        };
+
+        var finalStream = _llmClient.Stream(finalRequest);
+        await foreach (var streamEvent in finalStream.WithCancellation(cancellationToken))
+        {
+            yield return new AgentLlmStreamEvent
+            {
+                AgentId = _config.Id,
+                StreamEvent = streamEvent
+            };
+        }
+
+        var finalResponse = await finalStream.GetResponseAsync(cancellationToken);
+
+        // 累计 token 用量
+        if (finalResponse.Usage != null)
+        {
+            totalUsage = new TokenUsage
+            {
+                InputTokens = totalUsage.InputTokens + finalResponse.Usage.InputTokens,
+                OutputTokens = totalUsage.OutputTokens + finalResponse.Usage.OutputTokens
+            };
+        }
+
+        var finalMessage = new Message
+        {
+            Role = MessageRole.Assistant,
+            Content = finalResponse.Content
+        };
+
+        stopwatch.Stop();
 
         yield return new AgentCompleteEvent
         {
@@ -307,11 +433,10 @@ public class Agent
             Result = new AgentResult
             {
                 Status = AgentStatus.Completed,
-                Message = lastMessage,
+                Message = finalMessage,
                 Usage = totalUsage,
                 Rounds = _config.MaxToolRounds,
-                DurationMs = stopwatch.ElapsedMilliseconds,
-                Error = $"Reached maximum tool rounds ({_config.MaxToolRounds})"
+                DurationMs = stopwatch.ElapsedMilliseconds
             }
         };
     }

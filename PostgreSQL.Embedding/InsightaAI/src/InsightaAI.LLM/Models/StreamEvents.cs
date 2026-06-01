@@ -107,21 +107,13 @@ public sealed record ToolCallEndEvent : StreamEvent
 }
 
 /// <summary>
-/// Token 用量事件
-/// </summary>
-public sealed record UsageEvent : StreamEvent
-{
-    public override string Type => "usage";
-    public required TokenUsage Usage { get; init; }
-}
-
-/// <summary>
-/// 流完成事件
+/// 流完成事件（包含 Token 用量）
 /// </summary>
 public sealed record DoneEvent : StreamEvent
 {
     public override string Type => "done";
     public required DoneReason Reason { get; init; }
+    public TokenUsage? Usage { get; init; }
     public Message? Message { get; init; }
 }
 

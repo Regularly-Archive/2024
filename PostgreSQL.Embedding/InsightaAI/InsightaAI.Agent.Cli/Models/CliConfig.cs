@@ -60,10 +60,31 @@ public class CliConfig
     public string? AnthropicBaseUrl { get; set; }
 
     /// <summary>
+    /// Google Gemini API Key
+    /// </summary>
+    [JsonPropertyName("gemini_api_key")]
+    public string? GeminiApiKey { get; set; }
+
+    /// <summary>
+    /// Google Gemini API Base URL（可选，用于自定义端点）
+    /// </summary>
+    [JsonPropertyName("gemini_base_url")]
+    public string? GeminiBaseUrl { get; set; }
+
+    /// <summary>
     /// 系统提示词
     /// </summary>
     [JsonPropertyName("system_prompt")]
-    public string SystemPrompt { get; set; } = "You are a helpful AI assistant. You can use tools to help the user.";
+    public string SystemPrompt { get; set; } = """
+        You are a helpful AI assistant with access to various tools.
+
+        When you need to use a tool:
+        1. First, briefly explain what you're about to do (1-2 sentences)
+        2. Then call the tool
+        3. After getting the result, summarize or explain the outcome
+
+        Keep your responses concise and conversational. Use the user's language to respond.
+        """;
 
     /// <summary>
     /// 最大工具调用轮次

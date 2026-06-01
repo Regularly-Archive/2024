@@ -68,6 +68,22 @@ public class TestConfig
     public bool HasAnthropic => !string.IsNullOrEmpty(AnthropicApiKey);
 
     // ============================================================
+    // Gemini 配置
+    // ============================================================
+
+    /// <summary>Google Gemini API Key</summary>
+    public string? GeminiApiKey => _configuration["GEMINI_API_KEY"];
+
+    /// <summary>Google Gemini Base URL (支持自定义端点)</summary>
+    public string? GeminiBaseUrl => _configuration["GEMINI_BASE_URL"];
+
+    /// <summary>Google Gemini 模型 ID</summary>
+    public string GeminiModel => _configuration["GEMINI_MODEL"] ?? "gemini-2.0-flash";
+
+    /// <summary>Google Gemini 是否配置完整</summary>
+    public bool HasGemini => !string.IsNullOrEmpty(GeminiApiKey);
+
+    // ============================================================
     // 通用配置
     // ============================================================
 
@@ -117,6 +133,19 @@ public class TestConfig
         {
             ApiKey = AnthropicApiKey!,
             BaseUrl = AnthropicBaseUrl
+        };
+    }
+
+    /// <summary>
+    /// 获取 Google Gemini ProviderConfig
+    /// </summary>
+    public ProviderConfig? GetGeminiConfig()
+    {
+        if (!HasGemini) return null;
+        return new ProviderConfig
+        {
+            ApiKey = GeminiApiKey!,
+            BaseUrl = GeminiBaseUrl
         };
     }
 }

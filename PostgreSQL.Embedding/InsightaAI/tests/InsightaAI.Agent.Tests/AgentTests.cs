@@ -216,8 +216,9 @@ public class AgentTests
         // Assert
         Assert.NotNull(result);
         Assert.Equal(3, result.Rounds);
-        Assert.NotNull(result.Error);
-        Assert.Contains("maximum tool rounds", result.Error);
+        // 现在超过最大轮次时，Agent 会调用 LLM 生成总结，而不是返回错误
+        Assert.NotNull(result.Message);
+        Assert.Equal(AgentStatus.Completed, result.Status);
     }
 
     [Fact]
@@ -360,11 +361,10 @@ public class AgentTests
         // Arrange
         var registry = new ToolRegistry();
 
-        // Act - 扫描包含 StaticToolExamples 的程序集
-        registry.ScanAssemblyContaining(typeof(StaticToolExamples));
+        // Act - 扫描包含 TestStaticTools 的程序集
+        registry.ScanAssemblyContaining(typeof(TestStaticTools));
 
         // Assert
-        Assert.True(registry.HasTool("ask_user_static"));
         Assert.True(registry.HasTool("save_memory"));
         Assert.True(registry.HasTool("get_memory"));
     }
@@ -374,7 +374,7 @@ public class AgentTests
     {
         // Arrange
         var registry = new ToolRegistry();
-        registry.ScanAssemblyContaining(typeof(StaticToolExamples));
+        registry.ScanAssemblyContaining(typeof(TestStaticTools));
 
         // Act
         var definitions = registry.GetDefinitions();
@@ -391,7 +391,7 @@ public class AgentTests
     {
         // Arrange
         var registry = new ToolRegistry();
-        var askUserTool = new AskUserTool(question => Task.FromResult($"Answer: {question}"));
+        var askUserTool = new AskUserTool((question, choices, multi) => Task.FromResult($"Answer: {question}"));
 
         // Act
         registry.Register(askUserTool);
@@ -573,5 +573,26 @@ internal class MockLlmStream : LlmStream
             FinishReason = _toolCalls?.Length > 0 ? DoneReason.ToolCalls : DoneReason.Complete,
             Usage = new TokenUsage { InputTokens = 10, OutputTokens = 20 }
         });
+    }
+}
+
+/// <summary>
+/// 测试用静态工具类
+/// </summary>
+internal static class TestStaticTools
+{
+    [Tool("save_memory", "保存信息到记忆中")]
+    public static ToolResult SaveMemory(
+        [ToolParameter("记忆的键")] string key,
+        [ToolParameter("记忆的内容")] string content)
+    {
+        return ToolResult.FromText($"Memory saved: {key}");
+    }
+
+    [Tool("get_memory", "从记忆中获取信息")]
+    public static ToolResult GetMemory(
+        [ToolParameter("记忆的键")] string key)
+    {
+        return ToolResult.FromText($"Memory for '{key}': (not implemented)");
     }
 }

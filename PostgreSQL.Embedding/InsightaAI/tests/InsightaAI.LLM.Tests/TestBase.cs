@@ -2,6 +2,7 @@ using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
 using InsightaAI.LLM.OpenAI;
 using InsightaAI.LLM.Anthropic;
+using InsightaAI.LLM.Gemini;
 using System.Text.Json;
 
 namespace InsightaAI.LLM.Tests;
@@ -20,6 +21,7 @@ public abstract class TestBase
         Factory = new LlmClientFactory();
         Factory.RegisterAdapter(new OpenAIAdapter());
         Factory.RegisterAdapter(new AnthropicAdapter());
+        Factory.RegisterAdapter(new GeminiAdapter());
     }
 
     /// <summary>
@@ -50,6 +52,16 @@ public abstract class TestBase
         var config = Config.GetAnthropicConfig();
         if (config == null) return null;
         return Factory.Create("anthropic", config);
+    }
+
+    /// <summary>
+    /// 创建 Google Gemini 客户端
+    /// </summary>
+    protected ILlmClient? CreateGeminiClient()
+    {
+        var config = Config.GetGeminiConfig();
+        if (config == null) return null;
+        return Factory.Create("gemini", config);
     }
 
     /// <summary>
@@ -115,12 +127,9 @@ public abstract class TestBase
                     Console.WriteLine($"\n[ToolCall End] {toolEnd.ToolCall.Name}({toolEnd.ToolCall.Arguments})");
                     break;
 
-                case UsageEvent usage:
-                    Console.WriteLine($"\n[Usage] Input: {usage.Usage.InputTokens}, Output: {usage.Usage.OutputTokens}");
-                    break;
-
                 case DoneEvent done:
                     Console.WriteLine($"\n[Done] Reason: {done.Reason}");
+                    Console.WriteLine($"\n[Usage] Input: {done.Usage?.InputTokens}, Output: {done.Usage?.OutputTokens}");
                     break;
 
                 case ErrorEvent error:

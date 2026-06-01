@@ -363,6 +363,13 @@ public class AnthropicAdapter : IProviderAdapter
     {
         var delta = data.GetProperty("delta");
 
+        // 提取 usage（可能和 stop_reason 同时存在）
+        TokenUsage? usage = null;
+        if (data.TryGetProperty("usage", out var usageElement))
+        {
+            usage = ParseUsage(usageElement);
+        }
+
         if (delta.TryGetProperty("stop_reason", out var stopReason))
         {
             return new DoneEvent
@@ -373,14 +380,15 @@ public class AnthropicAdapter : IProviderAdapter
                     "tool_use" => DoneReason.ToolCalls,
                     "max_tokens" => DoneReason.MaxTokens,
                     _ => DoneReason.Complete
-                }
+                },
+                Usage = usage  // 包含 usage
             };
         }
 
-        // 解析 usage
-        if (data.TryGetProperty("usage", out var usage))
+        // 如果只有 usage 没有 stop_reason，也返回 DoneEvent
+        if (usage != null)
         {
-            return new UsageEvent { Usage = ParseUsage(usage) };
+            return new DoneEvent { Reason = DoneReason.Complete, Usage = usage };
         }
 
         return new DoneEvent { Reason = DoneReason.Complete };
@@ -414,24 +422,18 @@ public class AnthropicAdapter : IProviderAdapter
     {
         var inputTokens = usage.TryGetProperty("input_tokens", out var it) ? it.GetInt32() : 0;
         var outputTokens = usage.TryGetProperty("output_tokens", out var ot) ? ot.GetInt32() : 0;
-        var cacheRead = 0;
-        var cacheWrite = 0;
+        var cacheHit = 0;
 
         if (usage.TryGetProperty("cache_read_input_tokens", out var cr))
         {
-            cacheRead = cr.GetInt32();
-        }
-        if (usage.TryGetProperty("cache_creation_input_tokens", out var cw))
-        {
-            cacheWrite = cw.GetInt32();
+            cacheHit = cr.GetInt32();
         }
 
         return new TokenUsage
         {
             InputTokens = inputTokens,
             OutputTokens = outputTokens,
-            CacheReadTokens = cacheRead,
-            CacheWriteTokens = cacheWrite
+            CacheHitTokens = cacheHit
         };
     }
 }

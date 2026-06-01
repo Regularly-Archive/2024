@@ -11,13 +11,14 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
     <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
-    <PackageReference Include="Spectre.Console" Version="0.49.1" />
+    <PackageReference Include="Spectre.Console" Version="0.55.2" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\src\InsightaAI.Agent\InsightaAI.Agent.csproj" />
     <ProjectReference Include="..\src\InsightaAI.LLM.OpenAI\InsightaAI.LLM.OpenAI.csproj" />
     <ProjectReference Include="..\src\InsightaAI.LLM.Anthropic\InsightaAI.LLM.Anthropic.csproj" />
+    <ProjectReference Include="..\src\InsightaAI.LLM.Gemini\InsightaAI.LLM.Gemini.csproj" />
   </ItemGroup>
 
 </Project>

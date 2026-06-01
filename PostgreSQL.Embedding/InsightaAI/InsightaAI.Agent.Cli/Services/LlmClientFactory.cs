@@ -2,6 +2,7 @@ using InsightaAI.Agent.Cli.Models;
 using InsightaAI.LLM;
 using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Anthropic;
+using InsightaAI.LLM.Gemini;
 using InsightaAI.LLM.OpenAI;
 
 namespace InsightaAI.Agent.Cli.Services;
@@ -21,6 +22,7 @@ public static class LlmClientFactory
         // 注册适配器
         factory.RegisterAdapter(new OpenAIAdapter());
         factory.RegisterAdapter(new AnthropicAdapter());
+        factory.RegisterAdapter(new GeminiAdapter());
 
         var providerConfig = BuildProviderConfig(config);
         return factory.Create(config.Provider, providerConfig);
@@ -47,6 +49,15 @@ public static class LlmClientFactory
                         "Anthropic API key is not configured. Set it via config or ANTHROPIC_API_KEY environment variable."),
                BaseUrl = config.AnthropicBaseUrl
                     ?? Environment.GetEnvironmentVariable("ANTHROPIC_BASE_URL")
+            },
+            "gemini" => new ProviderConfig
+            {
+                ApiKey = config.GeminiApiKey
+                    ?? Environment.GetEnvironmentVariable("GEMINI_API_KEY")
+                    ?? throw new InvalidOperationException(
+                        "Gemini API key is not configured. Set it via config or GEMINI_API_KEY environment variable."),
+                BaseUrl = config.GeminiBaseUrl
+                    ?? Environment.GetEnvironmentVariable("GEMINI_BASE_URL")
             },
             _ => throw new NotSupportedException($"Provider '{config.Provider}' is not supported.")
         };

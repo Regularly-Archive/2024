@@ -5,20 +5,15 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
-    <RootNamespace>InsightaAI.Agent</RootNamespace>
+    <RootNamespace>InsightaAI.LLM.Gemini</RootNamespace>
 
     <!-- NuGet Package Info -->
-    <PackageId>InsightaAI.Agent</PackageId>
+    <PackageId>InsightaAI.LLM.Gemini</PackageId>
     <Version>0.1.0</Version>
     <Authors>Insighta</Authors>
-    <Description>Agent runtime with tool use loop for InsightaAI</Description>
-    <PackageTags>llm;ai;agent;runtime</PackageTags>
+    <Description>Google Gemini adapter for InsightaAI</Description>
+    <PackageTags>llm;ai;google;gemini</PackageTags>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.0" />
-    <PackageReference Include="SqlSugarCore" Version="5.1.4.169" />
-  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\InsightaAI.LLM\InsightaAI.LLM.csproj" />

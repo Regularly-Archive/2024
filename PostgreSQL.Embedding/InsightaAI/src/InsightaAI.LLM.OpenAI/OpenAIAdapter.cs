@@ -1,8 +1,7 @@
-using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
+using System.Text;
+using System.Text.Json;
 
 namespace InsightaAI.LLM.OpenAI;
 
@@ -65,14 +64,18 @@ public class OpenAIAdapter : IProviderAdapter
     {
         try
         {
+            // 先提取 usage（可能和 choices 同时存在）
+            TokenUsage? usage = null;
+            if (data.TryGetProperty("usage", out var usageElement) &&
+                usageElement.ValueKind == JsonValueKind.Object)
+            {
+                usage = ParseUsage(usageElement);
+            }
+
             // OpenAI 格式: data.choices[0].delta
             if (!data.TryGetProperty("choices", out var choices) || choices.GetArrayLength() == 0)
             {
-                // 可能是 usage chunk
-                if (data.TryGetProperty("usage", out var usage))
-                {
-                    return ParseUsageEvent(usage);
-                }
+                // 没有 choices，但可能有 usage（最后一个 chunk）
                 return null;
             }
 
@@ -93,7 +96,8 @@ public class OpenAIAdapter : IProviderAdapter
                             "tool_calls" => DoneReason.ToolCalls,
                             "length" => DoneReason.MaxTokens,
                             _ => DoneReason.Complete
-                        }
+                        },
+                        Usage = usage  // 包含 usage
                     };
                 }
             }
@@ -377,27 +381,18 @@ public class OpenAIAdapter : IProviderAdapter
         };
     }
 
-    private static UsageEvent ParseUsageEvent(JsonElement usage)
-    {
-        return new UsageEvent
-        {
-            Usage = ParseUsage(usage)
-        };
-    }
-
     private static TokenUsage ParseUsage(JsonElement usage)
     {
         var inputTokens = usage.TryGetProperty("prompt_tokens", out var pt) ? pt.GetInt32() : 0;
         var outputTokens = usage.TryGetProperty("completion_tokens", out var ct) ? ct.GetInt32() : 0;
-        var cacheRead = 0;
-        var cacheWrite = 0;
+        var cacheHit = 0;
 
         // OpenAI 缓存 token
         if (usage.TryGetProperty("prompt_tokens_details", out var details))
         {
             if (details.TryGetProperty("cached_tokens", out var cached))
             {
-                cacheRead = cached.GetInt32();
+                cacheHit = cached.GetInt32();
             }
         }
 
@@ -405,8 +400,7 @@ public class OpenAIAdapter : IProviderAdapter
         {
             InputTokens = inputTokens,
             OutputTokens = outputTokens,
-            CacheReadTokens = cacheRead,
-            CacheWriteTokens = cacheWrite
+            CacheHitTokens = cacheHit
         };
     }
 }
