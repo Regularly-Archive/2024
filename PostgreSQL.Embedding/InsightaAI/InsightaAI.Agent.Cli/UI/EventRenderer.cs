@@ -91,6 +91,7 @@ public class EventRenderer : IDisposable
         var toolArgs = toolStart.Arguments.Truncate(50);
         var displayText = $"{toolStart.ToolName}({EscapeMarkup(toolArgs)})";
         _pendingTools[toolStart.ToolCallId] = displayText;
+        AnsiConsole.WriteLine();
     }
 
     private void HandleToolEnd(AgentToolEndEvent toolEnd)
