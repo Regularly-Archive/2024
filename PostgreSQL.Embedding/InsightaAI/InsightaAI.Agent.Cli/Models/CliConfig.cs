@@ -24,6 +24,22 @@ public class CliConfig
         "sessions");
 
     /// <summary>
+    /// 全局 Skills 目录
+    /// </summary>
+    public static readonly string GlobalSkillsDir = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        ".insightaai",
+        ".skills");
+
+    /// <summary>
+    /// 项目级 Skills 目录（当前工作目录下）
+    /// </summary>
+    public static readonly string ProjectSkillsDir = Path.Combine(
+        Directory.GetCurrentDirectory(),
+        ".insighta",
+        ".skills");
+
+    /// <summary>
     /// 当前使用的 LLM 提供商
     /// </summary>
     [JsonPropertyName("provider")]

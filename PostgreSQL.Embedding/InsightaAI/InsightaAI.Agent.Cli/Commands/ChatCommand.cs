@@ -3,6 +3,8 @@ using InsightaAI.Agent.Cli.Models;
 using InsightaAI.Agent.Cli.Services;
 using InsightaAI.Agent.Cli.UI;
 using InsightaAI.Agent.Models;
+using InsightaAI.Agent.Skills;
+using InsightaAI.Agent.Skills.Local;
 using InsightaAI.Agent.Storage;
 using InsightaAI.Agent.Tools;
 using InsightaAI.Agent.Tools.BuiltIn;
@@ -68,15 +70,19 @@ public class ChatCommand
         // 创建工具注册表
         var toolRegistry = CreateToolRegistry();
 
+        // 创建 SkillRegistry
+        var skillRegistry = CreateSkillRegistry();
+        var availableSkills = await skillRegistry.ListAllSkillsAsync();
+
         // 创建 Agent
-        var agent = CreateAgent(config, llmClient, toolRegistry);
+        var agent = CreateAgent(config, llmClient, toolRegistry, skillRegistry);
 
         // 获取或创建会话
         var session = await GetOrCreateSessionAsync(sessionId, config);
         if (session == null) return 1;
 
         // 显示欢迎信息
-        _renderer.ShowWelcome(config.Provider, config.Model, session.SessionId, toolRegistry.GetDefinitions().Length);
+        _renderer.ShowWelcome(config.Provider, config.Model, session.SessionId, toolRegistry.GetDefinitions().Length, availableSkills.Count);
         _renderer.ShowHistory(session.Messages);
 
         // 运行对话循环
@@ -191,7 +197,7 @@ public class ChatCommand
         return registry;
     }
 
-    private static Agent CreateAgent(CliConfig config, ILlmClient llmClient, ToolRegistry toolRegistry)
+    private static Agent CreateAgent(CliConfig config, ILlmClient llmClient, ToolRegistry toolRegistry, SkillRegistry skillRegistry)
     {
         var agentConfig = new AgentConfig
         {
@@ -202,10 +208,29 @@ public class ChatCommand
             MaxToolRounds = config.MaxToolRounds
         };
 
-        var agent = new Agent(agentConfig, llmClient, toolRegistry);
+        var agent = new Agent(agentConfig, llmClient, toolRegistry, skillRegistry);
         agent.AddHook(new ToolPermissionHook("bash", "write_file", "read_file"));
 
         return agent;
+    }
+
+    private static SkillRegistry CreateSkillRegistry()
+    {
+        var registry = new SkillRegistry();
+
+        // 加载全局 Skills
+        if (Directory.Exists(CliConfig.GlobalSkillsDir))
+        {
+            registry.RegisterProvider(new LocalSkillProvider(CliConfig.GlobalSkillsDir));
+        }
+
+        // 加载项目级 Skills
+        if (Directory.Exists(CliConfig.ProjectSkillsDir))
+        {
+            registry.RegisterProvider(new LocalSkillProvider(CliConfig.ProjectSkillsDir));
+        }
+
+        return registry;
     }
 
     private async Task<ChatSession?> GetOrCreateSessionAsync(string? sessionId, CliConfig config)

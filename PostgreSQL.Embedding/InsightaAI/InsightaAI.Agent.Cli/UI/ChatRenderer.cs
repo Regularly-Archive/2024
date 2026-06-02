@@ -14,13 +14,13 @@ public class ChatRenderer
     /// <summary>
     /// 显示欢迎信息
     /// </summary>
-    public void ShowWelcome(string provider, string model, string sessionId, int toolCount)
+    public void ShowWelcome(string provider, string model, string sessionId, int toolCount, int skillCount = 0)
     {
         AnsiConsole.Clear();
         AnsiConsole.Write(new FigletText("InsightaAI").Color(Color.Blue));
         AnsiConsole.MarkupLine($"[white]Provider: {provider} | Model: {model}[/]");
         AnsiConsole.MarkupLine($"[white]SessionId: {sessionId}[/]");
-        AnsiConsole.MarkupLine($"[white]Tools: {toolCount} registered[/]");
+        AnsiConsole.MarkupLine($"[white]Tools: {toolCount} registered | Skills: {skillCount} available[/]");
         AnsiConsole.MarkupLine("[white]输入消息开始对话，输入 'exit' 或 'quit' 退出[/]");
         AnsiConsole.MarkupLine("[white]输入 'clear' 清空上下文[/]");
         AnsiConsole.WriteLine();
