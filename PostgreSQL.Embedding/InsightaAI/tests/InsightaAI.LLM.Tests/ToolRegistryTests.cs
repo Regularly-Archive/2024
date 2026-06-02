@@ -1,6 +1,8 @@
 using System.Text.Json;
 using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
+using InsightaAI.LLM.Tests.Tools;
+using InsightaAI.Tests.Shared;
 using Xunit;
 
 namespace InsightaAI.LLM.Tests;
@@ -167,31 +169,5 @@ public class ToolRegistryTests
         Assert.NotNull(result);
         Assert.False(result.IsError);
         Assert.Contains("Hello, World!", result.Content.OfType<TextBlock>().First().Text);
-    }
-
-    // ============================================================
-    // Mock 工具
-    // ============================================================
-
-    private class MockTool : IToolExecutor
-    {
-        public string Name { get; }
-
-        public ToolDefinition Definition => new()
-        {
-            Name = Name,
-            Description = $"Mock tool: {Name}",
-            Schema = JsonSerializer.Deserialize<JsonElement>("{\"type\": \"object\"}")
-        };
-
-        public MockTool(string name)
-        {
-            Name = name;
-        }
-
-        public Task<ToolResult> ExecuteAsync(IDictionary<string, object> args, ToolExecutionContext context)
-        {
-            return Task.FromResult(ToolResult.FromText($"Executed {Name}"));
-        }
     }
 }

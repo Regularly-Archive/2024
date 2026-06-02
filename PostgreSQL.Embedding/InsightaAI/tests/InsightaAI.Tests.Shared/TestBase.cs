@@ -4,8 +4,9 @@ using InsightaAI.LLM.OpenAI;
 using InsightaAI.LLM.Anthropic;
 using InsightaAI.LLM.Gemini;
 using System.Text.Json;
+using InsightaAI.LLM;
 
-namespace InsightaAI.LLM.Tests;
+namespace InsightaAI.Tests.Shared;
 
 /// <summary>
 /// 测试基类 - 提供通用的测试工具和辅助方法

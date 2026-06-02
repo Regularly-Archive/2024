@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using InsightaAI.LLM.Abstractions;
 
-namespace InsightaAI.LLM.Tests;
+namespace InsightaAI.Tests.Shared;
 
 /// <summary>
 /// 测试配置 - 从环境变量或配置文件加载

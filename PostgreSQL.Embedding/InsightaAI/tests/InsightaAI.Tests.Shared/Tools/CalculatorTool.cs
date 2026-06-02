@@ -2,7 +2,7 @@ using System.Text.Json;
 using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
 
-namespace InsightaAI.LLM.Tests;
+namespace InsightaAI.Tests.Shared;
 
 /// <summary>
 /// 简单的计算器工具 (用于测试)
