@@ -42,6 +42,7 @@ public static class BuiltInToolsExtensions
         registry.Register(new GrepTool(fileSystem));
         registry.Register(new GlobTool(fileSystem));
         registry.Register(new BashTool(shellExecutor));
+        registry.Register(new WhereAmITool());
 
         // 注册 Attribute 模式的工具（扫描当前程序集）
         registry.FromAssembly(typeof(WebSearchTool).Assembly);

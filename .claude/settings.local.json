@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit --amend --no-edit)",
+      "Bash(git push:*)",
+      "Bash(git branch -D:*)",
+      "Bash(git update-ref:*)"
+    ]
+  }
+}

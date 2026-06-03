@@ -233,7 +233,7 @@ public partial class LocalSkillProvider : ISkillProvider
     private static string GetDefaultSkillsDirectory()
     {
         var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        return Path.Combine(userProfile, ".insighta", ".skills");
+        return Path.Combine(userProfile, ".agents", "skills");
     }
 
     [GeneratedRegex(@"^(\w[\w-]*):\s*(.*)$")]

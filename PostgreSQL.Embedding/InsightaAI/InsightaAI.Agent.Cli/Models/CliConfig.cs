@@ -24,12 +24,12 @@ public class CliConfig
         "sessions");
 
     /// <summary>
-    /// 全局 Skills 目录
+    /// 全局 Skills 目录（兼容主流工具的 .agents/skills 路径）
     /// </summary>
     public static readonly string GlobalSkillsDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        ".insightaai",
-        ".skills");
+        ".agents",
+        "skills");
 
     /// <summary>
     /// 项目级 Skills 目录（当前工作目录下）

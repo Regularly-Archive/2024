@@ -271,7 +271,8 @@ public class Agent
                 totalUsage = new TokenUsage
                 {
                     InputTokens = totalUsage.InputTokens + response.Usage.InputTokens,
-                    OutputTokens = totalUsage.OutputTokens + response.Usage.OutputTokens
+                    OutputTokens = totalUsage.OutputTokens + response.Usage.OutputTokens,
+                    CacheHitTokens = totalUsage.CacheHitTokens + response.Usage.CacheHitTokens
                 };
             }
 

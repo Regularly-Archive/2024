@@ -141,11 +141,18 @@ public class EventRenderer : IDisposable
             .AddColumn(new GridColumn().NoWrap())
             .AddColumn(new GridColumn().NoWrap())
             .AddColumn(new GridColumn().NoWrap())
+            .AddColumn(new GridColumn().NoWrap())
             .AddColumn(new GridColumn().NoWrap());
+
+        var cacheText = usage.CacheHitTokens > 0
+            ? $"[yellow]{usage.CacheHitTokens}⚡[/]"
+            : "[dim]0⚡[/]";
+
         grid.AddRow(
-            "[grey]Tokens Usage:[/]",
+            "[grey]Tokens:[/]",
             $"[green]{usage.InputTokens}↑[/]",
             $"[blue]{usage.OutputTokens}↓[/]",
+            cacheText,
             $"[dim]{total}[/]");
         AnsiConsole.WriteLine();
         AnsiConsole.Write(grid);
