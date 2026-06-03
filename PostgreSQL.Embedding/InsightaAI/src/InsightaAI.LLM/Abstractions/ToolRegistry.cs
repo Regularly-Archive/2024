@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Linq;
 using InsightaAI.LLM.Models;
 
 namespace InsightaAI.LLM.Abstractions;
@@ -85,6 +86,14 @@ public class ToolRegistry
     public bool HasTool(string name) => _executors.ContainsKey(name);
 
     /// <summary>
+    /// 移除已注册的工具
+    /// </summary>
+    public bool Unregister(string name)
+    {
+        return _executors.TryRemove(name, out _);
+    }
+
+    /// <summary>
     /// 获取已注册的工具名称
     /// </summary>
     public IEnumerable<string> GetRegisteredToolNames() => _executors.Keys;
@@ -123,6 +132,9 @@ public class ToolRegistry
             System.Text.Json.JsonValueKind.True => true,
             System.Text.Json.JsonValueKind.False => false,
             System.Text.Json.JsonValueKind.Null => null!,
+            System.Text.Json.JsonValueKind.Array => element.EnumerateArray().Select(ConvertJsonElement).ToArray(),
+            System.Text.Json.JsonValueKind.Object => element.EnumerateObject()
+                .ToDictionary(p => p.Name, p => ConvertJsonElement(p.Value)),
             _ => element.GetRawText()
         };
     }

@@ -3,6 +3,8 @@ using InsightaAI.Agent.Cli.Models;
 using InsightaAI.Agent.Cli.Services;
 using InsightaAI.Agent.Cli.UI;
 using InsightaAI.Agent.Models;
+using InsightaAI.Agent.Mcp;
+using InsightaAI.Agent.Mcp.Local;
 using InsightaAI.Agent.Skills;
 using InsightaAI.Agent.Skills.Local;
 using InsightaAI.Agent.Storage;
@@ -74,8 +76,11 @@ public class ChatCommand
         var skillRegistry = CreateSkillRegistry();
         var availableSkills = await skillRegistry.ListAllSkillsAsync();
 
+        // 创建 McpRegistry
+        var mcpRegistry = CreateMcpRegistry();
+
         // 创建 Agent
-        var agent = CreateAgent(config, llmClient, toolRegistry, skillRegistry);
+        var agent = CreateAgent(config, llmClient, toolRegistry, skillRegistry, mcpRegistry);
 
         // 获取或创建会话
         var session = await GetOrCreateSessionAsync(sessionId, config);
@@ -197,7 +202,7 @@ public class ChatCommand
         return registry;
     }
 
-    private static Agent CreateAgent(CliConfig config, ILlmClient llmClient, ToolRegistry toolRegistry, SkillRegistry skillRegistry)
+    private static Agent CreateAgent(CliConfig config, ILlmClient llmClient, ToolRegistry toolRegistry, SkillRegistry skillRegistry, McpRegistry? mcpRegistry = null)
     {
         var agentConfig = new AgentConfig
         {
@@ -208,7 +213,7 @@ public class ChatCommand
             MaxToolRounds = config.MaxToolRounds
         };
 
-        var agent = new Agent(agentConfig, llmClient, toolRegistry, skillRegistry);
+        var agent = new Agent(agentConfig, llmClient, toolRegistry, skillRegistry, mcpRegistry);
         agent.AddHook(new ToolPermissionHook("bash", "write_file", "read_file"));
 
         return agent;
@@ -247,6 +252,41 @@ public class ChatCommand
         }
 
         return await ChatSession.CreateAsync(_storage, config.Model, config.Provider);
+    }
+
+    private static McpRegistry? CreateMcpRegistry()
+    {
+        var globalConfigPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".agents",
+            "mcp-servers.json");
+        var projectConfigPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            ".insighta",
+            "mcp-servers.json");
+
+        var globalExists = File.Exists(globalConfigPath);
+        var projectExists = File.Exists(projectConfigPath);
+
+        if (!globalExists && !projectExists)
+        {
+            return null;
+        }
+
+        var pool = new SimpleMcpConnectionPool();
+        var registry = new McpRegistry(pool);
+
+        if (globalExists)
+        {
+            registry.RegisterProvider(new JsonMcpServerProvider(globalConfigPath));
+        }
+
+        if (projectExists)
+        {
+            registry.RegisterProvider(new JsonMcpServerProvider(projectConfigPath));
+        }
+
+        return registry;
     }
 
     private static bool ValidateConfig(CliConfig config)

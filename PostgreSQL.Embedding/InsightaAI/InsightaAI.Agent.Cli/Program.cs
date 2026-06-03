@@ -17,6 +17,7 @@ public class Program
         rootCommand.AddCommand(new ChatCommand(Storage).Create());
         rootCommand.AddCommand(new SessionsCommand(Storage).Create());
         rootCommand.AddCommand(new SkillsCommand().Create());
+        rootCommand.AddCommand(new McpCommand().Create());
 
         // 如果没有子命令，默认运行 chat
         if (args.Length == 0)

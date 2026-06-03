@@ -3,8 +3,10 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading.Channels;
 using InsightaAI.Agent.Hooks;
+using InsightaAI.Agent.Mcp;
 using InsightaAI.Agent.Models;
 using InsightaAI.Agent.Skills;
+using InsightaAI.Agent.Tools.BuiltIn;
 using InsightaAI.LLM;
 using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
@@ -20,6 +22,7 @@ public class Agent
     private readonly ILlmClient _llmClient;
     private readonly ToolRegistry _toolRegistry;
     private readonly ISkillRegistry? _skillRegistry;
+    private readonly McpRegistry? _mcpRegistry;
     private readonly List<IToolHook> _hooks = [];
     private readonly HashSet<string> _alwaysAllowedTools = [];
     private string _skillInstructions = "";
@@ -27,7 +30,7 @@ public class Agent
     /// <summary>
     /// 创建 Agent 实例
     /// </summary>
-    public Agent(AgentConfig config, ILlmClient llmClient, ToolRegistry toolRegistry, ISkillRegistry? skillRegistry = null)
+    public Agent(AgentConfig config, ILlmClient llmClient, ToolRegistry toolRegistry, ISkillRegistry? skillRegistry = null, McpRegistry? mcpRegistry = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(llmClient);
@@ -37,11 +40,18 @@ public class Agent
         _llmClient = llmClient;
         _toolRegistry = toolRegistry;
         _skillRegistry = skillRegistry;
+        _mcpRegistry = mcpRegistry;
 
         // 注册 activate_skill 工具
         if (_skillRegistry != null)
         {
             RegisterActivateSkillTool();
+        }
+
+        // 注册 MCP 工具
+        if (_mcpRegistry != null)
+        {
+            McpTools.RegisterAll(_toolRegistry, _mcpRegistry);
         }
     }
 
@@ -134,6 +144,38 @@ public class Agent
     }
 
     /// <summary>
+    /// 获取可用 MCP 服务器信息（用于构建 SystemPrompt）
+    /// </summary>
+    private async Task<string> GetAvailableMcpInfoAsync(CancellationToken cancellationToken = default)
+    {
+        if (_mcpRegistry == null)
+        {
+            return "";
+        }
+
+        var servers = await _mcpRegistry.ListAllServersAsync(cancellationToken);
+        if (servers.Count == 0)
+        {
+            return "";
+        }
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("\n\n## Available MCP Servers");
+        sb.AppendLine("You can use MCP (Model Context Protocol) tools from these servers:");
+        sb.AppendLine();
+
+        foreach (var server in servers)
+        {
+            sb.AppendLine($"- **{server.Name}**: {server.Description}");
+        }
+
+        sb.AppendLine("\nUse `list_mcp_tools` to see available tools, `activate_mcp_tool` to enable a tool.");
+        sb.AppendLine("Activated tools are named as `mcp__{server}__{tool}`.");
+
+        return sb.ToString();
+    }
+
+    /// <summary>
     /// 执行钩子检查
     /// </summary>
     private async Task<bool> CheckHooksAsync(
@@ -191,6 +233,7 @@ public class Agent
         // 构建系统提示词（包含可用 Skills 信息）
         var systemPrompt = _config.SystemPrompt ?? "";
         systemPrompt += await GetAvailableSkillsInfoAsync(cancellationToken);
+        systemPrompt += await GetAvailableMcpInfoAsync(cancellationToken);
 
         // 添加系统提示词
         if (!string.IsNullOrEmpty(systemPrompt))
