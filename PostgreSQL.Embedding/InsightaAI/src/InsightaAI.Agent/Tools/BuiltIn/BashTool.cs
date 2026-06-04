@@ -24,7 +24,7 @@ public class BashTool : IToolExecutor
         {
             Name = Name,
             Description = "执行 Shell 命令。适用于运行系统命令、脚本、编译代码等。" +
-                         "在 Windows 上使用 CMD，在 Linux/Mac 上使用 Bash。",
+                         "在 Windows 上使用 PowerShell，在 Linux/Mac 上使用 Bash。",
             Schema = JsonSerializer.SerializeToElement(new
             {
                 type = "object",
