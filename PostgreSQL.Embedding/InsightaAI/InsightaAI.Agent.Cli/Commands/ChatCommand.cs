@@ -52,6 +52,12 @@ public class ChatCommand
     {
         var config = CliConfig.Load();
 
+        // 注入环境变量
+        foreach (var (key, value) in config.Envs)
+        {
+            Environment.SetEnvironmentVariable(key, value);
+        }
+
         if (!ValidateConfig(config))
         {
             _renderer.ShowWarning("请先运行 'config' 命令进行配置");

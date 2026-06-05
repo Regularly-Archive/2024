@@ -50,16 +50,11 @@ public class WhereAmITool : IToolExecutor
                 platform = Environment.OSVersion.Platform.ToString()
             },
             ["workspace"] = Directory.GetCurrentDirectory(),
-            ["session"] = context.ConversationId,
+            ["session"] = context.ConversationId ?? string.Empty,
             ["agent"] = context.AgentId,
             ["runtime"] = RuntimeInformation.FrameworkDescription
         };
 
-        var json = JsonSerializer.Serialize(info, new JsonSerializerOptions
-        {
-            WriteIndented = true
-        });
-
-        return Task.FromResult(ToolResult.FromText(json));
+        return Task.FromResult(ToolResult.From(info));
     }
 }

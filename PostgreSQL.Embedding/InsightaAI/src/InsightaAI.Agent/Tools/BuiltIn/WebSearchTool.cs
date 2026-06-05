@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -20,8 +21,14 @@ public static class WebSearchTool
     [Tool("web_search", "搜索互联网获取实时信息。适用于查找最新资讯、文档、教程等。")]
     public static async Task<ToolResult> SearchAsync(
         [ToolParameter("搜索关键词")] string query,
-        [ToolParameter("搜索结果数量限制")] int max_results,
-        ToolExecutionContext context)
+        [ToolParameter("搜索结果数量限制（默认 5）")] int max_results,
+        ToolExecutionContext context,
+        [ToolParameter("是否包含 AI 生成的答案（默认 true）")] bool include_answer = true,
+        [ToolParameter("搜索深度：basic 或 advanced（默认 basic）")] string search_depth = "basic",
+        [ToolParameter("只搜索这些域名（逗号分隔）")] string? include_domains = null,
+        [ToolParameter("排除这些域名（逗号分隔）")] string? exclude_domains = null,
+        [ToolParameter("搜索主题：general 或 news（默认 general）")] string topic = "general",
+        [ToolParameter("新闻搜索的时间范围（天数，仅 topic=news 时有效）")] int days = 3)
     {
         try
         {
@@ -34,21 +41,45 @@ public static class WebSearchTool
                     "Please set it to use web search functionality.");
             }
 
-            // 构建请求
+            // 构建请求体
             var request = new TavilySearchRequest
             {
-                ApiKey = apiKey,
                 Query = query,
-                MaxResults = Math.Min(max_results, 10),
-                SearchDepth = "basic",
-                IncludeAnswer = true
+                MaxResults = Math.Min(max_results, 20),
+                SearchDepth = search_depth,
+                IncludeAnswer = include_answer,
+                Topic = topic,
+                Days = days
             };
 
+            // 处理域名过滤
+            if (!string.IsNullOrEmpty(include_domains))
+            {
+                request.IncludeDomains = include_domains
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .ToList();
+            }
+
+            if (!string.IsNullOrEmpty(exclude_domains))
+            {
+                request.ExcludeDomains = exclude_domains
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .ToList();
+            }
+
+            // 使用 Bearer token 认证
+            var requestMessage = new HttpRequestMessage(HttpMethod.Post, "https://api.tavily.com/search")
+            {
+                Content = JsonContent.Create(request, options: new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                })
+            };
+            requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
             // 发送请求
-            var response = await _httpClient.PostAsJsonAsync(
-                "https://api.tavily.com/search",
-                request,
-                context.CancellationToken);
+            var response = await _httpClient.SendAsync(requestMessage, context.CancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -65,33 +96,8 @@ public static class WebSearchTool
                 return ToolResult.FromError("Failed to parse search results.");
             }
 
-            // 格式化输出
-            var sb = new System.Text.StringBuilder();
-
-            if (!string.IsNullOrEmpty(result.Answer))
-            {
-                sb.AppendLine($"**Answer:** {result.Answer}");
-                sb.AppendLine();
-            }
-
-            if (result.Results != null && result.Results.Count > 0)
-            {
-                sb.AppendLine($"**Search Results ({result.Results.Count}):**");
-                sb.AppendLine();
-
-                foreach (var item in result.Results)
-                {
-                    sb.AppendLine($"- **{item.Title}**");
-                    sb.AppendLine($"  URL: {item.Url}");
-                    if (!string.IsNullOrEmpty(item.Content))
-                    {
-                        sb.AppendLine($"  {TruncateContent(item.Content, 200)}");
-                    }
-                    sb.AppendLine();
-                }
-            }
-
-            return ToolResult.FromText(sb.ToString().TrimEnd());
+            // 直接返回解析后的结果
+            return ToolResult.From(result);
         }
         catch (Exception ex)
         {
@@ -99,18 +105,8 @@ public static class WebSearchTool
         }
     }
 
-    private static string TruncateContent(string content, int maxLength)
-    {
-        if (content.Length <= maxLength) return content;
-        return content[..maxLength] + "...";
-    }
-
-    // Tavily API 类型定义
     private class TavilySearchRequest
     {
-        [JsonPropertyName("api_key")]
-        public string ApiKey { get; set; } = "";
-
         [JsonPropertyName("query")]
         public string Query { get; set; } = "";
 
@@ -122,6 +118,18 @@ public static class WebSearchTool
 
         [JsonPropertyName("include_answer")]
         public bool IncludeAnswer { get; set; } = true;
+
+        [JsonPropertyName("topic")]
+        public string Topic { get; set; } = "general";
+
+        [JsonPropertyName("days")]
+        public int Days { get; set; } = 3;
+
+        [JsonPropertyName("include_domains")]
+        public List<string>? IncludeDomains { get; set; }
+
+        [JsonPropertyName("exclude_domains")]
+        public List<string>? ExcludeDomains { get; set; }
     }
 
     private class TavilySearchResponse

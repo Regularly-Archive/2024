@@ -40,6 +40,13 @@ public sealed record ToolExecutionContext
 /// </summary>
 public sealed record ToolResult
 {
+    /// <summary>JSON 序列化选项</summary>
+    private static readonly JsonSerializerOptions DefaultJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+    };
+
     /// <summary>结果内容</summary>
     public required ContentBlock[] Content { get; init; }
 
@@ -52,6 +59,14 @@ public sealed record ToolResult
     public static ToolResult FromText(string text) => new()
     {
         Content = [new TextBlock { Text = text }]
+    };
+
+    /// <summary>
+    /// 从对象创建成功结果（序列化为 JSON）
+    /// </summary>
+    public static ToolResult From<T>(T obj) => new()
+    {
+        Content = [new TextBlock { Text = JsonSerializer.Serialize(obj, DefaultJsonOptions) }]
     };
 
     /// <summary>

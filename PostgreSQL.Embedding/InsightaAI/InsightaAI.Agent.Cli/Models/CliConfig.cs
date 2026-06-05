@@ -115,6 +115,12 @@ public class CliConfig
     public bool EnableBuiltInTools { get; set; } = true;
 
     /// <summary>
+    /// 环境变量配置
+    /// </summary>
+    [JsonPropertyName("envs")]
+    public Dictionary<string, string> Envs { get; set; } = [];
+
+    /// <summary>
     /// 加载配置
     /// </summary>
     public static CliConfig Load()
