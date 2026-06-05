@@ -112,6 +112,7 @@ public class EventRenderer : IDisposable
         else
         {
             AnsiConsole.MarkupLine($"[green]●[/] [dim]{toolDisplay}[/]");
+            AnsiConsole.MarkupLine($"[green]⎿ {EscapeMarkup(toolEnd.ResultPreview ?? "")}[/]");
         }
 
         AnsiConsole.WriteLine();

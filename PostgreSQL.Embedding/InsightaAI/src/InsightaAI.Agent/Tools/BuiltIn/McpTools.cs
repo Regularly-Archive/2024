@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Encodings.Web;
 using InsightaAI.Agent.Mcp;
 using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
@@ -10,6 +11,12 @@ namespace InsightaAI.Agent.Tools.BuiltIn;
 /// </summary>
 public static class McpTools
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+
     public static void RegisterAll(ToolRegistry registry, McpRegistry mcpRegistry)
     {
         RegisterListMcpTools(registry, mcpRegistry);
@@ -58,7 +65,7 @@ public static class McpTools
                         };
                     }
 
-                    return ToolResult.FromText(JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
+                    return ToolResult.FromText(JsonSerializer.Serialize(result, JsonOptions));
                 }
                 else
                 {
@@ -77,7 +84,7 @@ public static class McpTools
                         input_schema = t.InputSchema
                     }).ToArray();
 
-                    return ToolResult.FromText(JsonSerializer.Serialize(toolList, new JsonSerializerOptions { WriteIndented = true }));
+                    return ToolResult.FromText(JsonSerializer.Serialize(toolList, JsonOptions));
                 }
             });
     }
@@ -124,7 +131,7 @@ public static class McpTools
                     status = "activated",
                     registered_name = metadata.RegisteredName,
                     description = metadata.Description
-                }, new JsonSerializerOptions { WriteIndented = true }));
+                }, JsonOptions));
             });
     }
 
@@ -161,7 +168,7 @@ public static class McpTools
                 {
                     status = "deactivated",
                     registered_name = registeredName
-                }, new JsonSerializerOptions { WriteIndented = true })));
+                }, JsonOptions)));
             });
     }
 }

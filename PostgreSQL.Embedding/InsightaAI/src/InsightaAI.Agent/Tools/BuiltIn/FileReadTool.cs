@@ -1,4 +1,5 @@
 using System.Text.Json;
+using InsightaAI.Agent.Models;
 using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
 
@@ -11,14 +12,16 @@ namespace InsightaAI.Agent.Tools.BuiltIn;
 public class FileReadTool : IToolExecutor
 {
     private readonly IFileSystem _fileSystem;
+    private readonly FileReadState _readState;
 
     public string Name => "read_file";
 
     public ToolDefinition Definition { get; }
 
-    public FileReadTool(IFileSystem fileSystem)
+    public FileReadTool(IFileSystem fileSystem, FileReadState readState)
     {
         _fileSystem = fileSystem;
+        _readState = readState;
 
         Definition = new ToolDefinition
         {
@@ -72,6 +75,10 @@ public class FileReadTool : IToolExecutor
                 return ToolResult.FromError($"File not found: {filePath}");
             }
 
+            // 获取文件修改时间
+            var fileInfo = new FileInfo(Path.GetFullPath(filePath));
+            var lastModified = fileInfo.LastWriteTimeUtc;
+
             // 读取文件
             if (offset.HasValue || limit.HasValue)
             {
@@ -81,6 +88,10 @@ public class FileReadTool : IToolExecutor
                     offset,
                     limit,
                     context.CancellationToken);
+
+                // 读取完整内容用于状态跟踪（edit_file 需要）
+                var fullContent = await _fileSystem.ReadFileAsync(filePath, context.CancellationToken);
+                _readState.RecordRead(filePath, fullContent, lastModified);
 
                 var content = AddLineNumbers(result.Content, result.StartLine);
                 return ToolResult.FromText(
@@ -92,6 +103,9 @@ public class FileReadTool : IToolExecutor
             {
                 // 全文读取
                 var content = await _fileSystem.ReadFileAsync(filePath, context.CancellationToken);
+
+                // 记录读取状态
+                _readState.RecordRead(filePath, content, lastModified);
 
                 // 检查文件大小限制（默认 100KB）
                 if (content.Length > 100_000)

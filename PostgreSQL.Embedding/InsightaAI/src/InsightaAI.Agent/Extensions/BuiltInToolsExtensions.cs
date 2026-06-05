@@ -1,7 +1,9 @@
+using InsightaAI.Agent.Models;
+using InsightaAI.Agent.Tools.BuiltIn;
 using InsightaAI.LLM.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace InsightaAI.Agent.Tools.BuiltIn;
+namespace InsightaAI.Agent.Extensions;
 
 /// <summary>
 /// 内置工具扩展方法
@@ -36,9 +38,13 @@ public static class BuiltInToolsExtensions
         shellExecutor ??= new LocalShellExecutor();
         fileSystem ??= new LocalFileSystem();
 
+        // 创建共享的文件读取状态
+        var readState = new FileReadState();
+
         // 注册接口模式的工具
-        registry.Register(new FileReadTool(fileSystem));
+        registry.Register(new FileReadTool(fileSystem, readState));
         registry.Register(new FileWriteTool(fileSystem));
+        registry.Register(new FileEditTool(fileSystem, readState));
         registry.Register(new GrepTool(fileSystem));
         registry.Register(new GlobTool(fileSystem));
         registry.Register(new BashTool(shellExecutor));

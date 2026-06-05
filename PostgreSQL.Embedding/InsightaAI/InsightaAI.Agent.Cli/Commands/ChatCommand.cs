@@ -2,6 +2,7 @@ using System.CommandLine;
 using InsightaAI.Agent.Cli.Models;
 using InsightaAI.Agent.Cli.Services;
 using InsightaAI.Agent.Cli.UI;
+using InsightaAI.Agent.Extensions;
 using InsightaAI.Agent.Models;
 using InsightaAI.Agent.Mcp;
 using InsightaAI.Agent.Mcp.Local;
@@ -214,7 +215,7 @@ public class ChatCommand
         };
 
         var agent = new Agent(agentConfig, llmClient, toolRegistry, skillRegistry, mcpRegistry);
-        agent.AddHook(new ToolPermissionHook("bash", "write_file", "read_file"));
+        agent.AddHook(new ToolPermissionHook("bash", "write_file", "read_file", "edit_file"));
 
         return agent;
     }
