@@ -2,10 +2,10 @@ using System.Text.Json;
 using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
 
-namespace InsightaAI.Agent.Tools;
+namespace InsightaAI.Tests.Shared;
 
 /// <summary>
-/// 获取当前时间工具
+/// 获取当前时间工具 (用于测试)
 /// </summary>
 public class GetCurrentTimeTool : IToolExecutor
 {
@@ -53,7 +53,7 @@ public class GetCurrentTimeTool : IToolExecutor
 }
 
 /// <summary>
-/// 保存笔记工具
+/// 保存笔记工具 (用于测试)
 /// </summary>
 public class SaveNoteTool : IToolExecutor
 {

@@ -367,156 +367,19 @@ public class Agent
                 HasToolCalls = true
             };
 
-            // 判断是否并行执行
+            // 执行工具
             if (_config.ParallelToolExecution && toolCalls.Length > 1)
             {
-                // 并行执行多个工具调用
-                var toolEvents = Channel.CreateUnbounded<AgentEvent>();
-                var toolResults = new List<(ToolCallBlock ToolCall, ToolResult Result)>();
-                var toolResultsLock = new object();
-
-                var tasks = toolCalls.Select(async toolCall =>
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    var arguments = toolCall.Arguments.GetRawText();
-
-                    // 发送工具开始事件
-                    await toolEvents.Writer.WriteAsync(new AgentToolStartEvent
-                    {
-                        AgentId = _config.Id,
-                        ToolCallId = toolCall.Id,
-                        ToolName = toolCall.Name,
-                        Arguments = arguments
-                    }, cancellationToken);
-
-                    var toolContext = new ToolExecutionContext
-                    {
-                        AgentId = _config.Id,
-                        ToolCallId = toolCall.Id,
-                        ConversationId = conversationId,
-                        CancellationToken = cancellationToken
-                    };
-
-                    // 检查钩子
-                    var allowed = await CheckHooksAsync(toolCall.Name, arguments, toolContext);
-
-                    ToolResult toolResult;
-                    if (allowed)
-                    {
-                        // 执行工具
-                        toolResult = await _toolRegistry.ExecuteAsync(toolCall, toolContext);
-                    }
-                    else
-                    {
-                        // 用户拒绝执行
-                        toolResult = ToolResult.FromError("Tool execution denied by user.");
-                    }
-
-                    // 发送工具完成事件
-                    var resultText = toolResult.Content.OfType<TextBlock>().FirstOrDefault()?.Text;
-                    await toolEvents.Writer.WriteAsync(new AgentToolEndEvent
-                    {
-                        AgentId = _config.Id,
-                        ToolCallId = toolCall.Id,
-                        ToolName = toolCall.Name,
-                        IsError = toolResult.IsError,
-                        ResultPreview = resultText?.Length > 100 ? resultText[..100] + "..." : resultText
-                    }, cancellationToken);
-
-                    // 收集结果
-                    lock (toolResultsLock)
-                    {
-                        toolResults.Add((toolCall, toolResult));
-                    }
-                }).ToArray();
-
-                // 关闭 channel 当所有任务完成时
-                _ = Task.WhenAll(tasks).ContinueWith(_ => toolEvents.Writer.Complete());
-
-                // 转发事件
-                await foreach (var evt in toolEvents.Reader.ReadAllAsync(cancellationToken))
+                await foreach (var evt in ExecuteToolsParallelAsync(toolCalls, conversationId, messages, cancellationToken))
                 {
                     yield return evt;
-                }
-
-                // 等待所有任务完成
-                await Task.WhenAll(tasks);
-
-                // 按原始顺序添加工具结果到对话历史
-                foreach (var (toolCall, toolResult) in toolResults)
-                {
-                    var toolResultMessage = new Message
-                    {
-                        Role = MessageRole.ToolResult,
-                        ToolCallId = toolCall.Id,
-                        ToolName = toolCall.Name,
-                        Content = toolResult.Content
-                    };
-                    messages.Add(toolResultMessage);
                 }
             }
             else
             {
-                // 顺序执行工具调用
-                foreach (var toolCall in toolCalls)
+                await foreach (var evt in ExecuteToolsSequentialAsync(toolCalls, conversationId, messages, cancellationToken))
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    var toolContext = new ToolExecutionContext
-                    {
-                        AgentId = _config.Id,
-                        ToolCallId = toolCall.Id,
-                        ConversationId = conversationId,
-                        CancellationToken = cancellationToken
-                    };
-
-                    var arguments = toolCall.Arguments.GetRawText();
-
-                    // 发送工具开始事件
-                    yield return new AgentToolStartEvent
-                    {
-                        AgentId = _config.Id,
-                        ToolCallId = toolCall.Id,
-                        ToolName = toolCall.Name,
-                        Arguments = arguments
-                    };
-
-                    // 检查钩子
-                    var allowed = await CheckHooksAsync(toolCall.Name, arguments, toolContext);
-
-                    ToolResult toolResult;
-                    if (allowed)
-                    {
-                        // 执行工具
-                        toolResult = await _toolRegistry.ExecuteAsync(toolCall, toolContext);
-                    }
-                    else
-                    {
-                        // 用户拒绝执行
-                        toolResult = ToolResult.FromError("Tool execution denied by user.");
-                    }
-
-                    // 发送工具完成事件
-                    var resultText = toolResult.Content.OfType<TextBlock>().FirstOrDefault()?.Text;
-                    yield return new AgentToolEndEvent
-                    {
-                        AgentId = _config.Id,
-                        ToolCallId = toolCall.Id,
-                        ToolName = toolCall.Name,
-                        IsError = toolResult.IsError,
-                        ResultPreview = resultText?.Length > 100 ? resultText[..100] + "..." : resultText
-                    };
-
-                    // 将工具结果加入对话历史
-                    var toolResultMessage = new Message
-                    {
-                        Role = MessageRole.ToolResult,
-                        ToolCallId = toolCall.Id,
-                        ToolName = toolCall.Name,
-                        Content = toolResult.Content
-                    };
-                    messages.Add(toolResultMessage);
+                    yield return evt;
                 }
             }
         }
@@ -556,7 +419,8 @@ public class Agent
             totalUsage = new TokenUsage
             {
                 InputTokens = totalUsage.InputTokens + finalResponse.Usage.InputTokens,
-                OutputTokens = totalUsage.OutputTokens + finalResponse.Usage.OutputTokens
+                OutputTokens = totalUsage.OutputTokens + finalResponse.Usage.OutputTokens,
+                CacheHitTokens = totalUsage.CacheHitTokens + finalResponse.Usage.CacheHitTokens
             };
         }
 
@@ -580,6 +444,160 @@ public class Agent
                 DurationMs = stopwatch.ElapsedMilliseconds
             }
         };
+    }
+
+    /// <summary>
+    /// 并行执行多个工具调用
+    /// </summary>
+    private async IAsyncEnumerable<AgentEvent> ExecuteToolsParallelAsync(
+        ToolCallBlock[] toolCalls,
+        string conversationId,
+        List<Message> messages,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var toolEvents = Channel.CreateUnbounded<AgentEvent>();
+        var toolResults = new List<(ToolCallBlock ToolCall, ToolResult Result)>();
+        var toolResultsLock = new object();
+
+        var tasks = toolCalls.Select(async toolCall =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var arguments = toolCall.Arguments.GetRawText();
+
+            // 发送工具开始事件
+            await toolEvents.Writer.WriteAsync(new AgentToolStartEvent
+            {
+                AgentId = _config.Id,
+                ToolCallId = toolCall.Id,
+                ToolName = toolCall.Name,
+                Arguments = arguments
+            }, cancellationToken);
+
+            var (allowed, toolResult) = await ExecuteSingleToolAsync(toolCall, arguments, conversationId, cancellationToken);
+
+            // 发送工具完成事件
+            var resultText = toolResult.Content.OfType<TextBlock>().FirstOrDefault()?.Text;
+            await toolEvents.Writer.WriteAsync(new AgentToolEndEvent
+            {
+                AgentId = _config.Id,
+                ToolCallId = toolCall.Id,
+                ToolName = toolCall.Name,
+                IsError = toolResult.IsError,
+                ResultPreview = resultText?.Length > 100 ? resultText[..100] + "..." : resultText
+            }, cancellationToken);
+
+            // 收集结果
+            lock (toolResultsLock)
+            {
+                toolResults.Add((toolCall, toolResult));
+            }
+        }).ToArray();
+
+        // 关闭 channel 当所有任务完成时
+        _ = Task.WhenAll(tasks).ContinueWith(_ => toolEvents.Writer.Complete());
+
+        // 转发事件
+        await foreach (var evt in toolEvents.Reader.ReadAllAsync(cancellationToken))
+        {
+            yield return evt;
+        }
+
+        // 等待所有任务完成
+        await Task.WhenAll(tasks);
+
+        // 按原始顺序添加工具结果到对话历史
+        foreach (var (toolCall, toolResult) in toolResults)
+        {
+            messages.Add(new Message
+            {
+                Role = MessageRole.ToolResult,
+                ToolCallId = toolCall.Id,
+                ToolName = toolCall.Name,
+                Content = toolResult.Content
+            });
+        }
+    }
+
+    /// <summary>
+    /// 顺序执行工具调用
+    /// </summary>
+    private async IAsyncEnumerable<AgentEvent> ExecuteToolsSequentialAsync(
+        ToolCallBlock[] toolCalls,
+        string conversationId,
+        List<Message> messages,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        foreach (var toolCall in toolCalls)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var arguments = toolCall.Arguments.GetRawText();
+
+            // 发送工具开始事件
+            yield return new AgentToolStartEvent
+            {
+                AgentId = _config.Id,
+                ToolCallId = toolCall.Id,
+                ToolName = toolCall.Name,
+                Arguments = arguments
+            };
+
+            var (allowed, toolResult) = await ExecuteSingleToolAsync(toolCall, arguments, conversationId, cancellationToken);
+
+            // 发送工具完成事件
+            var resultText = toolResult.Content.OfType<TextBlock>().FirstOrDefault()?.Text;
+            yield return new AgentToolEndEvent
+            {
+                AgentId = _config.Id,
+                ToolCallId = toolCall.Id,
+                ToolName = toolCall.Name,
+                IsError = toolResult.IsError,
+                ResultPreview = resultText?.Length > 100 ? resultText[..100] + "..." : resultText
+            };
+
+            // 将工具结果加入对话历史
+            messages.Add(new Message
+            {
+                Role = MessageRole.ToolResult,
+                ToolCallId = toolCall.Id,
+                ToolName = toolCall.Name,
+                Content = toolResult.Content
+            });
+        }
+    }
+
+    /// <summary>
+    /// 执行单个工具（含钩子检查）
+    /// </summary>
+    private async Task<(bool Allowed, ToolResult Result)> ExecuteSingleToolAsync(
+        ToolCallBlock toolCall,
+        string arguments,
+        string conversationId,
+        CancellationToken cancellationToken)
+    {
+        var toolContext = new ToolExecutionContext
+        {
+            AgentId = _config.Id,
+            ToolCallId = toolCall.Id,
+            ConversationId = conversationId,
+            CancellationToken = cancellationToken
+        };
+
+        // 检查钩子
+        var allowed = await CheckHooksAsync(toolCall.Name, arguments, toolContext);
+
+        ToolResult toolResult;
+        if (allowed)
+        {
+            toolResult = await _toolRegistry.ExecuteAsync(toolCall, toolContext);
+        }
+        else
+        {
+            toolResult = ToolResult.FromError("Tool execution denied by user.");
+        }
+
+        return (allowed, toolResult);
     }
 
     /// <summary>
