@@ -70,19 +70,28 @@ public class FileEditTool : IToolExecutor
             var filePath = GetStringValue(args, "file_path");
             if (string.IsNullOrEmpty(filePath))
             {
-                return ToolResult.FromError("Missing required parameter: file_path");
+                return ToolResult.FromError(
+                    "Missing required parameter: file_path\n" +
+                    "Required: {\"file_path\": \"string\", \"old_string\": \"string\", \"new_string\": \"string\"}\n" +
+                    "Optional: {\"replace_all\": boolean}");
             }
 
             var oldString = GetStringValue(args, "old_string");
             if (string.IsNullOrEmpty(oldString))
             {
-                return ToolResult.FromError("Missing required parameter: old_string");
+                return ToolResult.FromError(
+                    "Missing required parameter: old_string\n" +
+                    "Required: {\"file_path\": \"string\", \"old_string\": \"string\", \"new_string\": \"string\"}\n" +
+                    "Optional: {\"replace_all\": boolean}");
             }
 
             var newString = GetStringValue(args, "new_string");
             if (newString == null)
             {
-                return ToolResult.FromError("Missing required parameter: new_string");
+                return ToolResult.FromError(
+                    "Missing required parameter: new_string\n" +
+                    "Required: {\"file_path\": \"string\", \"old_string\": \"string\", \"new_string\": \"string\"}\n" +
+                    "Optional: {\"replace_all\": boolean}");
             }
 
             var replaceAll = GetBoolValue(args, "replace_all");

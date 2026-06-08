@@ -29,7 +29,10 @@ public enum AgentEventType
     Complete,
 
     /// <summary>错误</summary>
-    Error
+    Error,
+
+    /// <summary>上下文已压缩</summary>
+    ContextCompacted
 }
 
 /// <summary>
@@ -120,4 +123,20 @@ public sealed record AgentErrorEvent : AgentEvent
     public override AgentEventType Type => AgentEventType.Error;
     public required string ErrorMessage { get; init; }
     public bool Recoverable { get; init; }
+}
+
+/// <summary>
+/// 上下文压缩事件
+/// </summary>
+public sealed record AgentContextCompactedEvent : AgentEvent
+{
+    public override AgentEventType Type => AgentEventType.ContextCompacted;
+    public required string Strategy { get; init; }
+    public int PreCompactTokens { get; init; }
+    public int PostCompactTokens { get; init; }
+    public int PreCompactMessages { get; init; }
+    public int PostCompactMessages { get; init; }
+
+    /// <summary>压缩后的消息列表（用于同步到 Session）</summary>
+    public Message[]? CompactedMessages { get; init; }
 }

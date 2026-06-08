@@ -56,7 +56,10 @@ public class BashTool : IToolExecutor
             var command = GetStringValue(args, "command");
             if (string.IsNullOrEmpty(command))
             {
-                return ToolResult.FromError("Missing required parameter: command");
+                return ToolResult.FromError(
+                    "Missing required parameter: command\n" +
+                    "Required: {\"command\": \"string\"}\n" +
+                    "Optional: {\"working_directory\": \"string\"}");
             }
 
             var workingDirectory = GetStringValue(args, "working_directory");

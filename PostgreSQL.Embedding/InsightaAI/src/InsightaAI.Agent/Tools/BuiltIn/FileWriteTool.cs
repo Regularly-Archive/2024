@@ -60,13 +60,19 @@ public class FileWriteTool : IToolExecutor
             var filePath = GetStringValue(args, "file_path");
             if (string.IsNullOrEmpty(filePath))
             {
-                return ToolResult.FromError("Missing required parameter: file_path");
+                return ToolResult.FromError(
+                    "Missing required parameter: file_path\n" +
+                    "Required parameters: {\"file_path\": \"string\", \"content\": \"string\"}\n" +
+                    "Optional: {\"append\": boolean}");
             }
 
             var content = GetStringValue(args, "content");
             if (content == null)
             {
-                return ToolResult.FromError("Missing required parameter: content");
+                return ToolResult.FromError(
+                    "Missing required parameter: content\n" +
+                    "Required parameters: {\"file_path\": \"string\", \"content\": \"string\"}\n" +
+                    "Optional: {\"append\": boolean}");
             }
 
             var append = GetBoolValue(args, "append") ?? false;

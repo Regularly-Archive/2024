@@ -63,7 +63,10 @@ public class FileReadTool : IToolExecutor
             var filePath = GetStringValue(args, "file_path");
             if (string.IsNullOrEmpty(filePath))
             {
-                return ToolResult.FromError("Missing required parameter: file_path");
+                return ToolResult.FromError(
+                    "Missing required parameter: file_path\n" +
+                    "Required: {\"file_path\": \"string\"}\n" +
+                    "Optional: {\"offset\": number, \"limit\": number}");
             }
 
             var offset = GetIntValue(args, "offset");

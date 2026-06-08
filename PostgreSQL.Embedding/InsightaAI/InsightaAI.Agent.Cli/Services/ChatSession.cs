@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text.Json;
 using InsightaAI.Agent.Models;
 using InsightaAI.Agent.Storage;
@@ -85,6 +86,78 @@ public class ChatSession
     }
 
     /// <summary>
+    /// 替换消息历史（用于压缩后的同步）
+    /// </summary>
+    public async Task ReplaceMessagesAsync(List<Message> messages)
+    {
+        // 清空存储
+        await _storage.ClearMessagesAsync(SessionId);
+
+        // 清空内存缓存
+        _messages.Clear();
+
+        // 转换并添加新消息
+        foreach (var message in messages)
+        {
+            // 跳过系统消息（不需要持久化）
+            if (message.Role == MessageRole.System)
+                continue;
+
+            var record = ConvertToMessageRecord(message);
+            _messages.Add(record);
+            await _storage.AddMessageAsync(SessionId, record);
+        }
+    }
+
+    private static MessageRecord ConvertToMessageRecord(Message message)
+    {
+        var contentItems = new List<ContentItem>();
+        foreach (var block in message.Content)
+        {
+            ContentItem item = block switch
+            {
+                TextBlock text => new TextContent { Text = text.Text },
+                ImageBlock image => new ImageContent
+                {
+                    MediaType = image.Source.MediaType,
+                    Data = image.Source.Data
+                },
+                ToolCallBlock toolCall => new ToolCallContent
+                {
+                    Id = toolCall.Id,
+                    Name = toolCall.Name,
+                    Arguments = toolCall.Arguments.GetRawText()
+                },
+                ToolResultBlock toolResult => new ToolResultContent
+                {
+                    ToolCallId = toolResult.ToolCallId,
+                    ToolName = toolResult.ToolName,
+                    Text = toolResult.Content.OfType<TextBlock>().FirstOrDefault()?.Text,
+                    IsError = toolResult.IsError
+                },
+                ThinkingBlock thinking => new ThinkingContent { Text = thinking.Thinking },
+                _ => new TextContent { Text = "" }
+            };
+            contentItems.Add(item);
+        }
+
+        return new MessageRecord
+        {
+            Role = message.Role switch
+            {
+                MessageRole.User => RoleUser,
+                MessageRole.Assistant => RoleAssistant,
+                MessageRole.System => "system",
+                MessageRole.ToolResult => "tool",
+                _ => RoleUser
+            },
+            Content = contentItems,
+            ToolCallId = message.ToolCallId,
+            ToolName = message.ToolName
+        };
+    }
+
+    /// <summary>
     /// 创建新的会话
     /// </summary>
     public static async Task<ChatSession> CreateAsync(IMessageStorage storage, string model, string provider)
@@ -120,6 +193,13 @@ public class ChatSession
                 Id = toolCall.Id,
                 Name = toolCall.Name,
                 Arguments = JsonSerializer.Deserialize<JsonElement>(toolCall.Arguments)
+            },
+            ToolResultContent toolResult => new ToolResultBlock
+            {
+                ToolCallId = toolResult.ToolCallId,
+                ToolName = toolResult.ToolName,
+                Content = [new TextBlock { Text = toolResult.Text ?? "" }],
+                IsError = toolResult.IsError
             },
             ThinkingContent thinking => new ThinkingBlock { Thinking = thinking.Text },
             _ => new TextBlock { Text = "" }

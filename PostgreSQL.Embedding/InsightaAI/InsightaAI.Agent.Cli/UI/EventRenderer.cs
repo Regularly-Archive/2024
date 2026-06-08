@@ -47,6 +47,10 @@ public class EventRenderer : IDisposable
             case AgentCompleteEvent completeEvent:
                 await HandleCompleteAsync(completeEvent);
                 break;
+
+            case AgentContextCompactedEvent compactedEvent:
+                HandleContextCompacted(compactedEvent);
+                break;
         }
     }
 
@@ -131,6 +135,16 @@ public class EventRenderer : IDisposable
         }
 
         ShowTokenUsage(completeEvent.Result.Usage);
+    }
+
+    private void HandleContextCompacted(AgentContextCompactedEvent compactedEvent)
+    {
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine(
+            $"[yellow]⟳[/] Context compacted ([dim]{compactedEvent.Strategy}[/]): " +
+            $"{compactedEvent.PreCompactMessages} → {compactedEvent.PostCompactMessages} messages, " +
+            $"~{compactedEvent.PreCompactTokens:N0} → ~{compactedEvent.PostCompactTokens:N0} tokens");
+        AnsiConsole.WriteLine();
     }
 
     private void ShowTokenUsage(TokenUsage? usage)

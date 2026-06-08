@@ -121,6 +121,12 @@ public class CliConfig
     public Dictionary<string, string> Envs { get; set; } = [];
 
     /// <summary>
+    /// 摘要模型（可选，默认使用当前模型，可配置更便宜的模型）
+    /// </summary>
+    [JsonPropertyName("summary_model")]
+    public string? SummaryModel { get; set; }
+
+    /// <summary>
     /// 加载配置
     /// </summary>
     public static CliConfig Load()

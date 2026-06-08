@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading.Channels;
+using InsightaAI.Agent.Context;
 using InsightaAI.Agent.Hooks;
 using InsightaAI.Agent.Mcp;
 using InsightaAI.Agent.Models;
@@ -23,6 +24,7 @@ public class Agent
     private readonly ToolRegistry _toolRegistry;
     private readonly ISkillRegistry? _skillRegistry;
     private readonly McpRegistry? _mcpRegistry;
+    private readonly IContextManager? _contextManager;
     private readonly List<IToolHook> _hooks = [];
     private readonly HashSet<string> _alwaysAllowedTools = [];
     private string _skillInstructions = "";
@@ -30,7 +32,13 @@ public class Agent
     /// <summary>
     /// 创建 Agent 实例
     /// </summary>
-    public Agent(AgentConfig config, ILlmClient llmClient, ToolRegistry toolRegistry, ISkillRegistry? skillRegistry = null, McpRegistry? mcpRegistry = null)
+    public Agent(
+        AgentConfig config,
+        ILlmClient llmClient,
+        ToolRegistry toolRegistry,
+        ISkillRegistry? skillRegistry = null,
+        McpRegistry? mcpRegistry = null,
+        IContextManager? contextManager = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(llmClient);
@@ -41,6 +49,7 @@ public class Agent
         _toolRegistry = toolRegistry;
         _skillRegistry = skillRegistry;
         _mcpRegistry = mcpRegistry;
+        _contextManager = contextManager;
 
         // 注册 activate_skill 工具
         if (_skillRegistry != null)
@@ -273,6 +282,27 @@ public class Agent
                 Round = round
             };
 
+            // 上下文压缩检查
+            if (_contextManager != null)
+            {
+                var compactionResult = await _contextManager.CompactIfNeededAsync(
+                    messages, cancellationToken);
+
+                if (compactionResult != null)
+                {
+                    yield return new AgentContextCompactedEvent
+                    {
+                        AgentId = _config.Id,
+                        Strategy = compactionResult.StrategyName,
+                        PreCompactTokens = compactionResult.PreCompactTokens,
+                        PostCompactTokens = compactionResult.PostCompactTokens,
+                        PreCompactMessages = compactionResult.PreCompactMessages,
+                        PostCompactMessages = compactionResult.PostCompactMessages,
+                        CompactedMessages = compactionResult.RequestMessages
+                    };
+                }
+            }
+
             // 构建 LLM 请求（动态注入已激活 Skill 的 Instructions）
             var requestMessages = messages.ToArray();
             if (!string.IsNullOrEmpty(_skillInstructions) && requestMessages.Length > 0 && requestMessages[0].Role == MessageRole.System)
@@ -444,6 +474,37 @@ public class Agent
                 DurationMs = stopwatch.ElapsedMilliseconds
             }
         };
+    }
+
+    /// <summary>
+    /// 强制执行上下文压缩
+    /// </summary>
+    /// <param name="strategy">压缩策略: auto, micro, traditional</param>
+    /// <param name="context">Agent 上下文</param>
+    /// <param name="cancellationToken">取消令牌</param>
+    /// <returns>压缩结果，如果无需压缩则返回 null</returns>
+    public async Task<CompactionResult?> CompactContextAsync(
+        string strategy = "auto",
+        AgentContext? context = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (_contextManager == null)
+            return null;
+
+        // 构建消息列表
+        var messages = new List<Message>();
+
+        if (!string.IsNullOrEmpty(_config.SystemPrompt))
+        {
+            messages.Add(Message.FromSystem(_config.SystemPrompt));
+        }
+
+        if (context?.History != null)
+        {
+            messages.AddRange(context.History);
+        }
+
+        return await _contextManager.ForceCompactAsync(messages, strategy, cancellationToken);
     }
 
     /// <summary>

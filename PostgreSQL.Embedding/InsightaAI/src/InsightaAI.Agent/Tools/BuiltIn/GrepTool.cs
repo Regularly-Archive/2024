@@ -85,13 +85,19 @@ public class GrepTool : IToolExecutor
             var pattern = GetStringValue(args, "pattern");
             if (string.IsNullOrEmpty(pattern))
             {
-                return ToolResult.FromError("Missing required parameter: pattern");
+                return ToolResult.FromError(
+                    "Missing required parameter: pattern\n" +
+                    "Required: {\"pattern\": \"string\", \"path\": \"string\"}\n" +
+                    "Optional: {\"recursive\": boolean, \"ignore_case\": boolean, \"use_regex\": boolean, \"files_only\": boolean, \"exclude\": \"string\", \"max_results\": number}");
             }
 
             var path = GetStringValue(args, "path");
             if (string.IsNullOrEmpty(path))
             {
-                return ToolResult.FromError("Missing required parameter: path");
+                return ToolResult.FromError(
+                    "Missing required parameter: path\n" +
+                    "Required: {\"pattern\": \"string\", \"path\": \"string\"}\n" +
+                    "Optional: {\"recursive\": boolean, \"ignore_case\": boolean, \"use_regex\": boolean, \"files_only\": boolean, \"exclude\": \"string\", \"max_results\": number}");
             }
 
             var recursive = GetBoolValue(args, "recursive") ?? true;

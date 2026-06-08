@@ -1,7 +1,8 @@
-using System.CommandLine;
+﻿using System.CommandLine;
 using InsightaAI.Agent.Cli.Models;
 using InsightaAI.Agent.Cli.Services;
 using InsightaAI.Agent.Cli.UI;
+using InsightaAI.Agent.Context;
 using InsightaAI.Agent.Extensions;
 using InsightaAI.Agent.Models;
 using InsightaAI.Agent.Mcp;
@@ -21,9 +22,9 @@ namespace InsightaAI.Agent.Cli.Commands;
 /// </summary>
 public class ChatCommand
 {
-    private const string CommandExit = "exit";
-    private const string CommandQuit = "quit";
-    private const string CommandClear = "clear";
+    private const string CommandExit = "/exit";
+    private const string CommandQuit = "/quit";
+    private const string CommandClear = "/clear";
 
     private readonly IMessageStorage _storage;
     private readonly ChatRenderer _renderer = new();
@@ -129,6 +130,12 @@ public class ChatCommand
                 continue;
             }
 
+            if (userInput.StartsWith("/compact", StringComparison.OrdinalIgnoreCase))
+            {
+                await HandleCompactCommandAsync(userInput, agent, session);
+                continue;
+            }
+
             // 保存用户消息
             await session.AddUserMessageAsync(userInput);
 
@@ -144,6 +151,48 @@ public class ChatCommand
         }
     }
 
+    private async Task HandleCompactCommandAsync(string input, Agent agent, ChatSession session)
+    {
+        var parts = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var strategy = parts.Length > 1 ? parts[1] : "auto";
+
+        // 构建上下文
+        var context = new AgentContext
+        {
+            ConversationId = session.SessionId,
+            History = session.GetLlmHistory()
+        };
+
+        _renderer.ShowInfo($"[yellow]⟳[/] Compacting context ([dim]{strategy}[/])...");
+
+        try
+        {
+            var result = await agent.CompactContextAsync(strategy, context);
+
+            if (result != null)
+            {
+                // 同步压缩后的消息到会话
+                var compactedMessages = result.RequestMessages?.ToList() ?? [];
+                await session.ReplaceMessagesAsync(compactedMessages);
+
+                var tokenDelta = result.PreCompactTokens - result.PostCompactTokens;
+                var msgDelta = result.PreCompactMessages - result.PostCompactMessages;
+                _renderer.ShowSuccess(
+                    $"[green]\u2713[/] Compacted ([dim]{result.StrategyName}[/]): " +
+                    $"{result.PreCompactMessages} \u2192 {result.PostCompactMessages} messages ([dim]-{msgDelta}[/]), " +
+                    $"~{result.PreCompactTokens:N0} \u2192 ~{result.PostCompactTokens:N0} tokens ([dim]-{tokenDelta:N0}[/])");
+            }
+            else
+            {
+                _renderer.ShowInfo("[dim]Context is clean, nothing to compact.[/]");
+            }
+        }
+        catch (Exception ex)
+        {
+            _renderer.ShowError($"[red]$([char]0x2717)[/] Compact failed: {ex.Message}");
+        }
+    }
+
     private async Task ExecuteAgentAsync(Agent agent, string userInput, AgentContext context, ChatSession session)
     {
         using var eventRenderer = new EventRenderer();
@@ -153,6 +202,13 @@ public class ChatCommand
             await foreach (var agentEvent in agent.RunStreamAsync(userInput, context))
             {
                 await eventRenderer.HandleEventAsync(agentEvent);
+
+                // 处理自动压缩事件：同步压缩后的消息到会话
+                if (agentEvent is AgentContextCompactedEvent compactedEvent
+                    && compactedEvent.CompactedMessages is { Length: > 0 } compactedMessages)
+                {
+                    await session.ReplaceMessagesAsync(compactedMessages.ToList());
+                }
             }
 
             // 保存助手消息
@@ -220,10 +276,34 @@ public class ChatCommand
             MaxToolRounds = config.MaxToolRounds
         };
 
-        var agent = new Agent(agentConfig, llmClient, toolRegistry, skillRegistry, mcpRegistry);
+        // 创建上下文管理器
+        var contextManager = CreateContextManager(config, llmClient);
+
+        var agent = new Agent(agentConfig, llmClient, toolRegistry, skillRegistry, mcpRegistry, contextManager);
         agent.AddHook(new ToolPermissionHook("bash", "write_file", "read_file", "edit_file"));
 
         return agent;
+    }
+
+    private static IContextManager? CreateContextManager(CliConfig config, ILlmClient llmClient)
+    {
+        // 从配置或模型名称获取上下文窗口大小
+        var contextWindowTokens = ModelContextWindows.GetContextWindowSize(config.Model);
+
+        var budget = new ContextBudget
+        {
+            MaxContextTokens = contextWindowTokens,
+            Enabled = true
+        };
+
+        var tokenEstimator = new CharTokenEstimator();
+        var strategies = new ICompactStrategy[]
+        {
+            new MicroCompactStrategy(),
+            new TraditionalCompactStrategy(llmClient, config.Model, config.SummaryModel)
+        };
+
+        return new ContextManager(tokenEstimator, budget, strategies);
     }
 
     private static SkillRegistry CreateSkillRegistry()

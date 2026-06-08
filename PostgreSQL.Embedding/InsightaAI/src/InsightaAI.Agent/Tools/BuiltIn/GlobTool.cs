@@ -55,7 +55,10 @@ public class GlobTool : IToolExecutor
             var pattern = GetStringValue(args, "pattern");
             if (string.IsNullOrEmpty(pattern))
             {
-                return ToolResult.FromError("Missing required parameter: pattern");
+                return ToolResult.FromError(
+                    "Missing required parameter: pattern\n" +
+                    "Required: {\"pattern\": \"string\"}\n" +
+                    "Optional: {\"path\": \"string\"}");
             }
 
             var path = GetStringValue(args, "path") ?? ".";
