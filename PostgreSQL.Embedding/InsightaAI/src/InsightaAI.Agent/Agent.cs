@@ -5,6 +5,7 @@ using System.Threading.Channels;
 using InsightaAI.Agent.Context;
 using InsightaAI.Agent.Hooks;
 using InsightaAI.Agent.Mcp;
+using InsightaAI.Agent.Memory;
 using InsightaAI.Agent.Models;
 using InsightaAI.Agent.Skills;
 using InsightaAI.Agent.Tools.BuiltIn;
@@ -25,7 +26,9 @@ public class Agent
     private readonly ISkillRegistry? _skillRegistry;
     private readonly McpRegistry? _mcpRegistry;
     private readonly IContextManager? _contextManager;
+    private readonly IMemoryManager? _memoryManager;
     private readonly List<IToolHook> _hooks = [];
+    private readonly List<IAgentHook> _agentHooks = [];
     private readonly HashSet<string> _alwaysAllowedTools = [];
     private string _skillInstructions = "";
 
@@ -38,7 +41,8 @@ public class Agent
         ToolRegistry toolRegistry,
         ISkillRegistry? skillRegistry = null,
         McpRegistry? mcpRegistry = null,
-        IContextManager? contextManager = null)
+        IContextManager? contextManager = null,
+        IMemoryManager? memoryManager = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(llmClient);
@@ -50,6 +54,7 @@ public class Agent
         _skillRegistry = skillRegistry;
         _mcpRegistry = mcpRegistry;
         _contextManager = contextManager;
+        _memoryManager = memoryManager;
 
         // 注册 activate_skill 工具
         if (_skillRegistry != null)
@@ -61,6 +66,12 @@ public class Agent
         if (_mcpRegistry != null)
         {
             McpTools.RegisterAll(_toolRegistry, _mcpRegistry);
+        }
+
+        // 注册记忆工具
+        if (_memoryManager != null && !string.IsNullOrEmpty(_config.UserId))
+        {
+            MemoryTools.RegisterAll(_toolRegistry, _memoryManager, _config.UserId);
         }
     }
 
@@ -76,6 +87,16 @@ public class Agent
     {
         ArgumentNullException.ThrowIfNull(hook);
         _hooks.Add(hook);
+        return this;
+    }
+
+    /// <summary>
+    /// 添加 Agent 级别钩子（轮次/会话级别）
+    /// </summary>
+    public Agent AddAgentHook(IAgentHook hook)
+    {
+        ArgumentNullException.ThrowIfNull(hook);
+        _agentHooks.Add(hook);
         return this;
     }
 
@@ -185,6 +206,110 @@ public class Agent
     }
 
     /// <summary>
+    /// 获取记忆上下文（注入到 SystemPrompt）
+    /// </summary>
+    private async Task<string> GetMemoryContextAsync(CancellationToken cancellationToken = default)
+    {
+        if (_memoryManager == null || string.IsNullOrEmpty(_config.UserId))
+        {
+            return "";
+        }
+
+        try
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("\n\n## Memory System");
+            sb.AppendLine("You have a persistent memory system. The MEMORY.md index below lists available memories:");
+            sb.AppendLine();
+
+            // 获取 MEMORY.md 索引（按需加载，不加载全部内容）
+            var memoryIndex = await _memoryManager.GetMemoryIndexAsync(
+                _config.UserId, null, cancellationToken);
+
+            if (!string.IsNullOrWhiteSpace(memoryIndex))
+            {
+                sb.AppendLine(memoryIndex);
+            }
+            else
+            {
+                sb.AppendLine("_No memories stored yet._");
+            }
+
+            // 添加记忆使用指南
+            sb.AppendLine(@"
+## When to access memories
+- When memories seem relevant, or the user references prior-conversation work.
+- You MUST access memory when the user explicitly asks you to check, recall, or remember.
+- Memory records can become stale over time. Before answering based solely on memory, verify that the memory is still correct.
+
+## What NOT to save in memory
+- Code patterns, conventions, architecture, file paths, or project structure — these can be derived by reading the current project state.
+- Git history, recent changes, or who-changed-what — `git log` / `git blame` are authoritative.
+- Debugging solutions or fix recipes — the fix is in the code; the commit message has the context.
+- Ephemeral task details: in-progress work, temporary state, current conversation context.
+- Sensitive data: API keys, passwords, tokens, credentials.");
+
+            return sb.ToString();
+        }
+        catch
+        {
+            // 记忆系统出错不应阻止对话
+            return "";
+        }
+    }
+
+    /// <summary>
+    /// 触发 agent 级别的轮次结束钩子（fire-and-forget）
+    /// 注意：此方法返回 void，明确表示不等待完成
+    /// </summary>
+    private void TriggerAgentRoundEndHooks(
+        int round,
+        List<Message> messages,
+        Message? assistantMessage,
+        CancellationToken cancellationToken)
+    {
+        if (_agentHooks.Count == 0)
+            return;
+
+        // Fire-and-forget: 并行触发所有 hooks，不阻塞主流程
+        var tasks = _agentHooks.Select(hook =>
+            hook.OnRoundEndAsync(round, messages, assistantMessage, cancellationToken));
+
+        _ = Task.WhenAll(tasks).ContinueWith(t =>
+        {
+            if (t.IsFaulted && t.Exception != null)
+            {
+                // TODO: 接入日志系统记录 hook 执行错误
+                System.Diagnostics.Debug.WriteLine(
+                    $"[AgentHook] Round {round} hooks failed: {t.Exception.InnerException?.Message}");
+            }
+        }, TaskContinuationOptions.ExecuteSynchronously);
+    }
+
+    /// <summary>
+    /// 触发 agent 级别的会话结束钩子
+    /// </summary>
+    private async Task TriggerAgentSessionEndHooksAsync(
+        List<Message> messages,
+        CancellationToken cancellationToken)
+    {
+        if (_agentHooks.Count == 0)
+            return;
+
+        foreach (var hook in _agentHooks)
+        {
+            try
+            {
+                await hook.OnSessionEndAsync(messages, cancellationToken);
+            }
+            catch
+            {
+                // 忽略 hook 执行错误
+            }
+        }
+    }
+
+    /// <summary>
     /// 执行钩子检查
     /// </summary>
     private async Task<bool> CheckHooksAsync(
@@ -239,10 +364,20 @@ public class Agent
         var conversationId = context?.ConversationId ?? Guid.NewGuid().ToString("N");
         var messages = new List<Message>();
 
-        // 构建系统提示词（包含可用 Skills 信息）
+        // 构建系统提示词（包含可用 Skills 信息和记忆索引）
         var systemPrompt = _config.SystemPrompt ?? "";
         systemPrompt += await GetAvailableSkillsInfoAsync(cancellationToken);
         systemPrompt += await GetAvailableMcpInfoAsync(cancellationToken);
+
+        // 注入记忆索引（按需加载 MEMORY.md）
+        if (_memoryManager != null && !string.IsNullOrEmpty(_config.UserId))
+        {
+            var memoryContext = await GetMemoryContextAsync(cancellationToken);
+            if (!string.IsNullOrWhiteSpace(memoryContext))
+            {
+                systemPrompt += memoryContext;
+            }
+        }
 
         // 添加系统提示词
         if (!string.IsNullOrEmpty(systemPrompt))
@@ -364,6 +499,9 @@ public class Agent
                 // 无工具调用，Agent 完成
                 stopwatch.Stop();
 
+                // 触发 agent hooks（fire-and-forget，不阻塞）
+                TriggerAgentRoundEndHooks(round, messages, assistantMessage, cancellationToken);
+
                 var result = new AgentResult
                 {
                     Status = AgentStatus.Completed,
@@ -412,6 +550,9 @@ public class Agent
                     yield return evt;
                 }
             }
+
+            // 工具执行完成后，触发 agent hooks（fire-and-forget，不阻塞）
+            TriggerAgentRoundEndHooks(round, messages, assistantMessage, cancellationToken);
         }
 
         // 超过最大轮次，尝试让 LLM 生成最终回复

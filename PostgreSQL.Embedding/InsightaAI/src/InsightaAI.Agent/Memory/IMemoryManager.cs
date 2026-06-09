@@ -1,0 +1,68 @@
+namespace InsightaAI.Agent.Memory;
+
+/// <summary>
+/// 记忆管理器接口 - 提供高级记忆操作
+/// </summary>
+public interface IMemoryManager
+{
+    /// <summary>
+    /// 保存记忆（自动分类和打标签）
+    /// </summary>
+    Task<MemoryEntry> SaveMemoryAsync(
+        string userId,
+        string content,
+        MemoryType? type = null,
+        List<string>? tags = null,
+        string? source = null,
+        string? project = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 智能搜索（结合语义搜索和关键词匹配）
+    /// </summary>
+    Task<List<MemoryEntry>> SearchRelevantMemoriesAsync(
+        string userId,
+        string context,
+        int maxResults = 5,
+        MemoryType? type = null,
+        string? projectId = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 获取 MEMORY.md 索引（用于注入 System Prompt）
+    /// </summary>
+    Task<string> GetMemoryIndexAsync(
+        string userId,
+        string? projectId = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 获取用户上下文（合并画像和索引）
+    /// </summary>
+    Task<string> GetUserContextAsync(
+        string userId,
+        string? currentProject = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 更新用户画像
+    /// </summary>
+    Task UpdateUserProfileAsync(
+        string userId,
+        Dictionary<string, string> updates,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 获取用户画像
+    /// </summary>
+    Task<UserProfile?> GetUserProfileAsync(
+        string userId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 保存用户画像
+    /// </summary>
+    Task SaveUserProfileAsync(
+        UserProfile profile,
+        CancellationToken cancellationToken = default);
+}

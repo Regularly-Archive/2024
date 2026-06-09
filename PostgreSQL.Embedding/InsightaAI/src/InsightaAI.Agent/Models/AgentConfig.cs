@@ -57,6 +57,9 @@ public sealed record AgentConfig
     /// <summary>是否并行执行同一轮中的多个工具调用，默认 true</summary>
     public bool ParallelToolExecution { get; init; } = true;
 
+    /// <summary>用户 ID（用于记忆系统）</summary>
+    public string? UserId { get; init; }
+
     /// <summary>自定义元数据</summary>
     public Dictionary<string, object>? Metadata { get; init; }
 }

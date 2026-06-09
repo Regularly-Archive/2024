@@ -41,3 +41,10 @@ bld/
 *.user
 *.userosscache
 *.sln.docstates
+
+## Secrets (API Keys, Connection Strings)
+**/appsettings.*.json
+!**/appsettings.json
+**/appsettings.json
+*.env
+.env*

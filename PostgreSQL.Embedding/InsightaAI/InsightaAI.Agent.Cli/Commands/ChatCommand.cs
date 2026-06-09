@@ -4,6 +4,8 @@ using InsightaAI.Agent.Cli.Services;
 using InsightaAI.Agent.Cli.UI;
 using InsightaAI.Agent.Context;
 using InsightaAI.Agent.Extensions;
+using InsightaAI.Agent.Hooks;
+using InsightaAI.Agent.Memory;
 using InsightaAI.Agent.Models;
 using InsightaAI.Agent.Mcp;
 using InsightaAI.Agent.Mcp.Local;
@@ -87,12 +89,12 @@ public class ChatCommand
         // 创建 McpRegistry
         var mcpRegistry = CreateMcpRegistry();
 
-        // 创建 Agent
-        var agent = CreateAgent(config, llmClient, toolRegistry, skillRegistry, mcpRegistry);
-
-        // 获取或创建会话
+        // 获取或创建会话（先获取 sessionId）
         var session = await GetOrCreateSessionAsync(sessionId, config);
         if (session == null) return 1;
+
+        // 创建 Agent（传入 sessionId 以注册会话记忆钩子）
+        var agent = CreateAgent(config, llmClient, toolRegistry, skillRegistry, mcpRegistry, session.SessionId);
 
         // 显示欢迎信息
         _renderer.ShowWelcome(config.Provider, config.Model, session.SessionId, toolRegistry.GetDefinitions().Length, availableSkills.Count);
@@ -265,24 +267,63 @@ public class ChatCommand
         return registry;
     }
 
-    private static Agent CreateAgent(CliConfig config, ILlmClient llmClient, ToolRegistry toolRegistry, SkillRegistry skillRegistry, McpRegistry? mcpRegistry = null)
+    private static Agent CreateAgent(CliConfig config, ILlmClient llmClient, ToolRegistry toolRegistry, SkillRegistry skillRegistry, McpRegistry? mcpRegistry = null, string? sessionId = null)
     {
+        // 生成或获取用户 ID
+        var userId = GetOrCreateUserId();
+
         var agentConfig = new AgentConfig
         {
             Id = "cli-agent",
             Name = "InsightaAI CLI",
             SystemPrompt = config.SystemPrompt,
             Model = config.Model,
-            MaxToolRounds = config.MaxToolRounds
+            MaxToolRounds = config.MaxToolRounds,
+            UserId = userId
         };
 
         // 创建上下文管理器
         var contextManager = CreateContextManager(config, llmClient);
 
-        var agent = new Agent(agentConfig, llmClient, toolRegistry, skillRegistry, mcpRegistry, contextManager);
+        // 创建记忆系统
+        var memoryManager = CreateMemoryManager();
+
+        var agent = new Agent(agentConfig, llmClient, toolRegistry, skillRegistry, mcpRegistry, contextManager, memoryManager);
         agent.AddHook(new ToolPermissionHook("bash", "write_file", "read_file", "edit_file"));
 
+        // 注册会话记忆钩子（短期记忆）
+        if (!string.IsNullOrEmpty(sessionId))
+        {
+            var sessionMemoryHook = new SessionMemoryHook(sessionId, userId);
+            agent.AddAgentHook(sessionMemoryHook);
+        }
+
         return agent;
+    }
+
+    private static IMemoryManager CreateMemoryManager()
+    {
+        var provider = new FileMemoryProvider();
+        return new MemoryManager(provider);
+    }
+
+    private static string GetOrCreateUserId()
+    {
+        var configDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".insightai");
+        Directory.CreateDirectory(configDir);
+
+        var userIdFile = Path.Combine(configDir, "user_id");
+        if (File.Exists(userIdFile))
+        {
+            return File.ReadAllText(userIdFile).Trim();
+        }
+
+        // 使用 12 个十六进制字符（48 bits），降低碰撞风险
+        var userId = $"user_{Guid.NewGuid().ToString("N")[..12]}";
+        File.WriteAllText(userIdFile, userId);
+        return userId;
     }
 
     private static IContextManager? CreateContextManager(CliConfig config, ILlmClient llmClient)
