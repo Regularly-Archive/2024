@@ -70,7 +70,7 @@ public class GrepTool : IToolExecutor
                         description = "最大返回结果数。默认 100。"
                     }
                 },
-                required = new[] { "pattern", "path" }
+                required = new[] { "pattern" }
             })
         };
     }
@@ -94,10 +94,7 @@ public class GrepTool : IToolExecutor
             var path = GetStringValue(args, "path");
             if (string.IsNullOrEmpty(path))
             {
-                return ToolResult.FromError(
-                    "Missing required parameter: path\n" +
-                    "Required: {\"pattern\": \"string\", \"path\": \"string\"}\n" +
-                    "Optional: {\"recursive\": boolean, \"ignore_case\": boolean, \"use_regex\": boolean, \"files_only\": boolean, \"exclude\": \"string\", \"max_results\": number}");
+                path = Environment.CurrentDirectory;
             }
 
             var recursive = GetBoolValue(args, "recursive") ?? true;
@@ -142,15 +139,27 @@ public class GrepTool : IToolExecutor
 
             if (filesOnly)
             {
-                // 只显示文件名
-                var files = result.Matches.Select(m => m.FilePath).Distinct().ToArray();
-                var fileOutput = string.Join("\n", files);
+                // Show files with match counts, sorted by count descending
+                var fileGroups = result.Matches
+                    .GroupBy(m => m.FilePath)
+                    .Select(g => new { FilePath = g.Key, Count = g.Count() })
+                    .OrderByDescending(g => g.Count)
+                    .ToArray();
+
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine($"Found {result.TotalMatches} matches in {fileGroups.Length} files:");
+                sb.AppendLine();
+                foreach (var fg in fileGroups)
+                {
+                    sb.AppendLine($"  {fg.Count,4} matches in {fg.FilePath}");
+                }
+
                 if (result.Truncated)
                 {
-                    fileOutput += "\n\n(Results truncated. Consider using a more specific path or pattern.)";
+                    sb.AppendLine("\n(Results truncated. Consider using a more specific path or pattern.)");
                 }
-                return ToolResult.FromText(
-                    $"Found {files.Length} files with matches:\n{fileOutput}");
+
+                return ToolResult.FromText(sb.ToString());
             }
             else
             {

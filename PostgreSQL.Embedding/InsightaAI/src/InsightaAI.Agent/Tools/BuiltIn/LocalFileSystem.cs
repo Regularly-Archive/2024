@@ -231,10 +231,88 @@ public class LocalFileSystem : IFileSystem
 
     private static bool MatchWildcardPattern(string pattern, string text)
     {
-        // 简单的通配符匹配
+        // 规范化路径分隔符（Windows 兼容）
+        text = text.Replace('\\', '/');
+        pattern = pattern.Replace('\\', '/');
+
+        // 如果模式不包含路径分隔符，检查是否匹配路径中的任意一段
+        // 例如 pattern="bin" 应匹配 "src/bin/Debug/file.cs"（匹配 "bin" 段）
+        if (!pattern.Contains('/'))
+        {
+            var segments = text.Split('/');
+            foreach (var segment in segments)
+            {
+                if (MatchGlobSegment(pattern, segment))
+                    return true;
+            }
+            return false;
+        }
+
+        // 将 glob 模式转换为正则表达式
+        var regexPattern = GlobToRegex(pattern);
+        return Regex.IsMatch(text, regexPattern, RegexOptions.IgnoreCase);
+    }
+
+    /// <summary>
+    /// 将 glob 模式转换为正则表达式
+    /// 支持: ** (匹配任意目录), * (匹配单个段), ? (匹配单个字符)
+    /// </summary>
+    private static string GlobToRegex(string pattern)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append('^');
+
+        int i = 0;
+        while (i < pattern.Length)
+        {
+            if (i + 1 < pattern.Length && pattern[i] == '*' && pattern[i + 1] == '*')
+            {
+                // ** 匹配任意数量的目录（包括空）
+                sb.Append(".*");
+                i += 2;
+                // 跳过随后的 /
+                if (i < pattern.Length && pattern[i] == '/')
+                    i++;
+            }
+            else if (pattern[i] == '*')
+            {
+                // * 匹配单个段内的任意字符（不包括 /）
+                sb.Append("[^/]*");
+                i++;
+            }
+            else if (pattern[i] == '?')
+            {
+                // ? 匹配单个字符（不包括 /）
+                sb.Append("[^/]");
+                i++;
+            }
+            else if (pattern[i] == '.')
+            {
+                // . 需要转义
+                sb.Append("\\.");
+                i++;
+            }
+            else
+            {
+                // 其他字符原样保留
+                sb.Append(pattern[i]);
+                i++;
+            }
+        }
+
+        sb.Append('$');
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// 匹配单个路径段（不含 **）
+    /// </summary>
+    private static bool MatchGlobSegment(string pattern, string text)
+    {
         var regexPattern = "^" + Regex.Escape(pattern)
-            .Replace("\\*", ".*")
-            .Replace("\\?", ".") + "$";
+            .Replace("\\*\\*", ".*")
+            .Replace("\\*", "[^/]*")
+            .Replace("\\?", "[^/]") + "$";
 
         return Regex.IsMatch(text, regexPattern, RegexOptions.IgnoreCase);
     }
