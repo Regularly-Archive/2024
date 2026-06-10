@@ -22,6 +22,16 @@ public sealed class SessionMemoryHook : IAgentHook
     private readonly string _sessionDir;
     private readonly SemaphoreSlim _lock = new(1, 1);
 
+    /// <summary>
+    /// 会话 ID
+    /// </summary>
+    public string SessionId => _sessionId;
+
+    /// <summary>
+    /// 会话记忆目录路径
+    /// </summary>
+    public string SessionDirectory => _sessionDir;
+
     public SessionMemoryHook(string sessionId, string userId, string? projectId = null)
     {
         _sessionId = sessionId;

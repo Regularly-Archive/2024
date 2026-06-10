@@ -19,6 +19,11 @@ public sealed record ContextBudget
     public double MicroCompactThreshold { get; init; } = 0.60;
 
     /// <summary>
+    /// Level 2 SessionMemoryCompact 触发阈值百分比
+    /// </summary>
+    public double SessionCompactThreshold { get; init; } = 0.65;
+
+    /// <summary>
     /// Level 3 TraditionalCompact 触发阈值百分比
     /// </summary>
     public double TraditionalCompactThreshold { get; init; } = 0.75;
@@ -62,6 +67,11 @@ public sealed record ContextBudget
     /// 获取 MicroCompact 的实际触发 token 数
     /// </summary>
     public int MicroCompactTriggerTokens => (int)(MaxContextTokens * MicroCompactThreshold);
+
+    /// <summary>
+    /// 获取 SessionMemoryCompact 的实际触发 token 数
+    /// </summary>
+    public int SessionCompactTriggerTokens => (int)(MaxContextTokens * SessionCompactThreshold);
 
     /// <summary>
     /// 获取 TraditionalCompact 的实际触发 token 数
