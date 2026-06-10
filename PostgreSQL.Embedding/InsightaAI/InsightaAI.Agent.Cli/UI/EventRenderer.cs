@@ -202,11 +202,18 @@ public class EventRenderer : IDisposable
         {
             try
             {
+                var dotCount = 0;
+
                 await AnsiConsole.Status()
                     .Spinner(Spinner.Known.Dots)
-                    .StartAsync("Thinking...", async _ =>
+                    .StartAsync("Thinking.", async ctx =>
                     {
-                        await Task.Delay(Timeout.Infinite, ct);
+                        while (!ct.IsCancellationRequested)
+                        {
+                            await Task.Delay(400, ct);
+                            dotCount = (dotCount % 3) + 1; 
+                            ctx.Status = $"Thinking{new string('.', dotCount)}";
+                        }
                     });
             }
             catch (OperationCanceledException) { }
