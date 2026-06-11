@@ -24,7 +24,11 @@ public class BashTool : IToolExecutor
         {
             Name = Name,
             Description = "执行 Shell 命令。适用于运行系统命令、脚本、编译代码等。" +
-                         "在 Windows 上使用 PowerShell，在 Linux/Mac 上使用 Bash。",
+                         "在 Windows 上使用 PowerShell，在 Linux/Mac 上使用 Bash。" +
+                         "Windows 平台请优先使用 PowerShell cmdlet，避免原生命令（中文输出可能乱码）。" +
+                         "常用映射：ipconfig → Get-NetIPAddress, tasklist → Get-Process, dir → Get-ChildItem, " +
+                         "findstr → Select-String, mkdir → New-Item -ItemType Directory, del → Remove-Item, " +
+                         "copy → Copy-Item, move → Move-Item, type → Get-Content, echo → Write-Output",
             Schema = JsonSerializer.SerializeToElement(new
             {
                 type = "object",
@@ -91,7 +95,7 @@ public class BashTool : IToolExecutor
                 sb.AppendLine($"[stderr] {result.Stderr}");
             }
 
-            sb.AppendLine($"[Exit code: {result.ExitCode}]");
+            sb.AppendLine($"[exit_code] {result.ExitCode}");
 
             var output = sb.ToString().TrimEnd();
 
