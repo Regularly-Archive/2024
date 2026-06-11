@@ -103,7 +103,9 @@ public class ChatCommand
         // 运行对话循环
         await RunChatLoopAsync(session, agent);
 
-        _renderer.ShowInfo("会话已保存，再见！");
+        _renderer.ShowInfo($"Session saved: {session.SessionId}");
+        _renderer.ShowInfo($"Resume with: insighta chat --session {session.SessionId}");
+        _renderer.ShowInfo("See you again!");
         return 0;
     }
 

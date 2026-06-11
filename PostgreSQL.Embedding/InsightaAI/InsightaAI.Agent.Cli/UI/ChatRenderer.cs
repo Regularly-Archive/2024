@@ -21,8 +21,8 @@ public class ChatRenderer
         AnsiConsole.MarkupLine($"[white]Provider: {provider} | Model: {model}[/]");
         AnsiConsole.MarkupLine($"[white]SessionId: {sessionId}[/]");
         AnsiConsole.MarkupLine($"[white]Tools: {toolCount} registered | Skills: {skillCount} available[/]");
-        AnsiConsole.MarkupLine("[white]输入消息开始对话，输入 'exit' 或 'quit' 退出[/]");
-        AnsiConsole.MarkupLine("[white]输入 'clear' 清空上下文[/]");
+        AnsiConsole.MarkupLine("[white]输入消息开始对话，输入 '/exit' 或 '/quit' 退出[/]");
+        AnsiConsole.MarkupLine("[white]输入 '/clear' 清空上下文[/]");
         AnsiConsole.WriteLine();
     }
 
