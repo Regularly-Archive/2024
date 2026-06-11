@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.Text;
 using InsightaAI.Agent.Cli.Commands;
 using InsightaAI.Agent.Storage;
 
@@ -10,6 +11,9 @@ public class Program
 
     public static async Task<int> Main(string[] args)
     {
+        // 设置控制台编码为 UTF-8（修复全局工具模式下特殊字符显示为问号的问题）
+        Console.OutputEncoding = Encoding.UTF8;
+
         var rootCommand = new RootCommand("InsightaAI Agent CLI - LLM 对话工具");
 
         // 注册命令

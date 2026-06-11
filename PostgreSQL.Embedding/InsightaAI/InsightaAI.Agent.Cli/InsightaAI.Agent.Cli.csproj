@@ -6,6 +6,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>InsightaAI.Agent.Cli</RootNamespace>
+
+    <!-- .NET Global Tool 配置 -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>insighta</ToolCommandName>
+    <PackageId>InsightaAI.Agent.Cli</PackageId>
+    <Version>1.0.0-alpha.1</Version>
+    <Description>InsightaAI Agent CLI - Your Another AI Assistant</Description>
+    <Authors>InsightaAI</Authors>
   </PropertyGroup>
 
   <ItemGroup>
