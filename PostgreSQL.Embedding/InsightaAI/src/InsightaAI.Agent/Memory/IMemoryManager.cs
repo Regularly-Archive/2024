@@ -18,6 +18,25 @@ public interface IMemoryManager
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 更新记忆内容
+    /// </summary>
+    Task<bool> UpdateMemoryAsync(
+        string userId,
+        string memoryId,
+        string? content = null,
+        MemoryType? type = null,
+        List<string>? tags = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 删除记忆
+    /// </summary>
+    Task<bool> DeleteMemoryAsync(
+        string userId,
+        string memoryId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 智能搜索（结合语义搜索和关键词匹配）
     /// </summary>
     Task<List<MemoryEntry>> SearchRelevantMemoriesAsync(

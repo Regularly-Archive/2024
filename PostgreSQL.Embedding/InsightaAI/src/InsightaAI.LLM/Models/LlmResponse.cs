@@ -33,24 +33,35 @@ public sealed record LlmResponse
     };
 
     /// <summary>
-    /// 获取纯文本内容
+    /// 获取纯文本内容（过滤掉 XML 格式的工具调用标签）
     /// </summary>
     public string GetTextContent()
     {
         var texts = Content
             .OfType<TextBlock>()
             .Select(b => b.Text);
-        return string.Join("", texts);
+        var raw = string.Join("", texts);
+
+        // 过滤掉 <tool_call>...</tool_call> 标签
+        return ToolCallParser.StripToolCallTags(raw);
     }
 
     /// <summary>
-    /// 获取工具调用
+    /// 获取工具调用（包括从文本中解析的 XML 格式工具调用）
     /// </summary>
     public ToolCallBlock[] GetToolCalls()
     {
-        return Content
+        // 优先返回正式的 ToolCallBlock
+        var toolCalls = Content
             .OfType<ToolCallBlock>()
             .ToArray();
+
+        if (toolCalls.Length > 0)
+            return toolCalls;
+
+        // 如果没有正式的工具调用，从原始文本中解析 XML 格式
+        var rawText = string.Join("", Content.OfType<TextBlock>().Select(b => b.Text));
+        return ToolCallParser.Parse(rawText);
     }
 
     /// <summary>

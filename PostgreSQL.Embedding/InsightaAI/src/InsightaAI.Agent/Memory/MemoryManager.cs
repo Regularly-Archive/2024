@@ -81,6 +81,65 @@ public sealed class MemoryManager : IMemoryManager
         return entry;
     }
 
+    public async Task<bool> UpdateMemoryAsync(
+        string userId,
+        string memoryId,
+        string? content = null,
+        MemoryType? type = null,
+        List<string>? tags = null,
+        CancellationToken cancellationToken = default)
+    {
+        // 获取现有记忆
+        var existing = await _provider.GetMemoryAsync(memoryId, cancellationToken);
+        if (existing == null)
+            return false;
+
+        // 更新内容（如果提供）
+        if (!string.IsNullOrWhiteSpace(content))
+        {
+            // 敏感数据检查
+            if (!ShouldSaveMemory(content))
+                return false;
+
+            existing.Content = content;
+            var (name, description) = GenerateNameAndDescription(content, type ?? existing.Type);
+            existing.Name = name;
+            existing.Description = description;
+        }
+
+        // 更新类型（如果提供）
+        if (type.HasValue)
+        {
+            existing.Type = type.Value;
+            existing.Scope = DetermineScope(type.Value, existing.Project);
+        }
+
+        // 更新标签（如果提供）
+        if (tags != null)
+        {
+            existing.Tags = tags;
+        }
+
+        existing.UpdatedAt = DateTime.UtcNow;
+
+        await _provider.UpdateMemoryAsync(existing, cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> DeleteMemoryAsync(
+        string userId,
+        string memoryId,
+        CancellationToken cancellationToken = default)
+    {
+        // 验证记忆存在
+        var existing = await _provider.GetMemoryAsync(memoryId, cancellationToken);
+        if (existing == null)
+            return false;
+
+        await _provider.DeleteMemoryAsync(memoryId, cancellationToken);
+        return true;
+    }
+
     public async Task<List<MemoryEntry>> SearchRelevantMemoriesAsync(
         string userId,
         string context,

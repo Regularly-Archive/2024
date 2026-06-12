@@ -16,6 +16,8 @@ public static class MemoryTools
     public static void RegisterAll(ToolRegistry registry, IMemoryManager memoryManager, string userId)
     {
         registry.Register(new SaveMemoryTool(memoryManager, userId));
+        registry.Register(new UpdateMemoryTool(memoryManager, userId));
+        registry.Register(new DeleteMemoryTool(memoryManager, userId));
         registry.Register(new SearchMemoryTool(memoryManager, userId));
         registry.Register(new GetUserProfileTool(memoryManager, userId));
     }
@@ -117,6 +119,161 @@ internal class SaveMemoryTool : IToolExecutor
         }
 
         return ToolResult.FromText($"Memory saved (id: {entry.Id}, type: {entry.Type}, scope: {entry.Scope}, tags: [{string.Join(", ", entry.Tags)}])");
+    }
+}
+
+/// <summary>
+/// 更新记忆工具
+/// </summary>
+internal class UpdateMemoryTool : IToolExecutor
+{
+    private readonly IMemoryManager _memoryManager;
+    private readonly string _userId;
+
+    public string Name => "update_memory";
+
+    public ToolDefinition Definition { get; }
+
+    public UpdateMemoryTool(IMemoryManager memoryManager, string userId)
+    {
+        _memoryManager = memoryManager;
+        _userId = userId;
+
+        Definition = new ToolDefinition
+        {
+            Name = Name,
+            Description = @"更新已有的长期记忆。需要先通过 search_memory 获取记忆 ID。
+可以更新记忆的内容、类型或标签。至少提供一个更新字段。",
+            Schema = JsonSerializer.SerializeToElement(new
+            {
+                type = "object",
+                properties = new
+                {
+                    memory_id = new
+                    {
+                        type = "string",
+                        description = "要更新的记忆 ID（通过 search_memory 获取）"
+                    },
+                    content = new
+                    {
+                        type = "string",
+                        description = "新的记忆内容（可选）"
+                    },
+                    type = new
+                    {
+                        type = "string",
+                        @enum = new[] { "user", "feedback", "project", "reference" },
+                        description = "新的记忆类型（可选）"
+                    },
+                    tags = new
+                    {
+                        type = "string",
+                        description = "新的标签列表，用逗号分隔（可选）"
+                    }
+                },
+                required = new[] { "memory_id" }
+            })
+        };
+    }
+
+    public async Task<ToolResult> ExecuteAsync(IDictionary<string, object> args, ToolExecutionContext context)
+    {
+        var memoryId = args.TryGetValue("memory_id", out var id) ? id?.ToString() : null;
+        if (string.IsNullOrWhiteSpace(memoryId))
+        {
+            return ToolResult.FromError("Missing required parameter: memory_id");
+        }
+
+        var content = args.TryGetValue("content", out var c) ? c?.ToString() : null;
+
+        MemoryType? type = null;
+        if (args.TryGetValue("type", out var t) && t?.ToString() is string typeStr)
+        {
+            if (Enum.TryParse<MemoryType>(typeStr, true, out var parsedType))
+                type = parsedType;
+        }
+
+        List<string>? tags = null;
+        if (args.TryGetValue("tags", out var tg) && tg?.ToString() is string tagsStr)
+        {
+            tags = tagsStr.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(t => t.Trim())
+                .Where(t => t.Length > 0)
+                .ToList();
+        }
+
+        // 至少需要一个更新字段
+        if (string.IsNullOrWhiteSpace(content) && !type.HasValue && tags == null)
+        {
+            return ToolResult.FromError("At least one update field (content, type, or tags) is required.");
+        }
+
+        var success = await _memoryManager.UpdateMemoryAsync(
+            _userId, memoryId, content, type, tags, context.CancellationToken);
+
+        if (!success)
+        {
+            return ToolResult.FromError($"Memory '{memoryId}' not found or update failed.");
+        }
+
+        return ToolResult.FromText($"Memory '{memoryId}' updated successfully.");
+    }
+}
+
+/// <summary>
+/// 删除记忆工具
+/// </summary>
+internal class DeleteMemoryTool : IToolExecutor
+{
+    private readonly IMemoryManager _memoryManager;
+    private readonly string _userId;
+
+    public string Name => "delete_memory";
+
+    public ToolDefinition Definition { get; }
+
+    public DeleteMemoryTool(IMemoryManager memoryManager, string userId)
+    {
+        _memoryManager = memoryManager;
+        _userId = userId;
+
+        Definition = new ToolDefinition
+        {
+            Name = Name,
+            Description = "删除长期记忆。需要先通过 search_memory 获取记忆 ID。",
+            Schema = JsonSerializer.SerializeToElement(new
+            {
+                type = "object",
+                properties = new
+                {
+                    memory_id = new
+                    {
+                        type = "string",
+                        description = "要删除的记忆 ID（通过 search_memory 获取）"
+                    }
+                },
+                required = new[] { "memory_id" }
+            })
+        };
+    }
+
+    public async Task<ToolResult> ExecuteAsync(IDictionary<string, object> args, ToolExecutionContext context)
+    {
+        var memoryId = args.TryGetValue("memory_id", out var id) ? id?.ToString() : null;
+        if (string.IsNullOrWhiteSpace(memoryId))
+        {
+            return ToolResult.FromError("Missing required parameter: memory_id");
+        }
+
+        var success = await _memoryManager.DeleteMemoryAsync(
+            _userId, memoryId, context.CancellationToken);
+
+        if (!success)
+        {
+            return ToolResult.FromError($"Memory '{memoryId}' not found.");
+        }
+
+        return ToolResult.FromText($"Memory '{memoryId}' deleted successfully.");
     }
 }
 
