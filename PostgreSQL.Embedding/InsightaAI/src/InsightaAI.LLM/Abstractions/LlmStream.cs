@@ -7,7 +7,7 @@ namespace InsightaAI.LLM.Abstractions;
 /// <summary>
 /// LLM 流式响应接口
 /// </summary>
-public interface LlmStream : IAsyncEnumerable<StreamEvent>
+public interface LlmStream : IAsyncEnumerable<StreamEvent>, IDisposable
 {
     /// <summary>
     /// 等待流完成并返回最终响应
@@ -41,6 +41,7 @@ public class LlmStreamImpl : LlmStream
     private bool _isCompleted;
     private bool _isAborted;
     private bool _isConsumed;
+    private bool _disposed;
 
     public bool IsCompleted => _isCompleted;
     public bool IsAborted => _isAborted;
@@ -244,5 +245,15 @@ public class LlmStreamImpl : LlmStream
     {
         _isAborted = true;
         _cts.Cancel();
+    }
+
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            _cts.Dispose();
+            _disposed = true;
+        }
+        GC.SuppressFinalize(this);
     }
 }

@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using InsightaAI.LLM.Abstractions;
+using InsightaAI.Agent.Abstractions;
 using InsightaAI.LLM.Models;
 using System.Text.Json;
 

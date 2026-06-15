@@ -2,6 +2,7 @@ using InsightaAI.Agent.Models;
 using InsightaAI.Agent.Tools;
 using InsightaAI.LLM;
 using InsightaAI.LLM.Abstractions;
+using InsightaAI.Agent.Abstractions;
 using InsightaAI.LLM.Anthropic;
 using InsightaAI.LLM.Models;
 using InsightaAI.LLM.OpenAI;

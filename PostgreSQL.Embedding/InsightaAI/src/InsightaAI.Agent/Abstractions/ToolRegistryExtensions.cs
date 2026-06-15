@@ -1,6 +1,6 @@
 using System.Reflection;
 
-namespace InsightaAI.LLM.Abstractions;
+namespace InsightaAI.Agent.Abstractions;
 
 /// <summary>
 /// ToolRegistry 扩展方法

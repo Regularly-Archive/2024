@@ -23,10 +23,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\src\InsightaAI.Agent\InsightaAI.Agent.csproj" />
-    <ProjectReference Include="..\src\InsightaAI.LLM.OpenAI\InsightaAI.LLM.OpenAI.csproj" />
-    <ProjectReference Include="..\src\InsightaAI.LLM.Anthropic\InsightaAI.LLM.Anthropic.csproj" />
-    <ProjectReference Include="..\src\InsightaAI.LLM.Gemini\InsightaAI.LLM.Gemini.csproj" />
+    <ProjectReference Include="..\InsightaAI.Agent\InsightaAI.Agent.csproj" />
+    <ProjectReference Include="..\InsightaAI.LLM.OpenAI\InsightaAI.LLM.OpenAI.csproj" />
+    <ProjectReference Include="..\InsightaAI.LLM.Anthropic\InsightaAI.LLM.Anthropic.csproj" />
+    <ProjectReference Include="..\InsightaAI.LLM.Gemini\InsightaAI.LLM.Gemini.csproj" />
   </ItemGroup>
 
 </Project>

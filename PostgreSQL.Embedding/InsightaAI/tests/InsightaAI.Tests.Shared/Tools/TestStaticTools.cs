@@ -1,4 +1,4 @@
-using InsightaAI.LLM.Abstractions;
+using InsightaAI.Agent.Abstractions;
 using InsightaAI.LLM.Models;
 
 namespace InsightaAI.Tests.Shared;

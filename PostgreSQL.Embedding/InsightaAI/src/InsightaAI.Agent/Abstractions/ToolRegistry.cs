@@ -1,8 +1,7 @@
 using System.Collections.Concurrent;
-using System.Linq;
 using InsightaAI.LLM.Models;
 
-namespace InsightaAI.LLM.Abstractions;
+namespace InsightaAI.Agent.Abstractions;
 
 /// <summary>
 /// 工具注册表 - 管理和执行工具

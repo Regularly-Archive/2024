@@ -1,7 +1,7 @@
 using InsightaAI.Agent.Models;
 using InsightaAI.Agent.Tests.Fixtures;
 using InsightaAI.Agent.Tools;
-using InsightaAI.LLM.Abstractions;
+using InsightaAI.Agent.Abstractions;
 using InsightaAI.Tests.Shared;
 
 namespace InsightaAI.Agent.Tests;

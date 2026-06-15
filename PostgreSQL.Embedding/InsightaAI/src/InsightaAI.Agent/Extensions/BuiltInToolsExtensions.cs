@@ -1,6 +1,6 @@
 using InsightaAI.Agent.Models;
 using InsightaAI.Agent.Tools.BuiltIn;
-using InsightaAI.LLM.Abstractions;
+using InsightaAI.Agent.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace InsightaAI.Agent.Extensions;

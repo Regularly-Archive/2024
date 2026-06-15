@@ -1,4 +1,5 @@
 using InsightaAI.LLM.Abstractions;
+using InsightaAI.Agent.Abstractions;
 using InsightaAI.LLM.Models;
 using InsightaAI.Tests.Shared;
 using Xunit;

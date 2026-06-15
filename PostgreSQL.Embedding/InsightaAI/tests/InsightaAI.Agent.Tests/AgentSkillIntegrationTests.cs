@@ -2,6 +2,7 @@ using System.Text.Json;
 using InsightaAI.Agent.Models;
 using InsightaAI.Agent.Skills;
 using InsightaAI.LLM.Abstractions;
+using InsightaAI.Agent.Abstractions;
 using InsightaAI.LLM.Models;
 using InsightaAI.Tests.Shared;
 
@@ -221,6 +222,8 @@ public class AgentSkillIntegrationTests
 
         public string ProviderName => "mock";
         public bool SupportsReasoning => false;
+
+        public void Dispose() { GC.SuppressFinalize(this); }
 
         public CapturingMockLlmClient(
             ToolCallBlock[]? firstResponseToolCalls,

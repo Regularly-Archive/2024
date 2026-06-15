@@ -1,4 +1,5 @@
 using InsightaAI.LLM.Abstractions;
+using InsightaAI.Agent.Abstractions;
 using InsightaAI.LLM.Models;
 
 namespace InsightaAI.Tests.Shared;
@@ -8,6 +9,7 @@ namespace InsightaAI.Tests.Shared;
 /// </summary>
 public class MockLlmClient : ILlmClient
 {
+    public void Dispose() { GC.SuppressFinalize(this); }
     private readonly string? _response;
     private readonly ToolCallBlock[]? _firstResponseToolCalls;
     private readonly string? _secondResponse;
@@ -83,6 +85,7 @@ public class MockLlmClient : ILlmClient
 /// </summary>
 public class MockLlmStream : LlmStream
 {
+    public void Dispose() { GC.SuppressFinalize(this); }
     private readonly string _text;
     private readonly ToolCallBlock[]? _toolCalls;
 

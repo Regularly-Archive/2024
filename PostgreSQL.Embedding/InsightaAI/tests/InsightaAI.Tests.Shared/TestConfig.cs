@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using InsightaAI.LLM.Abstractions;
+using InsightaAI.Agent.Abstractions;
 
 namespace InsightaAI.Tests.Shared;
 

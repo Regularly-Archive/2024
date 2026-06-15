@@ -1,6 +1,6 @@
 using System.Text.Json;
 using InsightaAI.Agent.Models;
-using InsightaAI.LLM.Abstractions;
+using InsightaAI.Agent.Abstractions;
 using InsightaAI.LLM.Models;
 
 namespace InsightaAI.Agent.Tools.BuiltIn;

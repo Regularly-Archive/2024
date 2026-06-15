@@ -1,3 +1,4 @@
+using InsightaAI.LLM.Abstractions;
 ﻿using System.CommandLine;
 using InsightaAI.Agent.Cli.Models;
 using InsightaAI.Agent.Cli.Services;
@@ -14,7 +15,7 @@ using InsightaAI.Agent.Skills.Local;
 using InsightaAI.Agent.Storage;
 using InsightaAI.Agent.Tools;
 using InsightaAI.Agent.Tools.BuiltIn;
-using InsightaAI.LLM.Abstractions;
+using InsightaAI.Agent.Abstractions;
 using Spectre.Console;
 
 namespace InsightaAI.Agent.Cli.Commands;

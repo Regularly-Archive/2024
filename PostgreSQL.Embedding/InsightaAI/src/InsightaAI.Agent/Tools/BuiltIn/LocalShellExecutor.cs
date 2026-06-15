@@ -1,9 +1,22 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
-using InsightaAI.LLM.Abstractions;
+using InsightaAI.Agent.Abstractions;
 
 namespace InsightaAI.Agent.Tools.BuiltIn;
+
+/// <summary>
+/// Shell 命令执行记录
+/// </summary>
+public sealed record ShellCommandLog
+{
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+    public required string Command { get; init; }
+    public string? WorkingDirectory { get; init; }
+    public int ExitCode { get; init; }
+    public TimeSpan Duration { get; init; }
+    public bool Success => ExitCode == 0;
+}
 
 /// <summary>
 /// 本地 Shell 命令执行器
@@ -12,6 +25,11 @@ namespace InsightaAI.Agent.Tools.BuiltIn;
 public class LocalShellExecutor : IShellExecutor
 {
     private readonly bool _isWindows;
+
+    /// <summary>
+    /// 命令执行日志事件（用于审计）
+    /// </summary>
+    public static event Action<ShellCommandLog>? OnCommandExecuted;
 
     public LocalShellExecutor()
     {
@@ -87,13 +105,28 @@ public class LocalShellExecutor : IShellExecutor
 
             stopwatch.Stop();
 
-            return new ShellResult
+            var result = new ShellResult
             {
                 ExitCode = process.ExitCode,
                 Stdout = stdoutBuilder.ToString().TrimEnd(),
                 Stderr = stderrBuilder.ToString().TrimEnd(),
                 Duration = stopwatch.Elapsed
             };
+
+            // 记录命令执行日志（审计）
+            try
+            {
+                OnCommandExecuted?.Invoke(new ShellCommandLog
+                {
+                    Command = command,
+                    WorkingDirectory = workingDirectory,
+                    ExitCode = result.ExitCode,
+                    Duration = result.Duration
+                });
+            }
+            catch { /* 日志记录失败不影响主流程 */ }
+
+            return result;
         }
         catch (Exception ex)
         {

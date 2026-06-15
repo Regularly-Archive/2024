@@ -1,5 +1,5 @@
 using System.Text.Json;
-using InsightaAI.LLM.Abstractions;
+using InsightaAI.Agent.Abstractions;
 using InsightaAI.LLM.Models;
 
 namespace InsightaAI.Agent.Tools.BuiltIn;
@@ -76,6 +76,14 @@ public class FileWriteTool : IToolExecutor
             }
 
             var append = GetBoolValue(args, "append") ?? false;
+
+            // 路径安全验证
+            var validation = PathValidator.Validate(filePath);
+            if (!validation.IsSafe)
+            {
+                return ToolResult.FromError(validation.ErrorMessage!);
+            }
+            filePath = validation.ResolvedPath!;
 
             // 写入文件
             if (append)

@@ -1,5 +1,5 @@
 using System.Text.RegularExpressions;
-using InsightaAI.LLM.Abstractions;
+using InsightaAI.Agent.Abstractions;
 
 namespace InsightaAI.Agent.Tools.BuiltIn;
 

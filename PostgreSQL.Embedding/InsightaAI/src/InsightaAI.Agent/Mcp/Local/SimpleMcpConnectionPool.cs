@@ -39,17 +39,16 @@ public class SimpleMcpConnectionPool : IMcpConnectionPool
         return string.Join("\n", result.Content.Where(c => c.Type == "text").Select(c => c.ToString()));
     }
 
-    public Task RemoveAsync(string serverName)
+    public async Task RemoveAsync(string serverName)
     {
         if (_connections.TryRemove(serverName, out var lazyTask))
         {
             if (lazyTask.IsValueCreated && lazyTask.Value.IsCompletedSuccessfully)
             {
-                lazyTask.Value.Result.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                await lazyTask.Value.Result.DisposeAsync();
             }
         }
         _toolCache.TryRemove(serverName, out _);
-        return Task.CompletedTask;
     }
 
     public async Task ClearAsync()

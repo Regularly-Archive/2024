@@ -1,4 +1,4 @@
-namespace InsightaAI.LLM.Abstractions;
+namespace InsightaAI.Agent.Abstractions;
 
 /// <summary>
 /// 文件系统接口

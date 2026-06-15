@@ -80,29 +80,45 @@ public class JsonlMessageStorage : IMessageStorage
 
     public async Task UpdateSessionAsync(SessionRecord session)
     {
-        var sessions = await ReadAllSessionsAsync();
-        var index = sessions.FindIndex(s => s.Id == session.Id);
-
-        if (index >= 0)
+        await _lock.WaitAsync();
+        try
         {
-            sessions[index] = session;
-            await WriteAllSessionsAsync(sessions);
+            var sessions = await ReadAllSessionsAsync();
+            var index = sessions.FindIndex(s => s.Id == session.Id);
+
+            if (index >= 0)
+            {
+                sessions[index] = session;
+                await WriteAllSessionsAsync(sessions);
+            }
+        }
+        finally
+        {
+            _lock.Release();
         }
     }
 
     public async Task DeleteSessionAsync(string sessionId)
     {
-        // 删除会话目录
+        await _lock.WaitAsync();
+        try
+        {
+            // 从索引中移除
+            var sessions = await ReadAllSessionsAsync();
+            sessions = sessions.Where(s => s.Id != sessionId).ToList();
+            await WriteAllSessionsAsync(sessions);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+
+        // 删除会话目录（在锁外执行，因为是独立操作）
         var sessionDir = GetSessionDir(sessionId);
         if (Directory.Exists(sessionDir))
         {
             Directory.Delete(sessionDir, true);
         }
-
-        // 从索引中移除
-        var sessions = await ReadAllSessionsAsync();
-        sessions = sessions.Where(s => s.Id != sessionId).ToList();
-        await WriteAllSessionsAsync(sessions);
     }
 
     public async Task AddMessageAsync(string sessionId, MessageRecord message)
@@ -111,21 +127,23 @@ public class JsonlMessageStorage : IMessageStorage
         await _lock.WaitAsync();
         try
         {
+            // 写入消息
             await File.AppendAllTextAsync(messagesFile,
                 JsonSerializer.Serialize(message, JsonOptions) + Environment.NewLine);
+
+            // 更新会话消息计数（在同一锁内完成）
+            var sessions = await ReadAllSessionsAsync();
+            var session = sessions.FirstOrDefault(s => s.Id == sessionId);
+            if (session != null)
+            {
+                session.MessageCount++;
+                session.UpdatedAt = DateTime.UtcNow;
+                await WriteAllSessionsAsync(sessions);
+            }
         }
         finally
         {
             _lock.Release();
-        }
-
-        // 更新会话消息计数
-        var session = await GetSessionAsync(sessionId);
-        if (session != null)
-        {
-            session.MessageCount++;
-            session.UpdatedAt = DateTime.UtcNow;
-            await UpdateSessionAsync(session);
         }
     }
 

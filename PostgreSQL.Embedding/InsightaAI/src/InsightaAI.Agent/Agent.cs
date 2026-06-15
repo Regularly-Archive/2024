@@ -11,6 +11,7 @@ using InsightaAI.Agent.Skills;
 using InsightaAI.Agent.Tools.BuiltIn;
 using InsightaAI.LLM;
 using InsightaAI.LLM.Abstractions;
+using InsightaAI.Agent.Abstractions;
 using InsightaAI.LLM.Models;
 
 namespace InsightaAI.Agent;
@@ -20,6 +21,10 @@ namespace InsightaAI.Agent;
 /// </summary>
 public class Agent
 {
+    /// <summary>
+    /// Hook 执行错误事件（用于日志记录）
+    /// </summary>
+    public static event Action<string, Exception>? OnHookError;
     private readonly AgentConfig _config;
     private readonly ILlmClient _llmClient;
     private readonly ToolRegistry _toolRegistry;
@@ -279,9 +284,16 @@ public class Agent
         {
             if (t.IsFaulted && t.Exception != null)
             {
-                // TODO: 接入日志系统记录 hook 执行错误
+                var innerEx = t.Exception.InnerException ?? t.Exception;
                 System.Diagnostics.Debug.WriteLine(
-                    $"[AgentHook] Round {round} hooks failed: {t.Exception.InnerException?.Message}");
+                    $"[AgentHook] Round {round} hooks failed: {innerEx.Message}");
+
+                // 触发错误事件，允许外部日志系统记录
+                try
+                {
+                    OnHookError?.Invoke($"Round {round} hooks failed", innerEx);
+                }
+                catch { /* 错误事件处理器自身不能抛出异常 */ }
             }
         }, TaskContinuationOptions.ExecuteSynchronously);
     }
@@ -560,7 +572,9 @@ public class Agent
         messages.Add(Message.FromSystem(
             "You have reached the maximum number of tool rounds. " +
             "Please provide a final response to the user based on the information gathered so far. " +
-            "Do not attempt to use any more tools."));
+            "Do not attempt to use any more tools." +
+            "Do not generate <tool_call></tool_call> block."
+        ));
 
         // 最后一次调用 LLM 获取总结
         var finalRequest = new LlmRequest

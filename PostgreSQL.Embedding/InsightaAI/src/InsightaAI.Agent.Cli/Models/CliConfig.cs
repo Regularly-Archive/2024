@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Text.Json.Serialization;
 
 namespace InsightaAI.Agent.Cli.Models;
@@ -148,6 +149,7 @@ public class CliConfig
         if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
         {
             Directory.CreateDirectory(dir);
+            SetDirectoryPermissions(dir);
         }
 
         var json = System.Text.Json.JsonSerializer.Serialize(this, new System.Text.Json.JsonSerializerOptions
@@ -155,6 +157,75 @@ public class CliConfig
             WriteIndented = true
         });
         File.WriteAllText(ConfigPath, json);
+        SetFilePermissions(ConfigPath);
+    }
+
+    /// <summary>
+    /// 设置配置目录权限（仅所有者可访问）
+    /// </summary>
+    private static void SetDirectoryPermissions(string dirPath)
+    {
+        try
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                // Windows: 使用 icacls 移除继承并只保留当前用户
+                var userName = Environment.UserName;
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "icacls",
+                    Arguments = $"\"{dirPath}\" /inheritance:r /grant:r \"{userName}:(OI)(CI)F\"",
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using var process = System.Diagnostics.Process.Start(psi);
+                process?.WaitForExit(5000);
+            }
+            else
+            {
+                // Linux/macOS: chmod 700
+                System.Diagnostics.Process.Start("chmod", "700 " + dirPath)?.WaitForExit(5000);
+            }
+        }
+        catch
+        {
+            // 权限设置失败不影响主流程
+        }
+    }
+
+    /// <summary>
+    /// 设置配置文件权限（仅所有者可读写）
+    /// </summary>
+    private static void SetFilePermissions(string filePath)
+    {
+        try
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                // Windows: 使用 icacls 移除继承并只保留当前用户
+                var userName = Environment.UserName;
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "icacls",
+                    Arguments = $"\"{filePath}\" /inheritance:r /grant:r \"{userName}:F\"",
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using var process = System.Diagnostics.Process.Start(psi);
+                process?.WaitForExit(5000);
+            }
+            else
+            {
+                // Linux/macOS: chmod 600
+                System.Diagnostics.Process.Start("chmod", "600 " + filePath)?.WaitForExit(5000);
+            }
+        }
+        catch
+        {
+            // 权限设置失败不影响主流程
+        }
     }
 
     /// <summary>

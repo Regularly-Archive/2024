@@ -1,6 +1,6 @@
 using System.Text.Json;
 using InsightaAI.Agent.Models;
-using InsightaAI.LLM.Abstractions;
+using InsightaAI.Agent.Abstractions;
 using InsightaAI.LLM.Models;
 
 namespace InsightaAI.Agent.Tools.BuiltIn;
@@ -95,6 +95,14 @@ public class FileEditTool : IToolExecutor
             }
 
             var replaceAll = GetBoolValue(args, "replace_all");
+
+            // 路径安全验证
+            var validation = PathValidator.Validate(filePath);
+            if (!validation.IsSafe)
+            {
+                return ToolResult.FromError(validation.ErrorMessage!);
+            }
+            filePath = validation.ResolvedPath!;
 
             // 1. 检查文件是否存在
             if (!await _fileSystem.ExistsAsync(filePath, context.CancellationToken))

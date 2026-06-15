@@ -1,4 +1,4 @@
-namespace InsightaAI.LLM.Abstractions;
+namespace InsightaAI.Agent.Abstractions;
 
 /// <summary>
 /// Shell 命令执行器接口

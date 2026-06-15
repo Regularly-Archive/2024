@@ -13,6 +13,8 @@ internal class DefaultLlmClient : ILlmClient
     private readonly IProviderAdapter _adapter;
     private readonly ProviderConfig _config;
     private readonly HttpClient _httpClient;
+    private readonly bool _ownsHttpClient;
+    private bool _disposed;
 
     public string ProviderName => _adapter.Name;
     public bool SupportsReasoning => _adapter.SupportsReasoning;
@@ -21,6 +23,7 @@ internal class DefaultLlmClient : ILlmClient
     {
         _adapter = adapter ?? throw new ArgumentNullException(nameof(adapter));
         _config = config ?? throw new ArgumentNullException(nameof(config));
+        _ownsHttpClient = httpClient == null;
         _httpClient = httpClient ?? new HttpClient();
     }
 
@@ -193,5 +196,18 @@ internal class DefaultLlmClient : ILlmClient
 
         // 如果循环正常结束但没有 DoneEvent
         yield return new DoneEvent { Reason = DoneReason.Complete };
+    }
+
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            if (_ownsHttpClient)
+            {
+                _httpClient.Dispose();
+            }
+            _disposed = true;
+        }
+        GC.SuppressFinalize(this);
     }
 }

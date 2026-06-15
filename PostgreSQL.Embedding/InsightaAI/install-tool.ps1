@@ -2,7 +2,7 @@
 # 用法: .\install-tool.ps1
 
 $ErrorActionPreference = "SilentlyContinue"
-$projectPath = "InsightaAI.Agent.Cli"
+$projectPath = "src/InsightaAI.Agent.Cli"
 $outputPath = "./nupkg"
 
 Write-Host "=== InsightaAI Agent CLI Installer ===" -ForegroundColor Cyan

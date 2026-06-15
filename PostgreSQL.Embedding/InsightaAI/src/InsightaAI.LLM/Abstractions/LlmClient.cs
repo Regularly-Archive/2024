@@ -5,7 +5,7 @@ namespace InsightaAI.LLM.Abstractions;
 /// <summary>
 /// LLM 客户端接口
 /// </summary>
-public interface ILlmClient
+public interface ILlmClient : IDisposable
 {
     /// <summary>
     /// 发起流式请求

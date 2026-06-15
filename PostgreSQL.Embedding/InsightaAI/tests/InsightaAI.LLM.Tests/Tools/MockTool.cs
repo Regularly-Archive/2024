@@ -1,5 +1,5 @@
 using System.Text.Json;
-using InsightaAI.LLM.Abstractions;
+using InsightaAI.Agent.Abstractions;
 using InsightaAI.LLM.Models;
 
 namespace InsightaAI.LLM.Tests.Tools;

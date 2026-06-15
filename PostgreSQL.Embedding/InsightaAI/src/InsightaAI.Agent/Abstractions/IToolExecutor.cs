@@ -1,6 +1,6 @@
 using InsightaAI.LLM.Models;
 
-namespace InsightaAI.LLM.Abstractions;
+namespace InsightaAI.Agent.Abstractions;
 
 /// <summary>
 /// 工具执行器接口

@@ -1,6 +1,7 @@
+using InsightaAI.LLM.Abstractions;
 using InsightaAI.Agent.Cli.Models;
 using InsightaAI.LLM;
-using InsightaAI.LLM.Abstractions;
+using InsightaAI.Agent.Abstractions;
 using InsightaAI.LLM.Anthropic;
 using InsightaAI.LLM.Gemini;
 using InsightaAI.LLM.OpenAI;

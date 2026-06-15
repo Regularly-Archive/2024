@@ -2,7 +2,7 @@ using System.Reflection;
 using System.Text.Json;
 using InsightaAI.LLM.Models;
 
-namespace InsightaAI.LLM.Abstractions;
+namespace InsightaAI.Agent.Abstractions;
 
 /// <summary>
 /// 工具扫描器 - 从程序集扫描带 [Tool] 标记的方法
@@ -306,7 +306,7 @@ public static class ToolScanner
 
     /// <summary>
     /// 将方法返回值转换为 ToolResult
-    /// 支持：ToolResult, Task<ToolResult>, Task<T>, Task, string, 其他类型
+    /// 支持：ToolResult, Task{ToolResult}, Task{T}, Task, string, 其他类型
     /// </summary>
     private static async Task<ToolResult> ConvertToToolResult(object? result)
     {

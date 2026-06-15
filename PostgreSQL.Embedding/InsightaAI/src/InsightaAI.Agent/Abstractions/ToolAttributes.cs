@@ -1,6 +1,4 @@
-using System.Text.Json;
-
-namespace InsightaAI.LLM.Abstractions;
+namespace InsightaAI.Agent.Abstractions;
 
 /// <summary>
 /// 标记方法为工具
