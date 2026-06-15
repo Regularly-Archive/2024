@@ -40,6 +40,10 @@ internal class AnthropicRequest
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AnthropicTool[]? Tools { get; set; }
 
+    [JsonPropertyName("tool_choice")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AnthropicToolChoice? ToolChoice { get; set; }
+
     [JsonPropertyName("stop_sequences")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string[]? StopSequences { get; set; }
@@ -163,6 +167,15 @@ internal class AnthropicTool
 
     [JsonPropertyName("input_schema")]
     public required JsonElement InputSchema { get; set; }
+}
+
+/// <summary>
+/// Anthropic 工具调用策略
+/// </summary>
+internal class AnthropicToolChoice
+{
+    [JsonPropertyName("type")]
+    public required string Type { get; set; }
 }
 
 /// <summary>

@@ -569,7 +569,8 @@ public class Agent
             Messages = messages.ToArray(),
             Tools = [],  // 不提供工具，强制生成文本
             Temperature = _config.Temperature,
-            MaxTokens = _config.MaxTokens
+            MaxTokens = _config.MaxTokens,
+            ToolChoice = ToolChoiceMode.None
         };
 
         var finalStream = _llmClient.Stream(finalRequest);

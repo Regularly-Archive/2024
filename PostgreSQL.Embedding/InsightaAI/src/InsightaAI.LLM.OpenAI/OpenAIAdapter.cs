@@ -245,6 +245,13 @@ public class OpenAIAdapter : IProviderAdapter
                     Parameters = t.Schema
                 }
             }).ToArray();
+
+            // 工具调用策略
+            body.ToolChoice = request.ToolChoice switch
+            {
+                ToolChoiceMode.None => "none",
+                ToolChoiceMode.Auto => "auto"
+            };
         }
 
         // 处理推理配置

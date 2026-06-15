@@ -211,6 +211,16 @@ public class AnthropicAdapter : IProviderAdapter
                 Description = t.Description,
                 InputSchema = t.Schema
             }).ToArray();
+
+            // 工具调用策略
+            body.ToolChoice = new AnthropicToolChoice
+            {
+                Type = request.ToolChoice switch
+                {
+                    ToolChoiceMode.None => "none",
+                    ToolChoiceMode.Auto => "auto"
+                }
+            };
         }
 
         // 处理推理配置 (Extended Thinking)

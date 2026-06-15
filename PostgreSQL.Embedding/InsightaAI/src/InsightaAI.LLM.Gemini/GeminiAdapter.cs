@@ -293,6 +293,17 @@ public class GeminiAdapter : IProviderAdapter
         if (tools != null)
         {
             body["tools"] = tools;
+
+            // 工具调用策略
+            var mode = request.ToolChoice switch
+            {
+                ToolChoiceMode.None => "NONE",
+                ToolChoiceMode.Auto => "AUTO"
+            };
+            body["tool_config"] = new
+            {
+                function_calling_config = new { mode }
+            };
         }
 
         // 生成配置

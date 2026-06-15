@@ -14,6 +14,9 @@ public sealed record LlmRequest
     /// <summary>可用工具</summary>
     public ToolDefinition[]? Tools { get; init; }
 
+    /// <summary>工具调用策略，默认 Auto</summary>
+    public ToolChoiceMode ToolChoice { get; init; } = ToolChoiceMode.Auto;
+
     /// <summary>温度 (0.0 - 2.0)</summary>
     public double? Temperature { get; init; }
 
@@ -113,4 +116,16 @@ public sealed record AnthropicMetadata
 {
     /// <summary>用户 ID</summary>
     public string? UserId { get; init; }
+}
+
+/// <summary>
+/// 工具调用策略
+/// </summary>
+public enum ToolChoiceMode
+{
+    /// <summary>自动决定是否调用工具（默认值）</summary>
+    Auto,
+
+    /// <summary>禁止调用工具</summary>
+    None
 }
