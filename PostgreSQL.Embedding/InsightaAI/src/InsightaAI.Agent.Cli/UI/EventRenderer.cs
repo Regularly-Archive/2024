@@ -16,6 +16,7 @@ public class EventRenderer : IDisposable
     private CancellationTokenSource? _thinkingCts;
     private Task _thinkingTask = Task.CompletedTask;
     private readonly Dictionary<string, string> _pendingTools = [];
+    private string _lastText = "";
 
     /// <summary>
     /// 累积的完整文本
@@ -77,12 +78,12 @@ public class EventRenderer : IDisposable
                 {
                     EnsureHeader();
                     FullText += textDelta.Delta;
+                    _lastText = textDelta.Delta;
                     AnsiConsole.Write("{0}", textDelta.Delta);
                 }
                 break;
             case TextEndEvent textEnd:
                 await StopThinkingAsync();
-                AnsiConsole.WriteLine();
                 break;
         }
     }
@@ -90,12 +91,16 @@ public class EventRenderer : IDisposable
     private async Task HandleToolStartAsync(AgentToolStartEvent toolStart)
     {
         await StopThinkingAsync();
-        EnsureHeader();
+        // 防御性调用：正常流程中 TextDeltaEvent 已调用过 EnsureHeader
+        if (!string.IsNullOrEmpty(_lastText))
+        {
+            EnsureHeader();
+        }
 
         var toolArgs = toolStart.Arguments.Truncate(50);
         var displayText = $"{toolStart.ToolName}({EscapeMarkup(toolArgs)})";
         _pendingTools[toolStart.ToolCallId] = displayText;
-        AnsiConsole.WriteLine();
+        //AnsiConsole.WriteLine();
     }
 
     private void HandleToolEnd(AgentToolEndEvent toolEnd)
@@ -104,7 +109,11 @@ public class EventRenderer : IDisposable
             ? text
             : toolEnd.ToolName;
 
-        AnsiConsole.WriteLine();
+        if (!string.IsNullOrEmpty(_lastText))
+        {
+            AnsiConsole.WriteLine();
+        }
+        
 
         if (toolEnd.IsError)
         {
@@ -121,6 +130,7 @@ public class EventRenderer : IDisposable
 
         AnsiConsole.WriteLine();
         _pendingTools.Remove(toolEnd.ToolCallId);
+        _lastText = string.Empty;
     }
 
     private async Task HandleCompleteAsync(AgentCompleteEvent completeEvent)
@@ -179,6 +189,7 @@ public class EventRenderer : IDisposable
     public void Reset()
     {
         FullText = "";
+        _lastText = "";
         _headerShown = false;
         _pendingTools.Clear();
     }
@@ -188,7 +199,6 @@ public class EventRenderer : IDisposable
         if (!_headerShown)
         {
             _headerShown = true;
-            AnsiConsole.WriteLine();
             AnsiConsole.Markup("[dim]● [/]");
         }
     }
