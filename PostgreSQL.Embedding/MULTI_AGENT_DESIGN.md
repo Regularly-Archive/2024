@@ -601,465 +601,479 @@ class WebSearchTool implements ToolExecutor { ... }
 
 ---
 
-## 四、Layer 3: Multi-Agent 编排
+## 四、Layer 3: Orchestrator 编排层
 
-### 4.1 核心概念
+> 参考项目：[open-multi-agent](https://github.com/open-multi-agent/open-multi-agent)
 
-```typescript
-// ============================================================
-// 共享内存
-// ============================================================
+### 4.1 设计理念
 
-interface SharedMemory {
-  /** 获取值 */
-  get<T>(key: string): T | undefined;
+- **目标优先 (Goal-First)**：工程师只描述目标，框架运行时自动构建任务 DAG
+- **节点多态**：DAG 节点可以是 Function、Preset Agent 或 SubAgent
+- **数据契约**：通过 Artifacts 声明节点间的数据流
+- **人机协作**：支持执行前审批和执行中干预
 
-  /** 设置值 */
-  set<T>(key: string, value: T): void;
+### 4.2 三种运行模式
 
-  /** 删除值 */
-  delete(key: string): boolean;
+| 模式 | 方法 | DAG 来源 | 类比 |
+|------|------|----------|------|
+| **目标优先** | `RunTeamAsync(goal)` | LLM 自动拆解 | `/goal` |
+| **手动 DAG** | `RunTasksAsync(nodes)` | 代码/配置定义 | `plan + execute` |
+| **单 Agent** | `RunAgentAsync(config, input)` | 无 DAG | 最简入口 |
 
-  /** 检查是否存在 */
-  has(key: string): boolean;
+### 4.3 节点类型
 
-  /** 按前缀搜索 */
-  keys(prefix?: string): string[];
-
-  /** 清空 */
-  clear(): void;
-}
-
-// ============================================================
-// 消息总线
-// ============================================================
-
-type MessageType = 'task' | 'result' | 'broadcast' | 'request' | 'response';
-
-interface BusMessage {
-  id: string;
-  type: MessageType;
-  from: string;      // sender agent ID
-  to: string | '*';  // receiver agent ID or '*' for broadcast
-  payload: unknown;
-  timestamp: number;
-  replyTo?: string;  // 用于 request/response 模式
-}
-
-interface MessageBus {
-  /** 发送消息 */
-  send(message: Omit<BusMessage, 'id' | 'timestamp'>): void;
-
-  /** 订阅消息 */
-  subscribe(
-    filter: { from?: string; type?: MessageType },
-    handler: (message: BusMessage) => void
-  ): () => void; // 返回取消订阅函数
-
-  /** 请求-响应模式 */
-  request(to: string, payload: unknown, timeout?: number): Promise<BusMessage>;
-}
-
-// ============================================================
-// 任务定义
-// ============================================================
-
-type TaskStatus = 'pending' | 'ready' | 'running' | 'completed' | 'failed' | 'skipped';
-
-interface Task {
-  id: string;
-  name: string;
-  agentId: string;        // 执行此任务的 Agent
-  input: string | Message[];
-  dependsOn?: string[];   // 依赖的任务 ID 列表
-  condition?: (results: Map<string, AgentResult>) => boolean; // 条件执行
-  metadata?: Record<string, unknown>;
-}
-
-interface TaskResult {
-  taskId: string;
-  agentId: string;
-  result: AgentResult;
-  startTime: number;
-  endTime: number;
+```csharp
+/// <summary>
+/// 节点类型枚举
+/// </summary>
+public enum NodeKind
+{
+    Function,     // 纯函数/委托，无 LLM 调用
+    PresetAgent,  // 预配置工具的 Agent（如数据分析 Agent: Jupyter + DuckDB）
+    SubAgent      // LLM 动态分配工具的 Agent，不支持嵌套
 }
 ```
 
-### 4.2 Team 编排器
+| 类型 | 执行方式 | 工具来源 | 典型用途 |
+|------|----------|----------|----------|
+| **Function** | `Func<NodeContext, Task<object?>>` | 无 | 数据转换、格式化、API 调用 |
+| **Preset Agent** | L2 Agent | 构建时静态绑定 | 专业领域 Agent（数据分析、代码审查等） |
+| **SubAgent** | L2 Agent | 编排层 LLM 动态分配 | 通用任务 Agent |
 
-```typescript
+> Preset Agent 和 SubAgent 均复用 L2 已实现的 Agent 运行时。SubAgent 不支持嵌套。
+
+### 4.4 核心接口
+
+```csharp
 // ============================================================
-// Team 配置
+// DAG 节点（多态）
 // ============================================================
 
-interface TeamConfig {
-  /** Team 名称 */
-  name: string;
+/// <summary>
+/// DAG 节点基类
+/// </summary>
+public abstract class DAGNode
+{
+    public required string Id { get; init; }
+    public required string Name { get; init; }
+    public string[] DependsOn { get; init; } = [];
+    public NodeKind Kind { get; init; }
 
-  /** Agent 配置列表 */
-  agents: AgentConfig[];
+    // 数据契约
+    public string[] InputArtifacts { get; init; } = [];   // 我需要什么
+    public string[] OutputArtifacts { get; init; } = [];  // 我产出什么
+}
 
-  /** 任务列表 (DAG) */
-  tasks: Task[];
+/// <summary>
+/// 函数节点 - 纯函数/委托
+/// </summary>
+public class FunctionNode : DAGNode
+{
+    public NodeKind Kind => NodeKind.Function;
+    public required Func<NodeContext, Task<object?>> Execute { get; init; }
+}
 
-  /** 全局共享内存配置 */
-  sharedMemory?: {
-    /** 初始数据 */
-    initialData?: Record<string, unknown>;
-  };
-
-  /** 编排策略 */
-  strategy?: 'parallel' | 'sequential' | 'dag' | 'auto';
-
-  /** 全局超时 (ms) */
-  timeout?: number;
-
-  /** 最大并发 Agent 数 */
-  maxConcurrency?: number;
+/// <summary>
+/// Agent 节点 - Preset 或 SubAgent
+/// </summary>
+public class AgentNode : DAGNode
+{
+    public required string AgentId { get; init; }         // 引用 Team 中的 Agent 配置
+    public string[]? ToolNames { get; init; }             // null = SubAgent 动态分配
+    public string? SystemPrompt { get; init; }            // 可覆盖 Agent 默认 prompt
+    public NodeKind Kind => ToolNames == null ? NodeKind.SubAgent : NodeKind.PresetAgent;
 }
 
 // ============================================================
-// Team 运行时
+// 节点执行上下文
 // ============================================================
 
-/** Team 执行状态 */
-type TeamStatus = 'idle' | 'running' | 'completed' | 'failed' | 'aborted';
+/// <summary>
+/// 节点执行上下文
+/// </summary>
+public class NodeContext
+{
+    /// <summary>节点输入（来自依赖节点的输出，自动注入）</summary>
+    public string Input { get; init; }
 
-/** Team 事件 */
-type TeamEventType =
-  | 'team_start'
-  | 'task_ready'
-  | 'task_start'
-  | 'agent_start'
-  | 'agent_event'      // 透传 Agent 事件
-  | 'task_complete'
-  | 'task_failed'
-  | 'team_complete'
-  | 'team_failed';
+    /// <summary>依赖节点的输出字典 { nodeId → output }</summary>
+    public IReadOnlyDictionary<string, object?> Dependencies { get; init; }
 
-interface TeamEvent {
-  type: TeamEventType;
-  timestamp: number;
-  taskId?: string;
-  agentId?: string;
-  data?: unknown;
-}
+    /// <summary>共享内存（全局读写）</summary>
+    public SharedMemory Memory { get; init; }
 
-interface TeamStream extends AsyncIterable<TeamEvent> {
-  result(): Promise<TeamResult>;
-  abort(): void;
-  readonly status: TeamStatus;
-}
-
-interface TeamResult {
-  status: TeamStatus;
-  taskResults: Map<string, TaskResult>;
-  totalUsage: TokenUsage;
-  duration: number;
+    /// <summary>Artifact 存储（数据契约）</summary>
+    public ArtifactStore Artifacts { get; init; }
 }
 
 // ============================================================
-// OpenMultiAgent 主入口
+// Team（编排基础设施）
 // ============================================================
 
-class OpenMultiAgent {
-  private llmFactory: LlmClientFactory;
-  private toolRegistry: ToolRegistry;
-
-  constructor(options?: {
-    llmFactory?: LlmClientFactory;
-    toolRegistry?: ToolRegistry;
-  });
-
-  /** 创建 Team */
-  createTeam(config: TeamConfig): Team;
-
-  /** 运行 Team (流式) */
-  runTeam(team: Team): TeamStream;
-
-  /** 运行 Team (非流式) */
-  runTeamSync(team: Team): Promise<TeamResult>;
-
-  /** 运行单个 Agent (便捷方法) */
-  runAgent(agentConfig: AgentConfig, input: string): Promise<AgentResult>;
-}
-```
-
-### 4.3 DAG 任务调度器
-
-```typescript
-// ============================================================
-// DAG 调度器
-// ============================================================
-
-class DagScheduler {
-  private tasks: Map<string, Task>;
-  private results: Map<string, TaskResult> = new Map();
-  private completed: Set<string> = new Set();
-
-  constructor(tasks: Task[]);
-
-  /** 获取所有就绪的任务 (依赖已完成) */
-  getReadyTasks(): Task[];
-
-  /** 标记任务完成 */
-  markComplete(taskId: string, result: TaskResult): void;
-
-  /** 标记任务失败 */
-  markFailed(taskId: string, error: Error): void;
-
-  /** 检查是否所有任务完成 */
-  isComplete(): boolean;
-
-  /** 获取任务执行顺序 (拓扑排序) */
-  getExecutionOrder(): string[][];
-
-  /** 检查是否有循环依赖 */
-  validate(): { valid: boolean; errors: string[] };
+/// <summary>
+/// Team - 编排基础设施容器
+/// </summary>
+public class Team
+{
+    public required string Name { get; init; }
+    public required AgentConfig[] Agents { get; init; }
+    public SharedMemory SharedMemory { get; } = new();
+    public MessageBus MessageBus { get; } = new();
 }
 
 // ============================================================
-// 执行引擎
+// Orchestrator（编排入口）
 // ============================================================
 
-class TeamExecutionEngine {
-  private scheduler: DagScheduler;
-  private agentPool: AgentPool;
-  private messageBus: MessageBus;
-  private sharedMemory: SharedMemory;
+/// <summary>
+/// 编排器主入口
+/// </summary>
+public class Orchestrator
+{
+    private readonly Team? _team;
 
-  /** 并行执行所有就绪任务 */
-  async execute(config: TeamConfig): AsyncIterable<TeamEvent> {
-    // 1. 验证 DAG
-    const validation = this.scheduler.validate();
-    if (!validation.valid) throw new Error(validation.errors.join('\n'));
-
-    // 2. 循环执行
-    while (!this.scheduler.isComplete()) {
-      const readyTasks = this.scheduler.getReadyTasks();
-
-      // 3. 并行执行就绪任务 (受 maxConcurrency 限制)
-      await this.agentPool.runParallel(readyTasks, async (task) => {
-        // 创建 Agent
-        const agent = this.createAgent(task.agentId);
-
-        // 执行
-        const stream = agent.run(task.input);
-
-        // 转发事件
-        for await (const event of stream) {
-          yield { type: 'agent_event', agentId: task.agentId, data: event };
-        }
-
-        // 获取结果
-        const result = await stream.result();
-        this.scheduler.markComplete(task.id, { taskId: task.id, result, ... });
-      });
+    public Orchestrator(Team? team = null)
+    {
+        _team = team;
     }
-  }
+
+    /// <summary>目标优先：LLM 自动拆解 DAG 并执行</summary>
+    public Task<TeamResult> RunTeamAsync(string goal, CancellationToken ct = default);
+
+    /// <summary>手动定义 DAG 并执行</summary>
+    public Task<TeamResult> RunTasksAsync(DAGNode[] nodes, CancellationToken ct = default);
+
+    /// <summary>单 Agent 执行</summary>
+    public Task<AgentResult> RunAgentAsync(AgentConfig config, string input, CancellationToken ct = default);
+
+    /// <summary>从计划恢复执行（跳过规划阶段）</summary>
+    public Task<TeamResult> RunFromPlanAsync(DAGPlan plan, CancellationToken ct = default);
+
+    /// <summary>创建可序列化的计划</summary>
+    public DAGPlan CreatePlan(DAGNode[] nodes);
+
+    // ===== Human-in-the-loop =====
+
+    /// <summary>执行前审批整个计划</summary>
+    public event Func<PlanApprovalContext, Task<PlanApprovalResult>>? OnPlanReady;
+
+    /// <summary>每个任务完成后回调</summary>
+    public event Func<TaskApprovalContext, Task<TaskApprovalResult>>? OnTaskComplete;
+
+    /// <summary>取消令牌</summary>
+    public CancellationTokenSource Cts { get; } = new();
 }
 ```
 
-### 4.4 并发控制
+### 4.5 SharedMemory
 
-```typescript
-// ============================================================
-// Agent 池 (并发控制)
-// ============================================================
+```csharp
+/// <summary>
+/// 共享内存 - 全局 KV 存储，节点间共享状态
+/// </summary>
+public class SharedMemory
+{
+    private readonly ConcurrentDictionary<string, object?> _store = new();
 
-class AgentPool {
-  private semaphore: Semaphore;
-  private agents: Map<string, Agent> = new Map();
-
-  constructor(maxConcurrency: number);
-
-  /** 并行执行任务，受信号量限制 */
-  async runParallel<T>(
-    tasks: T[],
-    executor: (task: T) => Promise<void>
-  ): Promise<void>;
-
-  /** 获取或创建 Agent */
-  getAgent(config: AgentConfig): Agent;
-}
-
-/** 信号量实现 */
-class Semaphore {
-  private permits: number;
-  private queue: Array<() => void> = [];
-
-  constructor(permits: number);
-
-  async acquire(): Promise<void>;
-  release(): void;
+    public T? Get<T>(string key);
+    public void Set<T>(string key, T value);
+    public bool Has(string key);
+    public void Delete(string key);
+    public IReadOnlyDictionary<string, object?> Snapshot();
 }
 ```
 
----
+### 4.6 ArtifactStore（数据契约）
 
-## 五、使用示例
+```csharp
+/// <summary>
+/// Artifact 定义
+/// </summary>
+public record Artifact
+{
+    public required string Name { get; init; }
+    public string? Description { get; init; }
+    public Type? DataType { get; init; }
+}
 
-### 5.1 基础 Agent 使用
+/// <summary>
+/// Artifact 存储 - 节点间声明式数据流
+/// </summary>
+public class ArtifactStore
+{
+    /// <summary>读取 artifact</summary>
+    public T? Get<T>(string name);
 
-```typescript
-// 创建 LLM Client
-const client = factory.create('openai', { apiKey: 'sk-xxx' });
+    /// <summary>写入 artifact（节点完成后自动存储）</summary>
+    public void Set<T>(string name, T value);
 
-// 定义工具
-const weatherTool: ToolExecutor = {
-  name: 'get_weather',
-  definition: {
-    name: 'get_weather',
-    description: 'Get weather for a location',
-    parameters: Type.Object({
-      location: Type.String(),
-    }),
-  },
-  async execute(args) {
-    return { content: [{ type: 'text', text: `Weather in ${args.location}: Sunny, 25°C` }] };
-  },
+    /// <summary>检查依赖是否满足</summary>
+    public bool AreDependenciesMet(string[] required);
+
+    /// <summary>获取所有 artifact 快照</summary>
+    public IReadOnlyDictionary<string, object?> Snapshot();
+}
+```
+
+**数据传递三层次**：
+
+| 机制 | 用途 | 生命周期 |
+|------|------|---------|
+| **DependsOn** | 节点执行顺序 | DAG 静态定义 |
+| **Artifacts** | 数据契约，声明式传参 | 节点间流转 |
+| **SharedMemory** | 全局状态，任意读写 | 整个 Team 生命周期 |
+
+### 4.7 Human-in-the-loop
+
+```csharp
+/// <summary>
+/// 计划审批上下文
+/// </summary>
+public class PlanApprovalContext
+{
+    public DAGNode[] Nodes { get; init; }
+    public string? Goal { get; init; }
+    public SharedMemory Memory { get; init; }
+}
+
+/// <summary>
+/// 计划审批结果
+/// </summary>
+public class PlanApprovalResult
+{
+    public bool Approved { get; init; }
+    public DAGNode[]? ModifiedNodes { get; init; }  // 可修改 DAG
+}
+
+/// <summary>
+/// 任务审批上下文
+/// </summary>
+public class TaskApprovalContext
+{
+    public DAGNode Node { get; init; }
+    public object? Result { get; init; }
+    public SharedMemory Memory { get; init; }
+}
+
+/// <summary>
+/// 任务审批结果
+/// </summary>
+public enum TaskApprovalResult
+{
+    Continue,  // 继续执行下一个
+    Pause,     // 暂停，等待人工干预
+    Abort      // 终止整个流程
+}
+```
+
+**使用模式**：
+
+```csharp
+// 模式1：全自动
+var orchestrator = new Orchestrator(team);
+await orchestrator.RunTeamAsync("分析销售数据");
+
+// 模式2：执行前审批
+orchestrator.OnPlanReady += async ctx =>
+{
+    PrintDAG(ctx.Nodes);
+    var ok = await AskUser("是否执行？");
+    return new PlanApprovalResult { Approved = ok };
+};
+await orchestrator.RunTeamAsync("分析销售数据");
+
+// 模式3：每个任务完成后审批
+orchestrator.OnTaskComplete += async ctx =>
+{
+    Console.WriteLine($"任务 {ctx.Node.Name} 完成");
+    return TaskApprovalResult.Continue;
+};
+await orchestrator.RunTasksAsync(nodes);
+```
+
+### 4.8 DAG 调度器
+
+```csharp
+/// <summary>
+/// DAG 调度器 - 拓扑排序 + 并行调度
+/// </summary>
+public class DAGScheduler
+{
+    private readonly DAGNode[] _nodes;
+    private readonly Dictionary<string, DAGNode> _nodeMap;
+    private readonly Dictionary<string, TaskState> _states;
+    private readonly Dictionary<string, object?> _results;
+
+    public DAGScheduler(DAGNode[] nodes);
+
+    /// <summary>获取所有就绪的任务（依赖已完成）</summary>
+    public DAGNode[] GetReadyTasks();
+
+    /// <summary>标记任务完成</summary>
+    public void MarkComplete(string nodeId, object? result);
+
+    /// <summary>标记任务失败</summary>
+    public void MarkFailed(string nodeId, Exception error);
+
+    /// <summary>检查是否所有任务完成</summary>
+    public bool IsComplete { get; }
+
+    /// <summary>验证 DAG（循环检测）</summary>
+    public ValidationResult Validate();
+}
+```
+
+### 4.9 计划持久化
+
+```csharp
+/// <summary>
+/// 可序列化的 DAG 计划
+/// </summary>
+public class DAGPlan
+{
+    public string? Goal { get; init; }
+    public DAGNodeDto[] Nodes { get; init; }
+    public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
+}
+
+/// <summary>
+/// DAG 节点 DTO（用于序列化）
+/// </summary>
+public class DAGNodeDto
+{
+    public string Id { get; init; }
+    public string Name { get; init; }
+    public NodeKind Kind { get; init; }
+    public string[] DependsOn { get; init; }
+    public string[] InputArtifacts { get; init; }
+    public string[] OutputArtifacts { get; init; }
+
+    // Agent 节点特有
+    public string? AgentId { get; init; }
+    public string[]? ToolNames { get; init; }
+    public string? SystemPrompt { get; init; }
+}
+```
+
+### 4.10 执行流程
+
+```
+goal / nodes
+    │
+    ▼
+┌─────────────┐
+│ TaskPlanner │ (RunTeamAsync 时，LLM 自动拆解)
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐     ┌──────────────┐
+│ OnPlanReady │────►│ 用户审批/修改 │
+└──────┬──────┘     └──────────────┘
+       │ Approved? → No → Abort
+       │ Yes
+       ▼
+┌─────────────┐
+│ DAGScheduler│ 拓扑排序 + 并行调度
+└──────┬──────┘
+       │
+  ┌────┼────┐
+  ▼    ▼    ▼
+Func Preset SubAgent  ← 按节点类型分发执行
+  └────┼────┘
+       │
+       ▼
+┌──────────────┐     ┌──────────────┐
+│OnTaskComplete│────►│ Continue/    │
+└──────┬──────┘     │ Pause/Abort  │
+       │            └──────────────┘
+       ▼
+   TeamResult
+```
+
+### 4.11 使用示例
+
+#### 目标优先模式
+
+```csharp
+var team = new Team
+{
+    Name = "数据分析团队",
+    Agents =
+    [
+        new AgentConfig { Id = "analyst", SystemPrompt = "你是数据分析专家", Tools = [jupyterTool, duckdbTool] },
+        new AgentConfig { Id = "writer", SystemPrompt = "你是报告撰写专家", Tools = [fileWriteTool] }
+    ]
 };
 
-// 创建 Agent
-const agent = new Agent(
-  {
-    id: 'assistant',
-    name: 'Weather Assistant',
-    systemPrompt: 'You are a helpful weather assistant.',
-    model: 'gpt-4o',
-    maxToolRounds: 5,
-  },
-  client,
-  new ToolRegistry([weatherTool])
-);
-
-// 执行
-const stream = agent.run('What is the weather in Beijing?');
-
-for await (const event of stream) {
-  switch (event.type) {
-    case 'llm_stream':
-      // 透传 LLM 事件
-      if (event.data.type === 'text_delta') {
-        process.stdout.write(event.data.delta);
-      }
-      break;
-    case 'tool_start':
-      console.log(`\n[Calling ${event.toolCall.name}...]`);
-      break;
-    case 'complete':
-      console.log('\n[Done]');
-      break;
-  }
-}
+var orchestrator = new Orchestrator(team);
+var result = await orchestrator.RunTeamAsync("分析上季度销售趋势，生成可视化报告");
 ```
 
-### 5.2 Multi-Agent 协作
+#### 手动 DAG 模式
 
-```typescript
-// 定义多个 Agent
-const teamConfig: TeamConfig = {
-  name: 'Research Team',
-  strategy: 'dag',
-  maxConcurrency: 3,
-  agents: [
+```csharp
+var nodes = new DAGNode[]
+{
+    new FunctionNode
     {
-      id: 'researcher',
-      name: 'Researcher',
-      systemPrompt: 'You research topics and gather information.',
-      model: 'gpt-4o',
-      tools: [webSearchTool, readFileTool],
+        Id = "fetch",
+        Name = "获取数据",
+        Execute = async ctx => await FetchSalesDataAsync()
     },
+    new AgentNode
     {
-      id: 'analyst',
-      name: 'Analyst',
-      systemPrompt: 'You analyze data and provide insights.',
-      model: 'gpt-4o',
-      tools: [executeCodeTool],
+        Id = "analyze",
+        Name = "分析数据",
+        AgentId = "analyst",           // Preset Agent，工具已预配置
+        DependsOn = ["fetch"]
     },
+    new AgentNode
     {
-      id: 'writer',
-      name: 'Writer',
-      systemPrompt: 'You write polished reports based on analysis.',
-      model: 'claude-3-5-sonnet',
-      tools: [writeFileTool],
-    },
-  ],
-  tasks: [
-    {
-      id: 'research',
-      name: 'Research Phase',
-      agentId: 'researcher',
-      input: 'Research the latest trends in AI agents',
-    },
-    {
-      id: 'analyze',
-      name: 'Analysis Phase',
-      agentId: 'analyst',
-      input: 'Analyze the research results',
-      dependsOn: ['research'],  // 依赖研究完成
-    },
-    {
-      id: 'write',
-      name: 'Writing Phase',
-      agentId: 'writer',
-      input: 'Write a report based on the analysis',
-      dependsOn: ['analyze'],  // 依赖分析完成
-    },
-  ],
+        Id = "report",
+        Name = "生成报告",
+        AgentId = "writer",
+        DependsOn = ["analyze"]
+    }
 };
 
-// 运行
-const orchestrator = new OpenMultiAgent();
-const team = orchestrator.createTeam(config);
-const stream = orchestrator.runTeam(team);
-
-for await (const event of stream) {
-  console.log(`[${event.type}] ${event.agentId || ''} ${event.taskId || ''}`);
-}
-
-const result = await stream.result();
-console.log('Total cost:', result.totalUsage.totalCost);
+var orchestrator = new Orchestrator(team);
+var result = await orchestrator.RunTasksAsync(nodes);
 ```
 
-### 5.3 对话式多 Agent
+#### SubAgent 模式
 
-```typescript
-// 对话式协作：多个 Agent 轮流对话
-const discussionConfig: TeamConfig = {
-  name: 'Discussion',
-  strategy: 'sequential',
-  agents: [
-    { id: 'moderator', name: 'Moderator', model: 'gpt-4o', systemPrompt: '...' },
-    { id: 'expert-a', name: 'Expert A', model: 'claude-3-5-sonnet', systemPrompt: '...' },
-    { id: 'expert-b', name: 'Expert B', model: 'gpt-4o', systemPrompt: '...' },
-  ],
-  tasks: [
+```csharp
+var nodes = new DAGNode[]
+{
+    new FunctionNode
     {
-      id: 'round-1-a',
-      agentId: 'expert-a',
-      input: 'Share your perspective on: {{topic}}',
+        Id = "fetch",
+        Name = "获取数据",
+        Execute = async ctx => await FetchDataAsync()
     },
+    new AgentNode
     {
-      id: 'round-1-b',
-      agentId: 'expert-b',
-      input: 'Respond to Expert A\'s view: {{round-1-a.result}}',
-      dependsOn: ['round-1-a'],
-    },
-    {
-      id: 'round-2-a',
-      agentId: 'expert-a',
-      input: 'Consider Expert B\'s response and refine: {{round-1-b.result}}',
-      dependsOn: ['round-1-b'],
-    },
-    {
-      id: 'summary',
-      agentId: 'moderator',
-      input: 'Summarize the discussion: {{round-1-a.result}} {{round-1-b.result}} {{round-2-a.result}}',
-      dependsOn: ['round-2-a'],
-    },
-  ],
+        Id = "process",
+        Name = "处理数据",
+        AgentId = "general",           // SubAgent，工具由 LLM 动态分配
+        ToolNames = null,              // null = 动态分配
+        DependsOn = ["fetch"]
+    }
 };
+```
+
+#### 计划持久化
+
+```csharp
+// 创建计划
+var plan = orchestrator.CreatePlan(nodes);
+
+// 序列化（可保存到文件/数据库）
+var json = JsonSerializer.Serialize(plan);
+
+// 从计划恢复执行
+var savedPlan = JsonSerializer.Deserialize<DAGPlan>(json);
+var result = await orchestrator.RunFromPlanAsync(savedPlan);
 ```
 
 ---
@@ -1068,67 +1082,93 @@ const discussionConfig: TeamConfig = {
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                        OpenMultiAgent (入口)                           │
+│ L3: Orchestrator                                                        │
 │                                                                         │
-│  createTeam()  runTeam()  runAgent()                                   │
+│  Orchestrator(Team?)                                                    │
+│  ├── RunTeamAsync(goal)    → TaskPlanner → DAG → 执行                   │
+│  ├── RunTasksAsync(nodes)  → 直接执行                                   │
+│  ├── RunAgentAsync(config) → 单 Agent                                   │
+│  └── RunFromPlanAsync()    → 从持久化计划恢复                            │
+│                                                                         │
+│  OnPlanReady (审批)  │  OnTaskComplete (干预)  │  Cts (取消)            │
 └───────────────────────────────┬─────────────────────────────────────────┘
                                 │
                     ┌───────────▼───────────┐
-                    │  TeamExecutionEngine  │
-                    │                       │
-                    │  DagScheduler         │
-                    │  AgentPool            │
-                    │  MessageBus           │
-                    │  SharedMemory         │
+                    │     DAGScheduler      │
+                    │  拓扑排序 + 并行调度   │
                     └───────────┬───────────┘
                                 │
-                ┌───────────────┼───────────────┐
-                │               │               │
-        ┌───────▼──────┐ ┌─────▼──────┐ ┌──────▼──────┐
-        │    Agent A   │ │  Agent B   │ │  Agent C    │
-        │              │ │            │ │             │
-        │  AgentRunner │ │ AgentRunner│ │ AgentRunner │
-        │  ToolRegistry│ │ ToolRegistry│ │ ToolRegistry│
-        └───────┬──────┘ └─────┬──────┘ └──────┬──────┘
-                │               │               │
-                └───────────────┼───────────────┘
+         ┌──────────────────────┼──────────────────────┐
+         │                      │                      │
+   ┌─────▼─────┐         ┌─────▼─────┐         ┌─────▼─────┐
+   │FunctionNode│         │AgentNode  │         │AgentNode  │
+   │            │         │(Preset)   │         │(SubAgent) │
+   │ Func<T,R>  │         │ Agent     │         │ Agent     │
+   │            │         │ +固定工具  │         │ +动态工具  │
+   └────────────┘         └─────┬─────┘         └─────┬─────┘
+                                │                      │
+                    ┌───────────▼──────────────────────▼───┐
+                    │ Team                                  │
+                    │ ├── AgentConfig[] (Agent 池)          │
+                    │ ├── SharedMemory   (全局 KV 存储)     │
+                    │ ├── ArtifactStore  (数据契约)         │
+                    │ └── MessageBus     (Agent 间通信)     │
+                    └───────────────────────┬──────────────┘
                                 │
-                    ┌───────────▼───────────┐
-                    │      LlmClient       │
-                    │                       │
-                    │  stream() / complete()│
-                    │  ProviderAdapter      │
-                    └───────────┬───────────┘
+┌───────────────────────────────┼─────────────────────────────────────────┐
+│ L2: Agent 运行时                                                        │
+│                                                                         │
+│  Agent.RunAsync(input) → AgentStream                                    │
+│  ├── SystemPrompt                                                      │
+│  ├── ToolRegistry (IToolExecutor[])                                     │
+│  └── LlmClient                                                         │
+└───────────────────────────────┬─────────────────────────────────────────┘
                                 │
-                ┌───────────────┼───────────────┐
-                │               │               │
-        ┌───────▼──────┐ ┌─────▼──────┐ ┌──────▼──────┐
-        │   OpenAI     │ │ Anthropic  │ │  Custom     │
-        │  Compatible  │ │ Compatible │ │  Provider   │
-        └──────────────┘ └────────────┘ └─────────────┘
+┌───────────────────────────────┼─────────────────────────────────────────┐
+│ L1: LLM 抽象层                                                          │
+│                                                                         │
+│  ILlmClient                                                             │
+│  ├── Stream(request) → LlmStream (IAsyncEnumerable<StreamEvent>)        │
+│  ├── Complete(request) → LlmResponse                                    │
+│  └── IProviderAdapter (OpenAI / Anthropic / Custom)                     │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 七、与现有项目集成
+## 七、实现状态
 
-对于 PostgreSQL.Embedding (.NET) 项目，可以：
+| 层级 | 项目 | 状态 | 说明 |
+|------|------|------|------|
+| **L1: LLM 抽象层** | `InsightaAI.LLM` | ✅ 已实现 | ILlmClient, IProviderAdapter, StreamEvent |
+| **L2: Agent 运行时** | `InsightaAI.Agent` | ✅ 已实现 | Agent, ToolRegistry, IToolExecutor, MCP 集成 |
+| **L3: Orchestrator** | `InsightaAI.Orchestrator` | ❌ 待实现 | Team, DAGNode, DAGScheduler, SharedMemory |
+| **CLI** | `InsightaAI.Agent.Cli` | ✅ 已实现 | 终端交互界面，EventRenderer |
 
-1. **移植核心概念** - 将 TypeScript 设计转换为 C# 接口
-2. **利用现有基础设施** - 复用 Semantic Kernel、Polly 等
-3. **事件流使用 IAsyncEnumerable<T>** - C# 的异步迭代器
+### L3 待实现清单
 
-```csharp
-// C# 对应设计
-public interface ILlmClient
-{
-    IAsyncEnumerable<StreamEvent> StreamAsync(LlmRequest request, CancellationToken ct = default);
-    Task<Message> CompleteAsync(LlmRequest request, CancellationToken ct = default);
-}
-
-public interface IAgent
-{
-    IAsyncEnumerable<AgentEvent> RunAsync(string input, CancellationToken ct = default);
-    Task<AgentResult> ExecuteAsync(string input, CancellationToken ct = default);
-}
+```
+InsightaAI.Orchestrator/
+├── Core/
+│   ├── Orchestrator.cs           // 编排入口
+│   ├── Team.cs                   // Team 基础设施
+│   └── DAGScheduler.cs           // DAG 调度器
+├── Nodes/
+│   ├── DAGNode.cs                // 节点基类
+│   ├── FunctionNode.cs           // 函数节点
+│   └── AgentNode.cs              // Agent 节点
+├── Storage/
+│   ├── SharedMemory.cs           // 共享内存
+│   └── ArtifactStore.cs          // Artifact 存储
+├── Planning/
+│   ├── TaskPlanner.cs            // LLM 任务分解
+│   ├── DAGPlan.cs                // 计划 DTO
+│   └── Prompts/
+│       └── TaskPlanner.txt       // 规划 prompt
+├── HumanInTheLoop/
+│   ├── PlanApprovalContext.cs    // 计划审批
+│   └── TaskApprovalContext.cs    // 任务审批
+└── Results/
+    ├── TeamResult.cs             // Team 执行结果
+    └── NodeResult.cs             // 节点执行结果
 ```
