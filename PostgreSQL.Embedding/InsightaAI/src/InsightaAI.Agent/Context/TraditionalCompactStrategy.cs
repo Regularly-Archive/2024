@@ -2,6 +2,7 @@ using System.Text.Json;
 using InsightaAI.LLM;
 using InsightaAI.LLM.Abstractions;
 using InsightaAI.Agent.Abstractions;
+using InsightaAI.Agent.Prompts;
 using InsightaAI.LLM.Models;
 
 namespace InsightaAI.Agent.Context;
@@ -19,7 +20,7 @@ namespace InsightaAI.Agent.Context;
 public sealed class TraditionalCompactStrategy : ICompactStrategy
 {
     public string Name => "TraditionalCompact";
-    public int Priority => 2; // 低于 MicroCompact
+    public int Priority => 3; // 低于 MicroCompact(1) 和 SessionMemoryCompact(2)
 
     private readonly ILlmClient _llmClient;
     private readonly string _summaryModel;
@@ -182,37 +183,8 @@ public sealed class TraditionalCompactStrategy : ICompactStrategy
     /// </summary>
     private async Task<string> GenerateSummaryAsync(List<Message> messages, CancellationToken cancellationToken)
     {
-        // 构建摘要请求
-        var summaryPrompt = @"You are a conversation summarizer for an AI coding assistant.
-
-Summarize the following conversation, focusing on:
-1. **User Intent**: What was the user trying to accomplish?
-2. **Key Decisions**: Technical decisions made during the conversation
-3. **File Changes**: Files created, modified, or deleted (with paths)
-4. **Errors & Solutions**: Problems encountered and how they were resolved
-5. **Current State**: What task is in progress, what remains to be done
-
-Format your response as structured sections:
-
-## User Intent
-[What the user wants to achieve]
-
-## Key Decisions
-- [Decision 1]
-- [Decision 2]
-
-## File Changes
-- Created: [file paths]
-- Modified: [file paths]
-- Deleted: [file paths]
-
-## Errors & Solutions
-- [Error]: [Solution]
-
-## Current State
-[What's in progress, what's next]
-
-Keep the summary concise but preserve critical details like file paths, function names, and configuration values.";
+        // 从嵌入资源加载摘要提示词
+        var summaryPrompt = PromptLoader.Load("traditional-summary");
 
         // 构建消息列表（摘要提示 + 待摘要的消息）
         var summaryMessages = new List<Message>

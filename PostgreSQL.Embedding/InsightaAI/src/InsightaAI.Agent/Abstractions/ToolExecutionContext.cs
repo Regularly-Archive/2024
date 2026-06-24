@@ -1,3 +1,4 @@
+﻿using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
 
 namespace InsightaAI.Agent.Abstractions;
@@ -18,6 +19,9 @@ public sealed record ToolExecutionContext
 
     /// <summary>取消令牌</summary>
     public CancellationToken CancellationToken { get; init; }
+
+    /// <summary>LLM 客户端，ToolHook 可调用 LLM 生成内容</summary>
+    public ILlmClient? LlmClient { get; init; }
 }
 
 /// <summary>
@@ -29,7 +33,8 @@ public sealed record ToolResult
     private static readonly System.Text.Json.JsonSerializerOptions DefaultJsonOptions = new()
     {
         PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
     /// <summary>结果内容</summary>

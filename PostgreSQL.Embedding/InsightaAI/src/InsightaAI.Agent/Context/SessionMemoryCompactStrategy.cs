@@ -1,4 +1,5 @@
 using InsightaAI.Agent.Memory;
+using InsightaAI.Agent.Prompts;
 using InsightaAI.LLM.Models;
 
 namespace InsightaAI.Agent.Context;
@@ -179,7 +180,16 @@ public sealed class SessionMemoryCompactStrategy : ICompactStrategy
     private static string CreateBoundaryMarker(string sessionMemory, int preCompactTokens, int preCompactMessages)
     {
         return $"[Context compacted (Session Memory): {preCompactMessages} messages, ~{preCompactTokens:N0} tokens removed]\n\n" +
-               $"Session Memory Summary:\n{sessionMemory}";
+               $"Session Memory Summary:\n{sessionMemory}\n\n" +
+               BuildCompactionImportPrompt();
+    }
+
+    /// <summary>
+    /// 加载压缩后导入提示（Hermes Agent 风格）
+    /// </summary>
+    private static string BuildCompactionImportPrompt()
+    {
+        return PromptLoader.Load("compaction-import");
     }
 
     /// <summary>

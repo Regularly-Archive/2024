@@ -268,6 +268,7 @@ public class Agent
     /// 注意：此方法返回 void，明确表示不等待完成
     /// </summary>
     private void TriggerAgentRoundEndHooks(
+        HookContext hookContext,
         int round,
         List<Message> messages,
         Message? assistantMessage,
@@ -278,7 +279,7 @@ public class Agent
 
         // Fire-and-forget: 并行触发所有 hooks，不阻塞主流程
         var tasks = _agentHooks.Select(hook =>
-            hook.OnRoundEndAsync(round, messages, assistantMessage, cancellationToken));
+            hook.OnRoundEndAsync(hookContext, round, messages, assistantMessage, cancellationToken));
 
         _ = Task.WhenAll(tasks).ContinueWith(t =>
         {
@@ -374,6 +375,11 @@ public class Agent
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var conversationId = context?.ConversationId ?? Guid.NewGuid().ToString("N");
+        var hookContext = new HookContext
+        {
+            LlmClient = _llmClient,
+            SessionId = conversationId
+        };
         var messages = new List<Message>();
 
         // 构建系统提示词（包含可用 Skills 信息和记忆索引）
@@ -512,7 +518,7 @@ public class Agent
                 stopwatch.Stop();
 
                 // 触发 agent hooks（fire-and-forget，不阻塞）
-                TriggerAgentRoundEndHooks(round, messages, assistantMessage, cancellationToken);
+                TriggerAgentRoundEndHooks(hookContext, round, messages, assistantMessage, cancellationToken);
 
                 var result = new AgentResult
                 {
@@ -564,7 +570,7 @@ public class Agent
             }
 
             // 工具执行完成后，触发 agent hooks（fire-and-forget，不阻塞）
-            TriggerAgentRoundEndHooks(round, messages, assistantMessage, cancellationToken);
+            TriggerAgentRoundEndHooks(hookContext, round, messages, assistantMessage, cancellationToken);
         }
 
         // 超过最大轮次，尝试让 LLM 生成最终回复
@@ -798,7 +804,8 @@ public class Agent
             AgentId = _config.Id,
             ToolCallId = toolCall.Id,
             ConversationId = conversationId,
-            CancellationToken = cancellationToken
+            CancellationToken = cancellationToken,
+            LlmClient = _llmClient
         };
 
         // 检查钩子

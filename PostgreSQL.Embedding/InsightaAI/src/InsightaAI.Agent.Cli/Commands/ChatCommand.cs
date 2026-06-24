@@ -7,6 +7,7 @@ using InsightaAI.Agent.Context;
 using InsightaAI.Agent.Extensions;
 using InsightaAI.Agent.Hooks;
 using InsightaAI.Agent.Memory;
+using InsightaAI.Agent.MetaLearning;
 using InsightaAI.Agent.Models;
 using InsightaAI.Agent.Mcp;
 using InsightaAI.Agent.Mcp.Local;
@@ -95,7 +96,7 @@ public class ChatCommand
         if (session == null) return 1;
 
         // 创建 Agent（传入 sessionId 以注册会话记忆钩子）
-        var agent = CreateAgent(config, llmClient, toolRegistry, skillRegistry, mcpRegistry, session.SessionId);
+        var agent = await CreateAgentAsync(config, llmClient, toolRegistry, skillRegistry, mcpRegistry, session.SessionId);
 
         // 显示欢迎信息
         _renderer.ShowWelcome(config.Provider, config.Model, session.SessionId, toolRegistry.GetDefinitions().Length, availableSkills.Count);
@@ -270,7 +271,7 @@ public class ChatCommand
         return registry;
     }
 
-    private static Agent CreateAgent(CliConfig config, ILlmClient llmClient, ToolRegistry toolRegistry, SkillRegistry skillRegistry, McpRegistry? mcpRegistry = null, string? sessionId = null)
+    private static async Task<Agent> CreateAgentAsync(CliConfig config, ILlmClient llmClient, ToolRegistry toolRegistry, SkillRegistry skillRegistry, McpRegistry? mcpRegistry = null, string? sessionId = null)
     {
         // 生成或获取用户 ID
         var userId = GetOrCreateUserId();
@@ -285,8 +286,16 @@ public class ChatCommand
             UserId = userId
         };
 
+        // 创建会话记忆钩子（需先于 ContextManager，供 SessionMemoryCompactStrategy 使用）
+        SessionMemoryHook? sessionMemoryHook = null;
+        if (!string.IsNullOrEmpty(sessionId))
+        {
+            var memoryOptions = new SessionMemoryOptions { SummaryModel = config.Model };
+            sessionMemoryHook = new SessionMemoryHook(sessionId, userId, options: memoryOptions);
+        }
+
         // 创建上下文管理器
-        var contextManager = CreateContextManager(config, llmClient);
+        var contextManager = CreateContextManager(config, llmClient, sessionMemoryHook);
 
         // 创建记忆系统
         var memoryManager = CreateMemoryManager();
@@ -294,10 +303,14 @@ public class ChatCommand
         var agent = new Agent(agentConfig, llmClient, toolRegistry, skillRegistry, mcpRegistry, contextManager, memoryManager);
         agent.AddHook(new ToolPermissionHook("bash", "write_file", "read_file", "edit_file"));
 
+        // 注册元学习 Hook（自动捕获工具错误并记录教训）
+        var metaLearningStore = new MetaLearningStore();
+        await metaLearningStore.EnsureInitializedAsync();
+        agent.AddHook(new MetaLearningHook(metaLearningStore));
+
         // 注册会话记忆钩子（短期记忆）
-        if (!string.IsNullOrEmpty(sessionId))
+        if (sessionMemoryHook != null)
         {
-            var sessionMemoryHook = new SessionMemoryHook(sessionId, userId);
             agent.AddAgentHook(sessionMemoryHook);
         }
 
@@ -329,7 +342,7 @@ public class ChatCommand
         return userId;
     }
 
-    private static IContextManager? CreateContextManager(CliConfig config, ILlmClient llmClient)
+    private static IContextManager? CreateContextManager(CliConfig config, ILlmClient llmClient, SessionMemoryHook? sessionMemoryHook = null)
     {
         // 从配置或模型名称获取上下文窗口大小
         var contextWindowTokens = ModelContextWindows.GetContextWindowSize(config.Model);
@@ -341,11 +354,19 @@ public class ChatCommand
         };
 
         var tokenEstimator = new CharTokenEstimator();
-        var strategies = new ICompactStrategy[]
+        var strategies = new List<ICompactStrategy>
         {
-            new MicroCompactStrategy(),
-            new TraditionalCompactStrategy(llmClient, config.Model, config.SummaryModel)
+            new MicroCompactStrategy()
         };
+
+        // 注册会话记忆压缩策略（零 LLM 成本，优先级 2）
+        if (sessionMemoryHook != null)
+        {
+            strategies.Add(new SessionMemoryCompactStrategy(sessionMemoryHook));
+        }
+
+        // 传统 LLM 摘要压缩（兜底，优先级 3）
+        strategies.Add(new TraditionalCompactStrategy(llmClient, config.Model, config.SummaryModel));
 
         return new ContextManager(tokenEstimator, budget, strategies);
     }

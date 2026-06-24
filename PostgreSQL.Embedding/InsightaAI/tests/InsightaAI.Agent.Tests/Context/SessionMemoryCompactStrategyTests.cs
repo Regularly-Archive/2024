@@ -144,7 +144,7 @@ public class SessionMemoryCompactStrategyTests : IDisposable
         File.WriteAllText(Path.Combine(sessionDir, "session-memory.md"),
             "## Round 1\n- User asked about REST API\n- Decided to use FastAPI");
 
-        var messages = CreateMessagesWithRounds(5);
+        var messages = CreateMessagesWithRounds(15);
         var preCompactTokens = EstimateMessagesTokens(messages);
 
         try

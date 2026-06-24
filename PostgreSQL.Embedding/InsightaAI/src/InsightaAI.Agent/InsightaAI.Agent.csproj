@@ -22,6 +22,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="MetaLearning\SKILL.md" />
+    <EmbeddedResource Include="Prompts\*.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\InsightaAI.LLM\InsightaAI.LLM.csproj" />
   </ItemGroup>
 

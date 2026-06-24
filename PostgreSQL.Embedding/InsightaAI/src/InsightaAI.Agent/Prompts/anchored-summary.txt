@@ -1,0 +1,56 @@
+<conversation>
+{CONVERSATION}
+</conversation>
+
+CRITICAL: Respond with TEXT ONLY. Do NOT call any tools.
+Tool calls will be REJECTED and will waste your turn.
+
+Update the anchored summary below using the conversation history above.
+Preserve still-true details, remove stale details, and merge in the new facts.
+
+<previous-summary>
+{PREVIOUS_SUMMARY}
+</previous-summary>
+
+Before providing your final summary, wrap your analysis in <analysis> tags to organize your thoughts.
+Then output the final summary inside <summary> tags.
+
+<template>
+## Goal
+- [single-sentence task summary]
+
+## Constraints & Preferences
+- [user constraints, preferences, specs, or "(none)"]
+
+## Progress
+### Done
+- [completed work or "(none)"]
+
+### In Progress
+- [current work or "(none)"]
+
+### Blocked
+- [blockers or "(none)"]
+
+## Key Decisions
+- [decision and why, or "(none)"]
+
+## Next Steps
+- [ordered next actions or "(none)"]
+
+## Critical Context
+- [important technical facts, errors, open questions, or "(none)"]
+
+## Relevant Files
+- [file or directory path: why it matters, or "(none)"]
+</template>
+
+Rules:
+- Keep every section, even when empty.
+- Use terse bullets, not prose paragraphs.
+- Preserve exact file paths, commands, error strings, and identifiers when known.
+- Do not mention the summary process or that context was compacted.
+- Keep summary under 500 words.
+- Write in the same language as the conversation.
+
+REMINDER: Do NOT call any tools. Respond with plain text only.

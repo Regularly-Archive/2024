@@ -2,12 +2,38 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using InsightaAI.Agent.Hooks;
+using InsightaAI.Agent.Prompts;
+using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
 
 namespace InsightaAI.Agent.Memory;
 
 /// <summary>
-/// 会话记忆钩子 - 在每轮结束后异步提取短期记忆
+/// SessionMemoryHook 配置选项
+/// </summary>
+public sealed record SessionMemoryOptions
+{
+    /// <summary>是否启用 LLM 增强摘要</summary>
+    public bool EnableLlmSummary { get; init; } = true;
+
+    /// <summary>启用 LLM 摘要的最小轮次数</summary>
+    public int MinRoundsBeforeLlm { get; init; } = 3;
+
+    /// <summary>LLM 摘要的轮次间隔</summary>
+    public int SummaryInterval { get; init; } = 1;
+
+    /// <summary>摘要使用的模型</summary>
+    public string SummaryModel { get; init; } = "deepseek-v4-flash";
+
+    /// <summary>摘要最大 token 数</summary>
+    public int SummaryMaxTokens { get; init; } = 512;
+
+    /// <summary>摘要温度</summary>
+    public double SummaryTemperature { get; init; } = 0.3;
+}
+
+/// <summary>
+/// 会话记忆钩子 - 在每轮结束后提取短期记忆，支持 LLM 增强摘要
 ///
 /// 存储结构：
 /// ~/.insightai/memory/sessions/{sessionId}/
@@ -22,6 +48,14 @@ public sealed class SessionMemoryHook : IAgentHook
     private readonly string _sessionDir;
     private readonly SemaphoreSlim _lock = new(1, 1);
 
+    // LLM 增强配置
+    private readonly SessionMemoryOptions _options;
+
+    /// <summary>
+    /// Hook 唯一标识
+    /// </summary>
+    public string Id => "session-memory";
+
     /// <summary>
     /// 会话 ID
     /// </summary>
@@ -32,8 +66,29 @@ public sealed class SessionMemoryHook : IAgentHook
     /// </summary>
     public string SessionDirectory => _sessionDir;
 
-    public SessionMemoryHook(string sessionId, string userId, string? projectId = null)
+    /// <summary>
+    /// 创建 SessionMemoryHook 实例
+    /// </summary>
+    /// <param name="sessionId">会话 ID</param>
+    /// <param name="userId">用户 ID</param>
+    /// <param name="projectId">项目 ID（可选）</param>
+    /// <param name="options">配置选项（可选）</param>
+    public SessionMemoryHook(
+        string sessionId,
+        string userId,
+        string? projectId = null,
+        SessionMemoryOptions? options = null)
     {
+        ArgumentException.ThrowIfNullOrEmpty(sessionId);
+        ArgumentException.ThrowIfNullOrEmpty(userId);
+
+        _options = options ?? new SessionMemoryOptions();
+
+        if (_options.SummaryInterval < 1)
+            throw new ArgumentOutOfRangeException(nameof(options), "SummaryInterval must be >= 1");
+        if (_options.SummaryMaxTokens < 1)
+            throw new ArgumentOutOfRangeException(nameof(options), "SummaryMaxTokens must be >= 1");
+
         _sessionId = sessionId;
         _userId = userId;
         _projectId = projectId;
@@ -49,22 +104,22 @@ public sealed class SessionMemoryHook : IAgentHook
     /// <summary>
     /// 每轮结束后触发，异步提取记忆
     /// </summary>
-    /// <remarks>
-    /// 实际提取工作在后台执行，此方法立即返回 Task.CompletedTask。
-    /// 这样既满足接口契约，又不阻塞主流程。
-    /// </remarks>
     public Task OnRoundEndAsync(
+        HookContext context,
         int round,
         IReadOnlyList<Message> messages,
         Message? assistantMessage,
         CancellationToken cancellationToken = default)
     {
+        // 创建快照：后台任务可能在 Agent 主循环修改 messages 之后才执行
+        var messagesSnapshot = messages.ToList();
+
         // 在后台执行提取，不传递 cancellationToken（调用方可能已取消）
         _ = Task.Run(async () =>
         {
             try
             {
-                await ExtractAndSaveMemoryAsync(round, messages, assistantMessage, CancellationToken.None);
+                await ExtractAndSaveMemoryAsync(context, round, messagesSnapshot, assistantMessage, CancellationToken.None);
             }
             catch (Exception ex)
             {
@@ -104,18 +159,50 @@ public sealed class SessionMemoryHook : IAgentHook
     /// 提取并保存记忆
     /// </summary>
     private async Task ExtractAndSaveMemoryAsync(
+        HookContext context,
         int round,
         IReadOnlyList<Message> messages,
         Message? assistantMessage,
         CancellationToken cancellationToken)
     {
-        // 提取本轮的关键信息
-        var extractedInfo = ExtractRoundInfo(round, messages, assistantMessage);
+        // Step 0: 检查是否满足 LLM 摘要条件
+        if (_options.EnableLlmSummary
+            && round >= _options.MinRoundsBeforeLlm
+            && (round - _options.MinRoundsBeforeLlm) % _options.SummaryInterval == 0
+            && context.LlmClient != null)
+        {
+            // Step 1: 读取已有摘要
+            var existingSummary = await GetSessionMemoryAsync(cancellationToken);
 
-        if (string.IsNullOrWhiteSpace(extractedInfo))
+            // Step 2: 使用 LLM 锚定增量摘要（读取旧摘要 → 合并新事实 → 替换文件）
+            var mergedSummary = await GenerateLlmSummaryAsync(
+                context.LlmClient, existingSummary, messages, cancellationToken);
+
+            if (!string.IsNullOrWhiteSpace(mergedSummary))
+            {
+                // Step 3: 替换文件（不是追加）
+                await _lock.WaitAsync(cancellationToken);
+                try
+                {
+                    var memoryPath = Path.Combine(_sessionDir, "session-memory.md");
+                    await File.WriteAllTextAsync(memoryPath, mergedSummary, cancellationToken);
+                }
+                finally
+                {
+                    _lock.Release();
+                }
+                return;
+            }
+
+            // LLM 失败，降级到关键词提取
+            System.Diagnostics.Debug.WriteLine($"[SessionMemory] LLM summary empty, falling back to keyword extraction");
+        }
+
+        // 降级路径：关键词提取（追加模式）
+        var keywordSummary = ExtractRoundInfo(round, messages, assistantMessage);
+        if (string.IsNullOrWhiteSpace(keywordSummary))
             return;
 
-        // 追加到会话记忆文件
         await _lock.WaitAsync(cancellationToken);
         try
         {
@@ -130,7 +217,7 @@ public sealed class SessionMemoryHook : IAgentHook
             if (sb.Length > 0)
                 sb.AppendLine();
             sb.AppendLine($"## Round {round} ({DateTime.UtcNow:HH:mm:ss})");
-            sb.AppendLine(extractedInfo);
+            sb.AppendLine(keywordSummary);
 
             await File.WriteAllTextAsync(memoryPath, sb.ToString(), cancellationToken);
         }
@@ -141,7 +228,88 @@ public sealed class SessionMemoryHook : IAgentHook
     }
 
     /// <summary>
-    /// 提取本轮关键信息
+    /// 使用 LLM 生成锚定增量摘要（Anchored Summary）
+    ///
+    /// 流程：读取已有摘要 → 传入 previous-summary → LLM 合并新事实 → 返回完整摘要
+    /// </summary>
+    private async Task<string> GenerateLlmSummaryAsync(
+        ILlmClient llmClient,
+        string existingSummary,
+        IReadOnlyList<Message> messages,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            // 构建对话文本：最近几轮
+            var recentMessages = messages.TakeLast(10).ToList();
+            var conversationText = new StringBuilder();
+            foreach (var msg in recentMessages)
+            {
+                var role = msg.Role switch
+                {
+                    MessageRole.User => "User",
+                    MessageRole.Assistant => "Assistant",
+                    MessageRole.System => "System",
+                    _ => msg.Role.ToString()
+                };
+                var content = msg.GetTextContent();
+                if (!string.IsNullOrWhiteSpace(content))
+                {
+                    if (content.Length > 2000)
+                        content = content[..2000] + "...";
+                    conversationText.AppendLine($"{role}: {content}");
+                }
+            }
+
+            var promptTemplate = PromptLoader.Load("anchored-summary");
+            var previousSummary = string.IsNullOrEmpty(existingSummary) ? "(none)" : existingSummary;
+            var prompt = promptTemplate
+                .Replace("{CONVERSATION}", conversationText.ToString())
+                .Replace("{PREVIOUS_SUMMARY}", previousSummary);
+
+            var request = new LlmRequest
+            {
+                Model = _options.SummaryModel,
+                Messages = [Message.FromSystem(prompt)],
+                Tools = [],
+                ToolChoice = ToolChoiceMode.None,
+                MaxTokens = _options.SummaryMaxTokens,
+                Temperature = _options.SummaryTemperature
+            };
+
+            var response = await llmClient.CompleteAsync(request, cancellationToken);
+            var responseText = response?.GetTextContent();
+
+            return ExtractSummary(responseText ?? "");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[SessionMemory] LLM summary failed: {ex.Message}");
+            return "";
+        }
+    }
+
+    /// <summary>
+    /// 从 LLM 响应中提取 <summary> 标签内容
+    /// </summary>
+    private static string ExtractSummary(string response)
+    {
+        if (string.IsNullOrWhiteSpace(response))
+            return "";
+
+        // 尝试解析 <summary>...</summary> 标签
+        var match = Regex.Match(response, @"<summary>\s*(.*?)\s*</summary>", RegexOptions.Singleline);
+        if (match.Success)
+        {
+            return match.Groups[1].Value.Trim();
+        }
+
+        // 如果没有标签，返回整个响应（截断）
+        return response.Length > 1000 ? response[..1000] : response;
+    }
+
+    /// <summary>
+    /// 提取本轮关键信息（规则方式）
     /// </summary>
     private static string ExtractRoundInfo(
         int round,
