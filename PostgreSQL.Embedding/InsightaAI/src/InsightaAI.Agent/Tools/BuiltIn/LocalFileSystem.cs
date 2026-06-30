@@ -48,17 +48,31 @@ public class LocalFileSystem : IFileSystem
     {
         var fullPath = Path.GetFullPath(path);
 
-        // 确保目录存在
         var dir = Path.GetDirectoryName(fullPath);
-        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-        {
+        if (!string.IsNullOrEmpty(dir))
             Directory.CreateDirectory(dir);
-        }
 
-        // 原子写入：先写临时文件，再替换原文件
-        var tempPath = fullPath + ".tmp";
-        await File.WriteAllTextAsync(tempPath, content, cancellationToken);
-        File.Move(tempPath, fullPath, overwrite: true);
+        var tempPath = Path.Combine(dir ?? Path.GetTempPath(), Guid.NewGuid() + ".tmp");
+        try
+        {
+            for (var retry = 0; ; retry++)
+            {
+                try
+                {
+                    await File.WriteAllTextAsync(tempPath, content, cancellationToken);
+                    File.Move(tempPath, fullPath, overwrite: true);
+                    return;
+                }
+                catch (IOException) when (retry < 5)
+                {
+                    await Task.Delay(Random.Shared.Next(50, 200) * (retry + 1), cancellationToken);
+                }
+            }
+        }
+        finally
+        {
+            try { File.Delete(tempPath); } catch { }
+        }
     }
 
     public async Task AppendFileAsync(string path, string content, CancellationToken cancellationToken = default)
