@@ -85,6 +85,11 @@ public class EventRenderer : IDisposable
             case TextEndEvent textEnd:
                 await StopThinkingAsync();
                 break;
+            case ErrorEvent errorEvent:
+                AnsiConsole.MarkupLine($"[red]●[/] [dim][/]");
+                AnsiConsole.MarkupLine($"[red]⎿ {EscapeMarkup(errorEvent.Error.Message)}[/]");
+                break;
+
         }
     }
 
