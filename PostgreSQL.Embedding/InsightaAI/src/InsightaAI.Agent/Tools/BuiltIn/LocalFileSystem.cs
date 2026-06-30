@@ -1,5 +1,7 @@
-using System.Text.RegularExpressions;
 using InsightaAI.Agent.Abstractions;
+using Microsoft.Extensions.FileSystemGlobbing;
+using Microsoft.Extensions.FileSystemGlobbing.Abstractions;
+using System.Text.RegularExpressions;
 
 namespace InsightaAI.Agent.Tools.BuiltIn;
 
@@ -114,9 +116,17 @@ public class LocalFileSystem : IFileSystem
     {
         var searchPath = basePath != null ? Path.GetFullPath(basePath) : Directory.GetCurrentDirectory();
 
-        // 简单的 glob 实现
-        var files = Directory.GetFiles(searchPath, pattern, SearchOption.AllDirectories);
+        var matcher = new Matcher();
+        matcher.AddInclude(pattern);
+        matcher.AddIncludePatterns(new[] { "*.txt", "*.asciidoc", "*.md" });
 
+        var result = matcher.Execute(
+            new DirectoryInfoWrapper(new DirectoryInfo(searchPath))
+        );
+
+        if (!result.HasMatches) return Task.FromResult(Array.Empty<string>());
+
+        var files = result.Files.Select(x => x.Path).ToArray();
         return Task.FromResult(files);
     }
 
