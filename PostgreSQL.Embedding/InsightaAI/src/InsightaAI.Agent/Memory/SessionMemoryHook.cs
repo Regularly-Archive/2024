@@ -261,7 +261,7 @@ public sealed class SessionMemoryHook : IAgentHook
                 }
             }
 
-            var promptTemplate = PromptLoader.Load("anchored-summary");
+            var promptTemplate = PromptTemplate.Load("anchored-summary");
             var previousSummary = string.IsNullOrEmpty(existingSummary) ? "(none)" : existingSummary;
             var prompt = promptTemplate
                 .Replace("{CONVERSATION}", conversationText.ToString())

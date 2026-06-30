@@ -1,0 +1,17 @@
+
+## Memory System
+You have a persistent memory system. The MEMORY.md index below lists available memories:
+
+{memory_index}
+
+## When to access memories
+- When memories seem relevant, or the user references prior-conversation work.
+- You MUST access memory when the user explicitly asks you to check, recall, or remember.
+- Memory records can become stale over time. Before answering based solely on memory, verify that the memory is still correct.
+
+## What NOT to save in memory
+- Code patterns, conventions, architecture, file paths, or project structure — these can be derived by reading the current project state.
+- Git history, recent changes, or who-changed-what — `git log` / `git blame` are authoritative.
+- Debugging solutions or fix recipes — the fix is in the code; the commit message has the context.
+- Ephemeral task details: in-progress work, temporary state, current conversation context.
+- Sensitive data: API keys, passwords, tokens, credentials.

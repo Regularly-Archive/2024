@@ -60,7 +60,7 @@ public sealed class FileMemoryProvider : IMemoryProvider
             var privateIndex = await File.ReadAllTextAsync(privateIndexPath, cancellationToken);
             if (!string.IsNullOrWhiteSpace(privateIndex))
             {
-                sb.AppendLine("## Private Memories");
+                sb.AppendLine($"## Private Memories at '{privateIndex}'");
                 sb.AppendLine(privateIndex);
                 sb.AppendLine();
             }
@@ -75,7 +75,7 @@ public sealed class FileMemoryProvider : IMemoryProvider
                 var teamIndex = await File.ReadAllTextAsync(teamIndexPath, cancellationToken);
                 if (!string.IsNullOrWhiteSpace(teamIndex))
                 {
-                    sb.AppendLine("## Team Memories");
+                    sb.AppendLine($"## Team Memories at '{teamIndexPath}'");
                     sb.AppendLine(teamIndex);
                     sb.AppendLine();
                 }

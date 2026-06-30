@@ -189,7 +189,7 @@ public sealed class SessionMemoryCompactStrategy : ICompactStrategy
     /// </summary>
     private static string BuildCompactionImportPrompt()
     {
-        return PromptLoader.Load("compaction-import");
+        return PromptTemplate.Load("compaction-import");
     }
 
     /// <summary>

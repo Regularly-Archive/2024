@@ -13,6 +13,8 @@ using InsightaAI.LLM;
 using InsightaAI.LLM.Abstractions;
 using InsightaAI.Agent.Abstractions;
 using InsightaAI.LLM.Models;
+using System.ComponentModel.DataAnnotations;
+using InsightaAI.Agent.Prompts;
 
 namespace InsightaAI.Agent;
 
@@ -149,7 +151,7 @@ public class Agent
     /// <summary>
     /// 获取可用 Skills 信息（用于构建 SystemPrompt）
     /// </summary>
-    private async Task<string> GetAvailableSkillsInfoAsync(CancellationToken cancellationToken = default)
+    private async Task<string> GetAvailableSkillsAsync(CancellationToken cancellationToken = default)
     {
         if (_skillRegistry == null)
         {
@@ -162,26 +164,17 @@ public class Agent
             return "";
         }
 
-        var sb = new System.Text.StringBuilder();
-        sb.AppendLine("\n\n## Available Skills");
-        sb.AppendLine("You can activate the following skills when needed:");
-        sb.AppendLine();
-
-        foreach (var skill in skills)
+        var skillsList = string.Join("\n", skills.Select(s => $"- **{s.Name}**: {s.Description}"));
+        return await PromptTemplate.RenderAsync("available-skills", new Dictionary<string, string>
         {
-            sb.AppendLine($"- **{skill.Name}**: {skill.Description}");
-        }
-
-        sb.AppendLine("\nUse the `activate_skill` tool to activate a skill before using its guidance.");
-        sb.AppendLine("You can activate multiple skills if the task requires.");
-
-        return sb.ToString();
+            ["skills_list"] = skillsList
+        });
     }
 
     /// <summary>
     /// 获取可用 MCP 服务器信息（用于构建 SystemPrompt）
     /// </summary>
-    private async Task<string> GetAvailableMcpInfoAsync(CancellationToken cancellationToken = default)
+    private async Task<string> GetAvailableMcpServersAsync(CancellationToken cancellationToken = default)
     {
         if (_mcpRegistry == null)
         {
@@ -194,20 +187,11 @@ public class Agent
             return "";
         }
 
-        var sb = new System.Text.StringBuilder();
-        sb.AppendLine("\n\n## Available MCP Servers");
-        sb.AppendLine("You can use MCP (Model Context Protocol) tools from these servers:");
-        sb.AppendLine();
-
-        foreach (var server in servers)
+        var serversList = string.Join("\n", servers.Select(s => $"- **{s.Name}**: {s.Description}"));
+        return await PromptTemplate.RenderAsync("available-mcps", new Dictionary<string, string>
         {
-            sb.AppendLine($"- **{server.Name}**: {server.Description}");
-        }
-
-        sb.AppendLine("\nUse `list_mcp_tools` to see available tools, `activate_mcp_tool` to enable a tool.");
-        sb.AppendLine("Activated tools are named as `mcp__{server}__{tool}`.");
-
-        return sb.ToString();
+            ["mcp_servers_list"] = serversList
+        });
     }
 
     /// <summary>
@@ -222,39 +206,14 @@ public class Agent
 
         try
         {
-            var sb = new System.Text.StringBuilder();
-            sb.AppendLine("\n\n## Memory System");
-            sb.AppendLine("You have a persistent memory system. The MEMORY.md index below lists available memories:");
-            sb.AppendLine();
-
             // 获取 MEMORY.md 索引（按需加载，不加载全部内容）
             var memoryIndex = await _memoryManager.GetMemoryIndexAsync(
                 _config.UserId, null, cancellationToken);
 
-            if (!string.IsNullOrWhiteSpace(memoryIndex))
+            return await PromptTemplate.RenderAsync("available-memories", new Dictionary<string, string>
             {
-                sb.AppendLine(memoryIndex);
-            }
-            else
-            {
-                sb.AppendLine("_No memories stored yet._");
-            }
-
-            // 添加记忆使用指南
-            sb.AppendLine(@"
-## When to access memories
-- When memories seem relevant, or the user references prior-conversation work.
-- You MUST access memory when the user explicitly asks you to check, recall, or remember.
-- Memory records can become stale over time. Before answering based solely on memory, verify that the memory is still correct.
-
-## What NOT to save in memory
-- Code patterns, conventions, architecture, file paths, or project structure — these can be derived by reading the current project state.
-- Git history, recent changes, or who-changed-what — `git log` / `git blame` are authoritative.
-- Debugging solutions or fix recipes — the fix is in the code; the commit message has the context.
-- Ephemeral task details: in-progress work, temporary state, current conversation context.
-- Sensitive data: API keys, passwords, tokens, credentials.");
-
-            return sb.ToString();
+                ["memory_index"] = string.IsNullOrWhiteSpace(memoryIndex) ? "_No memories stored yet._" : memoryIndex
+            });
         }
         catch
         {
@@ -384,8 +343,8 @@ public class Agent
 
         // 构建系统提示词（包含可用 Skills 信息和记忆索引）
         var systemPrompt = _config.SystemPrompt ?? "";
-        systemPrompt += await GetAvailableSkillsInfoAsync(cancellationToken);
-        systemPrompt += await GetAvailableMcpInfoAsync(cancellationToken);
+        systemPrompt += await GetAvailableSkillsAsync(cancellationToken);
+        systemPrompt += await GetAvailableMcpServersAsync(cancellationToken);
 
         // 注入记忆索引（按需加载 MEMORY.md）
         if (_memoryManager != null && !string.IsNullOrEmpty(_config.UserId))
@@ -575,20 +534,29 @@ public class Agent
 
         // 超过最大轮次，尝试让 LLM 生成最终回复
         // 添加提示让 LLM 总结当前结果
-        messages.Add(Message.FromSystem(
-            "You have reached the maximum number of tool rounds. " +
+        var content = "You have reached the maximum number of tool rounds. " +
             "Please provide a final response to the user based on the information gathered so far. " +
             "Do not attempt to use any more tools." +
-            "Do not generate <tool_call></tool_call> block."
-        ));
+            "Do not generate <tool_call></tool_call> block.";
+        messages.Add(Message.FromToolResult(
+            toolCallId: Guid.NewGuid().ToString(),
+            toolName: "max_iter_reached",
+            content: [new TextBlock() { Text = content }]
+         ));
+        //messages.Add(Message.FromSystem(
+        //    "You have reached the maximum number of tool rounds. " +
+        //    "Please provide a final response to the user based on the information gathered so far. " +
+        //    "Do not attempt to use any more tools." +
+        //    "Do not generate <tool_call></tool_call> block."
+        //));
 
         // 最后一次调用 LLM 获取总结
         var finalRequest = new LlmRequest
         {
             Model = _config.Model,
             Messages = messages.ToArray(),
-            Tools = [],  // 不提供工具，强制生成文本
-            Temperature = _config.Temperature,
+            Tools = [],
+            Temperature = 0,
             MaxTokens = _config.MaxTokens,
             ToolChoice = ToolChoiceMode.None
         };

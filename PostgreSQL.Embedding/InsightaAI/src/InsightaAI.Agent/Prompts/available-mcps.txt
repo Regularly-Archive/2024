@@ -1,0 +1,8 @@
+
+## Available MCP Servers
+You can use MCP (Model Context Protocol) tools from these servers:
+
+{mcp_servers_list}
+
+Use `list_mcp_tools` to see available tools, `activate_mcp_tool` to enable a tool.
+Activated tools are named as `mcp__{{server}}__{{tool}}`.

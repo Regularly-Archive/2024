@@ -184,7 +184,7 @@ public sealed class TraditionalCompactStrategy : ICompactStrategy
     private async Task<string> GenerateSummaryAsync(List<Message> messages, CancellationToken cancellationToken)
     {
         // 从嵌入资源加载摘要提示词
-        var summaryPrompt = PromptLoader.Load("traditional-summary");
+        var summaryPrompt = PromptTemplate.Load("traditional-summary");
 
         // 构建消息列表（摘要提示 + 待摘要的消息）
         var summaryMessages = new List<Message>

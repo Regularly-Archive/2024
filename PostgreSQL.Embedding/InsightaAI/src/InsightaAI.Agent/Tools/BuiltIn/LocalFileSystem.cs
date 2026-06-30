@@ -55,7 +55,10 @@ public class LocalFileSystem : IFileSystem
             Directory.CreateDirectory(dir);
         }
 
-        await File.WriteAllTextAsync(fullPath, content, cancellationToken);
+        // 原子写入：先写临时文件，再替换原文件
+        var tempPath = fullPath + ".tmp";
+        await File.WriteAllTextAsync(tempPath, content, cancellationToken);
+        File.Move(tempPath, fullPath, overwrite: true);
     }
 
     public async Task AppendFileAsync(string path, string content, CancellationToken cancellationToken = default)
