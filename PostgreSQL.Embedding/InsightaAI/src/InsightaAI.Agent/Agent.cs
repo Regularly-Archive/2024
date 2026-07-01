@@ -34,7 +34,7 @@ public class Agent
     private readonly McpRegistry? _mcpRegistry;
     private readonly IContextManager? _contextManager;
     private readonly IMemoryManager? _memoryManager;
-    private readonly List<IToolHook> _hooks = [];
+    private readonly List<IToolHook> _toolHooks = [];
     private readonly List<IAgentHook> _agentHooks = [];
     private readonly HashSet<string> _alwaysAllowedTools = [];
     private string _skillInstructions = "";
@@ -93,7 +93,7 @@ public class Agent
     public Agent AddHook(IToolHook hook)
     {
         ArgumentNullException.ThrowIfNull(hook);
-        _hooks.Add(hook);
+        _toolHooks.Add(hook);
         return this;
     }
 
@@ -295,7 +295,7 @@ public class Agent
             return true;
         }
 
-        foreach (var hook in _hooks)
+        foreach (var hook in _toolHooks)
         {
             // 检查钩子是否适用于该工具
             if (hook.TargetTools != null && !hook.TargetTools.Contains(toolName))

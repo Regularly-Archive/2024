@@ -69,8 +69,8 @@ public class FileReadTool : IToolExecutor
                     "Optional: {\"offset\": number, \"limit\": number}");
             }
 
-            var offset = GetIntValue(args, "offset");
-            var limit = GetIntValue(args, "limit");
+            var offset = GetIntValue(args, "offset", 0);
+            var limit = GetIntValue(args, "limit", 120);
 
             // 检查文件是否存在
             if (!await _fileSystem.ExistsAsync(filePath, context.CancellationToken))
@@ -82,50 +82,22 @@ public class FileReadTool : IToolExecutor
             var fileInfo = new FileInfo(Path.GetFullPath(filePath));
             var lastModified = fileInfo.LastWriteTimeUtc;
 
-            // 读取文件
-            if (offset.HasValue || limit.HasValue)
-            {
-                // 按行读取
-                var result = await _fileSystem.ReadFileLinesAsync(
-                    filePath,
-                    offset,
-                    limit,
-                    context.CancellationToken);
+            // 按行读取
+            var result = await _fileSystem.ReadFileLinesAsync(
+                filePath,
+                offset,
+                limit,
+                context.CancellationToken);
 
-                // 读取完整内容用于状态跟踪（edit_file 需要）
-                var fullContent = await _fileSystem.ReadFileAsync(filePath, context.CancellationToken);
-                _readState.RecordRead(filePath, fullContent, lastModified);
+            // 读取完整内容用于状态跟踪（edit_file 需要）
+            var fullContent = await _fileSystem.ReadFileAsync(filePath, context.CancellationToken);
+            _readState.RecordRead(filePath, fullContent, lastModified);
 
-                var content = AddLineNumbers(result.Content, result.StartLine);
-                return ToolResult.FromText(
-                    $"File: {result.Path}\n" +
-                    $"Lines: {result.StartLine}-{result.StartLine + result.LineCount} of {result.TotalLines}\n" +
-                    $"---\n{content}");
-            }
-            else
-            {
-                // 全文读取
-                var content = await _fileSystem.ReadFileAsync(filePath, context.CancellationToken);
-
-                // 记录读取状态
-                _readState.RecordRead(filePath, content, lastModified);
-
-                // 检查文件大小限制（默认 100KB）
-                if (content.Length > 100_000)
-                {
-                    return ToolResult.FromText(
-                        $"File is too large ({content.Length} characters). " +
-                        "Please use offset and limit parameters to read specific portions of the file.\n" +
-                        $"Total lines: {content.Split('\n').Length}");
-                }
-
-                var lines = content.Split('\n');
-                var numberedContent = AddLineNumbers(content, 0);
-                return ToolResult.FromText(
-                    $"File: {filePath}\n" +
-                    $"Lines: 0-{lines.Length} of {lines.Length}\n" +
-                    $"---\n{numberedContent}");
-            }
+            var content = AddLineNumbers(result.Content, result.StartLine);
+            return ToolResult.FromText(
+                $"File: {result.Path}\n" +
+                $"Lines: {result.StartLine}-{result.StartLine + result.LineCount} of {result.TotalLines}\n" +
+                $"---\n{content}");
         }
         catch (Exception ex)
         {
@@ -142,20 +114,18 @@ public class FileReadTool : IToolExecutor
         {
             sb.AppendLine($"{startLine + i,6}\t{lines[i]}");
         }
-
         return sb.ToString();
     }
 
-    private static string? GetStringValue(IDictionary<string, object> args, string key)
+    private static string? GetStringValue(IDictionary<string, object> args, string key, string? defaultValue = null)
     {
         if (args.TryGetValue(key, out var value))
         {
             return value?.ToString();
         }
-        return null;
+        return defaultValue;
     }
-
-    private static int? GetIntValue(IDictionary<string, object> args, string key)
+    private static int? GetIntValue(IDictionary<string, object> args, string key, int? defaultValue = null)
     {
         if (args.TryGetValue(key, out var value) && value != null)
         {
@@ -171,6 +141,6 @@ public class FileReadTool : IToolExecutor
                 return parsedValue;
             }
         }
-        return null;
+        return defaultValue;
     }
 }
