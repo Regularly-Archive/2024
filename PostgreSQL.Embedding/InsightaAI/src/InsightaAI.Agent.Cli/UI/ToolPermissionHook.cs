@@ -1,7 +1,6 @@
+using InsightaAI.Agent.Abstractions;
 using InsightaAI.Agent.Cli.Extensions;
 using InsightaAI.Agent.Hooks;
-using InsightaAI.Agent.Abstractions;
-using InsightaAI.LLM.Models;
 using Spectre.Console;
 
 namespace InsightaAI.Agent.Cli.UI;
