@@ -1,6 +1,7 @@
 using InsightaAI.Agent.Abstractions;
 using Microsoft.Extensions.FileSystemGlobbing;
 using Microsoft.Extensions.FileSystemGlobbing.Abstractions;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace InsightaAI.Agent.Tools.BuiltIn;
@@ -13,7 +14,8 @@ public class LocalFileSystem : IFileSystem
     public async Task<string> ReadFileAsync(string path, CancellationToken cancellationToken = default)
     {
         var fullPath = Path.GetFullPath(path);
-        return await File.ReadAllTextAsync(fullPath, cancellationToken);
+        var encoding = DetectEncoding(fullPath);
+        return await File.ReadAllTextAsync(fullPath, encoding, cancellationToken);
     }
 
     public async Task<FileContent> ReadFileLinesAsync(
@@ -46,7 +48,7 @@ public class LocalFileSystem : IFileSystem
         };
     }
 
-    public async Task WriteFileAsync(string path, string content, CancellationToken cancellationToken = default)
+    public async Task WriteFileAsync(string path, string content, Encoding encoding, CancellationToken cancellationToken = default)
     {
         var fullPath = Path.GetFullPath(path);
 
@@ -61,7 +63,7 @@ public class LocalFileSystem : IFileSystem
             {
                 try
                 {
-                    await File.WriteAllTextAsync(tempPath, content, cancellationToken);
+                    await File.WriteAllTextAsync(tempPath, content, encoding, cancellationToken);
                     File.Move(tempPath, fullPath, overwrite: true);
                     return;
                 }
@@ -80,6 +82,7 @@ public class LocalFileSystem : IFileSystem
     public async Task AppendFileAsync(string path, string content, CancellationToken cancellationToken = default)
     {
         var fullPath = Path.GetFullPath(path);
+        var encoding = DetectEncoding(fullPath);
 
         // 确保目录存在
         var dir = Path.GetDirectoryName(fullPath);
@@ -88,7 +91,7 @@ public class LocalFileSystem : IFileSystem
             Directory.CreateDirectory(dir);
         }
 
-        await File.AppendAllTextAsync(fullPath, content, cancellationToken);
+        await File.AppendAllTextAsync(fullPath, content, encoding, cancellationToken);
     }
 
     public Task<bool> ExistsAsync(string path, CancellationToken cancellationToken = default)
@@ -342,5 +345,12 @@ public class LocalFileSystem : IFileSystem
             .Replace("\\?", "[^/]") + "$";
 
         return Regex.IsMatch(text, regexPattern, RegexOptions.IgnoreCase);
+    }
+
+    public Encoding DetectEncoding(string filePath)
+    {
+        using var reader = new StreamReader(filePath, Encoding.Default, detectEncodingFromByteOrderMarks: true);
+        reader.Read();
+        return reader.CurrentEncoding;
     }
 }

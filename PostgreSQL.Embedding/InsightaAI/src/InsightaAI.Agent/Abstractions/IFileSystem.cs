@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace InsightaAI.Agent.Abstractions;
 
 /// <summary>
@@ -26,7 +28,7 @@ public interface IFileSystem
     /// <summary>
     /// 写入文件（覆盖）
     /// </summary>
-    Task WriteFileAsync(string path, string content, CancellationToken cancellationToken = default);
+    Task WriteFileAsync(string path, string content, Encoding encoding, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 追加写入文件
@@ -52,6 +54,11 @@ public interface IFileSystem
     /// 搜索文件内容
     /// </summary>
     Task<GrepResult> GrepAsync(string pattern, string path, GrepOptions? options = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 检测文件编码（基于 BOM 和内容分析）
+    /// </summary>
+    Encoding DetectEncoding(string filePath);
 }
 
 /// <summary>

@@ -45,7 +45,7 @@ public class FileReadTool : IToolExecutor
                     limit = new
                     {
                         type = "integer",
-                        description = "要读取的行数。不指定则读取从 offset 到文件末尾的所有内容。"
+                        description = "要读取的行数。不指定则默认读取 120 行。"
                     }
                 },
                 required = new[] { "file_path" }

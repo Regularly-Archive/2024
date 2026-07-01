@@ -1,7 +1,8 @@
-using System.Text.Json;
-using InsightaAI.Agent.Models;
 using InsightaAI.Agent.Abstractions;
+using InsightaAI.Agent.Models;
 using InsightaAI.LLM.Models;
+using System.Text;
+using System.Text.Json;
 
 namespace InsightaAI.Agent.Tools.BuiltIn;
 
@@ -131,13 +132,19 @@ public class FileEditTool : IToolExecutor
             }
 
             // 5. 使用缓存的内容进行编辑（保证原子性）
-            var content = readInfo.Content;
+            var normalizedContent = NormalizeLineEndings(readInfo.Content);
+            var normalizedOldString = NormalizeLineEndings(oldString);
+            var normalizedNewString = NormalizeLineEndings(newString);
+
+            var originalEncoding = _fileSystem.DetectEncoding(filePath);
+            var originalLineEndingStyle = DetectLineEndingStyle(readInfo.Content);
+            var originalLineEnding = ResolveOutputLineEnding(originalLineEndingStyle);
 
             // 6. 执行替换
             if (replaceAll == true)
             {
                 // 替换所有匹配
-                var count = CountOccurrences(content, oldString);
+                var count = CountOccurrences(normalizedContent, normalizedOldString);
                 if (count == 0)
                 {
                     return ToolResult.FromError(
@@ -145,14 +152,15 @@ public class FileEditTool : IToolExecutor
                         "Make sure the string matches exactly, including whitespace and indentation.");
                 }
 
-                content = content.Replace(oldString, newString);
+                var newContent = normalizedContent.Replace(normalizedOldString, normalizedNewString);
+                newContent = ApplyLineEnding(newContent, originalLineEnding);
 
                 // 写入文件
-                await _fileSystem.WriteFileAsync(filePath, content, context.CancellationToken);
+                await _fileSystem.WriteFileAsync(filePath, newContent, originalEncoding, context.CancellationToken);
 
                 // 更新读取状态
                 var newFileInfo = new FileInfo(Path.GetFullPath(filePath));
-                _readState.RecordRead(filePath, content, newFileInfo.LastWriteTimeUtc);
+                _readState.RecordRead(filePath, newContent, newFileInfo.LastWriteTimeUtc);
 
                 return ToolResult.FromText(
                     $"The file '{filePath}' has been updated successfully. " +
@@ -161,7 +169,7 @@ public class FileEditTool : IToolExecutor
             else
             {
                 // 替换第一个匹配
-                var index = content.IndexOf(oldString, StringComparison.Ordinal);
+                var index = normalizedContent.IndexOf(normalizedOldString, StringComparison.Ordinal);
                 if (index == -1)
                 {
                     return ToolResult.FromError(
@@ -171,7 +179,7 @@ public class FileEditTool : IToolExecutor
                 }
 
                 // 检查是否有多个匹配
-                var secondIndex = content.IndexOf(oldString, index + oldString.Length, StringComparison.Ordinal);
+                var secondIndex = normalizedContent.IndexOf(normalizedOldString, index + normalizedOldString.Length, StringComparison.Ordinal);
                 if (secondIndex != -1)
                 {
                     return ToolResult.FromError(
@@ -180,14 +188,15 @@ public class FileEditTool : IToolExecutor
                 }
 
                 // 执行替换
-                content = content.Remove(index, oldString.Length).Insert(index, newString);
+                var newContent = normalizedContent.Remove(index, normalizedOldString.Length).Insert(index, normalizedNewString);
+                newContent = ApplyLineEnding(newContent, originalLineEnding);
 
                 // 写入文件
-                await _fileSystem.WriteFileAsync(filePath, content, context.CancellationToken);
+                await _fileSystem.WriteFileAsync(filePath, newContent, originalEncoding, context.CancellationToken);
 
                 // 更新读取状态
                 var newFileInfo = new FileInfo(Path.GetFullPath(filePath));
-                _readState.RecordRead(filePath, content, newFileInfo.LastWriteTimeUtc);
+                _readState.RecordRead(filePath, newContent, newFileInfo.LastWriteTimeUtc);
 
                 return ToolResult.FromText(
                     $"The file '{filePath}' has been updated successfully.");
@@ -241,4 +250,46 @@ public class FileEditTool : IToolExecutor
         }
         return null;
     }
+
+    private static string NormalizeLineEndings(string text)
+    {
+        return text.Replace("\r\n", "\n").Replace("\r", "\n");
+    }
+
+    private static string ApplyLineEnding(string text, string lineEnding)
+    {
+        return text.Replace("\n", lineEnding);
+    }
+
+    private enum LineEndingStyle { CRLF, LF, Mixed, Unknown }
+
+    private static LineEndingStyle DetectLineEndingStyle(string text)
+    {
+        bool hasCrlf = text.Contains("\r\n");
+        bool hasLf = text.Replace("\r\n", "").Contains('\n');
+
+        if (!hasCrlf && !hasLf)
+        {
+            hasLf = text.Contains('\n');
+            if (!hasLf && text.Contains('\r'))
+                return LineEndingStyle.Mixed;
+        }
+
+        if (hasCrlf && hasLf) return LineEndingStyle.Mixed;
+        if (hasCrlf) return LineEndingStyle.CRLF;
+        if (hasLf) return LineEndingStyle.LF;
+        return LineEndingStyle.Unknown;
+    }
+
+    private static string ResolveOutputLineEnding(LineEndingStyle original)
+    {
+        return original switch
+        {
+            LineEndingStyle.CRLF => "\r\n",
+            LineEndingStyle.LF => "\n",
+            LineEndingStyle.Mixed => Environment.NewLine,
+            _ => Environment.NewLine
+        };
+    }
+
 }

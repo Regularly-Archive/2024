@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using InsightaAI.Agent.Abstractions;
 using InsightaAI.LLM.Models;
@@ -93,7 +94,7 @@ public class FileWriteTool : IToolExecutor
             }
             else
             {
-                await _fileSystem.WriteFileAsync(filePath, content, context.CancellationToken);
+                await _fileSystem.WriteFileAsync(filePath, content, Encoding.UTF8, context.CancellationToken);
                 return ToolResult.FromText($"File written successfully: {filePath}");
             }
         }
