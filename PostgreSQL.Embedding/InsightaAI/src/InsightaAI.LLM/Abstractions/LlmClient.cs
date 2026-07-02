@@ -10,7 +10,7 @@ public interface ILlmClient : IDisposable
     /// <summary>
     /// 发起流式请求
     /// </summary>
-    LlmStream Stream(LlmRequest request);
+    LlmStream Streaming(LlmRequest request);
 
     /// <summary>
     /// 发起非流式请求 (内部可能使用流式)

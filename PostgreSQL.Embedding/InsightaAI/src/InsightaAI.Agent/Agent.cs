@@ -1,20 +1,19 @@
-using System.Diagnostics;
-using System.Runtime.CompilerServices;
-using System.Text.Json;
-using System.Threading.Channels;
+using InsightaAI.Agent.Abstractions;
 using InsightaAI.Agent.Context;
 using InsightaAI.Agent.Hooks;
 using InsightaAI.Agent.Mcp;
 using InsightaAI.Agent.Memory;
 using InsightaAI.Agent.Models;
-using InsightaAI.Agent.Skills;
-using InsightaAI.Agent.Tools.BuiltIn;
-using InsightaAI.LLM;
-using InsightaAI.LLM.Abstractions;
-using InsightaAI.Agent.Abstractions;
-using InsightaAI.LLM.Models;
-using System.ComponentModel.DataAnnotations;
 using InsightaAI.Agent.Prompts;
+using InsightaAI.Agent.Skills;
+using InsightaAI.Agent.Tools;
+using InsightaAI.Agent.Tools.BuiltIn;
+using InsightaAI.LLM.Abstractions;
+using InsightaAI.LLM.Models;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
+using System.Threading.Channels;
 
 namespace InsightaAI.Agent;
 
@@ -38,6 +37,7 @@ public class Agent
     private readonly List<IAgentHook> _agentHooks = [];
     private readonly HashSet<string> _alwaysAllowedTools = [];
     private string _skillInstructions = "";
+    private readonly TokenUsage _totalUsage;
 
     /// <summary>
     /// 创建 Agent 实例
@@ -80,6 +80,9 @@ public class Agent
         {
             MemoryTools.RegisterAll(_toolRegistry, _memoryManager, _config.UserId);
         }
+
+        _totalUsage = _config.Metadata != null && _config.Metadata!.TryGetValue("token_usage", out var totalUsage) ?
+            (TokenUsage)totalUsage : new TokenUsage();
     }
 
     /// <summary>
@@ -262,6 +265,7 @@ public class Agent
     /// 触发 agent 级别的会话结束钩子
     /// </summary>
     private async Task TriggerAgentSessionEndHooksAsync(
+        HookContext context,
         List<Message> messages,
         CancellationToken cancellationToken)
     {
@@ -272,9 +276,9 @@ public class Agent
         {
             try
             {
-                await hook.OnSessionEndAsync(messages, cancellationToken);
+                await hook.OnSessionEndAsync(context, messages, cancellationToken);
             }
-            catch
+            catch (Exception e)
             {
                 // 忽略 hook 执行错误
             }
@@ -284,7 +288,7 @@ public class Agent
     /// <summary>
     /// 执行钩子检查
     /// </summary>
-    private async Task<bool> CheckHooksAsync(
+    private async Task<bool> CheckToolPermissionAsync(
         string toolName,
         string arguments,
         ToolExecutionContext context)
@@ -339,6 +343,13 @@ public class Agent
             LlmClient = _llmClient,
             SessionId = conversationId
         };
+
+        var toolExecutor = new ToolExecutor(_config.Id, conversationId, async (request, ct)  =>
+        {
+            var (allowd, result) = await ExecuteSingleToolAsync(request.ToolCall, request.Arguments, request.SessionId, ct);
+            return new ToolCallReponse(allowd, result);
+        });
+
         var messages = new List<Message>();
 
         // 构建系统提示词（包含可用 Skills 信息和记忆索引）
@@ -420,8 +431,7 @@ public class Agent
             if (!string.IsNullOrEmpty(_skillInstructions) && requestMessages.Length > 0 && requestMessages[0].Role == MessageRole.System)
             {
                 // 更新系统消息，追加 Skill Instructions
-                var updatedSystemMessage = Message.FromSystem(
-                    requestMessages[0].GetTextContent() + _skillInstructions);
+                var updatedSystemMessage = Message.FromSystem(requestMessages[0].GetTextContent() + _skillInstructions);
                 requestMessages = [updatedSystemMessage, .. requestMessages[1..]];
             }
 
@@ -436,7 +446,7 @@ public class Agent
 
             // 调用 LLM 并转发流事件
             LlmResponse? response = null;
-            var llmStream = _llmClient.Stream(request);
+            var llmStream = _llmClient.Streaming(request);
 
             await foreach (var streamEvent in llmStream.WithCancellation(cancellationToken))
             {
@@ -501,6 +511,8 @@ public class Agent
                     Result = result
                 };
 
+                await TriggerAgentSessionEndHooksAsync(hookContext, messages, cancellationToken);
+
                 yield break;
             }
 
@@ -515,14 +527,14 @@ public class Agent
             // 执行工具
             if (_config.ParallelToolExecution && toolCalls.Length > 1)
             {
-                await foreach (var evt in ExecuteToolsParallelAsync(toolCalls, conversationId, messages, cancellationToken))
+                await foreach (var evt in toolExecutor.ExecuteToolsParallelAsync(toolCalls,messages, cancellationToken))
                 {
                     yield return evt;
                 }
             }
             else
             {
-                await foreach (var evt in ExecuteToolsSequentialAsync(toolCalls, conversationId, messages, cancellationToken))
+                await foreach (var evt in toolExecutor.ExecuteToolsSequentialAsync(toolCalls, messages, cancellationToken))
                 {
                     yield return evt;
                 }
@@ -561,7 +573,7 @@ public class Agent
             ToolChoice = ToolChoiceMode.None
         };
 
-        var finalStream = _llmClient.Stream(finalRequest);
+        var finalStream = _llmClient.Streaming(finalRequest);
         await foreach (var streamEvent in finalStream.WithCancellation(cancellationToken))
         {
             yield return new AgentLlmStreamEvent
@@ -604,6 +616,8 @@ public class Agent
                 DurationMs = stopwatch.ElapsedMilliseconds
             }
         };
+
+        await TriggerAgentSessionEndHooksAsync(hookContext, messages, cancellationToken);
     }
 
     /// <summary>
@@ -638,127 +652,6 @@ public class Agent
     }
 
     /// <summary>
-    /// 并行执行多个工具调用
-    /// </summary>
-    private async IAsyncEnumerable<AgentEvent> ExecuteToolsParallelAsync(
-        ToolCallBlock[] toolCalls,
-        string conversationId,
-        List<Message> messages,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
-    {
-        var toolEvents = Channel.CreateUnbounded<AgentEvent>();
-        var toolResults = new List<(ToolCallBlock ToolCall, ToolResult Result)>();
-        var toolResultsLock = new object();
-
-        var tasks = toolCalls.Select(async toolCall =>
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var arguments = toolCall.Arguments.GetRawText();
-
-            // 发送工具开始事件
-            await toolEvents.Writer.WriteAsync(new AgentToolStartEvent
-            {
-                AgentId = _config.Id,
-                ToolCallId = toolCall.Id,
-                ToolName = toolCall.Name,
-                Arguments = arguments
-            }, cancellationToken);
-
-            var (allowed, toolResult) = await ExecuteSingleToolAsync(toolCall, arguments, conversationId, cancellationToken);
-
-            // 发送工具完成事件
-            var resultText = toolResult.Content.OfType<TextBlock>().FirstOrDefault()?.Text;
-            await toolEvents.Writer.WriteAsync(new AgentToolEndEvent
-            {
-                AgentId = _config.Id,
-                ToolCallId = toolCall.Id,
-                ToolName = toolCall.Name,
-                IsError = toolResult.IsError,
-                ResultPreview = resultText?.Length > 100 ? resultText[..100] + "..." : resultText
-            }, cancellationToken);
-
-            // 收集结果
-            lock (toolResultsLock)
-            {
-                toolResults.Add((toolCall, toolResult));
-            }
-        }).ToArray();
-
-        // 关闭 channel 当所有任务完成时
-        _ = Task.WhenAll(tasks).ContinueWith(_ => toolEvents.Writer.Complete());
-
-        // 转发事件
-        await foreach (var evt in toolEvents.Reader.ReadAllAsync(cancellationToken))
-        {
-            yield return evt;
-        }
-
-        // 等待所有任务完成
-        await Task.WhenAll(tasks);
-
-        // 按原始顺序添加工具结果到对话历史
-        foreach (var (toolCall, toolResult) in toolResults)
-        {
-            messages.Add(new Message
-            {
-                Role = MessageRole.ToolResult,
-                ToolCallId = toolCall.Id,
-                ToolName = toolCall.Name,
-                Content = toolResult.Content
-            });
-        }
-    }
-
-    /// <summary>
-    /// 顺序执行工具调用
-    /// </summary>
-    private async IAsyncEnumerable<AgentEvent> ExecuteToolsSequentialAsync(
-        ToolCallBlock[] toolCalls,
-        string conversationId,
-        List<Message> messages,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
-    {
-        foreach (var toolCall in toolCalls)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var arguments = toolCall.Arguments.GetRawText();
-
-            // 发送工具开始事件
-            yield return new AgentToolStartEvent
-            {
-                AgentId = _config.Id,
-                ToolCallId = toolCall.Id,
-                ToolName = toolCall.Name,
-                Arguments = arguments
-            };
-
-            var (allowed, toolResult) = await ExecuteSingleToolAsync(toolCall, arguments, conversationId, cancellationToken);
-
-            // 发送工具完成事件
-            var resultText = toolResult.Content.OfType<TextBlock>().FirstOrDefault()?.Text;
-            yield return new AgentToolEndEvent
-            {
-                AgentId = _config.Id,
-                ToolCallId = toolCall.Id,
-                ToolName = toolCall.Name,
-                IsError = toolResult.IsError,
-                ResultPreview = resultText?.Length > 100 ? resultText[..100] + "..." : resultText
-            };
-
-            // 将工具结果加入对话历史
-            messages.Add(new Message
-            {
-                Role = MessageRole.ToolResult,
-                ToolCallId = toolCall.Id,
-                ToolName = toolCall.Name,
-                Content = toolResult.Content
-            });
-        }
-    }
-
-    /// <summary>
     /// 执行单个工具（含钩子检查）
     /// </summary>
     private async Task<(bool Allowed, ToolResult Result)> ExecuteSingleToolAsync(
@@ -777,7 +670,7 @@ public class Agent
         };
 
         // 检查钩子
-        var allowed = await CheckHooksAsync(toolCall.Name, arguments, toolContext);
+        var allowed = await CheckToolPermissionAsync(toolCall.Name, arguments, toolContext);
 
         ToolResult toolResult;
         if (allowed)

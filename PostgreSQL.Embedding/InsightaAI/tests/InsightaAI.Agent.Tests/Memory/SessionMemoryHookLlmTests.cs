@@ -41,7 +41,7 @@ public class SessionMemoryHookLlmTests : IDisposable
         // minRoundsBeforeLlm=3, summaryInterval=1 → 触发于 round 3, 4, 5, ...
         var sessionId = $"trigger-test-{Guid.NewGuid():N}";
         var hook = new SessionMemoryHook(sessionId, TestUserId,
-            options: new SessionMemoryOptions { EnableLlmSummary = true, MinRoundsBeforeLlm = 3, SummaryInterval = 1 });
+            options: new SessionMemoryOptions { EnableLlmSummary = true, MinRoundsBeforeLlm = 3, SummaryInterval = TimeSpan.FromMinutes(5) });
 
         var llmClient = new MockLlmClient(response: "<summary>Test summary</summary>");
         var hookContext = new HookContext { LlmClient = llmClient, SessionId = sessionId };
@@ -70,7 +70,7 @@ public class SessionMemoryHookLlmTests : IDisposable
     {
         var sessionId = $"parse-test-{Guid.NewGuid():N}";
         var hook = new SessionMemoryHook(sessionId, TestUserId,
-            options: new SessionMemoryOptions { EnableLlmSummary = true, MinRoundsBeforeLlm = 1, SummaryInterval = 1 });
+            options: new SessionMemoryOptions { EnableLlmSummary = true, MinRoundsBeforeLlm = 1, SummaryInterval = TimeSpan.FromMinutes(5) });
 
         var llmResponse = @"Some analysis text here...
 <summary>
@@ -102,7 +102,7 @@ public class SessionMemoryHookLlmTests : IDisposable
     {
         var sessionId = $"replace-test-{Guid.NewGuid():N}";
         var hook = new SessionMemoryHook(sessionId, TestUserId,
-            options: new SessionMemoryOptions { EnableLlmSummary = true, MinRoundsBeforeLlm = 1, SummaryInterval = 1 });
+            options: new SessionMemoryOptions { EnableLlmSummary = true, MinRoundsBeforeLlm = 1, SummaryInterval = TimeSpan.FromMinutes(5) });
 
         var llmClient = new MockLlmClient(response: "<summary>Round 1 summary</summary>");
         var hookContext = new HookContext { LlmClient = llmClient, SessionId = sessionId };
@@ -131,7 +131,7 @@ public class SessionMemoryHookLlmTests : IDisposable
     {
         var sessionId = $"fallback-empty-{Guid.NewGuid():N}";
         var hook = new SessionMemoryHook(sessionId, TestUserId,
-            options: new SessionMemoryOptions { EnableLlmSummary = true, MinRoundsBeforeLlm = 1, SummaryInterval = 1 });
+            options: new SessionMemoryOptions { EnableLlmSummary = true, MinRoundsBeforeLlm = 1, SummaryInterval = TimeSpan.FromMinutes(5) });
 
         var llmClient = new MockLlmClient(response: ""); // 空响应
         var hookContext = new HookContext { LlmClient = llmClient, SessionId = sessionId };
@@ -153,7 +153,7 @@ public class SessionMemoryHookLlmTests : IDisposable
     {
         var sessionId = $"fallback-error-{Guid.NewGuid():N}";
         var hook = new SessionMemoryHook(sessionId, TestUserId,
-            options: new SessionMemoryOptions { EnableLlmSummary = true, MinRoundsBeforeLlm = 1, SummaryInterval = 1 });
+            options: new SessionMemoryOptions { EnableLlmSummary = true, MinRoundsBeforeLlm = 1, SummaryInterval = TimeSpan.FromMinutes(5) });
 
         // MockLlmClient 不会抛异常，但我们可以用 null LlmClient 触发降级
         var hookContext = new HookContext { LlmClient = null, SessionId = sessionId };
@@ -174,7 +174,7 @@ public class SessionMemoryHookLlmTests : IDisposable
     {
         var sessionId = $"anchored-{Guid.NewGuid():N}";
         var hook = new SessionMemoryHook(sessionId, TestUserId,
-            options: new SessionMemoryOptions { EnableLlmSummary = true, MinRoundsBeforeLlm = 1, SummaryInterval = 1 });
+            options: new SessionMemoryOptions { EnableLlmSummary = true, MinRoundsBeforeLlm = 1, SummaryInterval = TimeSpan.FromMinutes(5) });
 
         // Round 1: 初始摘要
         var llm1 = new MockLlmClient(response: "<summary>## Goal\n- Build agent</summary>");

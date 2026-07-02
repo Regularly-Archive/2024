@@ -3,7 +3,7 @@ using InsightaAI.Agent.Cli.Extensions;
 using InsightaAI.Agent.Hooks;
 using Spectre.Console;
 
-namespace InsightaAI.Agent.Cli.UI;
+namespace InsightaAI.Agent.Cli.Hooks;
 
 /// <summary>
 /// 工具权限确认钩子 - 在工具执行前向用户征求同意

@@ -40,6 +40,7 @@ public interface IAgentHook
     /// <param name="messages">完整对话历史</param>
     /// <param name="cancellationToken">取消令牌</param>
     Task OnSessionEndAsync(
+        HookContext context,
         IReadOnlyList<Message> messages,
         CancellationToken cancellationToken = default) => Task.CompletedTask;
 }

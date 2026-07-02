@@ -50,7 +50,7 @@ public class GeminiTests : TestBase
             MaxTokens = 50
         };
 
-        var stream = client.Stream(request);
+        var stream = client.Streaming(request);
         var response = await PrintStreamAsync(stream);
 
         Assert.NotNull(response);
@@ -75,7 +75,7 @@ public class GeminiTests : TestBase
             MaxTokens = 200
         };
 
-        var stream = client.Stream(request);
+        var stream = client.Streaming(request);
         var response = await PrintStreamAsync(stream);
 
         Assert.NotNull(response);
@@ -132,7 +132,7 @@ public class GeminiTests : TestBase
             MaxTokens = 50
         };
 
-        var stream = client.Stream(request);
+        var stream = client.Streaming(request);
         var response = await PrintStreamAsync(stream);
 
         Assert.NotNull(response);

@@ -27,7 +27,7 @@ internal class DefaultLlmClient : ILlmClient
         _httpClient = httpClient ?? new HttpClient();
     }
 
-    public LlmStream Stream(LlmRequest request)
+    public LlmStream Streaming(LlmRequest request)
     {
         var events = StreamEventsAsync(request);
         return new LlmStreamImpl(events);
@@ -35,9 +35,15 @@ internal class DefaultLlmClient : ILlmClient
 
     public async Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken cancellationToken = default)
     {
-        // 使用流式 API 并收集结果
-        var stream = Stream(request with { Stream = true });
-        return await stream.GetResponseAsync(cancellationToken);
+        var httpRequest = _adapter.CreateRequest(request, _config, stream: false);
+
+        using var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        var element = JsonSerializer.Deserialize<JsonElement>(json);
+
+        return _adapter.ParseResponse(element);
     }
 
     private async IAsyncEnumerable<StreamEvent> StreamEventsAsync(
@@ -45,7 +51,7 @@ internal class DefaultLlmClient : ILlmClient
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         // 创建 HTTP 请求
-        var httpRequest = _adapter.CreateRequest(request, _config, stream: true);
+        var httpRequest = _adapter.CreateRequest(request, _config, stream: request.Stream);
 
         // 发送请求
         HttpResponseMessage? response = null;

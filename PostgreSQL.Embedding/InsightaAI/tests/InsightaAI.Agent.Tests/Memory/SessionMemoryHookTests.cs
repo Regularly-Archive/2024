@@ -209,6 +209,6 @@ public class SessionMemoryHookTests : IDisposable
         };
 
         // Act & Assert - 不应抛异常
-        await hook.OnSessionEndAsync(messages);
+        await hook.OnSessionEndAsync(null, messages);
     }
 }

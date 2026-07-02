@@ -1,8 +1,6 @@
-using System.Linq;
-using System.Text.Json;
-using InsightaAI.Agent.Models;
 using InsightaAI.Agent.Storage;
 using InsightaAI.LLM.Models;
+using System.Text.Json;
 
 namespace InsightaAI.Agent.Cli.Services;
 
@@ -63,6 +61,41 @@ public class ChatSession
         {
             Role = RoleAssistant,
             Content = [new TextContent { Text = text }]
+        };
+        _messages.Add(message);
+        await _storage.AddMessageAsync(SessionId, message);
+    }
+
+    /// <summary>
+    /// 添加带工具调用的助手消息
+    /// </summary>
+    public async Task AddAssistantWithToolCallsAsync(string? text, List<ToolCallContent> toolCalls)
+    {
+        var content = new List<ContentItem>();
+        if (!string.IsNullOrEmpty(text))
+            content.Add(new TextContent { Text = text });
+        content.AddRange(toolCalls);
+
+        var message = new MessageRecord
+        {
+            Role = RoleAssistant,
+            Content = content
+        };
+        _messages.Add(message);
+        await _storage.AddMessageAsync(SessionId, message);
+    }
+
+    /// <summary>
+    /// 添加工具结果消息
+    /// </summary>
+    public async Task AddToolResultMessageAsync(string toolCallId, string toolName, string result, bool isError)
+    {
+        var message = new MessageRecord
+        {
+            Role = "tool",
+            ToolCallId = toolCallId,
+            ToolName = toolName,
+            Content = [new ToolResultContent { ToolCallId = toolCallId, ToolName = toolName, Text = result, IsError = isError }]
         };
         _messages.Add(message);
         await _storage.AddMessageAsync(SessionId, message);

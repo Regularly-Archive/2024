@@ -30,7 +30,7 @@ public sealed class SessionMemoryCompactStrategy : ICompactStrategy
     public SessionMemoryCompactStrategy(SessionMemoryHook sessionMemoryHook)
     {
         _sessionMemoryHook = sessionMemoryHook ?? throw new ArgumentNullException(nameof(sessionMemoryHook));
-        _memoryFilePath = Path.Combine(sessionMemoryHook.SessionDirectory, "session-memory.md");
+        _memoryFilePath = Path.Combine(sessionMemoryHook.SessionDirectory, "MEMORY.md");
     }
 
     public bool ShouldCompact(IReadOnlyList<Message> messages, int estimatedTokens, ContextBudget budget)

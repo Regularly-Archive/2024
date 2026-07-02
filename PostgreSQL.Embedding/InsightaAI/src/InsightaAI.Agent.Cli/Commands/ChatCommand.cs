@@ -1,23 +1,22 @@
-using InsightaAI.LLM.Abstractions;
-﻿using System.CommandLine;
+using InsightaAI.Agent.Abstractions;
+using InsightaAI.Agent.Cli.Hooks;
 using InsightaAI.Agent.Cli.Models;
 using InsightaAI.Agent.Cli.Services;
 using InsightaAI.Agent.Cli.UI;
 using InsightaAI.Agent.Context;
 using InsightaAI.Agent.Extensions;
-using InsightaAI.Agent.Hooks;
+using InsightaAI.Agent.Mcp;
+using InsightaAI.Agent.Mcp.Local;
 using InsightaAI.Agent.Memory;
 using InsightaAI.Agent.MetaLearning;
 using InsightaAI.Agent.Models;
-using InsightaAI.Agent.Mcp;
-using InsightaAI.Agent.Mcp.Local;
 using InsightaAI.Agent.Skills;
 using InsightaAI.Agent.Skills.Local;
 using InsightaAI.Agent.Storage;
 using InsightaAI.Agent.Tools;
-using InsightaAI.Agent.Tools.BuiltIn;
-using InsightaAI.Agent.Abstractions;
+using InsightaAI.LLM.Abstractions;
 using Spectre.Console;
+using System.CommandLine;
 
 namespace InsightaAI.Agent.Cli.Commands;
 
@@ -205,22 +204,96 @@ public class ChatCommand
 
         try
         {
+            var roundToolCalls = new List<ToolCallContent>();
+            var roundToolResults = new List<(string ToolCallId, string ToolName, string Result, bool IsError)>();
+            int textLengthBeforeRound = 0;
+
             await foreach (var agentEvent in agent.RunStreamAsync(userInput, context))
             {
                 await eventRenderer.HandleEventAsync(agentEvent);
 
-                // 处理自动压缩事件：同步压缩后的消息到会话
-                if (agentEvent is AgentContextCompactedEvent compactedEvent
+                if (agentEvent is AgentToolStartEvent toolStart)
+                {
+                    roundToolCalls.Add(new ToolCallContent
+                    {
+                        Id = toolStart.ToolCallId,
+                        Name = toolStart.ToolName,
+                        Arguments = toolStart.Arguments
+                    });
+                }
+                else if (agentEvent is AgentToolEndEvent toolEnd)
+                {
+                    roundToolResults.Add((toolEnd.ToolCallId, toolEnd.ToolName, toolEnd.ResultPreview ?? string.Empty, toolEnd.IsError));
+                }
+                else if (agentEvent is AgentRoundEndEvent roundEnd)
+                {
+                    if (roundEnd.HasToolCalls)
+                    {
+                        // AgentRoundEndEvent 在工具执行前发射
+                        // 先保存上一轮积累的工具调用和结果
+                        if (roundToolCalls.Count > 0)
+                        {
+                            await session.AddAssistantWithToolCallsAsync(null, roundToolCalls);
+                            foreach (var tr in roundToolResults)
+                            {
+                                await session.AddToolResultMessageAsync(tr.ToolCallId, tr.ToolName, tr.Result, tr.IsError);
+                            }
+                            roundToolCalls.Clear();
+                            roundToolResults.Clear();
+                        }
+
+                        // 保存本轮助手文本
+                        var fullText = eventRenderer.FullText;
+                        var roundText = fullText.Length > textLengthBeforeRound
+                            ? fullText[textLengthBeforeRound..]
+                            : null;
+                        if (!string.IsNullOrWhiteSpace(roundText))
+                        {
+                            await session.AddAssistantMessageAsync(roundText);
+                        }
+                        textLengthBeforeRound = fullText.Length;
+                    }
+                    else
+                    {
+                        // 最后一轮（无工具调用）：保存之前积累的工具调用和结果
+                        if (roundToolCalls.Count > 0)
+                        {
+                            await session.AddAssistantWithToolCallsAsync(null, roundToolCalls);
+                            foreach (var tr in roundToolResults)
+                            {
+                                await session.AddToolResultMessageAsync(tr.ToolCallId, tr.ToolName, tr.Result, tr.IsError);
+                            }
+                            roundToolCalls.Clear();
+                            roundToolResults.Clear();
+                        }
+                    }
+                }
+                else if (agentEvent is AgentContextCompactedEvent compactedEvent
                     && compactedEvent.CompactedMessages is { Length: > 0 } compactedMessages)
                 {
                     await session.ReplaceMessagesAsync(compactedMessages.ToList());
                 }
             }
 
-            // 保存助手消息
-            if (!string.IsNullOrEmpty(eventRenderer.FullText))
+            // 流结束后，保存剩余的工具调用和结果（如果有）
+            if (roundToolCalls.Count > 0)
             {
-                await session.AddAssistantMessageAsync(eventRenderer.FullText);
+                await session.AddAssistantWithToolCallsAsync(null, roundToolCalls);
+                foreach (var tr in roundToolResults)
+                {
+                    await session.AddToolResultMessageAsync(tr.ToolCallId, tr.ToolName, tr.Result, tr.IsError);
+                }
+            }
+
+            // 保存最终回复（纯文本）
+            var finalText = eventRenderer.FullText;
+            if (finalText.Length > textLengthBeforeRound)
+            {
+                var remainingText = finalText[textLengthBeforeRound..];
+                if (!string.IsNullOrWhiteSpace(remainingText))
+                {
+                    await session.AddAssistantMessageAsync(remainingText);
+                }
             }
         }
         catch (Exception ex)
@@ -283,7 +356,7 @@ public class ChatCommand
             SystemPrompt = config.SystemPrompt,
             Model = config.Model,
             MaxToolRounds = config.MaxToolRounds,
-            UserId = userId
+            UserId = userId,
         };
 
         // 创建会话记忆钩子（需先于 ContextManager，供 SessionMemoryCompactStrategy 使用）

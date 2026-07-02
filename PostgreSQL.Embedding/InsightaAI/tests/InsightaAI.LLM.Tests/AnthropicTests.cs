@@ -50,7 +50,7 @@ public class AnthropicTests : TestBase
             MaxTokens = 50
         };
 
-        var stream = client.Stream(request);
+        var stream = client.Streaming(request);
         var response = await PrintStreamAsync(stream);
 
         Assert.NotNull(response);
@@ -75,7 +75,7 @@ public class AnthropicTests : TestBase
             MaxTokens = 200
         };
 
-        var stream = client.Stream(request);
+        var stream = client.Streaming(request);
         var response = await PrintStreamAsync(stream);
 
         Assert.NotNull(response);
@@ -106,7 +106,7 @@ public class AnthropicTests : TestBase
             MaxTokens = 500
         };
 
-        var stream = client.Stream(request);
+        var stream = client.Streaming(request);
         var response = await PrintStreamAsync(stream);
 
         Assert.NotNull(response);

@@ -9,6 +9,27 @@ using InsightaAI.LLM.Models;
 namespace InsightaAI.Agent.Memory;
 
 /// <summary>
+/// 会话记忆元数据
+/// </summary>
+public sealed record SessionMemoryMetadata
+{
+    /// <summary>会话 ID</summary>
+    public string SessionId { get; init; } = "";
+
+    /// <summary>用户 ID</summary>
+    public string UserId { get; init; } = "";
+
+    /// <summary>项目 ID</summary>
+    public string? ProjectId { get; init; }
+
+    /// <summary>会话创建时间</summary>
+    public DateTime CreatedAt { get; init; }
+
+    /// <summary>最后更新时间</summary>
+    public DateTime UpdatedAt { get; init; }
+}
+
+/// <summary>
 /// SessionMemoryHook 配置选项
 /// </summary>
 public sealed record SessionMemoryOptions
@@ -20,13 +41,13 @@ public sealed record SessionMemoryOptions
     public int MinRoundsBeforeLlm { get; init; } = 3;
 
     /// <summary>LLM 摘要的轮次间隔</summary>
-    public int SummaryInterval { get; init; } = 1;
+    public TimeSpan SummaryInterval { get; init; } = TimeSpan.FromMinutes(5);
 
     /// <summary>摘要使用的模型</summary>
     public string SummaryModel { get; init; } = "deepseek-v4-flash";
 
     /// <summary>摘要最大 token 数</summary>
-    public int SummaryMaxTokens { get; init; } = 512;
+    public int SummaryMaxTokens { get; init; } = 2048;
 
     /// <summary>摘要温度</summary>
     public double SummaryTemperature { get; init; } = 0.3;
@@ -84,8 +105,6 @@ public sealed class SessionMemoryHook : IAgentHook
 
         _options = options ?? new SessionMemoryOptions();
 
-        if (_options.SummaryInterval < 1)
-            throw new ArgumentOutOfRangeException(nameof(options), "SummaryInterval must be >= 1");
         if (_options.SummaryMaxTokens < 1)
             throw new ArgumentOutOfRangeException(nameof(options), "SummaryMaxTokens must be >= 1");
 
@@ -119,12 +138,11 @@ public sealed class SessionMemoryHook : IAgentHook
         {
             try
             {
-                await ExtractAndSaveMemoryAsync(context, round, messagesSnapshot, assistantMessage, CancellationToken.None);
+                await ExtractAndSaveMemoryAsync(context, messagesSnapshot, CancellationToken.None);
             }
             catch (Exception ex)
             {
-                // 记忆提取失败不应影响对话
-                System.Diagnostics.Debug.WriteLine($"[SessionMemory] Round {round} extraction failed: {ex.Message}");
+
             }
         });
 
@@ -135,12 +153,29 @@ public sealed class SessionMemoryHook : IAgentHook
     /// <summary>
     /// 会话结束时触发
     /// </summary>
-    public async Task OnSessionEndAsync(
+    public Task OnSessionEndAsync(
+        HookContext context,
         IReadOnlyList<Message> messages,
         CancellationToken cancellationToken = default)
     {
-        // 更新元数据
-        await SaveMetadataAsync(cancellationToken);
+        // 创建快照：后台任务可能在 Agent 主循环修改 messages 之后才执行
+        var messagesSnapshot = messages.ToList();
+
+        // 在后台执行提取，不传递 cancellationToken（调用方可能已取消）
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await ExtractAndSaveMemoryAsync(context, messagesSnapshot, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+
+            }
+        });
+
+        // 立即返回，不等待后台任务完成
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -148,7 +183,7 @@ public sealed class SessionMemoryHook : IAgentHook
     /// </summary>
     public async Task<string> GetSessionMemoryAsync(CancellationToken cancellationToken = default)
     {
-        var memoryPath = Path.Combine(_sessionDir, "session-memory.md");
+        var memoryPath = Path.Combine(_sessionDir, "MEMORY.md");
         if (!File.Exists(memoryPath))
             return "";
 
@@ -156,27 +191,35 @@ public sealed class SessionMemoryHook : IAgentHook
     }
 
     /// <summary>
-    /// 提取并保存记忆
+    /// 提取并保存会话记忆
     /// </summary>
     private async Task ExtractAndSaveMemoryAsync(
         HookContext context,
-        int round,
         IReadOnlyList<Message> messages,
-        Message? assistantMessage,
         CancellationToken cancellationToken)
     {
         // Step 0: 检查是否满足 LLM 摘要条件
-        if (_options.EnableLlmSummary
-            && round >= _options.MinRoundsBeforeLlm
-            && (round - _options.MinRoundsBeforeLlm) % _options.SummaryInterval == 0
-            && context.LlmClient != null)
+        if (_options.EnableLlmSummary && context.LlmClient != null)
         {
+            // Step 0.1: 检查时间间隔，避免频繁调用 LLM
+            var metadata = await LoadMetadataAsync(cancellationToken);
+            if (metadata != null)
+            {
+                var elapsed = DateTime.UtcNow - metadata.UpdatedAt;
+                if (elapsed.TotalMinutes < _options.SummaryInterval.TotalMinutes)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[SessionMemory] Skip LLM summary, elapsed {elapsed.TotalMinutes:F1}min < {_options.SummaryInterval}min");
+                    return;
+                }
+            }
+
             // Step 1: 读取已有摘要
-            var existingSummary = await GetSessionMemoryAsync(cancellationToken);
+            var PreviousSummary = await GetSessionMemoryAsync(cancellationToken);
 
             // Step 2: 使用 LLM 锚定增量摘要（读取旧摘要 → 合并新事实 → 替换文件）
-            var mergedSummary = await GenerateLlmSummaryAsync(
-                context.LlmClient, existingSummary, messages, cancellationToken);
+            var mergedSummary = await GenerateAnchoredSummaryAsync(
+                context.LlmClient, PreviousSummary, messages, cancellationToken);
 
             if (!string.IsNullOrWhiteSpace(mergedSummary))
             {
@@ -184,46 +227,21 @@ public sealed class SessionMemoryHook : IAgentHook
                 await _lock.WaitAsync(cancellationToken);
                 try
                 {
-                    var memoryPath = Path.Combine(_sessionDir, "session-memory.md");
+                    var memoryPath = Path.Combine(_sessionDir, "MEMORY.md");
                     await File.WriteAllTextAsync(memoryPath, mergedSummary, cancellationToken);
                 }
                 finally
                 {
                     _lock.Release();
                 }
+
+                // Step 4: 更新元数据（记录更新时间）
+                await CreateOrUpdateMetedata(cancellationToken);
                 return;
             }
 
             // LLM 失败，降级到关键词提取
             System.Diagnostics.Debug.WriteLine($"[SessionMemory] LLM summary empty, falling back to keyword extraction");
-        }
-
-        // 降级路径：关键词提取（追加模式）
-        var keywordSummary = ExtractRoundInfo(round, messages, assistantMessage);
-        if (string.IsNullOrWhiteSpace(keywordSummary))
-            return;
-
-        await _lock.WaitAsync(cancellationToken);
-        try
-        {
-            var memoryPath = Path.Combine(_sessionDir, "session-memory.md");
-            var existingContent = "";
-            if (File.Exists(memoryPath))
-            {
-                existingContent = await File.ReadAllTextAsync(memoryPath, cancellationToken);
-            }
-
-            var sb = new StringBuilder(existingContent);
-            if (sb.Length > 0)
-                sb.AppendLine();
-            sb.AppendLine($"## Round {round} ({DateTime.UtcNow:HH:mm:ss})");
-            sb.AppendLine(keywordSummary);
-
-            await File.WriteAllTextAsync(memoryPath, sb.ToString(), cancellationToken);
-        }
-        finally
-        {
-            _lock.Release();
         }
     }
 
@@ -232,9 +250,9 @@ public sealed class SessionMemoryHook : IAgentHook
     ///
     /// 流程：读取已有摘要 → 传入 previous-summary → LLM 合并新事实 → 返回完整摘要
     /// </summary>
-    private async Task<string> GenerateLlmSummaryAsync(
+    private async Task<string> GenerateAnchoredSummaryAsync(
         ILlmClient llmClient,
-        string existingSummary,
+        string previousSummary,
         IReadOnlyList<Message> messages,
         CancellationToken cancellationToken)
     {
@@ -261,20 +279,24 @@ public sealed class SessionMemoryHook : IAgentHook
                 }
             }
 
-            var promptTemplate = PromptTemplate.Load("anchored-summary");
-            var previousSummary = string.IsNullOrEmpty(existingSummary) ? "(none)" : existingSummary;
-            var prompt = promptTemplate
-                .Replace("{CONVERSATION}", conversationText.ToString())
-                .Replace("{PREVIOUS_SUMMARY}", previousSummary);
+            var prompt = await PromptTemplate.RenderAsync("anchored-summary", new Dictionary<string, string>
+            {
+                ["CONVERSATION"] = conversationText.ToString(),
+                ["PREVIOUS_SUMMARY"] = string.IsNullOrEmpty(previousSummary) ? "(none)" : previousSummary
+            });
 
             var request = new LlmRequest
             {
                 Model = _options.SummaryModel,
-                Messages = [Message.FromSystem(prompt)],
+                Messages = [
+                    Message.FromSystem("You are a conversation summarizer. Be concise but preserve important details."),
+                    Message.FromUser(prompt)
+                ],
                 Tools = [],
                 ToolChoice = ToolChoiceMode.None,
                 MaxTokens = _options.SummaryMaxTokens,
-                Temperature = _options.SummaryTemperature
+                Temperature = _options.SummaryTemperature,
+                Reasoning = new ReasoningConfig { Enabled = false }
             };
 
             var response = await llmClient.CompleteAsync(request, cancellationToken);
@@ -431,21 +453,48 @@ public sealed class SessionMemoryHook : IAgentHook
     }
 
     /// <summary>
-    /// 保存会话元数据
+    /// 加载会话记忆元数据（不存在则返回 null）
     /// </summary>
-    private async Task SaveMetadataAsync(CancellationToken cancellationToken)
+    private async Task<SessionMemoryMetadata?> LoadMetadataAsync(CancellationToken cancellationToken)
     {
-        var metadata = new
-        {
-            session_id = _sessionId,
-            user_id = _userId,
-            project_id = _projectId,
-            created_at = DateTime.UtcNow,
-            updated_at = DateTime.UtcNow
-        };
-
-        var json = JsonSerializer.Serialize(metadata, new JsonSerializerOptions { WriteIndented = true });
         var metadataPath = Path.Combine(_sessionDir, "metadata.json");
-        await File.WriteAllTextAsync(metadataPath, json, cancellationToken);
+        if (!File.Exists(metadataPath))
+            return null;
+
+        var json = await File.ReadAllTextAsync(metadataPath, cancellationToken);
+        return JsonSerializer.Deserialize<SessionMemoryMetadata>(json);
+    }
+
+    /// <summary>
+    /// 创建或者更新会话记忆元数据
+    /// </summary>
+    private async Task CreateOrUpdateMetedata(CancellationToken cancellationToken)
+    {
+        var metadataPath = Path.Combine(_sessionDir, "metadata.json");
+        var now = DateTime.UtcNow;
+
+        SessionMemoryMetadata metadata;
+
+        if (File.Exists(metadataPath))
+        {
+            var json = await File.ReadAllTextAsync(metadataPath, cancellationToken);
+            var existing = JsonSerializer.Deserialize<SessionMemoryMetadata>(json);
+
+            metadata = existing! with { UpdatedAt = now };
+        }
+        else
+        {
+            metadata = new SessionMemoryMetadata
+            {
+                SessionId = _sessionId,
+                UserId = _userId,
+                ProjectId = _projectId,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+        }
+
+        var metadataJson = JsonSerializer.Serialize(metadata, new JsonSerializerOptions { WriteIndented = true });
+        await File.WriteAllTextAsync(metadataPath, metadataJson, cancellationToken);
     }
 }

@@ -33,7 +33,7 @@ public class IntegrationTests : TestBase
         };
 
         Console.WriteLine("=== Round 1: Initial Request ===");
-        var stream = client.Stream(request);
+        var stream = client.Streaming(request);
         var response = await PrintStreamAsync(stream);
 
         Assert.NotNull(response);
@@ -82,7 +82,7 @@ public class IntegrationTests : TestBase
                 MaxTokens = 500
             };
 
-            var followUpStream = client.Stream(followUpRequest);
+            var followUpStream = client.Streaming(followUpRequest);
             var finalResponse = await PrintStreamAsync(followUpStream);
 
             Assert.NotNull(finalResponse);
@@ -113,7 +113,7 @@ public class IntegrationTests : TestBase
         };
 
         Console.WriteLine("=== Round 1: Initial Request ===");
-        var stream = client.Stream(request);
+        var stream = client.Streaming(request);
         var response = await PrintStreamAsync(stream);
 
         Assert.NotNull(response);
@@ -162,7 +162,7 @@ public class IntegrationTests : TestBase
                 MaxTokens = 500
             };
 
-            var followUpStream = client.Stream(followUpRequest);
+            var followUpStream = client.Streaming(followUpRequest);
             var finalResponse = await PrintStreamAsync(followUpStream);
 
             Assert.NotNull(finalResponse);

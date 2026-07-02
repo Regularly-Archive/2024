@@ -31,7 +31,7 @@ public class MockLlmClient : ILlmClient
         _alwaysToolCalls = alwaysToolCalls;
     }
 
-    public LlmStream Stream(LlmRequest request)
+    public LlmStream Streaming(LlmRequest request)
     {
         _callCount++;
 

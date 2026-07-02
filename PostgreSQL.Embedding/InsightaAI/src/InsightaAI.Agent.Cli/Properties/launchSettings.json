@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "InsightaAI.Agent.Cli": {
+      "commandName": "Project",
+      "commandLineArgs": "chat --session ffab2071c22b"
+    }
+  }
+}

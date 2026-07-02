@@ -11,7 +11,7 @@ public sealed record ContextBudget
     /// <remarks>
     /// 优先级：用户配置 > API 元数据 > ModelContextWindows 映射 > 默认值 (128K)
     /// </remarks>
-    public int MaxContextTokens { get; init; } = 128_000;
+    public int MaxContextTokens { get; init; } = 64_000;
 
     /// <summary>
     /// Level 1 MicroCompact 触发阈值百分比

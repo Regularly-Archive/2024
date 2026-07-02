@@ -235,7 +235,7 @@ public class AgentSkillIntegrationTests
             _onCaptureSystemPrompt = onCaptureSystemPrompt;
         }
 
-        public LlmStream Stream(LlmRequest request)
+        public LlmStream Streaming(LlmRequest request)
         {
             _callCount++;
 
