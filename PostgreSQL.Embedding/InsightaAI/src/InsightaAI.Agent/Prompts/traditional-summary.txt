@@ -9,22 +9,34 @@ Summarize the following conversation, focusing on:
 
 Format your response as structured sections:
 
-## User Intent
-[What the user wants to achieve]
+<template>
+## Goal
+- [single-sentence task summary]
+
+## Constraints & Preferences
+- [user constraints, preferences, specs, or "(none)"]
+
+## Progress
+### Done
+- [completed work or "(none)"]
+
+### In Progress
+- [current work or "(none)"]
+
+### Blocked
+- [blockers or "(none)"]
 
 ## Key Decisions
-- [Decision 1]
-- [Decision 2]
+- [decision and why, or "(none)"]
 
-## File Changes
-- Created: [file paths]
-- Modified: [file paths]
-- Deleted: [file paths]
+## Next Steps
+- [ordered next actions or "(none)"]
 
-## Errors & Solutions
-- [Error]: [Solution]
+## Critical Context
+- [important technical facts, errors, open questions, or "(none)"]
 
-## Current State
-[What's in progress, what's next]
+## Relevant Files
+- [file or directory path: why it matters, or "(none)"]
+</template>
 
 Keep the summary concise but preserve critical details like file paths, function names, and configuration values.

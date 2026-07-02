@@ -1,6 +1,7 @@
 using InsightaAI.Agent.Memory;
 using InsightaAI.Agent.Prompts;
 using InsightaAI.LLM.Models;
+using System.Text.Json;
 
 namespace InsightaAI.Agent.Context;
 
@@ -26,16 +27,18 @@ public sealed class SessionMemoryCompactStrategy : ICompactStrategy
 
     private readonly SessionMemoryHook _sessionMemoryHook;
     private readonly string _memoryFilePath;
+    private readonly string _memoryMetadataFilePath;
 
     public SessionMemoryCompactStrategy(SessionMemoryHook sessionMemoryHook)
     {
         _sessionMemoryHook = sessionMemoryHook ?? throw new ArgumentNullException(nameof(sessionMemoryHook));
         _memoryFilePath = Path.Combine(sessionMemoryHook.SessionDirectory, "MEMORY.md");
+        _memoryMetadataFilePath = Path.Combine(sessionMemoryHook.SessionDirectory, "metadata.json");
     }
 
     public bool ShouldCompact(IReadOnlyList<Message> messages, int estimatedTokens, ContextBudget budget)
     {
-        // 检查是否达到会话记忆压缩阈值
+        //// 检查是否达到会话记忆压缩阈值
         if (estimatedTokens < budget.SessionCompactTriggerTokens)
             return false;
 
@@ -67,7 +70,7 @@ public sealed class SessionMemoryCompactStrategy : ICompactStrategy
             var (systemMessages, _, recentMessages) = SplitMessages(messages, budget.KeepRecentRounds);
 
             // Step 3: 构建边界标记
-            var boundaryMarker = CreateBoundaryMarker(sessionMemory, preCompactTokens, preCompactMessages);
+            var boundaryMarker = await CreateCompactedContextBoundaryMarkerAsync(sessionMemory, preCompactTokens, preCompactMessages);
 
             // Step 4: 构建压缩后的消息列表
             var compactedMessages = new List<Message>();
@@ -75,8 +78,10 @@ public sealed class SessionMemoryCompactStrategy : ICompactStrategy
             // 添加系统消息
             compactedMessages.AddRange(systemMessages);
 
-            // 添加边界标记（作为系统消息）
-            compactedMessages.Add(Message.FromSystem(boundaryMarker));
+            // 添加边界标记（作为系统消息)
+            var updatedSystemMessage = Message.FromSystem(systemMessages[0].GetTextContent() + boundaryMarker);
+            compactedMessages = [updatedSystemMessage, .. compactedMessages[1..]];
+
 
             // 添加最近的消息
             compactedMessages.AddRange(recentMessages);
@@ -125,7 +130,7 @@ public sealed class SessionMemoryCompactStrategy : ICompactStrategy
     /// <summary>
     /// 分离消息为：系统消息、旧消息、最近消息
     /// </summary>
-    private static (List<Message> System, List<Message> Old, List<Message> Recent) SplitMessages(
+    private (List<Message> System, List<Message> Old, List<Message> Recent) SplitMessages(
         List<Message> messages, int keepRecentRounds)
     {
         var systemMessages = new List<Message>();
@@ -141,7 +146,7 @@ public sealed class SessionMemoryCompactStrategy : ICompactStrategy
         }
 
         // 计算最近消息的起始索引
-        int recentStartIndex = FindRecentMessagesStart(otherMessages, keepRecentRounds);
+        int recentStartIndex = FindRecentMessagesStart(otherMessages);
 
         var oldMessages = otherMessages.Take(recentStartIndex).ToList();
         var recentMessages = otherMessages.Skip(recentStartIndex).ToList();
@@ -152,18 +157,18 @@ public sealed class SessionMemoryCompactStrategy : ICompactStrategy
     /// <summary>
     /// 找到最近消息的起始索引
     /// </summary>
-    private static int FindRecentMessagesStart(List<Message> messages, int keepRecentRounds)
+    private int FindRecentMessagesStart(List<Message> messages)
     {
-        int roundCount = 0;
+        var metadata = LoadSessionMemoryMetadata();
         int startIndex = messages.Count;
 
-        // 从后往前数，找到 keepRecentRounds 轮的起始位置
+        // 从后往前数，找到上一次会话记忆更新时的消息位置
         for (int i = messages.Count - 1; i >= 0; i--)
         {
             if (messages[i].Role == MessageRole.User)
             {
-                roundCount++;
-                if (roundCount >= keepRecentRounds)
+                var userMessage = messages[i];
+                if (userMessage.Timestamp <= metadata.UpdatedAt)
                 {
                     startIndex = i;
                     break;
@@ -177,25 +182,21 @@ public sealed class SessionMemoryCompactStrategy : ICompactStrategy
     /// <summary>
     /// 创建压缩边界标记
     /// </summary>
-    private static string CreateBoundaryMarker(string sessionMemory, int preCompactTokens, int preCompactMessages)
+    private async Task<string> CreateCompactedContextBoundaryMarkerAsync(string sessionMemory, int preCompactTokens, int preCompactMessages)
     {
-        return $"[Context compacted (Session Memory): {preCompactMessages} messages, ~{preCompactTokens:N0} tokens removed]\n\n" +
-               $"Session Memory Summary:\n{sessionMemory}\n\n" +
-               BuildCompactionImportPrompt();
-    }
+        return await PromptTemplate.RenderAsync("compacted-context", new Dictionary<string, string>
+        {
+            ["preCompactMessages"] = preCompactMessages.ToString(),
+            ["preCompactTokens"] = preCompactTokens.ToString("N0"),
+            ["sessionMemory"] = sessionMemory
 
-    /// <summary>
-    /// 加载压缩后导入提示（Hermes Agent 风格）
-    /// </summary>
-    private static string BuildCompactionImportPrompt()
-    {
-        return PromptTemplate.Load("compaction-import");
+        });
     }
 
     /// <summary>
     /// 估算消息列表的 token 数量
     /// </summary>
-    private static int EstimateMessagesTokens(List<Message> messages, ITokenEstimator tokenEstimator)
+    private int EstimateMessagesTokens(List<Message> messages, ITokenEstimator tokenEstimator)
     {
         int total = 0;
         foreach (var message in messages)
@@ -227,5 +228,15 @@ public sealed class SessionMemoryCompactStrategy : ICompactStrategy
             }
         }
         return total;
+    }
+
+    /// <summary>
+    /// 加载会话记忆元数据
+    /// </summary>
+    /// <returns></returns>
+    private SessionMemoryMetadata LoadSessionMemoryMetadata()
+    {
+        var json = File.ReadAllText(_memoryMetadataFilePath);
+        return JsonSerializer.Deserialize<SessionMemoryMetadata>(json);
     }
 }

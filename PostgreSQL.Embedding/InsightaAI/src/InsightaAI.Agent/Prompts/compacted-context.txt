@@ -1,3 +1,8 @@
+[Context compacted (SessionMemory): {{preCompactMessages}} messages, ~{{preCompactTokens}} tokens removed]
+Session Memory Summary:
+{{sessionMemory}}
+
+
 [CONTEXT COMPACTION --- REFERENCE ONLY]
 Earlier turns were compacted into the summary above.
 This is a handoff from a previous context window ---
