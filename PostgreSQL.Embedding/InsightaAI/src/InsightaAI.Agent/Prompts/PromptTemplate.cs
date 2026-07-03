@@ -41,12 +41,15 @@ internal static class PromptTemplate
     /// </summary>
     /// <param name="name">文件名（不含扩展名）</param>
     /// <param name="variables">占位符字典，key 为占位符名称（不含花括号），value 为替换值</param>
-    public static async Task<string> RenderAsync(string name, Dictionary<string, string> variables)
+    public static async Task<string> RenderAsync(string name, Dictionary<string, string>? variables = null)
     {
         var template = await LoadAsync(name);
-        foreach (var (key, value) in variables)
+        if (variables != null)
         {
-            template = template.Replace($"{{{key}}}", value);
+            foreach (var (key, value) in variables)
+            {
+                template = template.Replace($"{{{key}}}", value);
+            }
         }
         return template;
     }

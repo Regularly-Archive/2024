@@ -8,6 +8,11 @@ namespace InsightaAI.Agent.Context;
 public interface IContextManager
 {
     /// <summary>
+    /// 最大上下文窗口大小（token 数）
+    /// </summary>
+    int MaxContextTokens { get; }
+
+    /// <summary>
     /// 估算消息列表的 token 数量
     /// </summary>
     int EstimateTokens(IReadOnlyList<Message> messages);

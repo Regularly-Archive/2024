@@ -149,7 +149,7 @@ public class EventRenderer : IDisposable
             AnsiConsole.WriteLine();
         }
 
-        ShowTokenUsage(completeEvent.Result.Usage);
+        ShowTokenUsage(completeEvent.Result.Usage, completeEvent.Result.EstimatedContextTokens, completeEvent.Result.MaxContextTokens);
     }
 
     private void HandleContextCompacted(AgentContextCompactedEvent compactedEvent)
@@ -162,11 +162,10 @@ public class EventRenderer : IDisposable
         AnsiConsole.WriteLine();
     }
 
-    private void ShowTokenUsage(TokenUsage? usage)
+    private void ShowTokenUsage(TokenUsage? usage, int estimatedContextTokens = 0, int maxContextTokens = 0)
     {
         if (usage == null) return;
 
-        var total = usage.InputTokens + usage.OutputTokens;
         var grid = new Grid()
             .AddColumn(new GridColumn().NoWrap())
             .AddColumn(new GridColumn().NoWrap())
@@ -178,12 +177,27 @@ public class EventRenderer : IDisposable
             ? $"[yellow]{usage.CacheHitTokens}⚡[/]"
             : "[dim]0⚡[/]";
 
+        // 上下文百分比
+        var contextText = "[dim]🧠 -[/]";
+        if (maxContextTokens > 0 && estimatedContextTokens > 0)
+        {
+            var contextPercent = (double)estimatedContextTokens / maxContextTokens * 100;
+            var contextColor = contextPercent switch
+            {
+                >= 90 => "red",
+                >= 70 => "yellow",
+                _ => "green"
+            };
+            contextText = $"[{contextColor}]🧠 {contextPercent:F0}%[/]";
+        }
+
         grid.AddRow(
-            "[grey]Tokens:[/]",
-            $"[green]{usage.InputTokens}↑[/]",
-            $"[blue]{usage.OutputTokens}↓[/]",
+            "[grey]Usage:[/]",
+            $"[green]{usage.InputTokens} ↑[/]",
+            $"[blue]{usage.OutputTokens} ↓[/]",
             cacheText,
-            $"[dim]{total}[/]");
+            contextText);
+
         AnsiConsole.WriteLine();
         AnsiConsole.Write(grid);
     }

@@ -86,6 +86,12 @@ public sealed record AgentResult
 
     /// <summary>错误信息 (如果失败)</summary>
     public string? Error { get; init; }
+
+    /// <summary>预估的上下文 token 数</summary>
+    public int EstimatedContextTokens { get; init; }
+
+    /// <summary>最大上下文窗口大小</summary>
+    public int MaxContextTokens { get; init; }
 }
 
 /// <summary>

@@ -495,7 +495,9 @@ public class Agent
                     Message = assistantMessage,
                     Usage = totalUsage,
                     Rounds = round,
-                    DurationMs = stopwatch.ElapsedMilliseconds
+                    DurationMs = stopwatch.ElapsedMilliseconds,
+                    EstimatedContextTokens = _contextManager?.EstimateTokens(messages) ?? 0,
+                    MaxContextTokens = _contextManager?.MaxContextTokens ?? 0
                 };
 
                 yield return new AgentRoundEndEvent
@@ -613,7 +615,9 @@ public class Agent
                 Message = finalMessage,
                 Usage = totalUsage,
                 Rounds = _config.MaxToolRounds,
-                DurationMs = stopwatch.ElapsedMilliseconds
+                DurationMs = stopwatch.ElapsedMilliseconds,
+                EstimatedContextTokens = _contextManager?.EstimateTokens(messages) ?? 0,
+                MaxContextTokens = _contextManager?.MaxContextTokens ?? 0
             }
         };
 

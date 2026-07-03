@@ -1,3 +1,4 @@
+using InsightaAI.Agent.Extensions;
 using InsightaAI.Agent.Memory;
 using InsightaAI.Agent.Prompts;
 using InsightaAI.LLM.Models;
@@ -87,7 +88,7 @@ public sealed class SessionMemoryCompactStrategy : ICompactStrategy
             compactedMessages.AddRange(recentMessages);
 
             // 估算压缩后的 token
-            var postCompactTokens = EstimateMessagesTokens(compactedMessages, tokenEstimator);
+            var postCompactTokens = (tokenEstimator as CharTokenEstimator).EstimateMessagesTokens(compactedMessages);
 
             // 更新原始消息列表
             messages.Clear();
@@ -207,48 +208,12 @@ public sealed class SessionMemoryCompactStrategy : ICompactStrategy
     {
         return await PromptTemplate.RenderAsync("compacted-context", new Dictionary<string, string>
         {
+            ["compactStrategy"] =  Name,
             ["preCompactMessages"] = preCompactMessages.ToString(),
             ["preCompactTokens"] = preCompactTokens.ToString("N0"),
             ["sessionMemory"] = sessionMemory
 
         });
-    }
-
-    /// <summary>
-    /// 估算消息列表的 token 数量
-    /// </summary>
-    private int EstimateMessagesTokens(List<Message> messages, ITokenEstimator tokenEstimator)
-    {
-        int total = 0;
-        foreach (var message in messages)
-        {
-            total += 4; // 消息开销
-            foreach (var block in message.Content)
-            {
-                if (block is TextBlock textBlock)
-                    total += tokenEstimator.EstimateTokens(textBlock.Text);
-                else if (block is ThinkingBlock thinkingBlock)
-                    total += tokenEstimator.EstimateTokens(thinkingBlock.Thinking);
-                else if (block is ImageBlock)
-                    total += 2000;
-                else if (block is ToolCallBlock toolCall)
-                {
-                    total += tokenEstimator.EstimateTokens(toolCall.Name);
-                    total += tokenEstimator.EstimateTokens(toolCall.Arguments.GetRawText());
-                }
-                else if (block is ToolResultBlock toolResult)
-                {
-                    foreach (var content in toolResult.Content)
-                    {
-                        if (content is TextBlock text)
-                            total += tokenEstimator.EstimateTokens(text.Text);
-                        else if (content is ImageBlock)
-                            total += 2000;
-                    }
-                }
-            }
-        }
-        return total;
     }
 
     /// <summary>

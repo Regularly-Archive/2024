@@ -33,6 +33,11 @@ public sealed class ContextManager : IContextManager
     }
 
     /// <summary>
+    /// 最大上下文窗口大小（token 数）
+    /// </summary>
+    public int MaxContextTokens => _budget.MaxContextTokens;
+
+    /// <summary>
     /// 估算消息列表的 token 数量
     /// </summary>
     public int EstimateTokens(IReadOnlyList<Message> messages)

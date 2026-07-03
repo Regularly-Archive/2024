@@ -1,8 +1,6 @@
-using System.Text.Json;
-using InsightaAI.LLM;
-using InsightaAI.LLM.Abstractions;
-using InsightaAI.Agent.Abstractions;
+using InsightaAI.Agent.Extensions;
 using InsightaAI.Agent.Prompts;
+using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
 
 namespace InsightaAI.Agent.Context;
@@ -53,10 +51,10 @@ public sealed class TraditionalCompactStrategy : ICompactStrategy
         var strippedOldMessages = StripImages(oldMessages);
 
         // Step 3: 生成摘要
-        var summary = await GenerateSummaryAsync(strippedOldMessages, cancellationToken);
+        var summary = await GenerateFullSummaryAsync(strippedOldMessages, cancellationToken);
 
         // Step 4: 构建边界标记
-        var boundaryMarker = CreateBoundaryMarker(summary, preCompactTokens, preCompactMessages);
+        var boundaryMarker = await CreateCompactedContextBoundaryMarkerAsync(summary, preCompactTokens, preCompactMessages);
 
         // Step 5: 构建压缩后的消息列表
         var compactedMessages = new List<Message>();
@@ -71,7 +69,7 @@ public sealed class TraditionalCompactStrategy : ICompactStrategy
         compactedMessages.AddRange(recentMessages);
 
         // 估算压缩后的 token
-        var postCompactTokens = EstimateMessagesTokens(compactedMessages, tokenEstimator);
+        var postCompactTokens = (tokenEstimator as CharTokenEstimator).EstimateMessagesTokens(compactedMessages);
 
         // 更新原始消息列表
         messages.Clear();
@@ -179,12 +177,12 @@ public sealed class TraditionalCompactStrategy : ICompactStrategy
     }
 
     /// <summary>
-    /// 生成对话摘要
+    /// 生成全量对话摘要
     /// </summary>
-    private async Task<string> GenerateSummaryAsync(List<Message> messages, CancellationToken cancellationToken)
+    private async Task<string> GenerateFullSummaryAsync(List<Message> messages, CancellationToken cancellationToken)
     {
         // 从嵌入资源加载摘要提示词
-        var summaryPrompt = PromptTemplate.Load("traditional-summary");
+        var summaryPrompt = await PromptTemplate.RenderAsync("traditional-summary");
 
         // 构建消息列表（摘要提示 + 待摘要的消息）
         var summaryMessages = new List<Message>
@@ -206,52 +204,43 @@ public sealed class TraditionalCompactStrategy : ICompactStrategy
         };
 
         var response = await _llmClient.CompleteAsync(request, cancellationToken);
-        return response.GetTextContent() ?? "[Summary generation failed]";
+        return ExtractSummary(response.GetTextContent()) ?? "[Summary generation failed]";
+    }
+
+    /// <summary>
+    /// 从响应中提取摘要内容（支持 XML 标签包裹）
+    /// </summary>
+    private static string? ExtractSummary(string? responseText)
+    {
+        if (string.IsNullOrWhiteSpace(responseText))
+            return null;
+
+        var trimmed = responseText.Trim();
+
+        // 尝试提取 <summary> 标签中的内容
+        var summaryStart = trimmed.IndexOf("<summary>", StringComparison.OrdinalIgnoreCase);
+        var summaryEnd = trimmed.IndexOf("</summary>", StringComparison.OrdinalIgnoreCase);
+
+        if (summaryStart >= 0 && summaryEnd > summaryStart)
+        {
+            var start = summaryStart + "<summary>".Length;
+            return trimmed[start..summaryEnd].Trim();
+        }
+
+        return trimmed;
     }
 
     /// <summary>
     /// 创建压缩边界标记
     /// </summary>
-    private static string CreateBoundaryMarker(string summary, int preCompactTokens, int preCompactMessages)
+    private async Task<string> CreateCompactedContextBoundaryMarkerAsync(string summary, int preCompactTokens, int preCompactMessages)
     {
-        return $"[Context compacted: {preCompactMessages} messages, ~{preCompactTokens:N0} tokens removed]\n\n" +
-               $"Previous conversation summary:\n{summary}";
-    }
-
-    /// <summary>
-    /// 估算消息列表的 token 数量
-    /// </summary>
-    private static int EstimateMessagesTokens(List<Message> messages, ITokenEstimator tokenEstimator)
-    {
-        int total = 0;
-        foreach (var message in messages)
+        return await PromptTemplate.RenderAsync("compacted-context", new Dictionary<string, string>
         {
-            total += 4; // 消息开销
-            foreach (var block in message.Content)
-            {
-                if (block is TextBlock textBlock)
-                    total += tokenEstimator.EstimateTokens(textBlock.Text);
-                else if (block is ThinkingBlock thinkingBlock)
-                    total += tokenEstimator.EstimateTokens(thinkingBlock.Thinking);
-                else if (block is ImageBlock)
-                    total += 2000;
-                else if (block is ToolCallBlock toolCall)
-                {
-                    total += tokenEstimator.EstimateTokens(toolCall.Name);
-                    total += tokenEstimator.EstimateTokens(toolCall.Arguments.GetRawText());
-                }
-                else if (block is ToolResultBlock toolResult)
-                {
-                    foreach (var content in toolResult.Content)
-                    {
-                        if (content is TextBlock text)
-                            total += tokenEstimator.EstimateTokens(text.Text);
-                        else if (content is ImageBlock)
-                            total += 2000;
-                    }
-                }
-            }
-        }
-        return total;
+            ["compactStrategy"] = Name,
+            ["preCompactMessages"] = preCompactMessages.ToString(),
+            ["preCompactTokens"] = preCompactTokens.ToString("N0"),
+            ["sessionMemory"] = summary,
+        });
     }
 }

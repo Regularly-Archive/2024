@@ -1,7 +1,6 @@
-[Context compacted (SessionMemory): {{preCompactMessages}} messages, ~{{preCompactTokens}} tokens removed]
+[Context compacted ({{compactStrategy}}): {{preCompactMessages}} messages, ~{{preCompactTokens}} tokens removed]
 Session Memory Summary:
 {{sessionMemory}}
-
 
 [CONTEXT COMPACTION --- REFERENCE ONLY]
 Earlier turns were compacted into the summary above.
