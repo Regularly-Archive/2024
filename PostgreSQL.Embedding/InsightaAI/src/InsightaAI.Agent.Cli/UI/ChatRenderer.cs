@@ -43,6 +43,7 @@ public class ChatRenderer
     public void ShowMessage(MessageRecord message)
     {
         var text = message.Content.OfType<TextContent>().FirstOrDefault()?.Text ?? "";
+        if (string.IsNullOrEmpty(text)) return;
 
         if (message.Role == RoleUser)
         {
