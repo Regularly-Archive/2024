@@ -146,7 +146,7 @@ public sealed class SessionMemoryCompactStrategy : ICompactStrategy
         }
 
         // 计算最近消息的起始索引
-        int recentStartIndex = FindRecentMessagesStart(otherMessages);
+        int recentStartIndex = FindRecentMessagesStart(otherMessages, keepRecentRounds);
 
         var oldMessages = otherMessages.Take(recentStartIndex).ToList();
         var recentMessages = otherMessages.Skip(recentStartIndex).ToList();
@@ -156,22 +156,43 @@ public sealed class SessionMemoryCompactStrategy : ICompactStrategy
 
     /// <summary>
     /// 找到最近消息的起始索引
+    /// 优先按时间戳找（元数据可用时），否则按轮数找
     /// </summary>
-    private int FindRecentMessagesStart(List<Message> messages)
+    private int FindRecentMessagesStart(List<Message> messages, int keepRecentRounds)
     {
         var metadata = LoadSessionMemoryMetadata();
         int startIndex = messages.Count;
 
-        // 从后往前数，找到上一次会话记忆更新时的消息位置
-        for (int i = messages.Count - 1; i >= 0; i--)
+        // 优先按时间戳找（元数据的 UpdatedAt 有值时）
+        if (metadata?.UpdatedAt != default)
         {
-            if (messages[i].Role == MessageRole.User)
+            for (int i = messages.Count - 1; i >= 0; i--)
             {
-                var userMessage = messages[i];
-                if (userMessage.Timestamp <= metadata.UpdatedAt)
+                if (messages[i].Role == MessageRole.User)
                 {
-                    startIndex = i;
-                    break;
+                    var userMessage = messages[i];
+                    if (userMessage.Timestamp <= metadata.UpdatedAt)
+                    {
+                        startIndex = i;
+                        break;
+                    }
+                }
+            }
+        }
+        else
+        {
+            // 元数据不可用时，按轮数找
+            int userCount = 0;
+            for (int i = messages.Count - 1; i >= 0; i--)
+            {
+                if (messages[i].Role == MessageRole.User)
+                {
+                    userCount++;
+                    if (userCount >= keepRecentRounds)
+                    {
+                        startIndex = i;
+                        break;
+                    }
                 }
             }
         }
@@ -234,9 +255,18 @@ public sealed class SessionMemoryCompactStrategy : ICompactStrategy
     /// 加载会话记忆元数据
     /// </summary>
     /// <returns></returns>
-    private SessionMemoryMetadata LoadSessionMemoryMetadata()
+    private SessionMemoryMetadata? LoadSessionMemoryMetadata()
     {
-        var json = File.ReadAllText(_memoryMetadataFilePath);
-        return JsonSerializer.Deserialize<SessionMemoryMetadata>(json);
+        try
+        {
+            if (!File.Exists(_memoryMetadataFilePath)) return null;
+
+            var json = File.ReadAllText(_memoryMetadataFilePath);
+            return JsonSerializer.Deserialize<SessionMemoryMetadata>(json);
+        }
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 }
