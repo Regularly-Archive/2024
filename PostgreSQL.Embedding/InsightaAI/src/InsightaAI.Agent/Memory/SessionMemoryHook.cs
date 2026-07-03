@@ -236,7 +236,7 @@ public sealed class SessionMemoryHook : IAgentHook
                 }
 
                 // Step 4: 更新元数据（记录更新时间）
-                await CreateOrUpdateMetedata(cancellationToken);
+                await CreateOrUpdateMetadata(cancellationToken);
                 return;
             }
 
@@ -468,7 +468,7 @@ public sealed class SessionMemoryHook : IAgentHook
     /// <summary>
     /// 创建或者更新会话记忆元数据
     /// </summary>
-    private async Task CreateOrUpdateMetedata(CancellationToken cancellationToken)
+    private async Task CreateOrUpdateMetadata(CancellationToken cancellationToken)
     {
         var metadataPath = Path.Combine(_sessionDir, "metadata.json");
         var now = DateTime.UtcNow;
