@@ -1,5 +1,7 @@
 ﻿# InsightaAI Agent - 待办事项
 
+> 愿景与期待详见 [VISION.md](VISION.md)
+
 ## 代码重构
 
 ### 1. 摘要服务统一（优先级：中）
