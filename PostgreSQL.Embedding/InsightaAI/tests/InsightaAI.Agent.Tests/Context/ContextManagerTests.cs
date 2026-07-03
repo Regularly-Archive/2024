@@ -1,4 +1,5 @@
 using InsightaAI.Agent.Context;
+using InsightaAI.Agent.Context.Compaction;
 using InsightaAI.LLM.Models;
 
 namespace InsightaAI.Agent.Tests.Context;

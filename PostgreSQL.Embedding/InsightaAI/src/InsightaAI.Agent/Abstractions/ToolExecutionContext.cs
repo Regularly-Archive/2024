@@ -1,5 +1,4 @@
-﻿using InsightaAI.LLM.Abstractions;
-using InsightaAI.LLM.Models;
+﻿using InsightaAI.LLM.Models;
 
 namespace InsightaAI.Agent.Abstractions;
 
@@ -20,8 +19,8 @@ public sealed record ToolExecutionContext
     /// <summary>取消令牌</summary>
     public CancellationToken CancellationToken { get; init; }
 
-    /// <summary>LLM 客户端，ToolHook 可调用 LLM 生成内容</summary>
-    public ILlmClient? LlmClient { get; init; }
+    /// <summary>服务提供者（可选，Tool/ToolHook 可按需解析服务）</summary>
+    public IServiceProvider? Services { get; init; }
 }
 
 /// <summary>

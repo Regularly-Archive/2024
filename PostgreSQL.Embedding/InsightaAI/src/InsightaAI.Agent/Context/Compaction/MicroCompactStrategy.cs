@@ -1,7 +1,7 @@
 using System.Text.Json;
 using InsightaAI.LLM.Models;
 
-namespace InsightaAI.Agent.Context;
+namespace InsightaAI.Agent.Context.Compaction;
 
 /// <summary>
 /// 微压缩策略 - 零成本清理旧工具结果

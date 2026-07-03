@@ -1,5 +1,6 @@
 using System.Text.Json;
 using InsightaAI.Agent.Context;
+using InsightaAI.Agent.Context.Compaction;
 using InsightaAI.Agent.Memory;
 using InsightaAI.LLM.Models;
 

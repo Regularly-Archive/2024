@@ -1,6 +1,7 @@
 using InsightaAI.Agent.Hooks;
 using InsightaAI.Agent.Memory;
 using InsightaAI.LLM.Models;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace InsightaAI.Agent.Tests.Memory;
 
@@ -25,7 +26,6 @@ public class SessionMemoryHookTests : IDisposable
         // 创建测试用的 HookContext（不含 LLM 客户端）
         _hookContext = new HookContext
         {
-            LlmClient = null,
             SessionId = TestSessionId
         };
     }

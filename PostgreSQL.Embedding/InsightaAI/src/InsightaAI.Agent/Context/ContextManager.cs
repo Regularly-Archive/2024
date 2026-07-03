@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using InsightaAI.Agent.Context.Compaction;
 using InsightaAI.LLM.Models;
 
 namespace InsightaAI.Agent.Context;

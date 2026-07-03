@@ -3,7 +3,7 @@ using InsightaAI.Agent.Prompts;
 using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
 
-namespace InsightaAI.Agent.Context;
+namespace InsightaAI.Agent.Context.Compaction;
 
 /// <summary>
 /// 传统压缩策略 - 使用 LLM 生成对话摘要

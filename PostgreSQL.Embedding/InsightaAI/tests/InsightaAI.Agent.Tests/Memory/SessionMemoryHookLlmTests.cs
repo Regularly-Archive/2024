@@ -1,7 +1,9 @@
 using InsightaAI.Agent.Hooks;
 using InsightaAI.Agent.Memory;
+using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
 using InsightaAI.Tests.Shared;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace InsightaAI.Agent.Tests.Memory;
 
@@ -44,7 +46,9 @@ public class SessionMemoryHookLlmTests : IDisposable
             options: new SessionMemoryOptions { EnableLlmSummary = true, MinRoundsBeforeLlm = 3, SummaryInterval = TimeSpan.FromMinutes(5) });
 
         var llmClient = new MockLlmClient(response: "<summary>Test summary</summary>");
-        var hookContext = new HookContext { LlmClient = llmClient, SessionId = sessionId };
+        var services = new ServiceCollection();
+        services.AddSingleton<ILlmClient>(llmClient);
+        var hookContext = new HookContext { Services = services.BuildServiceProvider(), SessionId = sessionId };
         var messages = new List<Message> { Message.FromUser("test message") };
 
         // Round 1, 2: 不应触发 LLM（关键词模式）
@@ -83,7 +87,9 @@ public class SessionMemoryHookLlmTests : IDisposable
 </summary>";
 
         var llmClient = new MockLlmClient(response: llmResponse);
-        var hookContext = new HookContext { LlmClient = llmClient, SessionId = sessionId };
+        var services = new ServiceCollection();
+        services.AddSingleton<ILlmClient>(llmClient);
+        var hookContext = new HookContext { Services = services.BuildServiceProvider(), SessionId = sessionId };
         var messages = new List<Message> { Message.FromUser("implement session memory") };
 
         await hook.OnRoundEndAsync(hookContext, 1, messages, null);
@@ -105,7 +111,9 @@ public class SessionMemoryHookLlmTests : IDisposable
             options: new SessionMemoryOptions { EnableLlmSummary = true, MinRoundsBeforeLlm = 1, SummaryInterval = TimeSpan.FromMinutes(5) });
 
         var llmClient = new MockLlmClient(response: "<summary>Round 1 summary</summary>");
-        var hookContext = new HookContext { LlmClient = llmClient, SessionId = sessionId };
+        var services = new ServiceCollection();
+        services.AddSingleton<ILlmClient>(llmClient);
+        var hookContext = new HookContext { Services = services.BuildServiceProvider(), SessionId = sessionId };
         var messages = new List<Message> { Message.FromUser("first round") };
 
         // Round 1
@@ -115,7 +123,9 @@ public class SessionMemoryHookLlmTests : IDisposable
 
         // Round 2 - 更新摘要
         var llmClient2 = new MockLlmClient(response: "<summary>Updated summary</summary>");
-        var hookContext2 = new HookContext { LlmClient = llmClient2, SessionId = sessionId };
+        var services2 = new ServiceCollection();
+        services2.AddSingleton<ILlmClient>(llmClient2);
+        var hookContext2 = new HookContext { Services = services2.BuildServiceProvider(), SessionId = sessionId };
 
         await hook.OnRoundEndAsync(hookContext2, 2, messages, null);
         await Task.Delay(500);
@@ -134,7 +144,9 @@ public class SessionMemoryHookLlmTests : IDisposable
             options: new SessionMemoryOptions { EnableLlmSummary = true, MinRoundsBeforeLlm = 1, SummaryInterval = TimeSpan.FromMinutes(5) });
 
         var llmClient = new MockLlmClient(response: ""); // 空响应
-        var hookContext = new HookContext { LlmClient = llmClient, SessionId = sessionId };
+        var services = new ServiceCollection();
+        services.AddSingleton<ILlmClient>(llmClient);
+        var hookContext = new HookContext { Services = services.BuildServiceProvider(), SessionId = sessionId };
         var messages = new List<Message> { Message.FromUser("我喜欢使用 C# 编程") };
 
         await hook.OnRoundEndAsync(hookContext, 1, messages, null);
@@ -155,8 +167,8 @@ public class SessionMemoryHookLlmTests : IDisposable
         var hook = new SessionMemoryHook(sessionId, TestUserId,
             options: new SessionMemoryOptions { EnableLlmSummary = true, MinRoundsBeforeLlm = 1, SummaryInterval = TimeSpan.FromMinutes(5) });
 
-        // MockLlmClient 不会抛异常，但我们可以用 null LlmClient 触发降级
-        var hookContext = new HookContext { LlmClient = null, SessionId = sessionId };
+        // 不注册 LlmClient 触发降级（Services 中无 ILlmClient）
+        var hookContext = new HookContext { SessionId = sessionId };
         var messages = new List<Message> { Message.FromUser("项目目标是在 Q2 完成") };
 
         await hook.OnRoundEndAsync(hookContext, 1, messages, null);
@@ -178,7 +190,8 @@ public class SessionMemoryHookLlmTests : IDisposable
 
         // Round 1: 初始摘要
         var llm1 = new MockLlmClient(response: "<summary>## Goal\n- Build agent</summary>");
-        var ctx1 = new HookContext { LlmClient = llm1, SessionId = sessionId };
+        var s1 = new ServiceCollection(); s1.AddSingleton<ILlmClient>(llm1);
+        var ctx1 = new HookContext { Services = s1.BuildServiceProvider(), SessionId = sessionId };
         var msgs1 = new List<Message> { Message.FromUser("build an agent") };
 
         await hook.OnRoundEndAsync(ctx1, 1, msgs1, null);
@@ -187,7 +200,8 @@ public class SessionMemoryHookLlmTests : IDisposable
         // Round 2: LLM 应收到 previous-summary 并合并
         string? capturedPrompt = null;
         var llm2 = new MockLlmClient(response: "<summary>## Goal\n- Build agent\n\n## Progress\n### Done\n- [x] Started</summary>");
-        var ctx2 = new HookContext { LlmClient = llm2, SessionId = sessionId };
+        var s2 = new ServiceCollection(); s2.AddSingleton<ILlmClient>(llm2);
+        var ctx2 = new HookContext { Services = s2.BuildServiceProvider(), SessionId = sessionId };
         var msgs2 = new List<Message> { Message.FromUser("I started working on it") };
 
         await hook.OnRoundEndAsync(ctx2, 2, msgs2, null);
@@ -205,7 +219,7 @@ public class SessionMemoryHookLlmTests : IDisposable
     {
         var sessionId = $"keyword-append-{Guid.NewGuid():N}";
         var hook = new SessionMemoryHook(sessionId, TestUserId, options: new SessionMemoryOptions { EnableLlmSummary = false });
-        var hookContext = new HookContext { LlmClient = null, SessionId = sessionId };
+        var hookContext = new HookContext { SessionId = sessionId };
 
         var msgs1 = new List<Message> { Message.FromUser("我喜欢 Python") };
         await hook.OnRoundEndAsync(hookContext, 1, msgs1, null);

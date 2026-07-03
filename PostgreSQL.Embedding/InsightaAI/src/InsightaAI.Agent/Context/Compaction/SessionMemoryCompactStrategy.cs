@@ -4,7 +4,7 @@ using InsightaAI.Agent.Prompts;
 using InsightaAI.LLM.Models;
 using System.Text.Json;
 
-namespace InsightaAI.Agent.Context;
+namespace InsightaAI.Agent.Context.Compaction;
 
 /// <summary>
 /// 会话记忆压缩策略 - 使用预提取的会话记忆作为摘要（Level 2）

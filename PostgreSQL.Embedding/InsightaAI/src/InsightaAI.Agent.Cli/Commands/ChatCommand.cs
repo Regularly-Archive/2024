@@ -4,6 +4,7 @@ using InsightaAI.Agent.Cli.Models;
 using InsightaAI.Agent.Cli.Services;
 using InsightaAI.Agent.Cli.UI;
 using InsightaAI.Agent.Context;
+using InsightaAI.Agent.Context.Compaction;
 using InsightaAI.Agent.Extensions;
 using InsightaAI.Agent.Mcp;
 using InsightaAI.Agent.Mcp.Local;

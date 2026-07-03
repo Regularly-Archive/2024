@@ -1,5 +1,6 @@
 using InsightaAI.Agent.Abstractions;
 using InsightaAI.Agent.Context;
+using InsightaAI.Agent.Context.Compaction;
 using InsightaAI.Agent.Hooks;
 using InsightaAI.Agent.Mcp;
 using InsightaAI.Agent.Memory;
@@ -10,6 +11,7 @@ using InsightaAI.Agent.Tools;
 using InsightaAI.Agent.Tools.BuiltIn;
 using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
+using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
@@ -37,10 +39,10 @@ public class Agent
     private readonly List<IAgentHook> _agentHooks = [];
     private readonly HashSet<string> _alwaysAllowedTools = [];
     private string _skillInstructions = "";
-    private readonly TokenUsage _totalUsage;
+    private readonly IServiceProvider _serviceProvider;
 
     /// <summary>
-    /// 创建 Agent 实例
+    /// 创建 Agent 实例（手动注入依赖）
     /// </summary>
     public Agent(
         AgentConfig config,
@@ -63,6 +65,16 @@ public class Agent
         _contextManager = contextManager;
         _memoryManager = memoryManager;
 
+        // 构建内部 ServiceProvider，让 Hook / Tool 可按需解析服务
+        var services = new ServiceCollection();
+        services.AddSingleton<ILlmClient>(_llmClient);
+        services.AddSingleton(_toolRegistry);
+        if (_skillRegistry != null) services.AddSingleton(_skillRegistry);
+        if (_mcpRegistry != null) services.AddSingleton(_mcpRegistry);
+        if (_contextManager != null) services.AddSingleton(_contextManager);
+        if (_memoryManager != null) services.AddSingleton(_memoryManager);
+        _serviceProvider = services.BuildServiceProvider();
+
         // 注册 activate_skill 工具
         if (_skillRegistry != null)
         {
@@ -80,9 +92,42 @@ public class Agent
         {
             MemoryTools.RegisterAll(_toolRegistry, _memoryManager, _config.UserId);
         }
+    }
 
-        _totalUsage = _config.Metadata != null && _config.Metadata!.TryGetValue("token_usage", out var totalUsage) ?
-            (TokenUsage)totalUsage : new TokenUsage();
+    /// <summary>
+    /// 创建 Agent 实例（通过 ServiceProvider 解析依赖）
+    /// </summary>
+    public Agent(AgentConfig config, IServiceProvider serviceProvider)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        ArgumentNullException.ThrowIfNull(serviceProvider);
+
+        _config = config;
+        _serviceProvider = serviceProvider;
+        _llmClient = serviceProvider.GetRequiredService<ILlmClient>();
+        _toolRegistry = serviceProvider.GetRequiredService<ToolRegistry>();
+        _skillRegistry = serviceProvider.GetService<ISkillRegistry>();
+        _mcpRegistry = serviceProvider.GetService<McpRegistry>();
+        _contextManager = serviceProvider.GetService<IContextManager>();
+        _memoryManager = serviceProvider.GetService<IMemoryManager>();
+
+        // 注册 activate_skill 工具
+        if (_skillRegistry != null)
+        {
+            RegisterActivateSkillTool();
+        }
+
+        // 注册 MCP 工具
+        if (_mcpRegistry != null)
+        {
+            McpTools.RegisterAll(_toolRegistry, _mcpRegistry);
+        }
+
+        // 注册记忆工具
+        if (_memoryManager != null && !string.IsNullOrEmpty(_config.UserId))
+        {
+            MemoryTools.RegisterAll(_toolRegistry, _memoryManager, _config.UserId);
+        }
     }
 
     /// <summary>
@@ -340,8 +385,8 @@ public class Agent
         var conversationId = context?.ConversationId ?? Guid.NewGuid().ToString("N");
         var hookContext = new HookContext
         {
-            LlmClient = _llmClient,
-            SessionId = conversationId
+            SessionId = conversationId,
+            Services = _serviceProvider
         };
 
         var toolExecutor = new ToolExecutor(_config.Id, conversationId, async (request, ct)  =>
@@ -670,7 +715,7 @@ public class Agent
             ToolCallId = toolCall.Id,
             ConversationId = conversationId,
             CancellationToken = cancellationToken,
-            LlmClient = _llmClient
+            Services = _serviceProvider
         };
 
         // 检查钩子

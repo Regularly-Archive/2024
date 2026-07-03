@@ -5,6 +5,7 @@ using InsightaAI.Agent.Hooks;
 using InsightaAI.Agent.Prompts;
 using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace InsightaAI.Agent.Memory;
 
@@ -187,7 +188,8 @@ public sealed class SessionMemoryHook : IAgentHook
         CancellationToken cancellationToken)
     {
         // Step 0: 检查是否满足 LLM 摘要条件
-        if (_options.EnableLlmSummary && context.LlmClient != null)
+        var llmClient = context.Services?.GetService<ILlmClient>();
+        if (_options.EnableLlmSummary && llmClient != null)
         {
             // Step 0.1: 检查时间间隔，避免频繁调用 LLM
             var metadata = await LoadMetadataAsync(cancellationToken);
@@ -207,7 +209,7 @@ public sealed class SessionMemoryHook : IAgentHook
 
             // Step 2: 使用 LLM 锚定增量摘要（读取旧摘要 → 合并新事实 → 替换文件）
             var mergedSummary = await GenerateAnchoredSummaryAsync(
-                context.LlmClient, previousSummary, messages, cancellationToken);
+                llmClient, previousSummary, messages, cancellationToken);
 
             if (!string.IsNullOrWhiteSpace(mergedSummary))
             {

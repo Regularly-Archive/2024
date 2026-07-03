@@ -1,6 +1,6 @@
 using InsightaAI.LLM.Models;
 
-namespace InsightaAI.Agent.Context;
+namespace InsightaAI.Agent.Context.Compaction;
 
 /// <summary>
 /// 压缩结果
