@@ -130,23 +130,7 @@ public sealed class SessionMemoryHook : IAgentHook
         Message? assistantMessage,
         CancellationToken cancellationToken = default)
     {
-        // 创建快照：后台任务可能在 Agent 主循环修改 messages 之后才执行
-        var messagesSnapshot = messages.ToList();
-
-        // 在后台执行提取，不传递 cancellationToken（调用方可能已取消）
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await ExtractAndSaveMemoryAsync(context, messagesSnapshot, CancellationToken.None);
-            }
-            catch (Exception ex)
-            {
-
-            }
-        });
-
-        // 立即返回，不等待后台任务完成
+        ExtractMemoryInBackground(context, messages);
         return Task.CompletedTask;
     }
 
@@ -158,10 +142,17 @@ public sealed class SessionMemoryHook : IAgentHook
         IReadOnlyList<Message> messages,
         CancellationToken cancellationToken = default)
     {
-        // 创建快照：后台任务可能在 Agent 主循环修改 messages 之后才执行
+        ExtractMemoryInBackground(context, messages);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 在后台执行记忆提取（创建快照避免并发问题）
+    /// </summary>
+    private void ExtractMemoryInBackground(HookContext context, IReadOnlyList<Message> messages)
+    {
         var messagesSnapshot = messages.ToList();
 
-        // 在后台执行提取，不传递 cancellationToken（调用方可能已取消）
         _ = Task.Run(async () =>
         {
             try
@@ -170,12 +161,9 @@ public sealed class SessionMemoryHook : IAgentHook
             }
             catch (Exception ex)
             {
-
+                System.Diagnostics.Debug.WriteLine($"[SessionMemoryHook] 后台记忆提取失败: {ex.Message}");
             }
         });
-
-        // 立即返回，不等待后台任务完成
-        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -215,11 +203,11 @@ public sealed class SessionMemoryHook : IAgentHook
             }
 
             // Step 1: 读取已有摘要
-            var PreviousSummary = await GetSessionMemoryAsync(cancellationToken);
+            var previousSummary = await GetSessionMemoryAsync(cancellationToken);
 
             // Step 2: 使用 LLM 锚定增量摘要（读取旧摘要 → 合并新事实 → 替换文件）
             var mergedSummary = await GenerateAnchoredSummaryAsync(
-                context.LlmClient, PreviousSummary, messages, cancellationToken);
+                context.LlmClient, previousSummary, messages, cancellationToken);
 
             if (!string.IsNullOrWhiteSpace(mergedSummary))
             {
@@ -239,9 +227,6 @@ public sealed class SessionMemoryHook : IAgentHook
                 await CreateOrUpdateMetadata(cancellationToken);
                 return;
             }
-
-            // LLM 失败，降级到关键词提取
-            System.Diagnostics.Debug.WriteLine($"[SessionMemory] LLM summary empty, falling back to keyword extraction");
         }
     }
 
@@ -296,7 +281,7 @@ public sealed class SessionMemoryHook : IAgentHook
                 ToolChoice = ToolChoiceMode.None,
                 MaxTokens = _options.SummaryMaxTokens,
                 Temperature = _options.SummaryTemperature,
-                Reasoning = new ReasoningConfig { Enabled = false }
+                Reasoning = new ReasoningConfig { Enabled = false, Effort = ReasoningEffort.Low }
             };
 
             var response = await llmClient.CompleteAsync(request, cancellationToken);
@@ -331,138 +316,23 @@ public sealed class SessionMemoryHook : IAgentHook
     }
 
     /// <summary>
-    /// 提取本轮关键信息（规则方式）
-    /// </summary>
-    private static string ExtractRoundInfo(
-        int round,
-        IReadOnlyList<Message> messages,
-        Message? assistantMessage)
-    {
-        var sb = new StringBuilder();
-
-        // 获取最近的用户消息
-        var userMessages = messages
-            .Where(m => m.Role == MessageRole.User)
-            .TakeLast(3)
-            .ToList();
-
-        foreach (var msg in userMessages)
-        {
-            var content = msg.GetTextContent();
-            if (string.IsNullOrWhiteSpace(content))
-                continue;
-
-            // 提取关键信息
-            var keyInfo = ExtractKeyInformation(content);
-            if (!string.IsNullOrWhiteSpace(keyInfo))
-            {
-                sb.AppendLine(keyInfo);
-            }
-        }
-
-        // 提取助手回复中的关键决策
-        if (assistantMessage != null)
-        {
-            var assistantContent = assistantMessage.GetTextContent();
-            if (!string.IsNullOrWhiteSpace(assistantContent))
-            {
-                var decisions = ExtractDecisions(assistantContent);
-                if (!string.IsNullOrWhiteSpace(decisions))
-                {
-                    sb.AppendLine(decisions);
-                }
-            }
-        }
-
-        return sb.ToString().Trim();
-    }
-
-    /// <summary>
-    /// 从用户消息中提取关键信息
-    /// </summary>
-    private static string ExtractKeyInformation(string content)
-    {
-        var sb = new StringBuilder();
-        var lower = content.ToLowerInvariant();
-
-        // 用户偏好
-        if (lower.Contains("我喜欢") || lower.Contains("我偏好") || lower.Contains("i prefer") ||
-            lower.Contains("不要") || lower.Contains("don't"))
-        {
-            sb.AppendLine($"- 用户偏好: {Truncate(content, 100)}");
-        }
-
-        // 项目信息
-        if (lower.Contains("项目") || lower.Contains("project") || lower.Contains("目标") ||
-            lower.Contains("goal") || lower.Contains("截止") || lower.Contains("deadline"))
-        {
-            sb.AppendLine($"- 项目信息: {Truncate(content, 100)}");
-        }
-
-        // 决策
-        if (lower.Contains("决定") || lower.Contains("decide") || lower.Contains("选择") ||
-            lower.Contains("choose") || lower.Contains("方案") || lower.Contains("approach"))
-        {
-            sb.AppendLine($"- 决策: {Truncate(content, 100)}");
-        }
-
-        // 问题/错误
-        if (lower.Contains("错误") || lower.Contains("error") || lower.Contains("问题") ||
-            lower.Contains("issue") || lower.Contains("bug"))
-        {
-            sb.AppendLine($"- 问题: {Truncate(content, 100)}");
-        }
-
-        return sb.ToString().Trim();
-    }
-
-    /// <summary>
-    /// 从助手回复中提取关键决策
-    /// </summary>
-    private static string ExtractDecisions(string content)
-    {
-        var sb = new StringBuilder();
-
-        // 查找决策相关的模式
-        var patterns = new[]
-        {
-            @"(?:我建议|我决定|让我们|我选择|方案是|I suggest|I recommend|let's|we should)[:\s]*(.{20,100})",
-            @"(?:修改了|更新了|实现了|added|updated|implemented|fixed)[:\s]*(.{20,100})"
-        };
-
-        foreach (var pattern in patterns)
-        {
-            var matches = Regex.Matches(content, pattern, RegexOptions.IgnoreCase);
-            foreach (Match match in matches)
-            {
-                sb.AppendLine($"- {Truncate(match.Value, 80)}");
-            }
-        }
-
-        return sb.ToString().Trim();
-    }
-
-    /// <summary>
-    /// 截断文本
-    /// </summary>
-    private static string Truncate(string text, int maxLength)
-    {
-        if (string.IsNullOrEmpty(text))
-            return "";
-        return text.Length <= maxLength ? text : text[..maxLength] + "...";
-    }
-
-    /// <summary>
     /// 加载会话记忆元数据（不存在则返回 null）
     /// </summary>
     private async Task<SessionMemoryMetadata?> LoadMetadataAsync(CancellationToken cancellationToken)
     {
-        var metadataPath = Path.Combine(_sessionDir, "metadata.json");
-        if (!File.Exists(metadataPath))
-            return null;
+        try
+        {
+            var metadataPath = Path.Combine(_sessionDir, "metadata.json");
+            if (!File.Exists(metadataPath))
+                return null;
 
-        var json = await File.ReadAllTextAsync(metadataPath, cancellationToken);
-        return JsonSerializer.Deserialize<SessionMemoryMetadata>(json);
+            var json = await File.ReadAllTextAsync(metadataPath, cancellationToken);
+            return JsonSerializer.Deserialize<SessionMemoryMetadata>(json);
+        }
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 
     /// <summary>
