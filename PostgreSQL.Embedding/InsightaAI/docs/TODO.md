@@ -54,7 +54,33 @@
 
 ---
 
-### 4. 上下文用量显示（优先级：中）
+### 4. AgentBuilder 生命周期一致性（优先级：中）
+
+**问题描述：**
+`AgentBuilder` 的 `WithXxx()` 方法使用 `TryAddSingleton` 注册服务，但构造函数中未预先注册 `ToolRegistry`。如果用户不调用 `WithToolRegistry()`，`Agent` 构造时会抛出 `InvalidOperationException`。
+
+**当前代码：**
+```csharp
+// AgentBuilder 构造函数
+public AgentBuilder(AgentConfig config)
+{
+    _config = config;
+    _services = new ServiceCollection();
+    _services.TryAddSingleton(_config);
+    // ToolRegistry 未注册！
+}
+
+// Agent 构造函数
+_toolRegistry = serviceProvider.GetRequiredService<ToolRegistry>();  // 会抛异常
+```
+
+**待优化：**
+- [ ] 构造函数中默认注册 `ToolRegistry`
+- [ ] 或者在 `Build()` 中检查 `ToolRegistry` 是否已注册并给出清晰错误提示
+
+---
+
+### 5. 上下文用量显示（优先级：中）
 
 **问题描述：**
 用户希望在 Tokens Usage 显示区域增加上下文用量百分比，类似内存占用，通过预估当前消息列表的 token 总数和上下文窗口大小做对比。
@@ -100,3 +126,4 @@
 ## 记录时间
 - 2026-07-03: 创建文档，记录当前待办事项
 - 2026-07-15: 新增 Agent 依赖注入待办、TiktokenTokenEstimator、测试失败清单
+- 2026-07-16: 新增 AgentBuilder 生命周期一致性待办（ToolRegistry 注册问题）
