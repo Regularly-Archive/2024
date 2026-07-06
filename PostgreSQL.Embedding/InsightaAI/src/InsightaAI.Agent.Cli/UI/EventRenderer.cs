@@ -174,7 +174,7 @@ public class EventRenderer : IDisposable
             .AddColumn(new GridColumn().NoWrap());
 
         var cacheText = usage.CacheHitTokens > 0
-            ? $"[yellow]{usage.CacheHitTokens}⚡[/]"
+            ? $"[yellow]{usage.CacheHitTokens:N0}⚡[/]"
             : "[dim]0⚡[/]";
 
         // 上下文百分比
@@ -193,8 +193,8 @@ public class EventRenderer : IDisposable
 
         grid.AddRow(
             "[grey]Usage:[/]",
-            $"[green]{usage.InputTokens} ↑[/]",
-            $"[blue]{usage.OutputTokens} ↓[/]",
+            $"[green]{usage.InputTokens:N0} ↑[/]",
+            $"[blue]{usage.OutputTokens:N0} ↓[/]",
             cacheText,
             contextText);
 
