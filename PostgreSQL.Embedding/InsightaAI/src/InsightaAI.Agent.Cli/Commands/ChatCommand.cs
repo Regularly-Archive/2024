@@ -389,7 +389,7 @@ public class ChatCommand
             .Build();
 
         // 注册 Hook（Build 后添加）
-        agent.AddHook(new ToolPermissionHook("bash", "write_file", "read_file", "edit_file"));
+        agent.AddHook(new ToolPermissionHook("bash", "write_file", "read_file", "edit_file", "web_fetch"));
 
         // 注册元学习 Hook（自动捕获工具错误并记录教训）
         var metaLearningStore = new MetaLearningStore();
