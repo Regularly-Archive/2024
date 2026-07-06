@@ -393,7 +393,7 @@ public class Agent : IDisposable
         {
             var (allowd, result) = await ExecuteSingleToolAsync(request.ToolCall, request.Arguments, request.SessionId, ct);
             return new ToolCallReponse(allowd, result);
-        });
+        }, _toolRegistry);
 
         var messages = new List<Message>();
 

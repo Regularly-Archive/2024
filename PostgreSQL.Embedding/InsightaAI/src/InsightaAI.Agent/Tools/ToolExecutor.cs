@@ -11,12 +11,50 @@ public class ToolExecutor
     private readonly string _agentId;
     private readonly string _sessionId;
     private readonly ToolCallHandler _handler;
+    private readonly ToolRegistry? _toolRegistry;
+    private readonly bool _enableInterception;
 
-    public ToolExecutor(string agentId, string sessionId, ToolCallHandler handler)
+    public ToolExecutor(string agentId, string sessionId, ToolCallHandler handler, 
+        ToolRegistry? toolRegistry = null, bool enableInterception = true)
     {
         _agentId = agentId;
         _sessionId = sessionId;
         _handler = handler;
+        _toolRegistry = toolRegistry;
+        _enableInterception = enableInterception;
+    }
+
+    /// <summary>
+    /// 拦截工具结果（如果启用且工具实现了 Intercept）
+    /// </summary>
+    private (ToolResult Result, bool Intercepted) TryInterceptResult(
+        string toolName, string toolCallId, ToolResult toolResult)
+    {
+        if (!_enableInterception || _toolRegistry == null)
+            return (toolResult, false);
+
+        var executor = _toolRegistry.GetExecutor(toolName);
+        if (executor == null)
+            return (toolResult, false);
+
+        // 计算结果大小
+        var textBlocks = toolResult.Content.OfType<TextBlock>().ToList();
+        var totalText = string.Join("\n", textBlocks.Select(t => t.Text));
+        
+        var truncationContext = new TruncationContext(
+            originalLength: totalText.Length,
+            originalLineCount: new Lazy<int>(() => totalText.Split('\n').Length),
+            utilizationRatio: 0, // TODO: 从 ContextManager 获取
+            budget: null,        // TODO: 从 ContextManager 获取
+            toolResultDirectory: Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "InsightaAI", "ToolResults", _sessionId),
+            toolName: toolName,
+            toolCallId: toolCallId
+        );
+
+        var intercepted = executor.Intercept(toolResult, truncationContext);
+        return (intercepted.Result, intercepted.ToolResultIntercepted);
     }
 
     public async IAsyncEnumerable<AgentEvent> ExecuteToolsParallelAsync(
@@ -80,12 +118,16 @@ public class ToolExecutor
         // 按原始顺序添加工具结果到对话历史
         foreach (var (toolCall, toolResult) in toolResults)
         {
+            // 尝试拦截工具结果
+            var (finalResult, intercepted) = TryInterceptResult(toolCall.Name, toolCall.Id, toolResult);
+            
             messages.Add(new Message
             {
                 Role = MessageRole.ToolResult,
                 ToolCallId = toolCall.Id,
                 ToolName = toolCall.Name,
-                Content = toolResult.Content
+                Content = finalResult.Content,
+                ToolResultIntercepted = intercepted
             });
         }
     }
@@ -125,13 +167,17 @@ public class ToolExecutor
                 ResultPreview = resultText?.Length > 100 ? resultText[..100] + "..." : resultText
             };
 
+            // 尝试拦截工具结果
+            var (finalResult, intercepted) = TryInterceptResult(toolCall.Name, toolCall.Id, toolResult);
+            
             // 将工具结果加入对话历史
             messages.Add(new Message
             {
                 Role = MessageRole.ToolResult,
                 ToolCallId = toolCall.Id,
                 ToolName = toolCall.Name,
-                Content = toolResult.Content
+                Content = finalResult.Content,
+                ToolResultIntercepted = intercepted
             });
         }
     }

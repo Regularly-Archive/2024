@@ -85,6 +85,12 @@ public class ToolRegistry
     public bool HasTool(string name) => _executors.ContainsKey(name);
 
     /// <summary>
+    /// 获取工具执行器（用于调用 Intercept 等方法）
+    /// </summary>
+    public IToolExecutor? GetExecutor(string name) => 
+        _executors.TryGetValue(name, out var executor) ? executor : null;
+
+    /// <summary>
     /// 移除已注册的工具
     /// </summary>
     public bool Unregister(string name)
