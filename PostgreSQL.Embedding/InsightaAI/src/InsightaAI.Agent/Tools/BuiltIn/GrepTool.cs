@@ -186,6 +186,49 @@ public class GrepTool : IToolExecutor
         }
     }
 
+    /// <summary>
+    /// 拦截大搜索结果：只保留文件名和匹配数量
+    /// </summary>
+    public InterceptionResult Intercept(ToolResult result, TruncationContext context)
+    {
+        var text = result.Content.OfType<TextBlock>().FirstOrDefault()?.Text;
+        if (text == null || context.OriginalLength <= 30_000)
+            return InterceptionResult.NotIntercepted(result);
+
+        // 提取文件名（格式：filepath:linenum: content 或 filepath:linenum）
+        var lines = text.Split('\n');
+        var fileMatches = new Dictionary<string, int>();
+        
+        foreach (var line in lines)
+        {
+            var colonIdx = line.IndexOf(':');
+            if (colonIdx > 0)
+            {
+                var filePath = line[..colonIdx];
+                // 跳过统计行
+                if (filePath.StartsWith("Found ") || filePath.StartsWith("(")) continue;
+                
+                if (!fileMatches.ContainsKey(filePath))
+                    fileMatches[filePath] = 0;
+                fileMatches[filePath]++;
+            }
+        }
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"[搜索结果过大，已截断。匹配文件: {fileMatches.Count} 个]");
+        sb.AppendLine();
+        foreach (var (filePath, count) in fileMatches.OrderByDescending(x => x.Value))
+        {
+            sb.AppendLine($"  {count,4} matches in {filePath}");
+        }
+
+        return new InterceptionResult(
+            ToolResult.FromText(sb.ToString()),
+            toolResultIntercepted: true,
+            originalLength: context.OriginalLength
+        );
+    }
+
     private static string? GetStringValue(IDictionary<string, object> args, string key)
     {
         if (args.TryGetValue(key, out var value))

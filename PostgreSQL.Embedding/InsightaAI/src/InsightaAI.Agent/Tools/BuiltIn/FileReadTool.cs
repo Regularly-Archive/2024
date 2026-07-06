@@ -117,6 +117,38 @@ public class FileReadTool : IToolExecutor
         return sb.ToString();
     }
 
+    /// <summary>
+    /// 拦截大文件读取结果：持久化到磁盘，上下文只保留预览
+    /// </summary>
+    public InterceptionResult Intercept(ToolResult result, TruncationContext context)
+    {
+        var text = result.Content.OfType<TextBlock>().FirstOrDefault()?.Text;
+        if (text == null || context.OriginalLength <= 30_000)
+            return InterceptionResult.NotIntercepted(result);
+
+        // 持久化到磁盘
+        Directory.CreateDirectory(context.ToolResultDirectory);
+        var path = Path.Combine(context.ToolResultDirectory,
+            $"FileRead_{DateTime.Now:yyyyMMdd_HHmmss}_{context.ToolCallId}.txt");
+        
+        using (var writer = new StreamWriter(path))
+        {
+            writer.Write(text);
+        }
+
+        // 保留 200 行预览
+        var lines = text.Split('\n');
+        var preview = string.Join("\n", lines.Take(200));
+        var lineCount = context.OriginalLineCount.Value;
+
+        return new InterceptionResult(
+            ToolResult.FromText($"{preview}\n\n[完整内容已保存: {path}] (共 {lineCount} 行)"),
+            toolResultIntercepted: true,
+            persistedPath: path,
+            originalLength: context.OriginalLength
+        );
+    }
+
     private static string? GetStringValue(IDictionary<string, object> args, string key, string? defaultValue = null)
     {
         if (args.TryGetValue(key, out var value))

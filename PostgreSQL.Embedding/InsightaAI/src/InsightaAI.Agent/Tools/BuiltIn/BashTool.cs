@@ -120,6 +120,33 @@ public class BashTool : IToolExecutor
         }
     }
 
+    /// <summary>
+    /// 拦截大命令输出：保留头尾各 50 行
+    /// </summary>
+    public InterceptionResult Intercept(ToolResult result, TruncationContext context)
+    {
+        var text = result.Content.OfType<TextBlock>().FirstOrDefault()?.Text;
+        if (text == null || context.OriginalLength <= 30_000)
+            return InterceptionResult.NotIntercepted(result);
+
+        var lines = text.Split('\n');
+        if (lines.Length <= 100)
+            return InterceptionResult.NotIntercepted(result);
+
+        // 保留头尾各 50 行
+        var head = lines.Take(50);
+        var tail = lines.TakeLast(50);
+        var truncated = string.Join("\n", head)
+            + $"\n\n[... 截断 {lines.Length - 100} 行 ...]\n\n"
+            + string.Join("\n", tail);
+
+        return new InterceptionResult(
+            ToolResult.FromText(truncated),
+            toolResultIntercepted: true,
+            originalLength: context.OriginalLength
+        );
+    }
+
     private static bool IsDangerousCommand(string command)
     {
         var dangerousPatterns = new[]
