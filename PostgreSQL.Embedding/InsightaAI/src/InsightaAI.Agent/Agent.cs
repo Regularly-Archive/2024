@@ -15,14 +15,13 @@ using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using System.Threading.Channels;
 
 namespace InsightaAI.Agent;
 
 /// <summary>
 /// Agent 运行时 - 实现 Agent Loop 模式
 /// </summary>
-public class Agent
+public class Agent : IDisposable
 {
     /// <summary>
     /// Hook 执行错误事件（用于日志记录）
@@ -40,6 +39,7 @@ public class Agent
     private readonly HashSet<string> _alwaysAllowedTools = [];
     private string _skillInstructions = "";
     private readonly IServiceProvider _serviceProvider;
+    private bool _disposed;
 
     /// <summary>
     /// 创建 Agent 实例（手动注入依赖）
@@ -758,5 +758,24 @@ public class Agent
             Message = Message.FromAssistant("Agent execution failed."),
             Error = "No completion event received."
         };
+    }
+
+    /// <summary>
+    /// 释放资源（释放内部 ServiceProvider）
+    /// </summary>
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            _disposed = true;
+
+            // 释放内部 ServiceProvider（如果是我们创建的）
+            if (_serviceProvider is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
+
+            GC.SuppressFinalize(this);
+        }
     }
 }

@@ -1,3 +1,4 @@
+using InsightaAI.Agent;
 using InsightaAI.Agent.Abstractions;
 using InsightaAI.Agent.Cli.Hooks;
 using InsightaAI.Agent.Cli.Models;
@@ -374,7 +375,20 @@ public class ChatCommand
         // 创建记忆系统
         var memoryManager = CreateMemoryManager();
 
-        var agent = new Agent(agentConfig, llmClient, toolRegistry, skillRegistry, mcpRegistry, contextManager, memoryManager);
+        // 使用 AgentBuilder 构建 Agent
+        var mcpConnectionPool = new SimpleMcpConnectionPool();
+        var mcpRegistryToUse = mcpRegistry ?? new McpRegistry(mcpConnectionPool);
+        
+        var agent = new AgentBuilder(agentConfig)
+            .WithLlm(llmClient)
+            .WithToolRegistry(toolRegistry)
+            .WithSkillRegistry(skillRegistry)
+            .WithContextManager(contextManager!)
+            .WithMemoryManager(memoryManager)
+            .WithMcpRegistry(mcpRegistryToUse)
+            .Build();
+
+        // 注册 Hook（Build 后添加）
         agent.AddHook(new ToolPermissionHook("bash", "write_file", "read_file", "edit_file"));
 
         // 注册元学习 Hook（自动捕获工具错误并记录教训）
