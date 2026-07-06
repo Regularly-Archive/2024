@@ -8,7 +8,7 @@ namespace InsightaAI.Agent.Memory;
 /// 基于文件系统的记忆存储提供者（参考 Claude Code 设计）
 ///
 /// 存储结构：
-/// ~/.insighta/memories/
+/// ~/.insightai/memory/
 /// ├── private/{userId}/           # 私有记忆
 /// │   ├── MEMORY.md              # 索引文件（加载到 System Prompt）
 /// │   ├── user-profile.md        # 用户画像
@@ -39,8 +39,8 @@ public sealed class FileMemoryProvider : IMemoryProvider
     {
         _basePath = basePath ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".insighta",
-            "memories");
+            ".insightai",
+            "memory");
     }
 
     /// <summary>
