@@ -370,7 +370,7 @@ public class ChatCommand
         }
 
         // 创建上下文管理器
-        var contextManager = CreateContextManager(config, llmClient, sessionMemoryHook);
+        var contextManager = CreateContextManager(config, llmClient, sessionMemoryHook, toolRegistry);
 
         // 创建记忆系统
         var memoryManager = CreateMemoryManager();
@@ -389,7 +389,7 @@ public class ChatCommand
             .Build();
 
         // 注册 Hook（Build 后添加）
-        agent.AddHook(new ToolPermissionHook("bash", "write_file", "read_file", "edit_file"));
+        agent.AddHook(new ToolPermissionHook("bash", "write_file", "read_file", "edit_file", "web_fetch"));
 
         // 注册元学习 Hook（自动捕获工具错误并记录教训）
         var metaLearningStore = new MetaLearningStore();
@@ -430,7 +430,7 @@ public class ChatCommand
         return userId;
     }
 
-    private static IContextManager? CreateContextManager(CliConfig config, ILlmClient llmClient, SessionMemoryHook? sessionMemoryHook = null)
+    private static IContextManager? CreateContextManager(CliConfig config, ILlmClient llmClient, SessionMemoryHook? sessionMemoryHook = null, ToolRegistry? toolRegistry = null)
     {
         // 从配置或模型名称获取上下文窗口大小
         var contextWindowTokens = ModelContextWindows.GetContextWindowSize(config.Model);
@@ -444,7 +444,7 @@ public class ChatCommand
         var tokenEstimator = new CharTokenEstimator();
         var strategies = new List<ICompactStrategy>
         {
-            new MicroCompactStrategy()
+            new MicroCompactStrategy(toolRegistry)
         };
 
         // 注册会话记忆压缩策略（零 LLM 成本，优先级 2）

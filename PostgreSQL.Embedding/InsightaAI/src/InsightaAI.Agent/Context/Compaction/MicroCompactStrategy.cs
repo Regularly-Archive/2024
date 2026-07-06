@@ -1,4 +1,5 @@
 using System.Text.Json;
+using InsightaAI.Agent.Abstractions;
 using InsightaAI.LLM.Models;
 
 namespace InsightaAI.Agent.Context.Compaction;
@@ -9,14 +10,22 @@ namespace InsightaAI.Agent.Context.Compaction;
 /// <remarks>
 /// 策略逻辑：
 /// 1. 保留最近 N 个工具结果的完整内容
-/// 2. 对于更早的工具结果，根据工具类型进行智能截断
-/// 3. 保留 Tool Use/Result 配对结构
-/// 4. 保留元数据（工具名、状态、关键参数）
+/// 2. 跳过已在执行时被拦截的结果（ToolResultIntercepted = true）
+/// 3. 对于有 Intercept 方法的工具，委托给工具自己处理
+/// 4. 对于其他工具，使用内置的截断策略
+/// 5. 保留 Tool Use/Result 配对结构
 /// </remarks>
 public sealed class MicroCompactStrategy : ICompactStrategy
 {
+    private readonly ToolRegistry? _toolRegistry;
+
     public string Name => "MicroCompact";
     public int Priority => 1; // 最高优先级
+
+    public MicroCompactStrategy(ToolRegistry? toolRegistry = null)
+    {
+        _toolRegistry = toolRegistry;
+    }
 
     /// <summary>
     /// 可压缩的工具及其截断策略
@@ -72,17 +81,46 @@ public sealed class MicroCompactStrategy : ICompactStrategy
             if (i < budget.KeepRecentToolResults)
                 continue;
 
-            // 检查是否是可压缩的工具
-            if (!CompactableTools.TryGetValue(toolName, out var truncationStrategy))
-                continue;
-
             // 获取工具结果消息
             var toolResultMessage = messages[toolResultIndex];
 
-            // 截断工具结果
+            // 跳过已在执行时被拦截的结果
+            if (toolResultMessage.ToolResultIntercepted)
+                continue;
+
+            // 尝试委托给工具自己的 Intercept 方法
+            if (_toolRegistry?.GetExecutor(toolName) is { } executor)
+            {
+                var toolResult = new ToolResult
+                {
+                    Content = toolResultMessage.Content,
+                    IsError = IsErrorMessage(toolResultMessage)
+                };
+
+                var truncationContext = CreateTruncationContext(toolResultMessage, toolName);
+                var intercepted = executor.Intercept(toolResult, truncationContext);
+
+                if (intercepted.ToolResultIntercepted)
+                {
+                    messages[toolResultIndex] = new Message
+                    {
+                        Role = MessageRole.ToolResult,
+                        ToolCallId = toolResultMessage.ToolCallId,
+                        ToolName = toolResultMessage.ToolName,
+                        Content = intercepted.Result.Content,
+                        ToolResultIntercepted = true
+                    };
+                    compactedCount++;
+                    continue;
+                }
+            }
+
+            // 回退到内置截断策略
+            if (!CompactableTools.TryGetValue(toolName, out var truncationStrategy))
+                continue;
+
             var truncatedContent = TruncateToolResult(toolResultMessage, toolName, truncationStrategy);
 
-            // 替换消息内容
             messages[toolResultIndex] = new Message
             {
                 Role = MessageRole.ToolResult,
@@ -144,6 +182,34 @@ public sealed class MicroCompactStrategy : ICompactStrategy
         }
 
         return pairs;
+    }
+
+    /// <summary>
+    /// 检查是否是错误消息
+    /// </summary>
+    private static bool IsErrorMessage(Message message)
+    {
+        return message.Content.OfType<TextBlock>()
+            .Any(t => t.Text.Contains("error", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// 创建截断上下文
+    /// </summary>
+    private static TruncationContext CreateTruncationContext(Message message, string toolName)
+    {
+        var text = message.GetTextContent() ?? "";
+        return new TruncationContext(
+            originalLength: text.Length,
+            originalLineCount: new Lazy<int>(() => text.Split('\n').Length),
+            utilizationRatio: 0,
+            budget: null,
+            toolResultDirectory: Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "InsightaAI", "ToolResults"),
+            toolName: toolName,
+            toolCallId: message.ToolCallId ?? ""
+        );
     }
 
     /// <summary>
