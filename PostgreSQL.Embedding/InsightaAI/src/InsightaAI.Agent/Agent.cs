@@ -382,7 +382,7 @@ public class Agent : IDisposable
         AgentContext? context = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var conversationId = context?.ConversationId ?? Guid.NewGuid().ToString("N");
+        var conversationId = context?.SessionId ?? Guid.NewGuid().ToString("N");
         var hookContext = new HookContext
         {
             SessionId = conversationId,
@@ -706,14 +706,14 @@ public class Agent : IDisposable
     private async Task<(bool Allowed, ToolResult Result)> ExecuteSingleToolAsync(
         ToolCallBlock toolCall,
         string arguments,
-        string conversationId,
+        string sessionId,
         CancellationToken cancellationToken)
     {
         var toolContext = new ToolExecutionContext
         {
             AgentId = _config.Id,
             ToolCallId = toolCall.Id,
-            ConversationId = conversationId,
+            SessionId = sessionId,
             CancellationToken = cancellationToken,
             Services = _serviceProvider
         };

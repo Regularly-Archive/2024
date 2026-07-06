@@ -100,7 +100,7 @@ public sealed record AgentResult
 public sealed record AgentContext
 {
     /// <summary>会话 ID</summary>
-    public string? ConversationId { get; init; }
+    public string? SessionId { get; init; }
 
     /// <summary>对话历史</summary>
     public List<Message> History { get; init; } = [];

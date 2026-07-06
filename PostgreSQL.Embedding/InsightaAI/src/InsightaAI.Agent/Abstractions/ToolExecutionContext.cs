@@ -14,7 +14,7 @@ public sealed record ToolExecutionContext
     public required string ToolCallId { get; init; }
 
     /// <summary>会话 ID</summary>
-    public string? ConversationId { get; init; }
+    public string? SessionId { get; init; }
 
     /// <summary>取消令牌</summary>
     public CancellationToken CancellationToken { get; init; }

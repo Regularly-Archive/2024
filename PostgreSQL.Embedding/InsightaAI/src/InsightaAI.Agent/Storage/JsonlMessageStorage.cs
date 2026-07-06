@@ -26,7 +26,9 @@ public class JsonlMessageStorage : IMessageStorage
     {
         _basePath = basePath ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".insightaai");
+            ".insighta",
+            "sessions"
+        );
         Directory.CreateDirectory(_basePath);
     }
 

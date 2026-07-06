@@ -1,7 +1,9 @@
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using InsightaAI.Agent.Abstractions;
+using InsightaAI.Agent.Models;
 using InsightaAI.LLM.Models;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace InsightaAI.Agent.Tools.BuiltIn;
 
@@ -19,7 +21,7 @@ public class WhereAmITool : IToolExecutor
         Definition = new ToolDefinition
         {
             Name = Name,
-            Description = "获取当前环境信息，包括时间、操作系统、工作目录、会话 ID 等。当你需要了解当前上下文时使用。",
+            Description = "获取当前环境信息，包括时间、操作系统、工作目录、会话 ID、模型信息等。当你需要了解当前上下文时使用。",
             Schema = JsonSerializer.SerializeToElement(new
             {
                 type = "object",
@@ -33,6 +35,8 @@ public class WhereAmITool : IToolExecutor
     {
         var now = DateTime.Now;
         var tz = TimeZoneInfo.Local;
+
+        var agentConfig = context.Services.GetRequiredService<AgentConfig>();
 
         var info = new Dictionary<string, object>
         {
@@ -50,9 +54,10 @@ public class WhereAmITool : IToolExecutor
                 platform = Environment.OSVersion.Platform.ToString()
             },
             ["workspace"] = Directory.GetCurrentDirectory(),
-            ["session"] = context.ConversationId ?? string.Empty,
+            ["session"] = context.SessionId ?? string.Empty,
             ["agent"] = context.AgentId,
-            ["runtime"] = RuntimeInformation.FrameworkDescription
+            ["runtime"] = RuntimeInformation.FrameworkDescription,
+            ["modelId"] = agentConfig!.Model
         };
 
         return Task.FromResult(ToolResult.From(info));

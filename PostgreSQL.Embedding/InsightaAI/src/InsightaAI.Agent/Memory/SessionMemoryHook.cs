@@ -59,7 +59,7 @@ public sealed record SessionMemoryOptions
 ///
 /// 存储结构：
 /// ~/.insightai/memory/sessions/{sessionId}/
-/// ├── session-memory.md    # 会话级记忆（短期）
+/// ├── MEMORY.md    # 会话级记忆（短期）
 /// └── metadata.json        # 会话元数据
 /// </summary>
 public sealed class SessionMemoryHook : IAgentHook
@@ -116,7 +116,7 @@ public sealed class SessionMemoryHook : IAgentHook
         // 会话记忆目录
         var memoryBase = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".insightai", "memory", "sessions", sessionId);
+            ".insighta", "memories", "sessions", sessionId);
         _sessionDir = memoryBase;
         Directory.CreateDirectory(_sessionDir);
     }

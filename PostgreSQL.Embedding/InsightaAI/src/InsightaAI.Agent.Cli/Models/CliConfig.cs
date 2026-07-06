@@ -13,7 +13,7 @@ public class CliConfig
     /// </summary>
     public static readonly string ConfigPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        ".insightaai",
+        ".insighta",
         "config.json");
 
     /// <summary>
@@ -21,7 +21,7 @@ public class CliConfig
     /// </summary>
     public static readonly string SessionsDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        ".insightaai",
+        ".insighta",
         "sessions");
 
     /// <summary>

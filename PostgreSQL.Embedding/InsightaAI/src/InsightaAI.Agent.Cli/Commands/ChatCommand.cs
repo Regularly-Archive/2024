@@ -149,7 +149,7 @@ public class ChatCommand
             // 构建上下文
             var context = new AgentContext
             {
-                ConversationId = session.SessionId,
+                SessionId = session.SessionId,
                 History = session.GetLlmHistory()
             };
 
@@ -166,7 +166,7 @@ public class ChatCommand
         // 构建上下文
         var context = new AgentContext
         {
-            ConversationId = session.SessionId,
+            SessionId = session.SessionId,
             History = session.GetLlmHistory()
         };
 
@@ -415,7 +415,7 @@ public class ChatCommand
     {
         var configDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".insightai");
+            ".insighta");
         Directory.CreateDirectory(configDir);
 
         var userIdFile = Path.Combine(configDir, "user_id");
