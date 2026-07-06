@@ -501,37 +501,37 @@ if (_enableToolResultInterception)
 
 ## 9. Implementation Roadmap
 
-### Phase 1: Core Infrastructure (Week 1)
-- [ ] Add `TruncationContext` class
-- [ ] Add `InterceptionResult` class
-- [ ] Add `Intercept` default interface method to `IToolExecutor`
-- [ ] Update `ToolExecutor` to call `Intercept` after execution
-- [ ] Add `ToolResultDirectory` management to `ContextManager`
-- [ ] Add `ToolResultIntercepted` flag to `Message` class
-- [ ] Add feature flag: `EnableToolResultInterception`
+### Phase 1: Core Infrastructure ✅ Done
+- [x] Add `TruncationContext` class
+- [x] Add `InterceptionResult` class
+- [x] Add `Intercept` default interface method to `IToolExecutor`
+- [x] Update `ToolExecutor` to call `Intercept` after execution
+- [ ] Add `ToolResultDirectory` management to `ContextManager` — 目前路径硬编码在各处
+- [x] Add `ToolResultIntercepted` flag to `Message` class
+- [x] Add feature flag: `EnableToolResultInterception`（通过构造参数控制）
 
-### Phase 2: Built-in Tool Overrides (Week 1-2)
-- [ ] `FileReadTool.Intercept` with persistence (basic version)
-- [ ] `GrepTool.Intercept` with file-name-only truncation
-- [ ] `BashTool.Intercept` with head+tail truncation
-- [ ] `WebFetchTool.Intercept` with persistence
-- [ ] `WebSearchTool.Intercept` with truncation
+### Phase 2: Built-in Tool Overrides ✅ Core Done
+- [x] `FileReadTool.Intercept` — 持久化 + 200 行预览
+- [x] `GrepTool.Intercept` — 文件名 + 匹配数量
+- [x] `BashTool.Intercept` — 头尾各 50 行
+- [ ] `WebFetchTool.Intercept` — 静态类，需重构为 `IToolExecutor`
+- [ ] `WebSearchTool.Intercept` — 静态类，需重构为 `IToolExecutor`
 - [ ] **Future Enhancement**: Smart preview by file type (JSON, Markdown, etc.)
 
-### Phase 3: MicroCompactStrategy Refactoring (Week 2)
-- [ ] Refactor `MicroCompactStrategy` to delegate to `tool.Intercept()`
-- [ ] Add skip logic for already-intercepted results
-- [ ] Keep `FallbackTruncationStrategy` for tools without overrides
-- [ ] Remove redundant `ToolTruncationStrategy` classes
+### Phase 3: MicroCompactStrategy Refactoring ✅ Done
+- [x] Refactor `MicroCompactStrategy` to delegate to `tool.Intercept()`
+- [x] Add skip logic for already-intercepted results
+- [x] Keep `FallbackTruncationStrategy` for tools without overrides
+- [ ] Remove redundant `ToolTruncationStrategy` classes — 可选清理
 
-### Phase 4: Testing & Polish (Week 2-3)
+### Phase 4: Testing & Polish ⬜ Not Started
 - [ ] Unit tests for each tool's `Intercept`
 - [ ] Integration test: large file read → persistence → re-read
 - [ ] Integration test: context utilization triggers appropriate layers
 - [ ] CLI display: show when results are truncated/persisted
 - [ ] Add monitoring metrics: truncation frequency, persistence frequency
 
-### Phase 5: Cleanup & Documentation (Week 3-4)
+### Phase 5: Cleanup & Documentation ⬜ Not Started
 - [ ] Implement ToolResultDirectory cleanup (normal + abnormal exit)
 - [ ] Update user documentation
 - [ ] Performance benchmarking
