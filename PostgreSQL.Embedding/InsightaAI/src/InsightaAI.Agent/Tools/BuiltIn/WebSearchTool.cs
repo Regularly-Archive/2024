@@ -1,4 +1,4 @@
-using System.Net.Http.Headers;
+﻿using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -8,66 +8,92 @@ using InsightaAI.LLM.Models;
 namespace InsightaAI.Agent.Tools.BuiltIn;
 
 /// <summary>
-/// Web 搜索工具（Attribute 模式示例）
+/// Web 搜索工具（IToolExecutor 模式，支持 Intercept）
 /// 使用 Tavily API 进行搜索
 /// </summary>
-public static class WebSearchTool
+public class WebSearchTool : IToolExecutor
 {
     private static readonly HttpClient _httpClient = new();
 
-    /// <summary>
-    /// 使用 Tavily API 搜索
-    /// </summary>
-    [Tool("web_search", "搜索互联网获取实时信息。适用于查找最新资讯、文档、教程等。")]
-    public static async Task<ToolResult> SearchAsync(
-        [ToolParameter("搜索关键词")] string query,
-        [ToolParameter("搜索结果数量限制（默认 5）")] int max_results,
-        ToolExecutionContext context,
-        [ToolParameter("是否包含 AI 生成的答案（默认 true）")] bool include_answer = true,
-        [ToolParameter("搜索深度：basic 或 advanced（默认 basic）")] string search_depth = "basic",
-        [ToolParameter("只搜索这些域名（逗号分隔）")] string? include_domains = null,
-        [ToolParameter("排除这些域名（逗号分隔）")] string? exclude_domains = null,
-        [ToolParameter("搜索主题：general 或 news（默认 general）")] string topic = "general",
-        [ToolParameter("新闻搜索的时间范围（天数，仅 topic=news 时有效）")] int days = 3)
+    public string Name => "web_search";
+
+    public ToolDefinition Definition => new()
     {
+        Name = Name,
+        Description = "搜索互联网获取实时信息。适用于查找最新资讯、文档、教程等。",
+        Schema = JsonSerializer.SerializeToElement(new
+        {
+            type = "object",
+            properties = new
+            {
+                query = new
+                {
+                    type = "string",
+                    description = "搜索关键词"
+                },
+                max_results = new
+                {
+                    type = "integer",
+                    description = "搜索结果数量限制（默认 5）"
+                },
+                search_depth = new
+                {
+                    type = "string",
+                    description = "搜索深度：basic 或 advanced（默认 basic）"
+                },
+                topic = new
+                {
+                    type = "string",
+                    description = "搜索主题：general 或 news（默认 general）"
+                }
+            },
+            required = new[] { "query" }
+        })
+    };
+
+    public async Task<ToolResult> ExecuteAsync(
+        IDictionary<string, object> args,
+        ToolExecutionContext context)
+    {
+        var query = GetStringValue(args, "query") ?? "";
+        var maxResults = GetIntValue(args, "max_results", 5);
+        var searchDepth = GetStringValue(args, "search_depth") ?? "basic";
+        var topic = GetStringValue(args, "topic") ?? "general";
+        var includeAnswer = !args.ContainsKey("include_answer") || args["include_answer"] is not bool b || b;
+        var days = GetIntValue(args, "days", 3);
+        var includeDomains = GetStringValue(args, "include_domains");
+        var excludeDomains = GetStringValue(args, "exclude_domains");
+
         try
         {
-            // 从环境变量获取 API Key
             var apiKey = Environment.GetEnvironmentVariable("TAVILY_API_KEY");
             if (string.IsNullOrEmpty(apiKey))
-            {
-                return ToolResult.FromError(
-                    "TAVILY_API_KEY environment variable is not set. " +
-                    "Please set it to use web search functionality.");
-            }
+                return ToolResult.FromError("TAVILY_API_KEY environment variable is not set.");
 
-            // 构建请求体
             var request = new TavilySearchRequest
             {
                 Query = query,
-                MaxResults = Math.Min(max_results, 20),
-                SearchDepth = search_depth,
-                IncludeAnswer = include_answer,
+                MaxResults = Math.Min(maxResults, 20),
+                SearchDepth = searchDepth,
+                IncludeAnswer = includeAnswer,
                 Topic = topic,
                 Days = days
             };
 
-            // 处理域名过滤
-            if (!string.IsNullOrEmpty(include_domains))
+            if (!string.IsNullOrEmpty(includeDomains))
             {
-                request.IncludeDomains = include_domains
+                request.IncludeDomains = includeDomains
                     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                     .ToList();
             }
 
-            if (!string.IsNullOrEmpty(exclude_domains))
+            if (!string.IsNullOrEmpty(excludeDomains))
             {
-                request.ExcludeDomains = exclude_domains
+                request.ExcludeDomains = excludeDomains
                     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                     .ToList();
             }
 
-            // 使用 Bearer token 认证
             var requestMessage = new HttpRequestMessage(HttpMethod.Post, "https://api.tavily.com/search")
             {
                 Content = JsonContent.Create(request, options: new JsonSerializerOptions
@@ -78,7 +104,6 @@ public static class WebSearchTool
             };
             requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
-            // 发送请求
             var response = await _httpClient.SendAsync(requestMessage, context.CancellationToken);
 
             if (!response.IsSuccessStatusCode)
@@ -87,22 +112,53 @@ public static class WebSearchTool
                 return ToolResult.FromError($"Search API error: {response.StatusCode} - {error}");
             }
 
-            // 解析响应
             var result = await response.Content.ReadFromJsonAsync<TavilySearchResponse>(
                 cancellationToken: context.CancellationToken);
 
             if (result == null)
-            {
                 return ToolResult.FromError("Failed to parse search results.");
-            }
 
-            // 直接返回解析后的结果
             return ToolResult.From(result);
         }
         catch (Exception ex)
         {
             return ToolResult.FromError($"Web search failed: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// 拦截大搜索结果：只保留摘要和前 N 条结果
+    /// </summary>
+    public InterceptionResult Intercept(ToolResult result, TruncationContext context)
+    {
+        var text = result.Content.OfType<TextBlock>().FirstOrDefault()?.Text;
+        if (text == null || context.OriginalLength <= 30_000)
+            return InterceptionResult.NotIntercepted(result);
+
+        // 保留前 10000 字符作为预览
+        var preview = text[..Math.Min(10000, text.Length)];
+
+        return new InterceptionResult(
+            ToolResult.FromText($"{preview}\n\n[搜索结果过大，已截断。原始大小: {context.OriginalLength} 字符]"),
+            toolResultIntercepted: true,
+            originalLength: context.OriginalLength
+        );
+    }
+
+    private static string? GetStringValue(IDictionary<string, object> args, string key)
+    {
+        if (args.TryGetValue(key, out var value))
+            return value?.ToString();
+        return null;
+    }
+
+    private static int GetIntValue(IDictionary<string, object> args, string key, int defaultValue)
+    {
+        if (args.TryGetValue(key, out var value) && value is int i)
+            return i;
+        if (value?.ToString() is string s && int.TryParse(s, out var parsed))
+            return parsed;
+        return defaultValue;
     }
 
     private class TavilySearchRequest

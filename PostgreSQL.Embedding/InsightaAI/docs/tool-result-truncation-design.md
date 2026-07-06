@@ -506,16 +506,16 @@ if (_enableToolResultInterception)
 - [x] Add `InterceptionResult` class
 - [x] Add `Intercept` default interface method to `IToolExecutor`
 - [x] Update `ToolExecutor` to call `Intercept` after execution
-- [ ] Add `ToolResultDirectory` management to `ContextManager` — 目前路径硬编码在各处
+- [x] Add `ToolResultDirectory` management to `ContextManager` — 通过 `TruncationContext.ToolResultDirectory` 传入
 - [x] Add `ToolResultIntercepted` flag to `Message` class
 - [x] Add feature flag: `EnableToolResultInterception`（通过构造参数控制）
 
-### Phase 2: Built-in Tool Overrides ✅ Core Done
+### Phase 2: Built-in Tool Overrides ✅ Done
 - [x] `FileReadTool.Intercept` — 持久化 + 200 行预览
 - [x] `GrepTool.Intercept` — 文件名 + 匹配数量
 - [x] `BashTool.Intercept` — 头尾各 50 行
-- [ ] `WebFetchTool.Intercept` — 静态类，需重构为 `IToolExecutor`
-- [ ] `WebSearchTool.Intercept` — 静态类，需重构为 `IToolExecutor`
+- [x] `WebFetchTool.Intercept` — 重构为 IToolExecutor + 持久化 + 5000 字符预览
+- [x] `WebSearchTool.Intercept` — 重构为 IToolExecutor + 10000 字符预览
 - [ ] **Future Enhancement**: Smart preview by file type (JSON, Markdown, etc.)
 
 ### Phase 3: MicroCompactStrategy Refactoring ✅ Done

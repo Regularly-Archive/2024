@@ -1,8 +1,8 @@
-using System.Diagnostics;
 using InsightaAI.Agent.Cli.Extensions;
 using InsightaAI.Agent.Models;
 using InsightaAI.LLM.Models;
 using Spectre.Console;
+using System.Diagnostics;
 
 namespace InsightaAI.Agent.Cli.UI;
 

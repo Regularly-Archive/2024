@@ -49,9 +49,12 @@ public static class BuiltInToolsExtensions
         registry.Register(new GlobTool(fileSystem));
         registry.Register(new BashTool(shellExecutor));
         registry.Register(new WhereAmITool());
+        registry.Register(new WebFetchTool());
+        registry.Register(new WebSearchTool());
 
         // 注册 Attribute 模式的工具（扫描当前程序集）
-        registry.FromAssembly(typeof(WebSearchTool).Assembly);
+        // 注意：WebFetchTool 和 WebSearchTool 已改为 IToolExecutor 模式，不再使用 Attribute
+        // registry.FromAssembly(typeof(WebSearchTool).Assembly);
 
         return registry;
     }
