@@ -123,7 +123,50 @@ _toolRegistry = serviceProvider.GetRequiredService<ToolRegistry>();  // 会抛�
 
 ---
 
+## 功能特性
+
+### 7. Tool Result Interception（优先级：高）
+
+**问题描述：**
+大型工具结果（如读取大文件、大范围搜索）会迅速消耗上下文窗口，导致压缩频繁触发。
+
+**设计方案：**
+在工具结果进入上下文前拦截，根据工具类型进行预处理（持久化、截断等）。
+
+**已完成：**
+- [x] Phase 1: Core Infrastructure
+  - `TruncationContext`、`InterceptionResult` 类
+  - `IToolExecutor.Intercept()` 默认接口方法
+  - `ToolExecutor.TryInterceptResult()` 集成
+  - `Message.ToolResultIntercepted` 标志
+  - Feature flag（构造参数控制）
+- [x] Phase 2: Built-in Tool Overrides
+  - `FileReadTool.Intercept` — 持久化 + 200 行预览
+  - `GrepTool.Intercept` — 文件名 + 匹配数量
+  - `BashTool.Intercept` — 头尾各 50 行
+  - `WebFetchTool.Intercept` — 重构为 IToolExecutor + 持久化 + 5000 字符预览
+  - `WebSearchTool.Intercept` — 重构为 IToolExecutor + 10000 字符预览
+- [x] Phase 3: MicroCompactStrategy Refactoring
+  - 跳过已拦截结果（`ToolResultIntercepted = true`）
+  - 委托给 `tool.Intercept()`
+
+**待优化：**
+- [ ] Phase 4: Testing & Polish
+  - [ ] 单元测试：各工具的 `Intercept` 方法
+  - [ ] 集成测试：大文件读取 → 持久化 → 重新读取
+  - [ ] CLI 显示截断/持久化状态
+  - [ ] 监控指标：截断频率、持久化频率
+- [ ] Phase 5: Cleanup & Documentation
+  - [ ] `ToolResultDirectory` 生命周期清理（正常退出 + 异常退出）
+  - [ ] 性能基准测试
+  - [ ] 移除冗余的 `ToolTruncationStrategy` 类（可选）
+
+**详细设计文档：** [tool-result-truncation-design.md](tool-result-truncation-design.md)
+
+---
+
 ## 记录时间
 - 2026-07-03: 创建文档，记录当前待办事项
 - 2026-07-15: 新增 Agent 依赖注入待办、TiktokenTokenEstimator、测试失败清单
 - 2026-07-16: 新增 AgentBuilder 生命周期一致性待办（ToolRegistry 注册问题）
+- 2026-07-21: 新增 Tool Result Interception 功能待办（Phase 1-3 已完成）
