@@ -241,7 +241,7 @@ public class OpenAIResponseAdapterTests
     [Fact]
     public void ParseStreamEvent_ResponseCreated_Should_Return_StreamStartEvent()
     {
-        var (eventType, data) = LoadStreamEvent("Response/response_created.json");
+        var (eventType, data) = LoadStreamEvent("response_created.json");
 
         var result = _adapter.ParseStreamEvent(eventType, data);
 
@@ -253,7 +253,7 @@ public class OpenAIResponseAdapterTests
     [Fact]
     public void ParseStreamEvent_ResponseInProgress_Should_Return_Null()
     {
-        var (eventType, data) = LoadStreamEvent("Response/response_in_progress.json");
+        var (eventType, data) = LoadStreamEvent("response_in_progress.json");
 
         var result = _adapter.ParseStreamEvent(eventType, data);
 
@@ -263,7 +263,7 @@ public class OpenAIResponseAdapterTests
     [Fact]
     public void ParseStreamEvent_OutputTextDelta_Should_Return_TextDeltaEvent()
     {
-        var (eventType, data) = LoadStreamEvent("Response/response_output_text_delta.json");
+        var (eventType, data) = LoadStreamEvent("response_output_text_delta.json");
 
         var result = _adapter.ParseStreamEvent(eventType, data);
 
@@ -275,7 +275,7 @@ public class OpenAIResponseAdapterTests
     [Fact]
     public void ParseStreamEvent_OutputTextDone_Should_Return_TextEndEvent()
     {
-        var (eventType, data) = LoadStreamEvent("Response/response_output_text_done.json");
+        var (eventType, data) = LoadStreamEvent("response_output_text_done.json");
 
         var result = _adapter.ParseStreamEvent(eventType, data);
 
@@ -286,7 +286,7 @@ public class OpenAIResponseAdapterTests
     [Fact]
     public void ParseStreamEvent_OutputItemAdded_FunctionCall_Should_Return_ToolCallStartEvent()
     {
-        var (eventType, data) = LoadStreamEvent("Response/output_item_added_function_call.json");
+        var (eventType, data) = LoadStreamEvent("output_item_added_function_call.json");
 
         var result = _adapter.ParseStreamEvent(eventType, data);
 
@@ -299,7 +299,7 @@ public class OpenAIResponseAdapterTests
     [Fact]
     public void ParseStreamEvent_OutputItemAdded_Message_Should_Return_Null()
     {
-        var (eventType, data) = LoadStreamEvent("Response/output_item_added_message.json");
+        var (eventType, data) = LoadStreamEvent("output_item_added_message.json");
 
         var result = _adapter.ParseStreamEvent(eventType, data);
 
@@ -310,11 +310,11 @@ public class OpenAIResponseAdapterTests
     public void ParseStreamEvent_FunctionCallArgumentsDelta_Should_Return_ToolCallDeltaEvent()
     {
         // 先触发一个 output_item.added 来注册 pending tool call
-        var (addType, addData) = LoadStreamEvent("Response/output_item_added_function_call.json");
+        var (addType, addData) = LoadStreamEvent("output_item_added_function_call.json");
         _adapter.ParseStreamEvent(addType, addData);
 
         // 然后发送 arguments delta
-        var (eventType, data) = LoadStreamEvent("Response/function_call_arguments_delta.json");
+        var (eventType, data) = LoadStreamEvent("function_call_arguments_delta.json");
 
         var result = _adapter.ParseStreamEvent(eventType, data);
 
@@ -326,7 +326,7 @@ public class OpenAIResponseAdapterTests
     [Fact]
     public void ParseStreamEvent_FunctionCallArgumentsDone_Should_Return_Null()
     {
-        var (eventType, data) = LoadStreamEvent("Response/function_call_arguments_done.json");
+        var (eventType, data) = LoadStreamEvent("function_call_arguments_done.json");
 
         var result = _adapter.ParseStreamEvent(eventType, data);
 
@@ -337,15 +337,15 @@ public class OpenAIResponseAdapterTests
     public void ParseStreamEvent_OutputItemDone_FunctionCall_Should_Return_ToolCallEndEvent()
     {
         // 先注册 pending tool call
-        var (addType, addData) = LoadStreamEvent("Response/output_item_added_function_call.json");
+        var (addType, addData) = LoadStreamEvent("output_item_added_function_call.json");
         _adapter.ParseStreamEvent(addType, addData);
 
         // 发送 arguments delta
-        var (deltaType, deltaData) = LoadStreamEvent("Response/function_call_arguments_delta.json");
+        var (deltaType, deltaData) = LoadStreamEvent("function_call_arguments_delta.json");
         _adapter.ParseStreamEvent(deltaType, deltaData);
 
         // 完成 item
-        var (eventType, data) = LoadStreamEvent("Response/output_item_done_function_call.json");
+        var (eventType, data) = LoadStreamEvent("output_item_done_function_call.json");
 
         var result = _adapter.ParseStreamEvent(eventType, data);
 
@@ -358,7 +358,7 @@ public class OpenAIResponseAdapterTests
     [Fact]
     public void ParseStreamEvent_OutputItemDone_Message_Should_Return_Null()
     {
-        var (eventType, data) = LoadStreamEvent("Response/output_item_done_message.json");
+        var (eventType, data) = LoadStreamEvent("output_item_done_message.json");
 
         var result = _adapter.ParseStreamEvent(eventType, data);
 
@@ -368,7 +368,7 @@ public class OpenAIResponseAdapterTests
     [Fact]
     public void ParseStreamEvent_ResponseCompleted_Should_Return_DoneEvent_With_Usage()
     {
-        var (eventType, data) = LoadStreamEvent("Response/response_completed.json");
+        var (eventType, data) = LoadStreamEvent("response_completed.json");
 
         var result = _adapter.ParseStreamEvent(eventType, data);
 
@@ -382,7 +382,7 @@ public class OpenAIResponseAdapterTests
     [Fact]
     public void ParseStreamEvent_ResponseCompleted_Incomplete_Should_Return_MaxTokens()
     {
-        var (eventType, data) = LoadStreamEvent("Response/response_completed_incomplete.json");
+        var (eventType, data) = LoadStreamEvent("response_completed_incomplete.json");
 
         var result = _adapter.ParseStreamEvent(eventType, data);
 
@@ -393,7 +393,7 @@ public class OpenAIResponseAdapterTests
     [Fact]
     public void ParseStreamEvent_Unknown_Event_Should_Return_Null()
     {
-        var (eventType, data) = LoadStreamEvent("Response/unknown_event.json");
+        var (eventType, data) = LoadStreamEvent("unknown_event.json");
 
         var result = _adapter.ParseStreamEvent(eventType, data);
 
@@ -405,7 +405,7 @@ public class OpenAIResponseAdapterTests
     [Fact]
     public void ParseStreamEvent_OutputItemAdded_Reasoning_Should_Return_Null()
     {
-        var (eventType, data) = LoadStreamEvent("Response/output_item_added_reasoning.json");
+        var (eventType, data) = LoadStreamEvent("output_item_added_reasoning.json");
 
         var result = _adapter.ParseStreamEvent(eventType, data);
 
@@ -415,7 +415,7 @@ public class OpenAIResponseAdapterTests
     [Fact]
     public void ParseStreamEvent_ContentPartAdded_ReasoningText_Should_Return_ThinkingStartEvent()
     {
-        var (eventType, data) = LoadStreamEvent("Response/content_part_added_reasoning_text.json");
+        var (eventType, data) = LoadStreamEvent("content_part_added_reasoning_text.json");
 
         var result = _adapter.ParseStreamEvent(eventType, data);
 
@@ -426,7 +426,7 @@ public class OpenAIResponseAdapterTests
     [Fact]
     public void ParseStreamEvent_OutputItemDone_Reasoning_Should_Return_Null()
     {
-        var (eventType, data) = LoadStreamEvent("Response/output_item_done_reasoning.json");
+        var (eventType, data) = LoadStreamEvent("output_item_done_reasoning.json");
 
         var result = _adapter.ParseStreamEvent(eventType, data);
 
@@ -868,7 +868,7 @@ public class OpenAIResponseAdapterTests
 
     private static (string EventType, JsonElement Data) LoadStreamEvent(string relativePath)
     {
-        var data = LoadJson($"StreamEvents/{relativePath}");
+        var data = LoadJson($"Responses/StreamEvents/{relativePath}");
         var eventType = data.GetProperty("type").GetString()!;
         return (eventType, data);
     }
