@@ -203,6 +203,28 @@ public class EventRenderer : IDisposable
     }
 
     /// <summary>
+    /// 显示用户中断提示
+    /// </summary>
+    public void ShowInterrupted()
+    {
+        // 停止 thinking spinner
+        if (_isThinking && _thinkingCts != null)
+        {
+            try { _thinkingCts.Cancel(); } catch { }
+            _isThinking = false;
+            _thinkingCts = null;
+        }
+
+        if (!string.IsNullOrEmpty(FullText))
+        {
+            AnsiConsole.WriteLine();
+        }
+
+        AnsiConsole.MarkupLine("[dim]● The task has been cancelled by user [/]");
+        AnsiConsole.MarkupLine("[red]⎿ Interrupted[/]");
+    }
+
+    /// <summary>
     /// 重置状态（用于新一轮对话）
     /// </summary>
     public void Reset()

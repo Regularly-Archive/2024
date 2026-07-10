@@ -126,6 +126,12 @@ public class ChatCommand
 
         while (true)
         {
+            // 清空控制台输入缓冲区，防止 agent 执行期间残留的按键（如 ESC）泄漏到 prompt
+            while (Console.KeyAvailable)
+            {
+                Console.ReadKey(intercept: true);
+            }
+
             var userInput = _renderer.PromptUser();
 
             if (string.IsNullOrWhiteSpace(userInput))
@@ -293,6 +299,26 @@ public class ChatCommand
     private async Task ExecuteAgentAsync(Agent agent, string userInput, AgentContext context, ChatSession session)
     {
         using var eventRenderer = new EventRenderer();
+        using var cts = new CancellationTokenSource();
+
+        // 启动 ESC 监听后台任务
+        // 注意：不能把 cts.Token 传给 Task.Delay，否则取消时会抛异常导致任务异常退出
+        var escListenerTask = Task.Run(async () =>
+        {
+            while (!cts.IsCancellationRequested)
+            {
+                if (Console.KeyAvailable)
+                {
+                    var key = Console.ReadKey(intercept: true);
+                    if (key.Key == ConsoleKey.Escape)
+                    {
+                        cts.Cancel();
+                        break;
+                    }
+                }
+                await Task.Delay(50).ConfigureAwait(false);
+            }
+        });
 
         try
         {
@@ -300,8 +326,11 @@ public class ChatCommand
             var roundToolResults = new List<(string ToolCallId, string ToolName, string Result, bool IsError)>();
             int textLengthBeforeRound = 0;
 
-            await foreach (var agentEvent in agent.RunStreamAsync(userInput, context))
+            await foreach (var agentEvent in agent.RunStreamAsync(userInput, context, cts.Token))
             {
+                // 每个事件处理前检查取消（WithCancellation 在事件间隙可能不触发）
+                cts.Token.ThrowIfCancellationRequested();
+
                 await eventRenderer.HandleEventAsync(agentEvent);
 
                 if (agentEvent is AgentToolStartEvent toolStart)
@@ -388,9 +417,19 @@ public class ChatCommand
                 }
             }
         }
+        catch (OperationCanceledException)
+        {
+            // 用户按 ESC 打断，不保存未完成的助手消息，避免 LLM 下轮重复生成
+            eventRenderer.ShowInterrupted();
+        }
         catch (Exception ex)
         {
             _renderer.ShowError(ex.Message);
+        }
+        finally
+        {
+            cts.Cancel(); // 确保 ESC 监听任务退出
+            try { await escListenerTask; } catch { }
         }
     }
 
