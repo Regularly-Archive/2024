@@ -1,0 +1,8 @@
+{
+  "type": "response.created",
+  "response": {
+    "id": "resp_123",
+    "model": "gpt-4o",
+    "status": "in_progress"
+  }
+}

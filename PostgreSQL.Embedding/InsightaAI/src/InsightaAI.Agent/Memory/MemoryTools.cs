@@ -369,6 +369,7 @@ internal class SearchMemoryTool : IToolExecutor
         foreach (var memory in memories)
         {
             var score = memory.RelevanceScore.HasValue ? $" (score: {memory.RelevanceScore:F2})" : "";
+            sb.AppendLine($"MemoryId: {memory.Id}");
             sb.AppendLine($"[{memory.Type}]{score} {memory.Name}");
             sb.AppendLine($"  {memory.Content}");
             if (memory.Tags.Count > 0)

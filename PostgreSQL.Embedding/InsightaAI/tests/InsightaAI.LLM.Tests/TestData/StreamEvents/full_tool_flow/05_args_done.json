@@ -1,0 +1,5 @@
+{
+  "type": "response.function_call_arguments.done",
+  "call_id": "call_001",
+  "arguments": "{\"location\":\"Shanghai\"}"
+}

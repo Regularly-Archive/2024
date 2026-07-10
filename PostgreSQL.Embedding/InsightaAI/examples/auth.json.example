@@ -1,0 +1,29 @@
+{
+  "providers": {
+    "openai": {
+      "adapter": "openai",
+      "api_key": "sk-xxx",
+      "base_url": null
+    },
+    "deepseek": {
+      "adapter": "openai",
+      "api_key": "sk-xxx",
+      "base_url": "https://api.deepseek.com/v1"
+    },
+    "kimi": {
+      "adapter": "openai",
+      "api_key": "sk-xxx",
+      "base_url": "https://api.moonshot.cn/v1"
+    },
+    "anthropic": {
+      "adapter": "anthropic",
+      "api_key": "sk-ant-xxx",
+      "base_url": null
+    },
+    "gemini": {
+      "adapter": "gemini",
+      "api_key": "xxx",
+      "base_url": null
+    }
+  }
+}

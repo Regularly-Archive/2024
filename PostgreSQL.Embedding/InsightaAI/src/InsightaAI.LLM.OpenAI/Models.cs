@@ -52,6 +52,10 @@ internal class OpenAIRequest
     [JsonPropertyName("tool_choice")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ToolChoice { get; set; }
+
+    [JsonPropertyName("stream_options")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public object? StreamOptions { get; set; }
 }
 
 /// <summary>

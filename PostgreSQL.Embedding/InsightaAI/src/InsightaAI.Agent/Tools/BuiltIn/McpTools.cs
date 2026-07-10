@@ -1,8 +1,7 @@
-using System.Text.Json;
-using System.Text.Encodings.Web;
-using InsightaAI.Agent.Mcp;
 using InsightaAI.Agent.Abstractions;
-using InsightaAI.LLM.Models;
+using InsightaAI.Agent.Mcp;
+using System.Text.Encodings.Web;
+using System.Text.Json;
 
 namespace InsightaAI.Agent.Tools.BuiltIn;
 

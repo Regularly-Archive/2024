@@ -149,7 +149,7 @@ public class EventRenderer : IDisposable
             AnsiConsole.WriteLine();
         }
 
-        ShowTokenUsage(completeEvent.Result.Usage, completeEvent.Result.EstimatedContextTokens, completeEvent.Result.MaxContextTokens);
+        ShowTokenUsage(completeEvent.Result!.Usage, completeEvent.Result!.EstimatedContextTokens, completeEvent.Result!.MaxContextTokens);
     }
 
     private void HandleContextCompacted(AgentContextCompactedEvent compactedEvent)

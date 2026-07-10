@@ -1,3 +1,4 @@
+using System.Reflection.Metadata.Ecma335;
 using System.Text.Json;
 using InsightaAI.Agent.Abstractions;
 using InsightaAI.LLM.Models;
@@ -18,6 +19,7 @@ namespace InsightaAI.Agent.Context.Compaction;
 public sealed class MicroCompactStrategy : ICompactStrategy
 {
     private readonly ToolRegistry? _toolRegistry;
+    private readonly double ToolResultTTL = 5 * 60 * 1000;
 
     public string Name => "MicroCompact";
     public int Priority => 1; // 最高优先级
@@ -33,8 +35,6 @@ public sealed class MicroCompactStrategy : ICompactStrategy
     private static readonly Dictionary<string, ToolTruncationStrategy> CompactableTools = new(StringComparer.OrdinalIgnoreCase)
     {
         ["bash"] = new BashTruncationStrategy(),
-        ["powershell"] = new BashTruncationStrategy(), // 复用 bash 策略
-        ["execute_command"] = new BashTruncationStrategy(),
         ["read_file"] = new FileReadTruncationStrategy(),
         ["grep"] = new GrepTruncationStrategy(),
         ["glob"] = new GlobTruncationStrategy(),
@@ -50,6 +50,9 @@ public sealed class MicroCompactStrategy : ICompactStrategy
         if (estimatedTokens < budget.MicroCompactTriggerTokens)
             return false;
 
+        if (estimatedTokens >= budget.SessionCompactTriggerTokens)
+            return false;
+
         // 检查是否有可压缩的工具结果
         return HasCompactableToolResults(messages, budget.KeepRecentToolResults);
     }
@@ -61,6 +64,7 @@ public sealed class MicroCompactStrategy : ICompactStrategy
         int preCompactTokens,
         CancellationToken cancellationToken = default)
     {
+        var currentTimestamp = DateTimeOffset.UtcNow;
         var preCompactMessages = messages.Count;
 
         // 找出所有 tool_use + tool_result 配对
@@ -88,6 +92,11 @@ public sealed class MicroCompactStrategy : ICompactStrategy
             if (toolResultMessage.ToolResultIntercepted)
                 continue;
 
+            // 跳过有效期内的工具调用
+            var timespan = (currentTimestamp - toolResultMessage.Timestamp).TotalMilliseconds;
+            if (timespan <= ToolResultTTL)
+                continue;
+
             // 尝试委托给工具自己的 Intercept 方法
             if (_toolRegistry?.GetExecutor(toolName) is { } executor)
             {
@@ -109,6 +118,19 @@ public sealed class MicroCompactStrategy : ICompactStrategy
                         ToolName = toolResultMessage.ToolName,
                         Content = intercepted.Result.Content,
                         ToolResultIntercepted = true
+                    };
+                    compactedCount++;
+                    continue;
+                }
+                else
+                {
+                    messages[toolResultIndex] = new Message
+                    {
+                        Role = MessageRole.ToolResult,
+                        ToolCallId = toolResultMessage.ToolCallId,
+                        ToolName = toolResultMessage.ToolName,
+                        Content = [new TextBlock() { Text = "[Content snipped - call this tool again if needed]" }],
+                        ToolResultIntercepted = true,
                     };
                     compactedCount++;
                     continue;
@@ -204,7 +226,8 @@ public sealed class MicroCompactStrategy : ICompactStrategy
             originalLineCount: new Lazy<int>(() => text.Split('\n').Length),
             utilizationRatio: 0,
             budget: null,
-            toolResultDirectory: Path.Combine(
+            toolResultDirectory: 
+            Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "InsightaAI", "ToolResults"),
             toolName: toolName,

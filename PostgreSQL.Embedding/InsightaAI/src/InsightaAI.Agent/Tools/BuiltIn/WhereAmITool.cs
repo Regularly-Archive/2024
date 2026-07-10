@@ -36,7 +36,7 @@ public class WhereAmITool : IToolExecutor
         var now = DateTime.Now;
         var tz = TimeZoneInfo.Local;
 
-        var agentConfig = context.Services.GetRequiredService<AgentConfig>();
+        var agentConfig = context.Services!.GetRequiredService<AgentConfig>();
 
         var info = new Dictionary<string, object>
         {

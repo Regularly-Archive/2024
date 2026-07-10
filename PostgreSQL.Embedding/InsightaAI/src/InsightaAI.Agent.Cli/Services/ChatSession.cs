@@ -186,7 +186,8 @@ public class ChatSession
             },
             Content = contentItems,
             ToolCallId = message.ToolCallId,
-            ToolName = message.ToolName
+            ToolName = message.ToolName,
+            CreatedAt = message.Timestamp.UtcDateTime,
         };
     }
 
@@ -240,17 +241,18 @@ public class ChatSession
 
         return record.Role switch
         {
-            RoleUser => new Message { Role = MessageRole.User, Content = contentBlocks.ToArray() },
-            RoleAssistant => new Message { Role = MessageRole.Assistant, Content = contentBlocks.ToArray() },
-            "system" => new Message { Role = MessageRole.System, Content = contentBlocks.ToArray() },
+            RoleUser => new Message { Role = MessageRole.User, Content = contentBlocks.ToArray(), Timestamp = record.CreatedAt },
+            RoleAssistant => new Message { Role = MessageRole.Assistant, Content = contentBlocks.ToArray(), Timestamp = record.CreatedAt },
+            "system" => new Message { Role = MessageRole.System, Content = contentBlocks.ToArray(), Timestamp = record.CreatedAt },
             "tool" => new Message
             {
                 Role = MessageRole.ToolResult,
                 ToolCallId = record.ToolCallId,
                 ToolName = record.ToolName,
-                Content = contentBlocks.ToArray()
+                Content = contentBlocks.ToArray(),
+                Timestamp = record.CreatedAt
             },
-            _ => new Message { Role = MessageRole.User, Content = contentBlocks.ToArray() }
+            _ => new Message { Role = MessageRole.User, Content = contentBlocks.ToArray(), Timestamp = record.CreatedAt }
         };
     }
 }

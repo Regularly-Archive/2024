@@ -16,7 +16,7 @@ public sealed record ContextBudget
     /// <summary>
     /// Level 1 MicroCompact 触发阈值百分比
     /// </summary>
-    public double MicroCompactThreshold { get; init; } = 0.60;
+    public double MicroCompactThreshold { get; init; } = 0.55;
 
     /// <summary>
     /// Level 2 SessionMemoryCompact 触发阈值百分比

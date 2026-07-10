@@ -1,0 +1,6 @@
+{
+  "type": "response.function_call_arguments.delta",
+  "call_id": "call_001",
+  "output_index": 0,
+  "delta": "{\"loc"
+}

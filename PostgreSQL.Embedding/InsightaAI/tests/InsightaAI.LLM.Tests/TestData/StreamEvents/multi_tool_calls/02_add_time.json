@@ -1,0 +1,11 @@
+{
+  "type": "response.output_item.added",
+  "output_index": 1,
+  "item": {
+    "type": "function_call",
+    "id": "item_fc2",
+    "call_id": "call_b",
+    "name": "get_time",
+    "arguments": ""
+  }
+}

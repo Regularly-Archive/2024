@@ -152,14 +152,14 @@ internal class DefaultLlmClient : ILlmClient
                 break;
             }
 
-            // 解析 SSE 格式
-            if (line.StartsWith("event: "))
+            // 解析 SSE 格式（兼容有无空格: "event: foo" 和 "event:foo"）
+            else if (line.StartsWith("event:"))
             {
-                eventType = line["event: ".Length..].Trim();
+                eventType = line[(line.IndexOf(':') + 1)..].Trim();
             }
-            else if (line.StartsWith("data: "))
+            else if (line.StartsWith("data:"))
             {
-                dataBuffer.AppendLine(line["data: ".Length..]);
+                dataBuffer.AppendLine(line[(line.IndexOf(':') + 1)..]);
             }
             else if (string.IsNullOrEmpty(line) && dataBuffer.Length > 0)
             {

@@ -1,0 +1,11 @@
+{
+  "type": "response.output_item.done",
+  "output_index": 0,
+  "item": {
+    "type": "function_call",
+    "id": "item_fc_1",
+    "call_id": "call_abc",
+    "name": "get_weather",
+    "arguments": "{\"location\":\"Beijing\"}"
+  }
+}

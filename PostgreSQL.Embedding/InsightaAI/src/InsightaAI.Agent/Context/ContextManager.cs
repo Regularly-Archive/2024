@@ -141,6 +141,7 @@ public sealed class ContextManager : IContextManager
             {
                 "micro" => _strategies.FirstOrDefault(s => s.Name == "MicroCompact"),
                 "traditional" => _strategies.FirstOrDefault(s => s.Name == "TraditionalCompact"),
+                "sessionMemory" => _strategies.FirstOrDefault(s => s.Name == "SessionMemoryCompact"),
                 "auto" => _strategies.FirstOrDefault(s => s.ShouldCompact(messages, estimatedTokens, _budget))
                     ?? _strategies.LastOrDefault(),
                 _ => null
@@ -156,5 +157,10 @@ public sealed class ContextManager : IContextManager
         {
             _compactLock.Release();
         }
+    }
+
+    public ContextBudget GetContextBudget()
+    {
+        return _budget;
     }
 }

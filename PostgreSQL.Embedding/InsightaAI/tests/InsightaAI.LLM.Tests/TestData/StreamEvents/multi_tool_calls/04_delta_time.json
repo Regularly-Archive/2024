@@ -1,0 +1,6 @@
+{
+  "type": "response.function_call_arguments.delta",
+  "call_id": "call_b",
+  "output_index": 1,
+  "delta": "{\"timezone\":\"UTC\"}"
+}

@@ -32,4 +32,10 @@ public interface IContextManager
         List<Message> messages,
         string strategy = "auto",
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 获取上下文预算
+    /// </summary>
+    /// <returns></returns>
+    ContextBudget GetContextBudget();
 }

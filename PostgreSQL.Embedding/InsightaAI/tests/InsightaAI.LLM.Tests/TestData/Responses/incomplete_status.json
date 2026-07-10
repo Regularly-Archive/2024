@@ -1,0 +1,21 @@
+{
+  "id": "resp_inc",
+  "model": "gpt-4o",
+  "status": "incomplete",
+  "output": [
+    {
+      "type": "message",
+      "id": "msg_1",
+      "role": "assistant",
+      "content": [
+        { "type": "output_text", "text": "Partial..." }
+      ],
+      "status": "incomplete"
+    }
+  ],
+  "usage": {
+    "input_tokens": 100,
+    "output_tokens": 50,
+    "total_tokens": 150
+  }
+}

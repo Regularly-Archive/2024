@@ -16,7 +16,9 @@ using InsightaAI.Agent.Skills;
 using InsightaAI.Agent.Skills.Local;
 using InsightaAI.Agent.Storage;
 using InsightaAI.Agent.Tools;
+using InsightaAI.Agent.Tools.BuiltIn;
 using InsightaAI.LLM.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
 using System.CommandLine;
 
@@ -30,6 +32,7 @@ public class ChatCommand
     private const string CommandExit = "/exit";
     private const string CommandQuit = "/quit";
     private const string CommandClear = "/clear";
+    private const string CommandModel = "/model";
 
     private readonly IMessageStorage _storage;
     private readonly ChatRenderer _renderer = new();
@@ -57,6 +60,7 @@ public class ChatCommand
     public async Task<int> ExecuteAsync(string? sessionId)
     {
         var config = CliConfig.Load();
+        var auth = AuthConfig.Load();
 
         // 注入环境变量
         foreach (var (key, value) in config.Envs)
@@ -64,17 +68,21 @@ public class ChatCommand
             Environment.SetEnvironmentVariable(key, value);
         }
 
-        if (!ValidateConfig(config))
+        if (!ValidateConfig(config, auth))
         {
             _renderer.ShowWarning("请先运行 'config' 命令进行配置");
             return 1;
         }
 
+        // 解析当前模型配置
+        var (providerName, _) = config.ParsePrimaryModel();
+        var model = config.GetModel(config.PrimaryModel);
+
         // 创建 LLM 客户端
         ILlmClient llmClient;
         try
         {
-            llmClient = LlmClientFactory.Create(config);
+            llmClient = LlmClientFactory.Create(auth, config);
         }
         catch (Exception ex)
         {
@@ -93,18 +101,18 @@ public class ChatCommand
         var mcpRegistry = CreateMcpRegistry();
 
         // 获取或创建会话（先获取 sessionId）
-        var session = await GetOrCreateSessionAsync(sessionId, config);
+        var session = await GetOrCreateSessionAsync(sessionId, config, providerName);
         if (session == null) return 1;
 
         // 创建 Agent（传入 sessionId 以注册会话记忆钩子）
-        var agent = await CreateAgentAsync(config, llmClient, toolRegistry, skillRegistry, mcpRegistry, session.SessionId);
+        var agent = await CreateAgentAsync(config, auth, llmClient, model, toolRegistry, skillRegistry, mcpRegistry, session.SessionId);
 
         // 显示欢迎信息
-        _renderer.ShowWelcome(config.Provider, config.Model, session.SessionId, toolRegistry.GetDefinitions().Length, availableSkills.Count);
+        _renderer.ShowWelcome(providerName, model.ModelId, session.SessionId, toolRegistry.GetDefinitions().Length, availableSkills.Count);
         _renderer.ShowHistory(session.Messages);
 
         // 运行对话循环
-        await RunChatLoopAsync(session, agent);
+        await RunChatLoopAsync(session, agent, config, auth, toolRegistry, skillRegistry, mcpRegistry);
 
         _renderer.ShowInfo($"Session saved: {session.SessionId}");
         _renderer.ShowInfo($"Resume with: insighta chat --session {session.SessionId}");
@@ -112,8 +120,10 @@ public class ChatCommand
         return 0;
     }
 
-    private async Task RunChatLoopAsync(ChatSession session, Agent agent)
+    private async Task RunChatLoopAsync(ChatSession session, Agent agent, CliConfig config, AuthConfig auth, ToolRegistry toolRegistry, SkillRegistry skillRegistry, McpRegistry? mcpRegistry)
     {
+        var currentAgent = agent;
+
         while (true)
         {
             var userInput = _renderer.PromptUser();
@@ -139,7 +149,13 @@ public class ChatCommand
 
             if (userInput.StartsWith("/compact", StringComparison.OrdinalIgnoreCase))
             {
-                await HandleCompactCommandAsync(userInput, agent, session);
+                await HandleCompactCommandAsync(userInput, currentAgent, session);
+                continue;
+            }
+
+            if (userInput.StartsWith(CommandModel, StringComparison.OrdinalIgnoreCase))
+            {
+                currentAgent = await HandleModelSwitchAsync(userInput, currentAgent, config, auth, session, toolRegistry, skillRegistry, mcpRegistry);
                 continue;
             }
 
@@ -154,8 +170,82 @@ public class ChatCommand
             };
 
             // 执行 Agent
-            await ExecuteAgentAsync(agent, userInput, context, session);
+            await ExecuteAgentAsync(currentAgent, userInput, context, session);
         }
+    }
+
+    /// <summary>
+    /// 处理 /model 命令 - 会话内切换模型
+    /// </summary>
+    private async Task<Agent> HandleModelSwitchAsync(string input, Agent currentAgent, CliConfig config, AuthConfig auth, ChatSession session, ToolRegistry toolRegistry, SkillRegistry skillRegistry, McpRegistry? mcpRegistry)
+    {
+        var parts = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 2)
+        {
+            _renderer.ShowWarning("用法: /model provider/model_key");
+            _renderer.ShowInfo($"当前模型: {config.PrimaryModel}");
+            if (config.Models.Count > 0)
+            {
+                _renderer.ShowInfo("可用模型:");
+                foreach (var key in config.Models.Keys)
+                {
+                    var marker = key == config.PrimaryModel ? " ← current" : "";
+                    _renderer.ShowInfo($"  {key}{marker}");
+                }
+            }
+            return currentAgent;
+        }
+
+        var modelRef = parts[1];
+
+        // 验证 model 引用格式
+        string newProviderName, newModelKey;
+        try
+        {
+            (newProviderName, newModelKey) = CliConfig.ParseModelReference(modelRef);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _renderer.ShowError(ex.Message);
+            return currentAgent;
+        }
+
+        // 验证 provider 存在
+        if (!auth.Providers.ContainsKey(newProviderName))
+        {
+            _renderer.ShowError($"Provider '{newProviderName}' 未在 auth.json 中配置");
+            return currentAgent;
+        }
+
+        // 验证 model 存在
+        if (!config.Models.ContainsKey(modelRef))
+        {
+            _renderer.ShowError($"Model '{modelRef}' 未在 config.json 中配置");
+            return currentAgent;
+        }
+
+        var newModel = config.Models[modelRef];
+
+        // 创建新的 LLM 客户端
+        ILlmClient newLlmClient;
+        try
+        {
+            newLlmClient = LlmClientFactory.Create(auth, config, modelRef);
+        }
+        catch (Exception ex)
+        {
+            _renderer.ShowError($"创建 LLM 客户端失败: {ex.Message}");
+            return currentAgent;
+        }
+
+        // 释放旧 agent
+        currentAgent.Dispose();
+
+        // 用新模型重建 Agent
+        var newAgent = await CreateAgentAsync(config, auth, newLlmClient, newModel, toolRegistry, skillRegistry, mcpRegistry, session.SessionId);
+
+        _renderer.ShowSuccess($"已切换到 {newProviderName}/{newModel.ModelId}");
+        return newAgent;
     }
 
     private async Task HandleCompactCommandAsync(string input, Agent agent, ChatSession session)
@@ -196,7 +286,7 @@ public class ChatCommand
         }
         catch (Exception ex)
         {
-            _renderer.ShowError($"[red]$([char]0x2717)[/] Compact failed: {ex.Message}");
+            _renderer.ShowError($"[red]Compact failed: {ex.Message}[/] ");
         }
     }
 
@@ -346,7 +436,7 @@ public class ChatCommand
         return registry;
     }
 
-    private static async Task<Agent> CreateAgentAsync(CliConfig config, ILlmClient llmClient, ToolRegistry toolRegistry, SkillRegistry skillRegistry, McpRegistry? mcpRegistry = null, string? sessionId = null)
+    private static async Task<Agent> CreateAgentAsync(CliConfig config, AuthConfig auth, ILlmClient llmClient, ModelEntry model, ToolRegistry toolRegistry, SkillRegistry skillRegistry, McpRegistry? mcpRegistry = null, string? sessionId = null)
     {
         // 生成或获取用户 ID
         var userId = GetOrCreateUserId();
@@ -356,7 +446,8 @@ public class ChatCommand
             Id = "cli-agent",
             Name = "InsightaAI CLI",
             SystemPrompt = config.SystemPrompt,
-            Model = config.Model,
+            Model = model.ModelId,
+            MaxTokens = model.MaxTokens,
             MaxToolRounds = config.MaxToolRounds,
             UserId = userId,
         };
@@ -365,12 +456,13 @@ public class ChatCommand
         SessionMemoryHook? sessionMemoryHook = null;
         if (!string.IsNullOrEmpty(sessionId))
         {
-            var memoryOptions = new SessionMemoryOptions { SummaryModel = config.Model };
+            var summaryModelId = config.ResolveSecondaryModelId();
+            var memoryOptions = new SessionMemoryOptions { SummaryModel = summaryModelId ?? model.ModelId };
             sessionMemoryHook = new SessionMemoryHook(sessionId, userId, options: memoryOptions);
         }
 
         // 创建上下文管理器
-        var contextManager = CreateContextManager(config, llmClient, sessionMemoryHook, toolRegistry);
+        var contextManager = CreateContextManager(config, llmClient, model, sessionMemoryHook, toolRegistry);
 
         // 创建记忆系统
         var memoryManager = CreateMemoryManager();
@@ -378,7 +470,7 @@ public class ChatCommand
         // 使用 AgentBuilder 构建 Agent
         var mcpConnectionPool = new SimpleMcpConnectionPool();
         var mcpRegistryToUse = mcpRegistry ?? new McpRegistry(mcpConnectionPool);
-        
+
         var agent = new AgentBuilder(agentConfig)
             .WithLlm(llmClient)
             .WithToolRegistry(toolRegistry)
@@ -386,6 +478,11 @@ public class ChatCommand
             .WithContextManager(contextManager!)
             .WithMemoryManager(memoryManager)
             .WithMcpRegistry(mcpRegistryToUse)
+            .ConfigureServices(sp =>
+            {
+                sp.AddScoped<IFileSystem, LocalFileSystem>();
+                sp.AddScoped<IShellExecutor, LocalShellExecutor>();
+            })
             .Build();
 
         // 注册 Hook（Build 后添加）
@@ -430,10 +527,12 @@ public class ChatCommand
         return userId;
     }
 
-    private static IContextManager? CreateContextManager(CliConfig config, ILlmClient llmClient, SessionMemoryHook? sessionMemoryHook = null, ToolRegistry? toolRegistry = null)
+    private static IContextManager? CreateContextManager(CliConfig config, ILlmClient llmClient, ModelEntry model, SessionMemoryHook? sessionMemoryHook = null, ToolRegistry? toolRegistry = null)
     {
-        // 从配置或模型名称获取上下文窗口大小
-        var contextWindowTokens = ModelContextWindows.GetContextWindowSize(config.Model);
+        // 优先使用 model 配置的 context_window，否则从硬编码字典匹配
+        var contextWindowTokens = model.ContextWindow > 0
+            ? model.ContextWindow.Value
+            : ModelContextWindows.GetContextWindowSize(model.ModelId);
 
         var budget = new ContextBudget
         {
@@ -454,7 +553,8 @@ public class ChatCommand
         }
 
         // 传统 LLM 摘要压缩（兜底，优先级 3）
-        strategies.Add(new TraditionalCompactStrategy(llmClient, config.Model, config.SummaryModel));
+        var summaryModelId = config.ResolveSecondaryModelId();
+        strategies.Add(new TraditionalCompactStrategy(llmClient, model.ModelId, summaryModelId));
 
         return new ContextManager(tokenEstimator, budget, strategies);
     }
@@ -478,7 +578,7 @@ public class ChatCommand
         return registry;
     }
 
-    private async Task<ChatSession?> GetOrCreateSessionAsync(string? sessionId, CliConfig config)
+    private async Task<ChatSession?> GetOrCreateSessionAsync(string? sessionId, CliConfig config, string providerName)
     {
         if (!string.IsNullOrEmpty(sessionId))
         {
@@ -491,7 +591,7 @@ public class ChatCommand
             return session;
         }
 
-        return await ChatSession.CreateAsync(_storage, config.Model, config.Provider);
+        return await ChatSession.CreateAsync(_storage, config.PrimaryModel, providerName);
     }
 
     private static McpRegistry? CreateMcpRegistry()
@@ -529,19 +629,25 @@ public class ChatCommand
         return registry;
     }
 
-    private static bool ValidateConfig(CliConfig config)
+    private static bool ValidateConfig(CliConfig config, AuthConfig auth)
     {
-        if (string.IsNullOrWhiteSpace(config.Provider))
+        if (string.IsNullOrWhiteSpace(config.PrimaryModel))
             return false;
 
-        if (string.IsNullOrWhiteSpace(config.Model))
-            return false;
+        try
+        {
+            var (providerName, _) = config.ParsePrimaryModel();
 
-        if (config.Provider == "openai" && string.IsNullOrWhiteSpace(config.OpenAiApiKey))
-            return false;
+            if (!auth.Providers.ContainsKey(providerName))
+                return false;
 
-        if (config.Provider == "anthropic" && string.IsNullOrWhiteSpace(config.AnthropicApiKey))
+            if (!config.Models.ContainsKey(config.PrimaryModel))
+                return false;
+        }
+        catch
+        {
             return false;
+        }
 
         return true;
     }

@@ -9,7 +9,7 @@ Summarize the following conversation, focusing on:
 
 Format your response as structured sections:
 
-<template>
+<summary>
 ## Goal
 - [single-sentence task summary]
 
@@ -37,6 +37,6 @@ Format your response as structured sections:
 
 ## Relevant Files
 - [file or directory path: why it matters, or "(none)"]
-</template>
+</<summary>
 
 Keep the summary concise but preserve critical details like file paths, function names, and configuration values.

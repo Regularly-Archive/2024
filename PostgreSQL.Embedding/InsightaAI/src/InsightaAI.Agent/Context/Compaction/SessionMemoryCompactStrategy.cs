@@ -43,6 +43,9 @@ public sealed class SessionMemoryCompactStrategy : ICompactStrategy
         if (estimatedTokens < budget.SessionCompactTriggerTokens)
             return false;
 
+        if (estimatedTokens > budget.TraditionalCompactTriggerTokens)
+            return false;
+
         // 同步检查文件是否存在（避免 .GetAwaiter().GetResult() 导致的死锁风险）
         return File.Exists(_memoryFilePath);
     }
@@ -80,8 +83,7 @@ public sealed class SessionMemoryCompactStrategy : ICompactStrategy
             compactedMessages.AddRange(systemMessages);
 
             // 添加边界标记（作为系统消息)
-            var updatedSystemMessage = Message.FromSystem(systemMessages[0].GetTextContent() + boundaryMarker);
-            compactedMessages = [updatedSystemMessage, .. compactedMessages[1..]];
+            compactedMessages.Add(Message.FromAssistant(boundaryMarker));
 
 
             // 添加最近的消息

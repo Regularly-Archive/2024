@@ -1,0 +1,40 @@
+{
+  "models": {
+    "openai/gpt-4o": {
+      "model_id": "gpt-4o"
+    },
+    "openai/gpt-4o-mini": {
+      "model_id": "gpt-4o-mini"
+    },
+    "deepseek/deepseek-chat": {
+      "model_id": "deepseek-chat",
+      "max_tokens": 4096
+    },
+    "deepseek/deepseek-reasoner": {
+      "model_id": "deepseek-reasoner",
+      "max_tokens": 8192,
+      "context_window": 65536
+    },
+    "kimi/moonshot-v1-128k": {
+      "model_id": "moonshot-v1-128k",
+      "context_window": 131072
+    },
+    "anthropic/claude-sonnet-4-20250514": {
+      "model_id": "claude-sonnet-4-20250514"
+    },
+    "anthropic/claude-haiku-4-20250414": {
+      "model_id": "claude-haiku-4-20250414"
+    },
+    "gemini/gemini-2.5-flash": {
+      "model_id": "gemini-2.5-flash"
+    }
+  },
+  "primary_model": "deepseek/deepseek-chat",
+  "secondary_model": "openai/gpt-4o-mini",
+  "system_prompt": "You are a helpful AI assistant with access to various tools.\n\nWhen you need to use a tool:\n1. First, briefly explain what you're about to do (1-2 sentences)\n2. Then call the tool\n3. After getting the result, summarize or explain the outcome\n\nKeep your responses concise and conversational. Use the user's language to respond.",
+  "max_tool_rounds": 30,
+  "enable_builtin_tools": true,
+  "envs": {
+    "TAVILY_API_KEY": ""
+  }
+}

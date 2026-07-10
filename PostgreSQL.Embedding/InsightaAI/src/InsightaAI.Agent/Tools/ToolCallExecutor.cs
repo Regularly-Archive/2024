@@ -1,34 +1,45 @@
 ﻿using InsightaAI.Agent.Abstractions;
+using InsightaAI.Agent.Context;
 using InsightaAI.Agent.Models;
 using InsightaAI.LLM.Models;
+using Microsoft.Extensions.DependencyInjection;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Threading.Channels;
 
 namespace InsightaAI.Agent.Tools;
 
-public class ToolExecutor
+public class ToolCallExecutor
 {
     private readonly string _agentId;
     private readonly string _sessionId;
     private readonly ToolCallHandler _handler;
     private readonly ToolRegistry? _toolRegistry;
+    private readonly IServiceProvider _serviceProvider;
     private readonly bool _enableInterception;
+    private const int LARGE_TOOL_RESULT_THRESHOLD = 30 * 1024;
+    private readonly string _basePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        ".insighta",
+        "sessions"
+    );
 
-    public ToolExecutor(string agentId, string sessionId, ToolCallHandler handler, 
-        ToolRegistry? toolRegistry = null, bool enableInterception = true)
+    public ToolCallExecutor(string agentId, string sessionId, ToolCallHandler handler,
+        IServiceProvider serviceProvider, bool enableInterception = true)
     {
         _agentId = agentId;
         _sessionId = sessionId;
         _handler = handler;
-        _toolRegistry = toolRegistry;
+        _toolRegistry = serviceProvider.GetRequiredService<ToolRegistry>();
+        _serviceProvider = serviceProvider;
         _enableInterception = enableInterception;
     }
 
     /// <summary>
     /// 拦截工具结果（如果启用且工具实现了 Intercept）
     /// </summary>
-    private (ToolResult Result, bool Intercepted) TryInterceptResult(
-        string toolName, string toolCallId, ToolResult toolResult)
+    private async Task<(ToolResult Result, bool Intercepted)> TryInterceptResultAsync(
+        string toolName, string toolCallId, ToolResult toolResult, CancellationToken cancellationToken)
     {
         if (!_enableInterception || _toolRegistry == null)
             return (toolResult, false);
@@ -37,24 +48,15 @@ public class ToolExecutor
         if (executor == null)
             return (toolResult, false);
 
-        // 计算结果大小
-        var textBlocks = toolResult.Content.OfType<TextBlock>().ToList();
-        var totalText = string.Join("\n", textBlocks.Select(t => t.Text));
-        
-        var truncationContext = new TruncationContext(
-            originalLength: totalText.Length,
-            originalLineCount: new Lazy<int>(() => totalText.Split('\n').Length),
-            utilizationRatio: 0, // TODO: 从 ContextManager 获取
-            budget: null,        // TODO: 从 ContextManager 获取
-            toolResultDirectory: Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "InsightaAI", "ToolResults", _sessionId),
-            toolName: toolName,
-            toolCallId: toolCallId
-        );
+        // 创建工具结果截取上下文
+        var truncationContext = CreateTruncationContext(toolName, toolCallId, toolResult);
 
-        var intercepted = executor.Intercept(toolResult, truncationContext);
-        return (intercepted.Result, intercepted.ToolResultIntercepted);
+        // 如果工具实现了 Intercept 接口，则使用工具的拦截策略，否则应用默认的拦截策略
+        var interceptedResult = executor.Intercept(toolResult, truncationContext);
+        if (interceptedResult.ToolResultIntercepted)
+            return (interceptedResult.Result, interceptedResult.ToolResultIntercepted);
+
+        return await ApplyDefaultTruncationPolicy(toolResult, truncationContext, cancellationToken);
     }
 
     public async IAsyncEnumerable<AgentEvent> ExecuteToolsParallelAsync(
@@ -119,8 +121,8 @@ public class ToolExecutor
         foreach (var (toolCall, toolResult) in toolResults)
         {
             // 尝试拦截工具结果
-            var (finalResult, intercepted) = TryInterceptResult(toolCall.Name, toolCall.Id, toolResult);
-            
+            var (finalResult, intercepted) = await TryInterceptResultAsync(toolCall.Name, toolCall.Id, toolResult, cancellationToken);
+
             messages.Add(new Message
             {
                 Role = MessageRole.ToolResult,
@@ -168,8 +170,8 @@ public class ToolExecutor
             };
 
             // 尝试拦截工具结果
-            var (finalResult, intercepted) = TryInterceptResult(toolCall.Name, toolCall.Id, toolResult);
-            
+            var (finalResult, intercepted) = await TryInterceptResultAsync(toolCall.Name, toolCall.Id, toolResult, cancellationToken);
+
             // 将工具结果加入对话历史
             messages.Add(new Message
             {
@@ -180,6 +182,50 @@ public class ToolExecutor
                 ToolResultIntercepted = intercepted
             });
         }
+    }
+
+    private TruncationContext CreateTruncationContext(string toolName, string toolCallId, ToolResult toolResult)
+    {
+        // 计算结果大小
+        var textBlocks = toolResult.Content.OfType<TextBlock>().ToList();
+        var totalText = string.Join("\n", textBlocks.Select(t => t.Text));
+
+        var contextManager = _serviceProvider.GetRequiredService<IContextManager>();
+        var truncationContext = new TruncationContext(
+            originalLength: totalText.Length,
+            originalLineCount: new Lazy<int>(() => totalText.Split('\n').Length),
+            utilizationRatio: 0,
+            budget: contextManager.GetContextBudget(),
+            toolResultDirectory: Path.Combine(_basePath, _sessionId, "tool_results"),
+            toolName: toolName,
+            toolCallId: toolCallId
+        );
+
+        return truncationContext;
+    }
+
+    private async Task<(ToolResult Result, bool Intercepted)> ApplyDefaultTruncationPolicy(ToolResult toolResult, TruncationContext truncationContext, CancellationToken cancellationToken)
+    {
+        var textBlocks = toolResult.Content.OfType<TextBlock>().ToList();
+        var totalText = string.Join("\n", textBlocks.Select(t => t.Text));
+
+        var byteSize = Encoding.UTF8.GetByteCount(totalText);
+        if (byteSize <= LARGE_TOOL_RESULT_THRESHOLD) return (toolResult, false);
+
+        var filePath = Path.Combine(truncationContext.ToolResultDirectory, $"{DateTime.Now:yyyyMMdd_HHmmss}_{truncationContext.ToolName}.txt");
+        var sizeKB = Math.Round(byteSize / 1024M, 1);
+        var preview = string.Join("\n", totalText.Split("\n").Take(200));
+
+        var stringBuilder = new StringBuilder();
+        stringBuilder.AppendLine($"[The result is too large (${sizeKB} KB, ${truncationContext.OriginalLineCount} lines). Full output saved to ${filePath}. You can use read_file to see the full result.]");
+        stringBuilder.AppendLine("Preview (first 200 lines):");
+        stringBuilder.AppendLine(preview);
+
+        var fileSystem = _serviceProvider.GetRequiredService<IFileSystem>();
+        await fileSystem.WriteFileAsync(filePath, stringBuilder.ToString(), Encoding.UTF8, cancellationToken);
+
+        var truncatedToolResult = new ToolResult() { Content = [new TextBlock() { Text = stringBuilder.ToString() }], IsError = false };
+        return (truncatedToolResult, true);
     }
 }
 

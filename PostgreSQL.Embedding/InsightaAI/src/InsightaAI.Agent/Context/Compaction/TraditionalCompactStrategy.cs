@@ -2,6 +2,7 @@ using InsightaAI.Agent.Extensions;
 using InsightaAI.Agent.Prompts;
 using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
+using System.Collections.Immutable;
 
 namespace InsightaAI.Agent.Context.Compaction;
 
@@ -49,6 +50,7 @@ public sealed class TraditionalCompactStrategy : ICompactStrategy
 
         // Step 2: 剥离图片
         var strippedOldMessages = StripImages(oldMessages);
+        if (!strippedOldMessages.Any()) return CreateNoCompactionResult(preCompactTokens, preCompactMessages, messages);
 
         // Step 3: 生成摘要
         var summary = await GenerateFullSummaryAsync(strippedOldMessages, cancellationToken);
@@ -63,7 +65,7 @@ public sealed class TraditionalCompactStrategy : ICompactStrategy
         compactedMessages.AddRange(systemMessages);
 
         // 添加边界标记（作为系统消息）
-        compactedMessages.Add(Message.FromSystem(boundaryMarker));
+        compactedMessages.Add(Message.FromAssistant(boundaryMarker));
 
         // 添加最近的消息
         compactedMessages.AddRange(recentMessages);
@@ -185,11 +187,9 @@ public sealed class TraditionalCompactStrategy : ICompactStrategy
         var summaryPrompt = await PromptTemplate.RenderAsync("traditional-summary");
 
         // 构建消息列表（摘要提示 + 待摘要的消息）
-        var summaryMessages = new List<Message>
-        {
-            Message.FromSystem(summaryPrompt)
-        };
-        summaryMessages.AddRange(messages);
+        var summaryMessages = new List<Message>();
+        summaryMessages.AddRange(messages.Where(x => x.Role != MessageRole.System));
+        summaryMessages.Add(Message.FromUser(summaryPrompt));
 
         // 调用 LLM 生成摘要
         var model = _summaryModel;
@@ -202,6 +202,7 @@ public sealed class TraditionalCompactStrategy : ICompactStrategy
             Temperature = 0.3, // 低温度，更确定性的摘要
             MaxTokens = 4096
         };
+
 
         var response = await _llmClient.CompleteAsync(request, cancellationToken);
         return ExtractSummary(response.GetTextContent()) ?? "[Summary generation failed]";
@@ -242,5 +243,18 @@ public sealed class TraditionalCompactStrategy : ICompactStrategy
             ["preCompactTokens"] = preCompactTokens.ToString("N0"),
             ["sessionMemory"] = summary,
         });
+    }
+
+    private CompactionResult CreateNoCompactionResult(int preCompactTokens, int preCompactMessages, List<Message> messages)
+    {
+        return new CompactionResult
+        {
+            StrategyName = Name,
+            PreCompactTokens = preCompactTokens,
+            PostCompactTokens = preCompactTokens,
+            PreCompactMessages = preCompactMessages,
+            PostCompactMessages = messages.Count,
+            RequestMessages = messages.ToArray()
+        };
     }
 }

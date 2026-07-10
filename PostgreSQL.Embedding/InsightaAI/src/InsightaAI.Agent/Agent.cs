@@ -382,18 +382,18 @@ public class Agent : IDisposable
         AgentContext? context = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var conversationId = context?.SessionId ?? Guid.NewGuid().ToString("N");
+        var sessionId = context?.SessionId ?? Guid.NewGuid().ToString("N");
         var hookContext = new HookContext
         {
-            SessionId = conversationId,
+            SessionId = sessionId,
             Services = _serviceProvider
         };
 
-        var toolExecutor = new ToolExecutor(_config.Id, conversationId, async (request, ct)  =>
+        var toolCallExecutor = new ToolCallExecutor(_config.Id, sessionId, async (request, ct)  =>
         {
             var (allowd, result) = await ExecuteSingleToolAsync(request.ToolCall, request.Arguments, request.SessionId, ct);
             return new ToolCallReponse(allowd, result);
-        }, _toolRegistry);
+        }, _serviceProvider);
 
         var messages = new List<Message>();
 
@@ -524,8 +524,8 @@ public class Agent : IDisposable
             };
             messages.Add(assistantMessage);
 
-            // 检查是否有工具调用
-            var toolCalls = response.GetToolCalls();
+            // 检查是否有工具调用（去重：LLM 可能生成相同名称+参数的重复调用）
+            var toolCalls = DeduplicateToolCalls(response.GetToolCalls());
             if (toolCalls.Length == 0)
             {
                 // 无工具调用，Agent 完成
@@ -574,14 +574,14 @@ public class Agent : IDisposable
             // 执行工具
             if (_config.ParallelToolExecution && toolCalls.Length > 1)
             {
-                await foreach (var evt in toolExecutor.ExecuteToolsParallelAsync(toolCalls,messages, cancellationToken))
+                await foreach (var evt in toolCallExecutor.ExecuteToolsParallelAsync(toolCalls,messages, cancellationToken))
                 {
                     yield return evt;
                 }
             }
             else
             {
-                await foreach (var evt in toolExecutor.ExecuteToolsSequentialAsync(toolCalls, messages, cancellationToken))
+                await foreach (var evt in toolCallExecutor.ExecuteToolsSequentialAsync(toolCalls, messages, cancellationToken))
                 {
                     yield return evt;
                 }
@@ -758,6 +758,28 @@ public class Agent : IDisposable
             Message = Message.FromAssistant("Agent execution failed."),
             Error = "No completion event received."
         };
+    }
+
+    /// <summary>
+    /// 去重工具调用：LLM 可能生成多个名称和参数完全相同的工具调用
+    /// </summary>
+    private static ToolCallBlock[] DeduplicateToolCalls(ToolCallBlock[] toolCalls)
+    {
+        if (toolCalls.Length <= 1) return toolCalls;
+
+        var seen = new HashSet<string>();
+        var result = new List<ToolCallBlock>(toolCalls.Length);
+
+        foreach (var tc in toolCalls)
+        {
+            var key = $"{tc.Name}:{tc.Arguments.GetRawText()}";
+            if (seen.Add(key))
+            {
+                result.Add(tc);
+            }
+        }
+
+        return result.Count == toolCalls.Length ? toolCalls : result.ToArray();
     }
 
     /// <summary>

@@ -1,0 +1,13 @@
+{
+  "type": "response.completed",
+  "response": {
+    "id": "resp_123",
+    "model": "gpt-4o",
+    "status": "incomplete",
+    "usage": {
+      "input_tokens": 100,
+      "output_tokens": 0,
+      "total_tokens": 100
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "type": "response.output_item.done",
+  "sequence_number": 80,
+  "output_index": 0,
+  "item": {
+    "id": "rs_54dee72a29bb4caea650bc005d7c9098",
+    "type": "reasoning",
+    "summary": [],
+    "content": [
+      {
+        "type": "reasoning_text",
+        "text": "Okay, the user just asked me to introduce myself."
+      }
+    ],
+    "status": "completed"
+  }
+}

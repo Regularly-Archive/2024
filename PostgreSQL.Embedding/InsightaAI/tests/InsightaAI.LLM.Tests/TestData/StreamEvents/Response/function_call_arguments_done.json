@@ -1,0 +1,7 @@
+{
+  "type": "response.function_call_arguments.done",
+  "item_id": "item_fc_1",
+  "call_id": "call_abc",
+  "output_index": 0,
+  "arguments": "{\"location\":\"Beijing\"}"
+}

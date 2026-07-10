@@ -1,0 +1,20 @@
+{
+  "id": "resp_456",
+  "model": "gpt-4o",
+  "status": "completed",
+  "output": [
+    {
+      "type": "function_call",
+      "id": "fc_1",
+      "call_id": "call_xyz",
+      "name": "get_weather",
+      "arguments": "{\"location\":\"Tokyo\"}",
+      "status": "completed"
+    }
+  ],
+  "usage": {
+    "input_tokens": 20,
+    "output_tokens": 15,
+    "total_tokens": 35
+  }
+}

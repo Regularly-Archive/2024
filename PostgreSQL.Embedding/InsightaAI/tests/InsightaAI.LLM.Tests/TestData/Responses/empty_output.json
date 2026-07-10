@@ -1,0 +1,11 @@
+{
+  "id": "resp_empty",
+  "model": "gpt-4o",
+  "status": "completed",
+  "output": [],
+  "usage": {
+    "input_tokens": 5,
+    "output_tokens": 0,
+    "total_tokens": 5
+  }
+}

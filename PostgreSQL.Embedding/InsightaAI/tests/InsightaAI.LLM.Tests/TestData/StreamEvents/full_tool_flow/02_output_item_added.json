@@ -1,0 +1,11 @@
+{
+  "type": "response.output_item.added",
+  "output_index": 0,
+  "item": {
+    "type": "function_call",
+    "id": "item_fc",
+    "call_id": "call_001",
+    "name": "get_weather",
+    "arguments": ""
+  }
+}

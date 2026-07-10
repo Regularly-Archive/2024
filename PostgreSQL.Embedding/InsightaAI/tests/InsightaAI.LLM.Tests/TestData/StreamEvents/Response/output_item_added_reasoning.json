@@ -1,0 +1,12 @@
+{
+  "type": "response.output_item.added",
+  "sequence_number": 2,
+  "output_index": 0,
+  "item": {
+    "id": "rs_54dee72a29bb4caea650bc005d7c9098",
+    "type": "reasoning",
+    "summary": [],
+    "content": [],
+    "status": "in_progress"
+  }
+}

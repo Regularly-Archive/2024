@@ -62,86 +62,88 @@ public class OpenAIAdapter : IProviderAdapter
 
     public StreamEvent? ParseStreamEvent(string eventType, JsonElement data)
     {
-        try
+        // 先提取 usage（可能和 choices 同时存在）
+        TokenUsage? usage = null;
+        if (data.TryGetProperty("usage", out var usageElement) &&
+            usageElement.ValueKind == JsonValueKind.Object)
         {
-            // 先提取 usage（可能和 choices 同时存在）
-            TokenUsage? usage = null;
-            if (data.TryGetProperty("usage", out var usageElement) &&
-                usageElement.ValueKind == JsonValueKind.Object)
+            usage = ParseUsage(usageElement);
+        }
+
+        // OpenAI 格式: data.choices[0].delta
+        if (!data.TryGetProperty("choices", out var choices) || choices.GetArrayLength() == 0)
+        {
+            // 没有 choices，但可能有 usage（最后一个 chunk）
+            if (usage != null)
             {
-                usage = ParseUsage(usageElement);
+                return new DoneEvent { Reason = DoneReason.Complete, Usage = usage };
             }
+            return null;
+        }
 
-            // OpenAI 格式: data.choices[0].delta
-            if (!data.TryGetProperty("choices", out var choices) || choices.GetArrayLength() == 0)
+        var choice = choices[0];
+
+        // 检查 finish_reason
+        if (choice.TryGetProperty("finish_reason", out var finishReason) &&
+            finishReason.ValueKind == JsonValueKind.String)
+        {
+            var reason = finishReason.GetString();
+            if (!string.IsNullOrEmpty(reason))
             {
-                // 没有 choices，但可能有 usage（最后一个 chunk）
-                return null;
-            }
-
-            var choice = choices[0];
-
-            // 检查 finish_reason
-            if (choice.TryGetProperty("finish_reason", out var finishReason) &&
-                finishReason.ValueKind != JsonValueKind.Null)
-            {
-                var reason = finishReason.GetString();
-                if (!string.IsNullOrEmpty(reason))
+                return new DoneEvent
                 {
-                    return new DoneEvent
+                    Reason = reason switch
                     {
-                        Reason = reason switch
-                        {
-                            "stop" => DoneReason.Complete,
-                            "tool_calls" => DoneReason.ToolCalls,
-                            "length" => DoneReason.MaxTokens,
-                            _ => DoneReason.Complete
-                        },
-                        Usage = usage  // 包含 usage
-                    };
-                }
+                        "stop" => DoneReason.Complete,
+                        "tool_calls" => DoneReason.ToolCalls,
+                        "length" => DoneReason.MaxTokens,
+                        _ => DoneReason.Complete
+                    },
+                    Usage = usage
+                };
             }
-
-            // 解析 delta
-            if (!choice.TryGetProperty("delta", out var delta))
-            {
-                return null;
-            }
-
-            // 检查是否有工具调用
-            if (delta.TryGetProperty("tool_calls", out var toolCalls) && toolCalls.GetArrayLength() > 0)
-            {
-                return ParseToolCallDelta(toolCalls[0]);
-            }
-
-            // 检查是否有 reasoning_content (DeepSeek)
-            if (delta.TryGetProperty("reasoning_content", out var reasoningContent) &&
-                reasoningContent.ValueKind == JsonValueKind.String)
-            {
-                var text = reasoningContent.GetString();
-                if (!string.IsNullOrEmpty(text))
-                {
-                    return new ThinkingDeltaEvent { Delta = text };
-                }
-            }
-
-            // 普通文本内容
-            if (delta.TryGetProperty("content", out var content) &&
-                content.ValueKind == JsonValueKind.String)
-            {
-                var text = content.GetString();
-                if (!string.IsNullOrEmpty(text))
-                {
-                    return new TextDeltaEvent { Delta = text };
-                }
-            }
-
-            return null;
         }
-        catch
+
+        // 解析 delta
+        if (!choice.TryGetProperty("delta", out var delta))
         {
+            if (usage != null)
+            {
+                return new DoneEvent { Reason = DoneReason.Complete, Usage = usage };
+            }
             return null;
         }
+
+        // 检查是否有工具调用
+        if (delta.TryGetProperty("tool_calls", out var toolCalls) &&
+            toolCalls.ValueKind == JsonValueKind.Array && toolCalls.GetArrayLength() > 0)
+        {
+            return ParseToolCallStreamDelta(toolCalls[0]);
+        }
+
+        // 检查是否有 reasoning_content (DeepSeek)
+        if (delta.TryGetProperty("reasoning_content", out var reasoningContent) &&
+            reasoningContent.ValueKind == JsonValueKind.String)
+        {
+            var text = reasoningContent.GetString();
+            if (!string.IsNullOrEmpty(text))
+            {
+                return new ThinkingDeltaEvent { Delta = text };
+            }
+        }
+
+        // 普通文本内容
+        if (delta.TryGetProperty("content", out var textContent) &&
+            textContent.ValueKind == JsonValueKind.String)
+        {
+            var text = textContent.GetString();
+            if (!string.IsNullOrEmpty(text))
+            {
+                return new TextDeltaEvent { Delta = text };
+            }
+        }
+
+        return null;
     }
 
     public LlmResponse ParseResponse(JsonElement response)
@@ -229,7 +231,8 @@ public class OpenAIAdapter : IProviderAdapter
             Messages = request.Messages.Select(ConvertMessage).ToArray(),
             MaxTokens = request.MaxTokens,
             Temperature = request.Temperature,
-            Stop = request.StopSequences
+            Stop = request.StopSequences,
+            StreamOptions = stream ? new { include_usage = true } : null
         };
 
         // 处理工具
@@ -324,7 +327,11 @@ public class OpenAIAdapter : IProviderAdapter
         return message;
     }
 
-    private static StreamEvent ParseToolCallDelta(JsonElement toolCall)
+    /// <summary>
+    /// 解析 OpenAI SSE 流式工具调用 delta chunk。
+    /// OpenAI 格式中，第一个 chunk 包含 id + name，后续 chunk 只包含 arguments 片段。
+    /// </summary>
+    private static StreamEvent ParseToolCallStreamDelta(JsonElement toolCall)
     {
         var index = 0;
         if (toolCall.TryGetProperty("index", out var indexElement))
@@ -332,7 +339,6 @@ public class OpenAIAdapter : IProviderAdapter
             index = indexElement.GetInt32();
         }
 
-        // 获取工具调用 ID (OpenAI 格式中每个 delta 都可能包含 id)
         var toolCallId = toolCall.TryGetProperty("id", out var idElement) ? idElement.GetString() : null;
 
         if (toolCall.TryGetProperty("function", out var function))
@@ -340,15 +346,7 @@ public class OpenAIAdapter : IProviderAdapter
             var name = function.TryGetProperty("name", out var nameElement) ? nameElement.GetString() : null;
             var arguments = function.TryGetProperty("arguments", out var argsElement) ? argsElement.GetString() : null;
 
-            if (!string.IsNullOrEmpty(arguments))
-            {
-                return new ToolCallDeltaEvent
-                {
-                    ContentIndex = index,
-                    ArgumentsDelta = arguments
-                };
-            }
-
+            // 第一个 chunk: 有 name → ToolCallStartEvent
             if (!string.IsNullOrEmpty(name))
             {
                 return new ToolCallStartEvent
@@ -356,6 +354,16 @@ public class OpenAIAdapter : IProviderAdapter
                     ContentIndex = index,
                     ToolName = name,
                     ToolCallId = toolCallId
+                };
+            }
+
+            // 后续 chunk: 有 arguments → ToolCallDeltaEvent
+            if (!string.IsNullOrEmpty(arguments))
+            {
+                return new ToolCallDeltaEvent
+                {
+                    ContentIndex = index,
+                    ArgumentsDelta = arguments
                 };
             }
         }
@@ -395,9 +403,9 @@ public class OpenAIAdapter : IProviderAdapter
         var cacheHit = 0;
 
         // OpenAI 缓存 token
-        if (usage.TryGetProperty("prompt_tokens_details", out var details))
+        if (usage.TryGetProperty("prompt_tokens_details", out var details) && details.ValueKind == JsonValueKind.Object)
         {
-            if (details.TryGetProperty("cached_tokens", out var cached))
+            if (details.TryGetProperty("cached_tokens", out var cached) && cached.ValueKind == JsonValueKind.Number)
             {
                 cacheHit = cached.GetInt32();
             }

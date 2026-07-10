@@ -1,0 +1,43 @@
+{
+  "id": "resp_646d7c966659449a9d5027ee8f2054a4",
+  "model": "mimo-v2.5-pro",
+  "status": "completed",
+  "output": [
+    {
+      "id": "rs_54dee72a29bb4caea650bc005d7c9098",
+      "type": "reasoning",
+      "summary": [],
+      "content": [
+        {
+          "type": "reasoning_text",
+          "text": "Okay, the user just asked me to introduce myself. This is a straightforward request."
+        }
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "msg_513be1269c1c4bff93511604f35d5967",
+      "type": "message",
+      "status": "completed",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Hello! I'm MiMo, your friendly AI assistant created by Xiaomi's LLM Core Team.",
+          "annotations": []
+        }
+      ]
+    }
+  ],
+  "usage": {
+    "input_tokens": 55,
+    "input_tokens_details": {
+      "cached_tokens": 30
+    },
+    "output_tokens": 177,
+    "output_tokens_details": {
+      "reasoning_tokens": 110
+    },
+    "total_tokens": 232
+  }
+}

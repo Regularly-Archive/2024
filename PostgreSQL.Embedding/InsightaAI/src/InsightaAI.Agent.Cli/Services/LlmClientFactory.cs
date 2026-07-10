@@ -1,7 +1,6 @@
 using InsightaAI.LLM.Abstractions;
 using InsightaAI.Agent.Cli.Models;
 using InsightaAI.LLM;
-using InsightaAI.Agent.Abstractions;
 using InsightaAI.LLM.Anthropic;
 using InsightaAI.LLM.Gemini;
 using InsightaAI.LLM.OpenAI;
@@ -14,53 +13,38 @@ namespace InsightaAI.Agent.Cli.Services;
 public static class LlmClientFactory
 {
     /// <summary>
-    /// 根据配置创建 LLM 客户端
+    /// 根据配置创建 LLM 客户端（使用 primary_model）
     /// </summary>
-    public static ILlmClient Create(CliConfig config)
+    public static ILlmClient Create(AuthConfig auth, CliConfig config)
     {
-        var factory = new InsightaAI.LLM.LlmClientFactory();
+        var (providerName, _) = config.ParsePrimaryModel();
+        return Create(auth, config, config.PrimaryModel);
+    }
 
-        // 注册适配器
+    /// <summary>
+    /// 根据指定 model 引用创建 LLM 客户端（支持会话内切换模型）
+    /// </summary>
+    public static ILlmClient Create(AuthConfig auth, CliConfig config, string modelRef)
+    {
+        var (providerName, _) = CliConfig.ParseModelReference(modelRef);
+        var provider = config.GetProvider(auth, providerName);
+
+        var factory = new InsightaAI.LLM.LlmClientFactory();
         factory.RegisterAdapter(new OpenAIAdapter());
+        factory.RegisterAdapter(new OpenAIResponseAdapter());
         factory.RegisterAdapter(new AnthropicAdapter());
         factory.RegisterAdapter(new GeminiAdapter());
 
-        var providerConfig = BuildProviderConfig(config);
-        return factory.Create(config.Provider, providerConfig);
-    }
-
-    private static ProviderConfig BuildProviderConfig(CliConfig config)
-    {
-        return config.Provider.ToLower() switch
+        var providerConfig = new ProviderConfig
         {
-            "openai" => new ProviderConfig
-            {
-                ApiKey = config.OpenAiApiKey
-                    ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY")
-                    ?? throw new InvalidOperationException(
-                        "OpenAI API key is not configured. Set it via config or OPENAI_API_KEY environment variable."),
-                BaseUrl = config.OpenAiBaseUrl
-                    ?? Environment.GetEnvironmentVariable("OPENAI_BASE_URL")
-            },
-            "anthropic" => new ProviderConfig
-            {
-                ApiKey = config.AnthropicApiKey
-                    ?? Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY")
-                    ?? throw new InvalidOperationException(
-                        "Anthropic API key is not configured. Set it via config or ANTHROPIC_API_KEY environment variable."),
-               BaseUrl = config.AnthropicBaseUrl
-                    ?? Environment.GetEnvironmentVariable("ANTHROPIC_BASE_URL")
-            },
-            "gemini" => new ProviderConfig
-            {
-                ApiKey = config.GeminiApiKey
-                    ?? Environment.GetEnvironmentVariable("GEMINI_API_KEY")
-                    ?? throw new InvalidOperationException(
-                        "Gemini API key is not configured. Set it via config or GEMINI_API_KEY environment variable."),
-                BaseUrl = config.GeminiBaseUrl
-                    ?? Environment.GetEnvironmentVariable("GEMINI_BASE_URL")
-            },
-            _ => throw new NotSupportedException($"Provider '{config.Provider}' is not supported.")
+            ApiKey = provider.ApiKey
+                ?? Environment.GetEnvironmentVariable($"{provider.Adapter.ToUpper()}_API_KEY")
+                ?? throw new InvalidOperationException(
+                    $"API key not configured for provider '{providerName}'. Run 'config' to add it."),
+            BaseUrl = provider.BaseUrl,
+            Headers = provider.Headers
         };
+
+        return factory.Create(provider.Adapter, providerConfig);
     }
 }

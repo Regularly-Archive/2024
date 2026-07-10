@@ -1,0 +1,29 @@
+{
+  "id": "resp_789",
+  "model": "gpt-4o",
+  "status": "completed",
+  "output": [
+    {
+      "type": "message",
+      "id": "msg_1",
+      "role": "assistant",
+      "content": [
+        { "type": "output_text", "text": "Let me check the weather." }
+      ],
+      "status": "completed"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_1",
+      "call_id": "call_abc",
+      "name": "get_weather",
+      "arguments": "{\"location\":\"Paris\"}",
+      "status": "completed"
+    }
+  ],
+  "usage": {
+    "input_tokens": 30,
+    "output_tokens": 25,
+    "total_tokens": 55
+  }
+}
