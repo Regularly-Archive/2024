@@ -42,8 +42,8 @@ public class WhereAmITool : IToolExecutor
         {
             ["time"] = new
             {
-                local = now.ToString("yyyy-MM-dd HH:mm:ss"),
-                utc = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"),
+                local = now.ToString("yyyy-MM-dd HH:mm:ss dddd"),
+                utc = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss dddd"),
                 timezone = tz.Id,
                 timezone_display = tz.DisplayName
             },
