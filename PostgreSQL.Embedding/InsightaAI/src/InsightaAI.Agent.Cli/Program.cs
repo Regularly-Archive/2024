@@ -23,6 +23,13 @@ public class Program
         rootCommand.AddCommand(new SkillsCommand().Create());
         rootCommand.AddCommand(new McpCommand().Create());
 
+        // 如果第一个参数是选项（以 - 开头），自动补上 chat 子命令
+        // 这样 insighta -c 等价于 insighta chat -c
+        if (args.Length > 0 && args[0].StartsWith('-'))
+        {
+            args = ["chat", .. args];
+        }
+
         // 如果没有子命令，默认运行 chat
         if (args.Length == 0)
         {

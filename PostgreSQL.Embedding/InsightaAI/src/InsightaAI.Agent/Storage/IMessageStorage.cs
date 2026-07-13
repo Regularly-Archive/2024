@@ -6,13 +6,16 @@ namespace InsightaAI.Agent.Storage;
 public interface IMessageStorage
 {
     /// <summary>创建会话</summary>
-    Task<SessionRecord> CreateSessionAsync(string model, string provider, string? title = null, string? userId = null);
+    Task<SessionRecord> CreateSessionAsync(string model, string provider, string? title = null, string? userId = null, string? workDir = null);
 
     /// <summary>获取会话</summary>
     Task<SessionRecord?> GetSessionAsync(string sessionId);
 
     /// <summary>获取会话列表</summary>
     Task<List<SessionRecord>> GetSessionsAsync(string? userId = null, int limit = 50);
+
+    /// <summary>获取指定工作目录下最近的会话</summary>
+    Task<SessionRecord?> GetLastSessionForWorkDirAsync(string workDir);
 
     /// <summary>更新会话</summary>
     Task UpdateSessionAsync(SessionRecord session);

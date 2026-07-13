@@ -194,9 +194,9 @@ public class ChatSession
     /// <summary>
     /// 创建新的会话
     /// </summary>
-    public static async Task<ChatSession> CreateAsync(IMessageStorage storage, string model, string provider)
+    public static async Task<ChatSession> CreateAsync(IMessageStorage storage, string model, string provider, string? workDir = null)
     {
-        var session = await storage.CreateSessionAsync(model, provider);
+        var session = await storage.CreateSessionAsync(model, provider, workDir: workDir);
         return new ChatSession(storage, session);
     }
 

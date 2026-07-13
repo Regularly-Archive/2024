@@ -36,14 +36,15 @@ public class PostgresMessageStorage : IMessageStorage
         _db = db;
     }
 
-    public async Task<SessionRecord> CreateSessionAsync(string model, string provider, string? title = null, string? userId = null)
+    public async Task<SessionRecord> CreateSessionAsync(string model, string provider, string? title = null, string? userId = null, string? workDir = null)
     {
         var session = new SessionRecord
         {
             Model = model,
             Provider = provider,
             Title = title,
-            UserId = userId
+            UserId = userId,
+            WorkDir = workDir
         };
 
         await _db.Insertable(session).ExecuteCommandAsync();
@@ -70,6 +71,14 @@ public class PostgresMessageStorage : IMessageStorage
             .OrderByDescending(s => s.UpdatedAt)
             .Take(limit)
             .ToListAsync();
+    }
+
+    public async Task<SessionRecord?> GetLastSessionForWorkDirAsync(string workDir)
+    {
+        return await _db.Queryable<SessionRecord>()
+            .Where(s => s.WorkDir == workDir)
+            .OrderByDescending(s => s.UpdatedAt)
+            .FirstAsync();
     }
 
     public async Task UpdateSessionAsync(SessionRecord session)

@@ -263,7 +263,7 @@ public class EventRenderer : IDisposable
                         {
                             await Task.Delay(400, ct);
                             dotCount = (dotCount % 3) + 1; 
-                            ctx.Status = $"Thinking{new string('.', dotCount)}";
+                            ctx.Status = $"Thinking{new string('.', dotCount)} (press esc to interrupt)";
                         }
                     });
             }

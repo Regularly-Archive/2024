@@ -32,14 +32,15 @@ public class JsonlMessageStorage : IMessageStorage
         Directory.CreateDirectory(_basePath);
     }
 
-    public async Task<SessionRecord> CreateSessionAsync(string model, string provider, string? title = null, string? userId = null)
+    public async Task<SessionRecord> CreateSessionAsync(string model, string provider, string? title = null, string? userId = null, string? workDir = null)
     {
         var session = new SessionRecord
         {
             Model = model,
             Provider = provider,
             Title = title,
-            UserId = userId
+            UserId = userId,
+            WorkDir = workDir
         };
 
         await _lock.WaitAsync();
@@ -80,6 +81,15 @@ public class JsonlMessageStorage : IMessageStorage
             .OrderByDescending(s => s.UpdatedAt)
             .Take(limit)
             .ToList();
+    }
+
+    public async Task<SessionRecord?> GetLastSessionForWorkDirAsync(string workDir)
+    {
+        var sessions = await ReadAllSessionsAsync();
+        return sessions
+            .Where(s => s.WorkDir == workDir)
+            .OrderByDescending(s => s.UpdatedAt)
+            .FirstOrDefault();
     }
 
     public async Task UpdateSessionAsync(SessionRecord session)

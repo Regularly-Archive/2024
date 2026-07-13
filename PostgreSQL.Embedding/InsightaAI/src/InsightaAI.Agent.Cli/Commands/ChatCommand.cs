@@ -49,15 +49,17 @@ public class ChatCommand
     {
         var command = new Command("chat", "开始对话");
         var sessionOption = new Option<string?>("--session", "指定会话 ID（继续已有会话）");
+        var continueOption = new Option<bool>(new[] { "-c", "--continue" }, "继续当前目录的最近一次会话");
         command.AddOption(sessionOption);
-        command.SetHandler((session) => ExecuteAsync(session), sessionOption);
+        command.AddOption(continueOption);
+        command.SetHandler((session, continueLast) => ExecuteAsync(session, continueLast), sessionOption, continueOption);
         return command;
     }
 
     /// <summary>
     /// 执行命令
     /// </summary>
-    public async Task<int> ExecuteAsync(string? sessionId)
+    public async Task<int> ExecuteAsync(string? sessionId, bool continueLast = false)
     {
         var config = CliConfig.Load();
         var auth = AuthConfig.Load();
@@ -101,7 +103,7 @@ public class ChatCommand
         var mcpRegistry = CreateMcpRegistry();
 
         // 获取或创建会话（先获取 sessionId）
-        var session = await GetOrCreateSessionAsync(sessionId, config, providerName);
+        var session = await GetOrCreateSessionAsync(sessionId, continueLast, config, providerName);
         if (session == null) return 1;
 
         // 创建 Agent（传入 sessionId 以注册会话记忆钩子）
@@ -617,7 +619,7 @@ public class ChatCommand
         return registry;
     }
 
-    private async Task<ChatSession?> GetOrCreateSessionAsync(string? sessionId, CliConfig config, string providerName)
+    private async Task<ChatSession?> GetOrCreateSessionAsync(string? sessionId, bool continueLast, CliConfig config, string providerName)
     {
         if (!string.IsNullOrEmpty(sessionId))
         {
@@ -630,7 +632,27 @@ public class ChatCommand
             return session;
         }
 
-        return await ChatSession.CreateAsync(_storage, config.PrimaryModel, providerName);
+        if (continueLast)
+        {
+            var workDir = Directory.GetCurrentDirectory();
+            var record = await _storage.GetLastSessionForWorkDirAsync(workDir);
+            if (record == null)
+            {
+                _renderer.ShowError($"当前目录没有历史会话: {workDir}");
+                return null;
+            }
+            var session = await ChatSession.LoadAsync(_storage, record.Id);
+            if (session == null)
+            {
+                _renderer.ShowError($"会话 {record.Id} 数据损坏");
+                return null;
+            }
+            _renderer.ShowInfo($"已恢复会话: {session.SessionId}");
+            return session;
+        }
+
+        var workDir2 = Directory.GetCurrentDirectory();
+        return await ChatSession.CreateAsync(_storage, config.PrimaryModel, providerName, workDir2);
     }
 
     private static McpRegistry? CreateMcpRegistry()

@@ -30,6 +30,10 @@ public class SessionRecord
     [JsonPropertyName("user_id")]
     public string? UserId { get; set; }
 
+    [SugarColumn(IsNullable = true, Length = 500)]
+    [JsonPropertyName("work_dir")]
+    public string? WorkDir { get; set; }
+
     [JsonPropertyName("message_count")]
     public int MessageCount { get; set; }
 
