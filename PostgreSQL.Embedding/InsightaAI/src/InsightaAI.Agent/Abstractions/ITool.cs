@@ -5,7 +5,7 @@ namespace InsightaAI.Agent.Abstractions;
 /// <summary>
 /// 工具执行器接口
 /// </summary>
-public interface IToolExecutor
+public interface ITool
 {
     /// <summary>工具名称</summary>
     string Name { get; }

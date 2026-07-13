@@ -10,7 +10,7 @@ namespace InsightaAI.Agent.Tools.BuiltIn;
 /// <summary>
 /// whereami 工具 - 告知 Agent 当前环境上下文信息
 /// </summary>
-public class WhereAmITool : IToolExecutor
+public class WhereAmITool : ITool
 {
     public string Name => "whereami";
 

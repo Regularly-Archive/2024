@@ -8,7 +8,7 @@ namespace InsightaAI.Agent.Tools.BuiltIn;
 /// 文件内容搜索工具
 /// 支持正则表达式、递归搜索、忽略大小写等选项
 /// </summary>
-public class GrepTool : IToolExecutor
+public class GrepTool : ITool
 {
     private readonly IFileSystem _fileSystem;
 

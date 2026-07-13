@@ -7,7 +7,7 @@ namespace InsightaAI.Tests.Shared;
 /// <summary>
 /// 简单的计算器工具 (用于测试)
 /// </summary>
-public class CalculatorTool : IToolExecutor
+public class CalculatorTool : ITool
 {
     public string Name => "calculator";
 

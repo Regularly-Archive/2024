@@ -14,7 +14,7 @@ public class OpenAITests : TestBase
     [Fact]
     public void Factory_Should_Register_OpenAI_Adapter()
     {
-        Assert.True(Factory.HasProvider("openai"));
+        Assert.True(Factory.HasAdapter("openai"));
     }
 
     [Fact]

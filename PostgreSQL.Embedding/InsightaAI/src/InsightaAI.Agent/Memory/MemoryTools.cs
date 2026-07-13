@@ -26,7 +26,7 @@ public static class MemoryTools
 /// <summary>
 /// 保存记忆工具
 /// </summary>
-internal class SaveMemoryTool : IToolExecutor
+internal class SaveMemoryTool : ITool
 {
     private readonly IMemoryManager _memoryManager;
     private readonly string _userId;
@@ -125,7 +125,7 @@ internal class SaveMemoryTool : IToolExecutor
 /// <summary>
 /// 更新记忆工具
 /// </summary>
-internal class UpdateMemoryTool : IToolExecutor
+internal class UpdateMemoryTool : ITool
 {
     private readonly IMemoryManager _memoryManager;
     private readonly string _userId;
@@ -223,7 +223,7 @@ internal class UpdateMemoryTool : IToolExecutor
 /// <summary>
 /// 删除记忆工具
 /// </summary>
-internal class DeleteMemoryTool : IToolExecutor
+internal class DeleteMemoryTool : ITool
 {
     private readonly IMemoryManager _memoryManager;
     private readonly string _userId;
@@ -280,7 +280,7 @@ internal class DeleteMemoryTool : IToolExecutor
 /// <summary>
 /// 搜索记忆工具
 /// </summary>
-internal class SearchMemoryTool : IToolExecutor
+internal class SearchMemoryTool : ITool
 {
     private readonly IMemoryManager _memoryManager;
     private readonly string _userId;
@@ -384,7 +384,7 @@ internal class SearchMemoryTool : IToolExecutor
 /// <summary>
 /// 获取用户画像工具
 /// </summary>
-internal class GetUserProfileTool : IToolExecutor
+internal class GetUserProfileTool : ITool
 {
     private readonly IMemoryManager _memoryManager;
     private readonly string _userId;

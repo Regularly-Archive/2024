@@ -8,7 +8,7 @@ namespace InsightaAI.Agent.Tools.BuiltIn;
 /// 文件名模式搜索工具
 /// 支持通配符模式搜索文件
 /// </summary>
-public class GlobTool : IToolExecutor
+public class GlobTool : ITool
 {
     private readonly IFileSystem _fileSystem;
 

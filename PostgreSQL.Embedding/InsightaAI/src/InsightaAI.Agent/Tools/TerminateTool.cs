@@ -7,7 +7,7 @@ namespace InsightaAI.Agent.Tools;
 /// <summary>
 /// 终止工具 - Agent 主动结束并返回最终答案
 /// </summary>
-public class TerminateTool : IToolExecutor
+public class TerminateTool : ITool
 {
     public string Name => "terminate";
 
@@ -41,7 +41,7 @@ public class TerminateTool : IToolExecutor
 /// <summary>
 /// 任务完成工具 - 标记任务完成
 /// </summary>
-public class CompleteTaskTool : IToolExecutor
+public class CompleteTaskTool : ITool
 {
     public string Name => "complete_task";
 

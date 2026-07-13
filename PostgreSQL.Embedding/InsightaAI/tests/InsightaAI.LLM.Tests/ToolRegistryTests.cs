@@ -32,7 +32,7 @@ public class ToolRegistryTests
     [Fact]
     public void RegisterAll_Should_Add_Multiple_Tools()
     {
-        var tools = new List<IToolExecutor>
+        var tools = new List<ITool>
         {
             new CalculatorTool(),
             new MockTool("tool_a"),

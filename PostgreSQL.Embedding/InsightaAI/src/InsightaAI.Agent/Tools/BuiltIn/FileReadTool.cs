@@ -9,7 +9,7 @@ namespace InsightaAI.Agent.Tools.BuiltIn;
 /// 文件读取工具
 /// 支持全文读取、按行读取（offset/limit）、读取头部/尾部
 /// </summary>
-public class FileReadTool : IToolExecutor
+public class FileReadTool : ITool
 {
     private readonly IFileSystem _fileSystem;
     private readonly FileReadState _readState;

@@ -9,7 +9,7 @@ namespace InsightaAI.Agent.Tools.BuiltIn;
 /// 文件编辑工具 - 支持字符串匹配的精确替换
 /// 需要先 read_file 读取文件，然后才能编辑
 /// </summary>
-public class FileEditTool : IToolExecutor
+public class FileEditTool : ITool
 {
     private readonly IFileSystem _fileSystem;
     private readonly FileReadState _readState;

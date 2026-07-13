@@ -14,7 +14,7 @@ public class AnthropicTests : TestBase
     [Fact]
     public void Factory_Should_Register_Anthropic_Adapter()
     {
-        Assert.True(Factory.HasProvider("anthropic"));
+        Assert.True(Factory.HasAdapter("anthropic"));
     }
 
     [Fact]

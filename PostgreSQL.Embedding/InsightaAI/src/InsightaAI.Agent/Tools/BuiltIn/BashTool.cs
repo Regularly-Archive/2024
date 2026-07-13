@@ -8,7 +8,7 @@ namespace InsightaAI.Agent.Tools.BuiltIn;
 /// Shell 命令执行工具
 /// 通过 IShellExecutor 接口支持多种执行环境（本地、Docker、远程等）
 /// </summary>
-public class BashTool : IToolExecutor
+public class BashTool : ITool
 {
     private readonly IShellExecutor _shellExecutor;
 

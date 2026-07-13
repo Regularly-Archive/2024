@@ -7,7 +7,7 @@ namespace InsightaAI.Agent.Tools;
 /// <summary>
 /// 委托工具 - 将任务委托给其他 Agent
 /// </summary>
-public class DelegateTool : IToolExecutor
+public class DelegateTool : ITool
 {
     private readonly Func<string, string, Task<string>> _delegateHandler;
 

@@ -11,7 +11,7 @@ namespace InsightaAI.Agent.Tools.BuiltIn;
 /// Web 搜索工具（IToolExecutor 模式，支持 Intercept）
 /// 使用 Tavily API 进行搜索
 /// </summary>
-public class WebSearchTool : IToolExecutor
+public class WebSearchTool : ITool
 {
     private static readonly HttpClient _httpClient = new();
 

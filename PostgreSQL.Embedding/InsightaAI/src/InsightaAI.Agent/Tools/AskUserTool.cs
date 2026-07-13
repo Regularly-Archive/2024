@@ -8,7 +8,7 @@ namespace InsightaAI.Agent.Tools;
 /// 向用户提问工具 - 用于 Agent 需要澄清或获取信息时
 /// 支持自由文本输入、单选和多选
 /// </summary>
-public class AskUserTool : IToolExecutor
+public class AskUserTool : ITool
 {
     private readonly Func<string, string[]?, bool, Task<string>> _askHandler;
 

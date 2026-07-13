@@ -9,7 +9,7 @@ namespace InsightaAI.Agent.Tools.BuiltIn;
 /// Web 内容获取工具（IToolExecutor 模式，支持 Intercept）
 /// 获取 URL 内容并转换为 Markdown
 /// </summary>
-public class WebFetchTool : IToolExecutor
+public class WebFetchTool : ITool
 {
     private static readonly HttpClient _httpClient = new()
     {

@@ -174,14 +174,53 @@ _toolRegistry = serviceProvider.GetRequiredService<ToolRegistry>();  // 会抛�
 - [x] `ChatCommand.ExecuteAgentAsync` 创建 `CancellationTokenSource`，传入 `RunStreamAsync`
 - [x] 后台 `Task` 监听 ESC 键，触发 `cts.Cancel()`
 - [x] 循环体内显式 `ThrowIfCancellationRequested()` 补充 `WithCancellation` 时机不足
-- [x] `catch (OperationCanceledException)` 调用 `EventRenderer.ShowInterrupted()` 显示中断提示
+- [x] `catch (OperationCanceledException)` 调用 `EventRenderer.ShowInterruptedAsync()` 显示中断提示
 - [x] 中断后不保存未完成的助手消息，避免 LLM 下轮重复生成
 - [x] `PromptUser()` 前清空输入缓冲区，防止 ESC 残留泄漏到 prompt
 - [x] `finally` 块确保 ESC 监听任务退出
 
 **待优化：**
+- [x] Spectre.Console `Status` spinner 与 `Prompt` 冲突：`StopThinkingAsync` 增加 150ms 等待渲染循环退出；`ThinkingEndEvent` 和 `AgentRoundEndEvent` 确保 spinner 在工具权限提示前停止
 - [ ] Spectre.Console `Status` spinner 运行时 `Console.KeyAvailable` 可能不稳定，考虑替换为不接管终端的实现
 - [ ] 取消流程单元测试
+
+---
+
+### 9. -c/--continue 恢复最近会话（优先级：中）
+
+**问题描述：**
+用户希望快速恢复当前工作目录的最近一次会话，无需手动查找 session ID。
+
+**已完成：**
+- [x] `SessionRecord` 新增 `WorkDir` 字段，记录会话所属工作目录
+- [x] `IMessageStorage.CreateSessionAsync` 新增 `workDir` 参数
+- [x] `JsonlMessageStorage` 和 `PostgresMessageStorage` 实现 `GetLastSessionForWorkDirAsync`
+- [x] `ChatCommand` 新增 `-c`/`--continue` 选项，自动恢复当前目录最近会话
+- [x] `Program.cs` 支持 `insighta -c` 自动补全为 `insighta chat -c`
+- [x] `ChatSession.CreateAsync` 传递 `workDir`
+
+---
+
+### 10. OpenAI Responses API reasoning 事件支持（优先级：高）
+
+**问题描述：**
+`OpenAIResponseAdapter` 缺少 `response.reasoning_text.delta` 和 `response.reasoning_text.done` 事件处理，导致 thinking spinner 无法正常停止。
+
+**已完成：**
+- [x] `ParseStreamEvent` 新增 `response.reasoning_text.delta` → `ThinkingDeltaEvent`
+- [x] `ParseStreamEvent` 新增 `response.reasoning_text.done` → `ThinkingEndEvent`
+- [x] `EventRenderer.HandleStreamEventAsync` 新增 `ThinkingEndEvent` 处理，调用 `StopThinkingAsync()`
+
+---
+
+### 11. 工具调用 ID 一致性修复（优先级：高）
+
+**问题描述：**
+`HandleOutputItemDone` 使用 `item.id`（output item ID）作为工具调用 ID，而 `HandleOutputItemAdded` 使用 `item.call_id`，导致 `LlmStream.BuildResponseFromEvents` 去重失败，同一工具调用被添加两次（第二次参数为空）。
+
+**已完成：**
+- [x] `HandleOutputItemDone` 改为优先使用 `call_id`，与 `HandleOutputItemAdded` 一致
+- [x] 移除 `LlmStream.BuildResponseFromEvents` 中的 `seenToolCallIds` 去重逻辑，去重职责统一交给 Agent 层
 
 ---
 
@@ -191,3 +230,4 @@ _toolRegistry = serviceProvider.GetRequiredService<ToolRegistry>();  // 会抛�
 - 2026-07-16: 新增 AgentBuilder 生命周期一致性待办（ToolRegistry 注册问题）
 - 2026-07-21: 新增 Tool Result Interception 功能待办（Phase 1-3 已完成）
 - 2026-07-13: 新增 ESC 打断 LLM 生成功能（已完成，待优化 Spectre.Console 兼容性和单元测试）
+- 2026-07-13: 新增 -c/--continue 恢复最近会话、reasoning 事件支持、工具调用 ID 一致性修复、Spectre.Console Status spinner 兼容性修复

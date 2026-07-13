@@ -91,7 +91,7 @@ public abstract class TestBase
     /// <summary>
     /// 创建计算器工具执行器
     /// </summary>
-    protected static IToolExecutor CreateCalculatorTool()
+    protected static ITool CreateCalculatorTool()
     {
         return new CalculatorTool();
     }

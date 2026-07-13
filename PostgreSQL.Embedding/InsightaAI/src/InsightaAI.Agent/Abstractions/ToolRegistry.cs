@@ -8,12 +8,12 @@ namespace InsightaAI.Agent.Abstractions;
 /// </summary>
 public class ToolRegistry
 {
-    private readonly ConcurrentDictionary<string, IToolExecutor> _executors = new();
+    private readonly ConcurrentDictionary<string, ITool> _executors = new();
 
     /// <summary>
     /// 注册工具执行器
     /// </summary>
-    public ToolRegistry Register(IToolExecutor executor)
+    public ToolRegistry Register(ITool executor)
     {
         ArgumentNullException.ThrowIfNull(executor);
         _executors[executor.Name] = executor;
@@ -23,7 +23,7 @@ public class ToolRegistry
     /// <summary>
     /// 批量注册工具执行器
     /// </summary>
-    public ToolRegistry RegisterAll(IEnumerable<IToolExecutor> executors)
+    public ToolRegistry RegisterAll(IEnumerable<ITool> executors)
     {
         foreach (var executor in executors)
         {
@@ -87,7 +87,7 @@ public class ToolRegistry
     /// <summary>
     /// 获取工具执行器（用于调用 Intercept 等方法）
     /// </summary>
-    public IToolExecutor? GetExecutor(string name) => 
+    public ITool? GetExecutor(string name) => 
         _executors.TryGetValue(name, out var executor) ? executor : null;
 
     /// <summary>
@@ -148,7 +148,7 @@ public class ToolRegistry
 /// <summary>
 /// 委托工具执行器
 /// </summary>
-internal class DelegateToolExecutor : IToolExecutor
+internal class DelegateToolExecutor : ITool
 {
     private readonly Func<IDictionary<string, object>, ToolExecutionContext, Task<ToolResult>> _handler;
 

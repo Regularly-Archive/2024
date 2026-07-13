@@ -7,7 +7,7 @@ namespace InsightaAI.LLM.Tests.Tools;
 /// <summary>
 /// 简单的 Mock 工具 (用于测试)
 /// </summary>
-public class MockTool : IToolExecutor
+public class MockTool : ITool
 {
     public string Name { get; }
 

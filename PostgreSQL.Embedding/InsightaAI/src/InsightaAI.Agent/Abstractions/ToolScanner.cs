@@ -12,9 +12,9 @@ public static class ToolScanner
     /// <summary>
     /// 扫描程序集中的所有工具
     /// </summary>
-    public static IEnumerable<IToolExecutor> ScanAssembly(Assembly assembly)
+    public static IEnumerable<ITool> ScanAssembly(Assembly assembly)
     {
-        var tools = new List<IToolExecutor>();
+        var tools = new List<ITool>();
 
         foreach (var type in assembly.GetTypes())
         {
@@ -37,7 +37,7 @@ public static class ToolScanner
     /// <summary>
     /// 扫描多个程序集
     /// </summary>
-    public static IEnumerable<IToolExecutor> ScanAssemblies(params Assembly[] assemblies)
+    public static IEnumerable<ITool> ScanAssemblies(params Assembly[] assemblies)
     {
         return assemblies.SelectMany(ScanAssembly);
     }
@@ -45,7 +45,7 @@ public static class ToolScanner
     /// <summary>
     /// 扫描当前应用程序域中的所有程序集
     /// </summary>
-    public static IEnumerable<IToolExecutor> ScanAllLoadedAssemblies()
+    public static IEnumerable<ITool> ScanAllLoadedAssemblies()
     {
         return AppDomain.CurrentDomain.GetAssemblies()
             .Where(a => !a.IsDynamic)
@@ -55,7 +55,7 @@ public static class ToolScanner
     /// <summary>
     /// 从方法创建工具执行器（静态方法）
     /// </summary>
-    public static IToolExecutor? CreateToolExecutorFromMethod(MethodInfo method)
+    public static ITool? CreateToolExecutorFromMethod(MethodInfo method)
     {
         var toolAttr = method.GetCustomAttribute<ToolAttribute>();
         if (toolAttr == null) return null;
@@ -66,7 +66,7 @@ public static class ToolScanner
     /// <summary>
     /// 从方法创建工具执行器（实例方法，需要提供实例）
     /// </summary>
-    public static IToolExecutor? CreateToolExecutorFromMethod(MethodInfo method, object instance)
+    public static ITool? CreateToolExecutorFromMethod(MethodInfo method, object instance)
     {
         var toolAttr = method.GetCustomAttribute<ToolAttribute>();
         if (toolAttr == null) return null;
@@ -81,7 +81,7 @@ public static class ToolScanner
         return new DelegateToolExecutor(toolAttr.Name, description, schema, handler);
     }
 
-    private static IToolExecutor? CreateToolExecutor(ToolAttribute toolAttr, MethodInfo method, Type type)
+    private static ITool? CreateToolExecutor(ToolAttribute toolAttr, MethodInfo method, Type type)
     {
         // 构建 JSON Schema
         var schema = BuildJsonSchema(method);

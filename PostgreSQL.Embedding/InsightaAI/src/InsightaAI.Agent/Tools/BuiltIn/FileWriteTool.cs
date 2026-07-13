@@ -9,7 +9,7 @@ namespace InsightaAI.Agent.Tools.BuiltIn;
 /// 文件写入工具
 /// 支持创建/覆盖写入和追加写入
 /// </summary>
-public class FileWriteTool : IToolExecutor
+public class FileWriteTool : ITool
 {
     private readonly IFileSystem _fileSystem;
 

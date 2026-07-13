@@ -14,7 +14,7 @@ public class GeminiTests : TestBase
     [Fact]
     public void Factory_Should_Register_Gemini_Adapter()
     {
-        Assert.True(Factory.HasProvider("gemini"));
+        Assert.True(Factory.HasAdapter("gemini"));
     }
 
     [Fact]

@@ -7,7 +7,7 @@ namespace InsightaAI.Tests.Shared;
 /// <summary>
 /// 获取当前时间工具 (用于测试)
 /// </summary>
-public class GetCurrentTimeTool : IToolExecutor
+public class GetCurrentTimeTool : ITool
 {
     public string Name => "get_current_time";
 
@@ -55,7 +55,7 @@ public class GetCurrentTimeTool : IToolExecutor
 /// <summary>
 /// 保存笔记工具 (用于测试)
 /// </summary>
-public class SaveNoteTool : IToolExecutor
+public class SaveNoteTool : ITool
 {
     private readonly Dictionary<string, string> _notes;
 
