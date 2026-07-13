@@ -71,6 +71,12 @@ public class OpenAIResponseAdapter : IProviderAdapter
             case "response.output_text.done":
                 return HandleOutputTextDone(data);
 
+            case "response.reasoning_text.delta":
+                return HandleReasoningTextDelta(data);
+
+            case "response.reasoning_text.done":
+                return HandleReasoningTextDone(data);
+
             case "response.function_call_arguments.delta":
                 return HandleFunctionCallArgumentsDelta(data);
 
@@ -346,6 +352,28 @@ public class OpenAIResponseAdapter : IProviderAdapter
         return new TextEndEvent { ContentIndex = contentIndex };
     }
 
+    private StreamEvent? HandleReasoningTextDelta(JsonElement data)
+    {
+        if (data.TryGetProperty("delta", out var delta) &&
+            delta.ValueKind == JsonValueKind.String)
+        {
+            var text = delta.GetString();
+            if (!string.IsNullOrEmpty(text))
+            {
+                var contentIndex = data.TryGetProperty("content_index", out var ci) ? ci.GetInt32() : 0;
+                return new ThinkingDeltaEvent { Delta = text, ContentIndex = contentIndex };
+            }
+        }
+
+        return null;
+    }
+
+    private StreamEvent? HandleReasoningTextDone(JsonElement data)
+    {
+        var contentIndex = data.TryGetProperty("content_index", out var ci) ? ci.GetInt32() : 0;
+        return new ThinkingEndEvent { ContentIndex = contentIndex };
+    }
+
     private StreamEvent? HandleFunctionCallArgumentsDelta(JsonElement data)
     {
         if (!data.TryGetProperty("delta", out var delta) ||
@@ -387,7 +415,9 @@ public class OpenAIResponseAdapter : IProviderAdapter
         {
             var callId = item.TryGetProperty("call_id", out var cid) ? cid.GetString() ?? "" : "";
             var name = item.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
-            var id = item.TryGetProperty("id", out var idEl) ? idEl.GetString() ?? callId : callId;
+            // 优先使用 call_id 作为工具调用 ID，与 HandleOutputItemAdded 保持一致
+            // item.id 是 output item 的 ID（如 "fc_xxx"），不是工具调用的 ID
+            var id = !string.IsNullOrEmpty(callId) ? callId : (item.TryGetProperty("id", out var idEl) ? idEl.GetString() ?? "" : "");
 
             // 优先使用通过 delta 累积的参数，fallback 到事件中的 arguments
             string argumentsStr;

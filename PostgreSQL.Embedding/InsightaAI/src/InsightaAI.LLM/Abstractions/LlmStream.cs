@@ -105,7 +105,6 @@ public class LlmStreamImpl : LlmStream
         var thinkingBlocks = new Dictionary<int, StringBuilder>();
         var pendingToolCalls = new Dictionary<int, ToolCallBlock>();
         var finalToolCalls = new List<ToolCallBlock>();
-        var seenToolCallIds = new HashSet<string>();
 
         var usage = default(TokenUsage);
         var model = string.Empty;
@@ -139,7 +138,7 @@ public class LlmStreamImpl : LlmStream
 
                 case ToolCallStartEvent toolCallStart:
                     // 开始新的工具调用，先完成之前的
-                    FinalizePendingToolCalls(finalToolCalls, pendingToolCalls, seenToolCallIds);
+                    FinalizePendingToolCalls(finalToolCalls, pendingToolCalls);
                     pendingToolCalls[toolCallStart.ContentIndex] = new ToolCallBlock
                     {
                         Id = toolCallStart.ToolCallId ?? $"call_{toolCallStart.ContentIndex}_{Guid.NewGuid():N}",
@@ -164,11 +163,7 @@ public class LlmStreamImpl : LlmStream
                     break;
 
                 case ToolCallEndEvent toolCallEnd:
-                    // 添加完成的工具调用（按 ID 去重，避免 LLM 重复生成同一工具调用）
-                    if (seenToolCallIds.Add(toolCallEnd.ToolCall.Id))
-                    {
-                        finalToolCalls.Add(toolCallEnd.ToolCall);
-                    }
+                    finalToolCalls.Add(toolCallEnd.ToolCall);
                     // 从 pending 中移除
                     var removeKey = pendingToolCalls
                         .Where(kvp => kvp.Value.Id == toolCallEnd.ToolCall.Id)
@@ -184,13 +179,13 @@ public class LlmStreamImpl : LlmStream
                     {
                         usage = done.Usage;
                     }
-                    FinalizePendingToolCalls(finalToolCalls, pendingToolCalls, seenToolCallIds);
+                    FinalizePendingToolCalls(finalToolCalls, pendingToolCalls);
                     break;
             }
         }
 
         // 确保所有待处理的工具调用都被添加
-        FinalizePendingToolCalls(finalToolCalls, pendingToolCalls, seenToolCallIds);
+        FinalizePendingToolCalls(finalToolCalls, pendingToolCalls);
 
         // 按 ContentIndex 顺序合并所有内容块
         var content = new List<ContentBlock>();
@@ -226,7 +221,7 @@ public class LlmStreamImpl : LlmStream
         };
     }
 
-    private static void FinalizePendingToolCalls(List<ToolCallBlock> target, Dictionary<int, ToolCallBlock> pending, HashSet<string> seenIds)
+    private static void FinalizePendingToolCalls(List<ToolCallBlock> target, Dictionary<int, ToolCallBlock> pending)
     {
         foreach (var kvp in pending.OrderBy(x => x.Key))
         {
@@ -247,12 +242,7 @@ public class LlmStreamImpl : LlmStream
                 parsedArgs = JsonSerializer.SerializeToElement(new { });
             }
 
-            var finalized = toolCall with { Arguments = parsedArgs };
-            // 按 ID 去重
-            if (seenIds.Add(finalized.Id))
-            {
-                target.Add(finalized);
-            }
+            target.Add(toolCall with { Arguments = parsedArgs });
         }
         pending.Clear();
     }

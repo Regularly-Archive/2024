@@ -422,7 +422,7 @@ public class ChatCommand
         catch (OperationCanceledException)
         {
             // 用户按 ESC 打断，不保存未完成的助手消息，避免 LLM 下轮重复生成
-            eventRenderer.ShowInterrupted();
+            await eventRenderer.ShowInterruptedAsync();
         }
         catch (Exception ex)
         {

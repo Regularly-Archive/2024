@@ -49,6 +49,12 @@ public class EventRenderer : IDisposable
                 await HandleCompleteAsync(completeEvent);
                 break;
 
+            case AgentRoundEndEvent:
+                // LLM 流已结束，立即停止 thinking spinner
+                // 否则从流结束到工具开始执行之间 spinner 仍在显示
+                await StopThinkingAsync();
+                break;
+
             case AgentContextCompactedEvent compactedEvent:
                 HandleContextCompacted(compactedEvent);
                 break;
@@ -65,6 +71,10 @@ public class EventRenderer : IDisposable
 
             case ThinkingDeltaEvent thinkingDelta when _isThinking:
                 // 累积 thinking 文本（当前不显示）
+                break;
+
+            case ThinkingEndEvent:
+                await StopThinkingAsync();
                 break;
 
             case TextStartEvent:
@@ -205,15 +215,11 @@ public class EventRenderer : IDisposable
     /// <summary>
     /// 显示用户中断提示
     /// </summary>
-    public void ShowInterrupted()
+    public async Task ShowInterruptedAsync()
     {
-        // 停止 thinking spinner
-        if (_isThinking && _thinkingCts != null)
-        {
-            try { _thinkingCts.Cancel(); } catch { }
-            _isThinking = false;
-            _thinkingCts = null;
-        }
+        // 停止 thinking spinner 并等待后台任务完全退出
+        // 否则 AnsiConsole.Status 的渲染循环可能仍在运行，干扰后续输出
+        await StopThinkingAsync();
 
         if (!string.IsNullOrEmpty(FullText))
         {
@@ -263,7 +269,7 @@ public class EventRenderer : IDisposable
                         {
                             await Task.Delay(400, ct);
                             dotCount = (dotCount % 3) + 1; 
-                            ctx.Status = $"Thinking{new string('.', dotCount)} (press esc to interrupt)";
+                            ctx.Status = $"Thinking (press esc to interrupt){new string('.', dotCount)}";
                         }
                     });
             }
@@ -279,6 +285,11 @@ public class EventRenderer : IDisposable
         {
             _thinkingCts.Cancel();
             await _thinkingTask;
+
+            // 等待 Status 组件的渲染循环完全退出
+            // Spectre.Console 的 Status 使用定时渲染循环（~80ms 间隔），
+            // 回调退出后渲染循环可能仍有 1 帧残留，需要等待足够时间
+            await Task.Delay(150);
         }
         catch (OperationCanceledException)
         {
