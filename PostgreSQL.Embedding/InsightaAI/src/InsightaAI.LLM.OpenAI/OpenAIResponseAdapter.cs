@@ -387,8 +387,18 @@ public class OpenAIResponseAdapter : IProviderAdapter
         {
             var callId = item.TryGetProperty("call_id", out var cid) ? cid.GetString() ?? "" : "";
             var name = item.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
-            var argumentsStr = item.TryGetProperty("arguments", out var args) ? args.GetString() ?? "{}" : "{}";
             var id = item.TryGetProperty("id", out var idEl) ? idEl.GetString() ?? callId : callId;
+
+            // 优先使用通过 delta 累积的参数，fallback 到事件中的 arguments
+            string argumentsStr;
+            if (_pendingToolCalls.TryGetValue(callId, out var pending) && pending.Args.Length > 0)
+            {
+                argumentsStr = pending.Args.ToString();
+            }
+            else
+            {
+                argumentsStr = item.TryGetProperty("arguments", out var args) ? args.GetString() ?? "{}" : "{}";
+            }
 
             // 从 pending 中移除
             _pendingToolCalls.Remove(callId);
