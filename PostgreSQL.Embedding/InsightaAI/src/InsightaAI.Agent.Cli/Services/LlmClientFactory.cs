@@ -38,7 +38,6 @@ public static class LlmClientFactory
         var providerConfig = new ProviderConfig
         {
             ApiKey = provider.ApiKey
-                ?? Environment.GetEnvironmentVariable($"{provider.Adapter.ToUpper()}_API_KEY")
                 ?? throw new InvalidOperationException(
                     $"API key not configured for provider '{providerName}'. Run 'config' to add it."),
             BaseUrl = provider.BaseUrl,

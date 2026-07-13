@@ -5,8 +5,11 @@ using InsightaAI.Agent.Memory;
 using InsightaAI.Agent.Models;
 using InsightaAI.Agent.Skills;
 using InsightaAI.Agent.Storage;
-using InsightaAI.Agent.Tools;
 using InsightaAI.LLM.Abstractions;
+using InsightaAI.LLM.Anthropic;
+using InsightaAI.LLM.Extensions;
+using InsightaAI.LLM.Gemini;
+using InsightaAI.LLM.OpenAI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -29,6 +32,13 @@ public class AgentBuilder
 
         // 注册基础服务
         _services.TryAddSingleton(_config);
+        _services.AddLlmClientFactory(factory =>
+        {
+            factory.RegisterAdapter(new OpenAIAdapter());
+            factory.RegisterAdapter(new OpenAIResponseAdapter());
+            factory.RegisterAdapter(new AnthropicAdapter());
+            factory.RegisterAdapter(new GeminiAdapter());
+        });
     }
 
     /// <summary>

@@ -69,12 +69,12 @@ public class LlmClientFactory
     }
 
     /// <summary>
-    /// 获取已注册的 Provider 名称
+    /// 获取已注册的 Adapter 名称
     /// </summary>
-    public IEnumerable<string> GetRegisteredProviders() => _adapters.Keys;
+    public IEnumerable<string> GetRegisteredAdapters() => _adapters.Keys;
 
     /// <summary>
-    /// 检查 Provider 是否已注册
+    /// 检查 Adapter 是否已注册
     /// </summary>
-    public bool HasProvider(string provider) => _adapters.ContainsKey(provider.ToLowerInvariant());
+    public bool HasAdapter(string provider) => _adapters.ContainsKey(provider.ToLowerInvariant());
 }

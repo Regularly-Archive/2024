@@ -32,6 +32,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\InsightaAI.LLM.Anthropic\InsightaAI.LLM.Anthropic.csproj" />
+    <ProjectReference Include="..\InsightaAI.LLM.Gemini\InsightaAI.LLM.Gemini.csproj" />
+    <ProjectReference Include="..\InsightaAI.LLM.OpenAI\InsightaAI.LLM.OpenAI.csproj" />
     <ProjectReference Include="..\InsightaAI.LLM\InsightaAI.LLM.csproj" />
   </ItemGroup>
 
