@@ -165,8 +165,29 @@ _toolRegistry = serviceProvider.GetRequiredService<ToolRegistry>();  // 会抛�
 
 ---
 
+### 8. ESC 打断 LLM 生成（优先级：中）
+
+**问题描述：**
+用户在 Agent 生成回复时无法中断，必须等待生成完成。
+
+**已完成：**
+- [x] `ChatCommand.ExecuteAgentAsync` 创建 `CancellationTokenSource`，传入 `RunStreamAsync`
+- [x] 后台 `Task` 监听 ESC 键，触发 `cts.Cancel()`
+- [x] 循环体内显式 `ThrowIfCancellationRequested()` 补充 `WithCancellation` 时机不足
+- [x] `catch (OperationCanceledException)` 调用 `EventRenderer.ShowInterrupted()` 显示中断提示
+- [x] 中断后不保存未完成的助手消息，避免 LLM 下轮重复生成
+- [x] `PromptUser()` 前清空输入缓冲区，防止 ESC 残留泄漏到 prompt
+- [x] `finally` 块确保 ESC 监听任务退出
+
+**待优化：**
+- [ ] Spectre.Console `Status` spinner 运行时 `Console.KeyAvailable` 可能不稳定，考虑替换为不接管终端的实现
+- [ ] 取消流程单元测试
+
+---
+
 ## 记录时间
 - 2026-07-03: 创建文档，记录当前待办事项
 - 2026-07-15: 新增 Agent 依赖注入待办、TiktokenTokenEstimator、测试失败清单
 - 2026-07-16: 新增 AgentBuilder 生命周期一致性待办（ToolRegistry 注册问题）
 - 2026-07-21: 新增 Tool Result Interception 功能待办（Phase 1-3 已完成）
+- 2026-07-13: 新增 ESC 打断 LLM 生成功能（已完成，待优化 Spectre.Console 兼容性和单元测试）
