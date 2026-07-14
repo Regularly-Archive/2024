@@ -9,6 +9,14 @@ using System.Threading.Channels;
 
 namespace InsightaAI.Agent.Tools;
 
+/// <summary>
+/// 工具执行结果
+/// </summary>
+public sealed record ToolExecutionResult(
+    ToolCallBlock ToolCall,
+    ToolResult Result,
+    bool Intercepted);
+
 public class ToolCallExecutor
 {
     private readonly string _agentId;
@@ -36,6 +44,11 @@ public class ToolCallExecutor
     }
 
     /// <summary>
+    /// 最近一次执行的工具结果（在 ExecuteTools*Async 完成后可用）
+    /// </summary>
+    public IReadOnlyList<ToolExecutionResult> Results { get; private set; } = [];
+
+    /// <summary>
     /// 拦截工具结果（如果启用且工具实现了 Intercept）
     /// </summary>
     private async Task<(ToolResult Result, bool Intercepted)> TryInterceptResultAsync(
@@ -61,7 +74,6 @@ public class ToolCallExecutor
 
     public async IAsyncEnumerable<AgentEvent> ExecuteToolsParallelAsync(
         ToolCallBlock[] toolCalls,
-        List<Message> messages,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var toolEvents = Channel.CreateUnbounded<AgentEvent>();
@@ -117,28 +129,22 @@ public class ToolCallExecutor
         // 等待所有任务完成
         await Task.WhenAll(tasks);
 
-        // 按原始顺序添加工具结果到对话历史
+        // 拦截结果并存储（不再直接操作 messages）
+        var finalResults = new List<ToolExecutionResult>();
         foreach (var (toolCall, toolResult) in toolResults)
         {
-            // 尝试拦截工具结果
             var (finalResult, intercepted) = await TryInterceptResultAsync(toolCall.Name, toolCall.Id, toolResult, cancellationToken);
-
-            messages.Add(new Message
-            {
-                Role = MessageRole.ToolResult,
-                ToolCallId = toolCall.Id,
-                ToolName = toolCall.Name,
-                Content = finalResult.Content,
-                ToolResultIntercepted = intercepted
-            });
+            finalResults.Add(new ToolExecutionResult(toolCall, finalResult, intercepted));
         }
+        Results = finalResults;
     }
 
     public async IAsyncEnumerable<AgentEvent> ExecuteToolsSequentialAsync(
         ToolCallBlock[] toolCalls,
-        List<Message> messages,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
+        var finalResults = new List<ToolExecutionResult>();
+
         foreach (var toolCall in toolCalls)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -169,19 +175,12 @@ public class ToolCallExecutor
                 ResultPreview = resultText?.Length > 100 ? resultText[..100] + "..." : resultText
             };
 
-            // 尝试拦截工具结果
+            // 拦截结果并存储
             var (finalResult, intercepted) = await TryInterceptResultAsync(toolCall.Name, toolCall.Id, toolResult, cancellationToken);
-
-            // 将工具结果加入对话历史
-            messages.Add(new Message
-            {
-                Role = MessageRole.ToolResult,
-                ToolCallId = toolCall.Id,
-                ToolName = toolCall.Name,
-                Content = finalResult.Content,
-                ToolResultIntercepted = intercepted
-            });
+            finalResults.Add(new ToolExecutionResult(toolCall, finalResult, intercepted));
         }
+
+        Results = finalResults;
     }
 
     private TruncationContext CreateTruncationContext(string toolName, string toolCallId, ToolResult toolResult)
@@ -229,7 +228,7 @@ public class ToolCallExecutor
     }
 }
 
-#region 
+#region
 public record ToolCallRequest
 {
     public ToolCallBlock ToolCall { get; set; }

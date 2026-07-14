@@ -14,7 +14,7 @@ public class Program
         // 设置控制台编码为 UTF-8（修复全局工具模式下特殊字符显示为问号的问题）
         Console.OutputEncoding = Encoding.UTF8;
 
-        var rootCommand = new RootCommand("InsightaAI Agent CLI - LLM 对话工具");
+        var rootCommand = new RootCommand("InsightaAI Agent CLI - Yet Another AI Agent");
 
         // 注册命令
         rootCommand.AddCommand(new ConfigCommand().Create());

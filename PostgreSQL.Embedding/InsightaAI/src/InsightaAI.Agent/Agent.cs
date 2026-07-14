@@ -7,6 +7,7 @@ using InsightaAI.Agent.Memory;
 using InsightaAI.Agent.Models;
 using InsightaAI.Agent.Prompts;
 using InsightaAI.Agent.Skills;
+using InsightaAI.Agent.Storage;
 using InsightaAI.Agent.Tools;
 using InsightaAI.Agent.Tools.BuiltIn;
 using InsightaAI.LLM.Abstractions;
@@ -34,6 +35,7 @@ public class Agent : IDisposable
     private readonly McpRegistry? _mcpRegistry;
     private readonly IContextManager? _contextManager;
     private readonly IMemoryManager? _memoryManager;
+    private readonly IMessageStorage? _messageStorage;
     private readonly List<IToolHook> _toolHooks = [];
     private readonly List<IAgentHook> _agentHooks = [];
     private readonly HashSet<string> _alwaysAllowedTools = [];
@@ -51,7 +53,8 @@ public class Agent : IDisposable
         ISkillRegistry? skillRegistry = null,
         McpRegistry? mcpRegistry = null,
         IContextManager? contextManager = null,
-        IMemoryManager? memoryManager = null)
+        IMemoryManager? memoryManager = null,
+        IMessageStorage? messageStorage = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(llmClient);
@@ -64,6 +67,7 @@ public class Agent : IDisposable
         _mcpRegistry = mcpRegistry;
         _contextManager = contextManager;
         _memoryManager = memoryManager;
+        _messageStorage = messageStorage;
 
         // 构建内部 ServiceProvider，让 Hook / Tool 可按需解析服务
         var services = new ServiceCollection();
@@ -110,6 +114,7 @@ public class Agent : IDisposable
         _mcpRegistry = serviceProvider.GetService<McpRegistry>();
         _contextManager = serviceProvider.GetService<IContextManager>();
         _memoryManager = serviceProvider.GetService<IMemoryManager>();
+        _messageStorage = serviceProvider.GetService<IMessageStorage>();
 
         // 注册 activate_skill 工具
         if (_skillRegistry != null)
@@ -389,13 +394,16 @@ public class Agent : IDisposable
             Services = _serviceProvider
         };
 
-        var toolCallExecutor = new ToolCallExecutor(_config.Id, sessionId, async (request, ct)  =>
+        // 每次调用创建 AgentLoop，确保 sessionId 正确
+        var toolCallExecutor = new ToolCallExecutor(_config.Id, sessionId, async (request, ct) =>
         {
-            var (allowd, result) = await ExecuteSingleToolAsync(request.ToolCall, request.Arguments, request.SessionId, ct);
-            return new ToolCallReponse(allowd, result);
+            var (allowed, result) = await ExecuteSingleToolAsync(request.ToolCall, request.Arguments, request.SessionId, ct);
+            return new ToolCallReponse(allowed, result);
         }, _serviceProvider);
+        var agentLoop = new AgentLoop(_config, _llmClient, _toolRegistry, toolCallExecutor, () => _skillInstructions);
 
-        var messages = new List<Message>();
+        // 构建 LoopContext（System Prompt + History + User Input）
+        var loopContext = new LoopContext(sessionId, _config.Id, _contextManager);
 
         // 构建系统提示词（包含可用 Skills 信息和记忆索引）
         var systemPrompt = _config.SystemPrompt ?? "";
@@ -412,261 +420,78 @@ public class Agent : IDisposable
             }
         }
 
-        // 添加系统提示词
         if (!string.IsNullOrEmpty(systemPrompt))
         {
-            messages.Add(Message.FromSystem(systemPrompt));
+            loopContext.AddMessage(Message.FromSystem(systemPrompt));
         }
 
-        // 添加历史消息
         if (context?.History != null)
         {
-            messages.AddRange(context.History);
+            loopContext.AddMessages(context.History);
         }
 
-        // 添加用户输入
-        messages.Add(Message.FromUser(input));
-
-        var totalUsage = new TokenUsage();
-        var stopwatch = Stopwatch.StartNew();
-
-        // 发送开始事件
-        yield return new AgentStartEvent
+        // 设置消息持久化回调（在 history 之后、user message 之前）
+        // 这样只有新增的消息会被持久化，历史消息不会重复存储
+        if (_messageStorage != null)
         {
-            AgentId = _config.Id,
-            AgentName = _config.Name,
-            Model = _config.Model
-        };
-
-        // Agent Loop
-        for (int round = 1; round <= _config.MaxToolRounds; round++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            // 发送轮次开始事件
-            yield return new AgentRoundStartEvent
+            loopContext.OnMessageAdded = msg =>
             {
-                AgentId = _config.Id,
-                Round = round
+                // 系统消息不持久化（运行时构建的 prompt）
+                if (msg.Role == MessageRole.System) return;
+                var record = msg.ToMessageRecord(sessionId);
+                _ = _messageStorage.AddMessageAsync(sessionId, record);
             };
+        }
 
-            // 上下文压缩检查
-            if (_contextManager != null)
+        loopContext.AddMessage(Message.FromUser(input));
+
+        // 运行 AgentLoop，消费事件并触发 hooks
+        Message? lastAssistantMessage = null;
+        int lastRound = 0;
+
+        await foreach (var evt in agentLoop.RunAsync(loopContext, cancellationToken))
+        {
+            // 跟踪状态用于 hook 触发
+            if (evt is AgentRoundEndEvent roundEnd)
             {
-                var compactionResult = await _contextManager.CompactIfNeededAsync(
-                    messages, cancellationToken);
+                lastRound = roundEnd.Round;
+            }
 
-                if (compactionResult != null)
-                {
-                    yield return new AgentContextCompactedEvent
+            // 转发事件给调用方
+            yield return evt;
+
+            // 事件后处理
+            switch (evt)
+            {
+                case AgentContextCompactedEvent compactedEvt:
+                    // 压缩策略直接修改了 LoopContext 的 _messages 列表
+                    // 需要同步到存储：清空旧消息，写入压缩后的新消息
+                    if (_messageStorage != null && compactedEvt.CompactedMessages is { Length: > 0 } compacted)
                     {
-                        AgentId = _config.Id,
-                        Strategy = compactionResult.StrategyName,
-                        PreCompactTokens = compactionResult.PreCompactTokens,
-                        PostCompactTokens = compactionResult.PostCompactTokens,
-                        PreCompactMessages = compactionResult.PreCompactMessages,
-                        PostCompactMessages = compactionResult.PostCompactMessages,
-                        CompactedMessages = compactionResult.RequestMessages
-                    };
-                }
+                        await _messageStorage.ClearMessagesAsync(sessionId);
+                        foreach (var msg in compacted)
+                        {
+                            if (msg.Role == MessageRole.System) continue;
+                            var record = msg.ToMessageRecord(sessionId);
+                            await _messageStorage.AddMessageAsync(sessionId, record);
+                        }
+                    }
+                    break;
+
+                case AgentRoundEndEvent roundEndEvt:
+                    // 从 LoopContext 获取最后一条助手消息
+                    lastAssistantMessage = loopContext.Messages
+                        .LastOrDefault(m => m.Role == MessageRole.Assistant);
+                    TriggerAgentRoundEndHooks(hookContext, roundEndEvt.Round,
+                        loopContext.Messages.ToList(), lastAssistantMessage, cancellationToken);
+                    break;
+
+                case AgentCompleteEvent:
+                    await TriggerAgentSessionEndHooksAsync(hookContext,
+                        loopContext.Messages.ToList(), cancellationToken);
+                    break;
             }
-
-            // 构建 LLM 请求（动态注入已激活 Skill 的 Instructions）
-            var requestMessages = messages.ToArray();
-            if (!string.IsNullOrEmpty(_skillInstructions) && requestMessages.Length > 0 && requestMessages[0].Role == MessageRole.System)
-            {
-                // 更新系统消息，追加 Skill Instructions
-                var updatedSystemMessage = Message.FromSystem(requestMessages[0].GetTextContent() + _skillInstructions);
-                requestMessages = [updatedSystemMessage, .. requestMessages[1..]];
-            }
-
-            var request = new LlmRequest
-            {
-                Model = _config.Model,
-                Messages = requestMessages,
-                Tools = _toolRegistry.GetDefinitions(),
-                Temperature = _config.Temperature,
-                MaxTokens = _config.MaxTokens
-            };
-
-            // 调用 LLM 并转发流事件
-            LlmResponse? response = null;
-            var llmStream = _llmClient.Streaming(request);
-
-            await foreach (var streamEvent in llmStream.WithCancellation(cancellationToken))
-            {
-                yield return new AgentLlmStreamEvent
-                {
-                    AgentId = _config.Id,
-                    StreamEvent = streamEvent
-                };
-            }
-
-            // 获取最终响应
-            response = await llmStream.GetResponseAsync(cancellationToken);
-
-            // 累计 token 用量
-            if (response.Usage != null)
-            {
-                totalUsage = new TokenUsage
-                {
-                    InputTokens = totalUsage.InputTokens + response.Usage.InputTokens,
-                    OutputTokens = totalUsage.OutputTokens + response.Usage.OutputTokens,
-                    CacheHitTokens = totalUsage.CacheHitTokens + response.Usage.CacheHitTokens
-                };
-            }
-
-            // 将助手消息加入对话历史
-            var assistantMessage = new Message
-            {
-                Role = MessageRole.Assistant,
-                Content = response.Content
-            };
-            messages.Add(assistantMessage);
-
-            // 检查是否有工具调用（去重：LLM 可能生成相同名称+参数的重复调用）
-            var toolCalls = DeduplicateToolCalls(response.GetToolCalls());
-            if (toolCalls.Length == 0)
-            {
-                // 无工具调用，Agent 完成
-                stopwatch.Stop();
-
-                // 触发 agent hooks（fire-and-forget，不阻塞）
-                TriggerAgentRoundEndHooks(hookContext, round, messages, assistantMessage, cancellationToken);
-
-                var result = new AgentResult
-                {
-                    Status = AgentStatus.Completed,
-                    Message = assistantMessage,
-                    Usage = totalUsage,
-                    Rounds = round,
-                    DurationMs = stopwatch.ElapsedMilliseconds,
-                    EstimatedContextTokens = _contextManager?.EstimateTokens(messages) ?? 0,
-                    MaxContextTokens = _contextManager?.MaxContextTokens ?? 0
-                };
-
-                yield return new AgentRoundEndEvent
-                {
-                    AgentId = _config.Id,
-                    Round = round,
-                    HasToolCalls = false
-                };
-
-                yield return new AgentCompleteEvent
-                {
-                    AgentId = _config.Id,
-                    Result = result
-                };
-
-                await TriggerAgentSessionEndHooksAsync(hookContext, messages, cancellationToken);
-
-                yield break;
-            }
-
-            // 有工具调用，执行工具
-            yield return new AgentRoundEndEvent
-            {
-                AgentId = _config.Id,
-                Round = round,
-                HasToolCalls = true
-            };
-
-            // 执行工具
-            if (_config.ParallelToolExecution && toolCalls.Length > 1)
-            {
-                await foreach (var evt in toolCallExecutor.ExecuteToolsParallelAsync(toolCalls,messages, cancellationToken))
-                {
-                    yield return evt;
-                }
-            }
-            else
-            {
-                await foreach (var evt in toolCallExecutor.ExecuteToolsSequentialAsync(toolCalls, messages, cancellationToken))
-                {
-                    yield return evt;
-                }
-            }
-
-            // 工具执行完成后，触发 agent hooks（fire-and-forget，不阻塞）
-            TriggerAgentRoundEndHooks(hookContext, round, messages, assistantMessage, cancellationToken);
         }
-
-        // 超过最大轮次，尝试让 LLM 生成最终回复
-        // 添加提示让 LLM 总结当前结果
-        var content = "You have reached the maximum number of tool rounds. " +
-            "Please provide a final response to the user based on the information gathered so far. " +
-            "Do not attempt to use any more tools." +
-            "Do not generate <tool_call></tool_call> block.";
-        messages.Add(Message.FromToolResult(
-            toolCallId: Guid.NewGuid().ToString(),
-            toolName: "max_iter_reached",
-            content: [new TextBlock() { Text = content }]
-         ));
-        //messages.Add(Message.FromSystem(
-        //    "You have reached the maximum number of tool rounds. " +
-        //    "Please provide a final response to the user based on the information gathered so far. " +
-        //    "Do not attempt to use any more tools." +
-        //    "Do not generate <tool_call></tool_call> block."
-        //));
-
-        // 最后一次调用 LLM 获取总结
-        var finalRequest = new LlmRequest
-        {
-            Model = _config.Model,
-            Messages = messages.ToArray(),
-            Tools = [],
-            Temperature = 0,
-            MaxTokens = _config.MaxTokens,
-            ToolChoice = ToolChoiceMode.None
-        };
-
-        var finalStream = _llmClient.Streaming(finalRequest);
-        await foreach (var streamEvent in finalStream.WithCancellation(cancellationToken))
-        {
-            yield return new AgentLlmStreamEvent
-            {
-                AgentId = _config.Id,
-                StreamEvent = streamEvent
-            };
-        }
-
-        var finalResponse = await finalStream.GetResponseAsync(cancellationToken);
-
-        // 累计 token 用量
-        if (finalResponse.Usage != null)
-        {
-            totalUsage = new TokenUsage
-            {
-                InputTokens = totalUsage.InputTokens + finalResponse.Usage.InputTokens,
-                OutputTokens = totalUsage.OutputTokens + finalResponse.Usage.OutputTokens,
-                CacheHitTokens = totalUsage.CacheHitTokens + finalResponse.Usage.CacheHitTokens
-            };
-        }
-
-        var finalMessage = new Message
-        {
-            Role = MessageRole.Assistant,
-            Content = finalResponse.Content
-        };
-
-        stopwatch.Stop();
-
-        yield return new AgentCompleteEvent
-        {
-            AgentId = _config.Id,
-            Result = new AgentResult
-            {
-                Status = AgentStatus.Completed,
-                Message = finalMessage,
-                Usage = totalUsage,
-                Rounds = _config.MaxToolRounds,
-                DurationMs = stopwatch.ElapsedMilliseconds,
-                EstimatedContextTokens = _contextManager?.EstimateTokens(messages) ?? 0,
-                MaxContextTokens = _contextManager?.MaxContextTokens ?? 0
-            }
-        };
-
-        await TriggerAgentSessionEndHooksAsync(hookContext, messages, cancellationToken);
     }
 
     /// <summary>
@@ -758,28 +583,6 @@ public class Agent : IDisposable
             Message = Message.FromAssistant("Agent execution failed."),
             Error = "No completion event received."
         };
-    }
-
-    /// <summary>
-    /// 去重工具调用：LLM 可能生成多个名称和参数完全相同的工具调用
-    /// </summary>
-    private static ToolCallBlock[] DeduplicateToolCalls(ToolCallBlock[] toolCalls)
-    {
-        if (toolCalls.Length <= 1) return toolCalls;
-
-        var seen = new HashSet<string>();
-        var result = new List<ToolCallBlock>(toolCalls.Length);
-
-        foreach (var tc in toolCalls)
-        {
-            var key = $"{tc.Name}:{tc.Arguments.GetRawText()}";
-            if (seen.Add(key))
-            {
-                result.Add(tc);
-            }
-        }
-
-        return result.Count == toolCalls.Length ? toolCalls : result.ToArray();
     }
 
     /// <summary>

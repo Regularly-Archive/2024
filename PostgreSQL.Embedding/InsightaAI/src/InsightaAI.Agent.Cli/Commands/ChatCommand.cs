@@ -167,18 +167,15 @@ public class ChatCommand
                 continue;
             }
 
-            // 保存用户消息
-            await session.AddUserMessageAsync(userInput);
-
-            // 构建上下文
+            // 构建上下文（用户消息由 Agent 自动持久化）
             var context = new AgentContext
             {
                 SessionId = session.SessionId,
                 History = session.GetLlmHistory()
             };
 
-            // 执行 Agent
-            await ExecuteAgentAsync(currentAgent, userInput, context, session);
+            // 执行 Agent（消息持久化由 Agent 通过 IMessageStorage 自动处理）
+            await ExecuteAgentAsync(currentAgent, userInput, context);
         }
     }
 
@@ -298,7 +295,7 @@ public class ChatCommand
         }
     }
 
-    private async Task ExecuteAgentAsync(Agent agent, string userInput, AgentContext context, ChatSession session)
+    private async Task ExecuteAgentAsync(Agent agent, string userInput, AgentContext context)
     {
         using var eventRenderer = new EventRenderer();
         using var cts = new CancellationTokenSource();
@@ -324,104 +321,16 @@ public class ChatCommand
 
         try
         {
-            var roundToolCalls = new List<ToolCallContent>();
-            var roundToolResults = new List<(string ToolCallId, string ToolName, string Result, bool IsError)>();
-            int textLengthBeforeRound = 0;
-
+            // 消息持久化由 Agent 自动处理（通过 IMessageStorage）
+            // 这里只负责渲染和展示
             await foreach (var agentEvent in agent.RunStreamAsync(userInput, context, cts.Token))
             {
-                // 每个事件处理前检查取消（WithCancellation 在事件间隙可能不触发）
                 cts.Token.ThrowIfCancellationRequested();
-
                 await eventRenderer.HandleEventAsync(agentEvent);
-
-                if (agentEvent is AgentToolStartEvent toolStart)
-                {
-                    roundToolCalls.Add(new ToolCallContent
-                    {
-                        Id = toolStart.ToolCallId,
-                        Name = toolStart.ToolName,
-                        Arguments = toolStart.Arguments
-                    });
-                }
-                else if (agentEvent is AgentToolEndEvent toolEnd)
-                {
-                    roundToolResults.Add((toolEnd.ToolCallId, toolEnd.ToolName, toolEnd.ResultPreview ?? string.Empty, toolEnd.IsError));
-                }
-                else if (agentEvent is AgentRoundEndEvent roundEnd)
-                {
-                    if (roundEnd.HasToolCalls)
-                    {
-                        // AgentRoundEndEvent 在工具执行前发射
-                        // 先保存上一轮积累的工具调用和结果
-                        if (roundToolCalls.Count > 0)
-                        {
-                            await session.AddAssistantWithToolCallsAsync(null, roundToolCalls);
-                            foreach (var tr in roundToolResults)
-                            {
-                                await session.AddToolResultMessageAsync(tr.ToolCallId, tr.ToolName, tr.Result, tr.IsError);
-                            }
-                            roundToolCalls.Clear();
-                            roundToolResults.Clear();
-                        }
-
-                        // 保存本轮助手文本
-                        var fullText = eventRenderer.FullText;
-                        var roundText = fullText.Length > textLengthBeforeRound
-                            ? fullText[textLengthBeforeRound..]
-                            : null;
-                        if (!string.IsNullOrWhiteSpace(roundText))
-                        {
-                            await session.AddAssistantMessageAsync(roundText);
-                        }
-                        textLengthBeforeRound = fullText.Length;
-                    }
-                    else
-                    {
-                        // 最后一轮（无工具调用）：保存之前积累的工具调用和结果
-                        if (roundToolCalls.Count > 0)
-                        {
-                            await session.AddAssistantWithToolCallsAsync(null, roundToolCalls);
-                            foreach (var tr in roundToolResults)
-                            {
-                                await session.AddToolResultMessageAsync(tr.ToolCallId, tr.ToolName, tr.Result, tr.IsError);
-                            }
-                            roundToolCalls.Clear();
-                            roundToolResults.Clear();
-                        }
-                    }
-                }
-                else if (agentEvent is AgentContextCompactedEvent compactedEvent
-                    && compactedEvent.CompactedMessages is { Length: > 0 } compactedMessages)
-                {
-                    await session.ReplaceMessagesAsync(compactedMessages.ToList());
-                }
-            }
-
-            // 流结束后，保存剩余的工具调用和结果（如果有）
-            if (roundToolCalls.Count > 0)
-            {
-                await session.AddAssistantWithToolCallsAsync(null, roundToolCalls);
-                foreach (var tr in roundToolResults)
-                {
-                    await session.AddToolResultMessageAsync(tr.ToolCallId, tr.ToolName, tr.Result, tr.IsError);
-                }
-            }
-
-            // 保存最终回复（纯文本）
-            var finalText = eventRenderer.FullText;
-            if (finalText.Length > textLengthBeforeRound)
-            {
-                var remainingText = finalText[textLengthBeforeRound..];
-                if (!string.IsNullOrWhiteSpace(remainingText))
-                {
-                    await session.AddAssistantMessageAsync(remainingText);
-                }
             }
         }
         catch (OperationCanceledException)
         {
-            // 用户按 ESC 打断，不保存未完成的助手消息，避免 LLM 下轮重复生成
             await eventRenderer.ShowInterruptedAsync();
         }
         catch (Exception ex)
@@ -519,6 +428,7 @@ public class ChatCommand
             .WithContextManager(contextManager!)
             .WithMemoryManager(memoryManager)
             .WithMcpRegistry(mcpRegistryToUse)
+            .WithMessageStore(new JsonlMessageStorage())
             .ConfigureServices(sp =>
             {
                 sp.AddScoped<IFileSystem, LocalFileSystem>();
