@@ -1,3 +1,7 @@
+using System.Text.Json;
+using DiffPlex;
+using DiffPlex.DiffBuilder;
+using DiffPlex.DiffBuilder.Model;
 using InsightaAI.Agent.Abstractions;
 using InsightaAI.Agent.Cli.Extensions;
 using InsightaAI.Agent.Hooks;
@@ -33,6 +37,13 @@ public class ToolPermissionHook : IToolHook
 
         var displayArgs = arguments.TruncateToConsoleWidth(offset: 4);
         AnsiConsole.MarkupLine($"[dim]⎿ {EscapeMarkup(displayArgs)}[/]");
+
+        // 对 edit_file 工具显示 diff 预览
+        if (toolName == "edit_file")
+        {
+            ShowEditDiff(arguments);
+        }
+
         AnsiConsole.WriteLine();
 
         var choice = AnsiConsole.Prompt(
@@ -60,6 +71,64 @@ public class ToolPermissionHook : IToolHook
     {
         // 可以在这里添加执行后的逻辑，比如日志记录
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 为 edit_file 工具显示 inline diff 预览
+    /// </summary>
+    private static void ShowEditDiff(string arguments)
+    {
+        try
+        {
+            var doc = JsonDocument.Parse(arguments);
+            var root = doc.RootElement;
+
+            if (!root.TryGetProperty("old_string", out var oldElement) ||
+                !root.TryGetProperty("new_string", out var newElement))
+                return;
+
+            var oldText = oldElement.GetString() ?? "";
+            var newText = newElement.GetString() ?? "";
+
+            var diffBuilder = new InlineDiffBuilder(new Differ());
+            var diffModel = diffBuilder.BuildDiffModel(oldText, newText);
+
+            // 统计变更行数
+            var added = diffModel.Lines.Count(l => l.Type == ChangeType.Inserted);
+            var removed = diffModel.Lines.Count(l => l.Type == ChangeType.Deleted);
+
+            if (added == 0 && removed == 0)
+                return;
+
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine($"[dim][green]+{added}[/] lines, [red]-{removed}[/] lines[/]");
+
+            var panelLines = new List<Markup>();
+            foreach (var line in diffModel.Lines)
+            {
+                var escaped = EscapeMarkup(line.Text ?? "");
+                var prefix = line.Type switch
+                {
+                    ChangeType.Inserted => "[green]+",
+                    ChangeType.Deleted => "[red]-",
+                    _ => "[dim] "
+                };
+                panelLines.Add(new Markup($"{prefix}{escaped}[/]"));
+            }
+
+            var panelContent = new Rows(panelLines);
+            var panel = new Panel(panelContent)
+            {
+                Border = BoxBorder.Square,
+                BorderStyle = new Style(Color.Grey),
+                Padding = new Padding(0, 0, 0, 0)
+            };
+            AnsiConsole.Write(panel);
+        }
+        catch
+        {
+            // JSON 解析失败或 diff 生成异常时静默跳过
+        }
     }
 
     private static string EscapeMarkup(string text)
