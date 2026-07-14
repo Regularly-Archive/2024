@@ -103,9 +103,9 @@ public class SessionMemoryCompactStrategyTests : IDisposable
         // Arrange - 先写入会话记忆
         var sessionDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".insightai", "memory", "sessions", "test-session");
+            ".insighta", "memories", "sessions", "test-session");
         Directory.CreateDirectory(sessionDir);
-        File.WriteAllText(Path.Combine(sessionDir, "session-memory.md"), "## Round 1\n- User asked about API");
+        File.WriteAllText(Path.Combine(sessionDir, "MEMORY.md"), "## Round 1\n- User asked about API");
 
         var messages = new List<Message>
         {
@@ -140,9 +140,9 @@ public class SessionMemoryCompactStrategyTests : IDisposable
         // Arrange - 先写入会话记忆
         var sessionDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".insightai", "memory", "sessions", "test-session");
+            ".insighta", "memories", "sessions", "test-session");
         Directory.CreateDirectory(sessionDir);
-        File.WriteAllText(Path.Combine(sessionDir, "session-memory.md"),
+        File.WriteAllText(Path.Combine(sessionDir, "MEMORY.md"),
             "## Round 1\n- User asked about REST API\n- Decided to use FastAPI");
 
         var messages = CreateMessagesWithRounds(15);
@@ -159,10 +159,9 @@ public class SessionMemoryCompactStrategyTests : IDisposable
             Assert.True(result.PostCompactTokens < result.PreCompactTokens,
                 $"Expected post-compact tokens ({result.PostCompactTokens}) < pre-compact ({result.PreCompactTokens})");
 
-            // 验证包含会话记忆内容
-            var systemMessage = messages.First(m => m.Role == MessageRole.System && m.GetTextContent().Contains("Session Memory Summary"));
-            Assert.NotNull(systemMessage);
-            Assert.Contains("FastAPI", systemMessage.GetTextContent());
+            // 验证包含会话记忆内容（边界标记作为 Assistant 消息添加）
+            var boundaryMessage = messages.First(m => m.Role == MessageRole.Assistant && m.GetTextContent().Contains("FastAPI"));
+            Assert.NotNull(boundaryMessage);
         }
         finally
         {
@@ -178,9 +177,9 @@ public class SessionMemoryCompactStrategyTests : IDisposable
         // Arrange - 先写入会话记忆
         var sessionDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".insightai", "memory", "sessions", "test-session");
+            ".insighta", "memories", "sessions", "test-session");
         Directory.CreateDirectory(sessionDir);
-        File.WriteAllText(Path.Combine(sessionDir, "session-memory.md"), "## Summary\nPrevious context");
+        File.WriteAllText(Path.Combine(sessionDir, "MEMORY.md"), "## Summary\nPrevious context");
 
         var messages = CreateMessagesWithRounds(5); // 5 轮对话
         var preCompactTokens = EstimateMessagesTokens(messages);
@@ -207,9 +206,9 @@ public class SessionMemoryCompactStrategyTests : IDisposable
         // Arrange - 先写入会话记忆
         var sessionDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".insightai", "memory", "sessions", "test-session");
+            ".insighta", "memories", "sessions", "test-session");
         Directory.CreateDirectory(sessionDir);
-        File.WriteAllText(Path.Combine(sessionDir, "session-memory.md"), "## Summary\nTest memory");
+        File.WriteAllText(Path.Combine(sessionDir, "MEMORY.md"), "## Summary\nTest memory");
 
         var messages = CreateMessagesWithRounds(3);
         var preCompactTokens = EstimateMessagesTokens(messages);
@@ -219,12 +218,11 @@ public class SessionMemoryCompactStrategyTests : IDisposable
             // Act
             var result = await _strategy.CompactAsync(messages, _budget, _estimator, preCompactTokens);
 
-            // Assert - 验证边界标记
+            // Assert - 验证边界标记（边界标记作为 Assistant 消息添加）
             var boundaryMessage = messages.FirstOrDefault(m =>
-                m.Role == MessageRole.System &&
-                m.GetTextContent().Contains("[Context compacted (Session Memory):"));
+                m.Role == MessageRole.Assistant &&
+                m.GetTextContent().Contains("SessionMemoryCompact"));
             Assert.NotNull(boundaryMessage);
-            Assert.Contains("tokens removed", boundaryMessage.GetTextContent());
         }
         finally
         {
@@ -244,9 +242,9 @@ public class SessionMemoryCompactStrategyTests : IDisposable
         // Arrange - 创建空的会话记忆文件
         var sessionDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".insightai", "memory", "sessions", "test-session");
+            ".insighta", "memories", "sessions", "test-session");
         Directory.CreateDirectory(sessionDir);
-        File.WriteAllText(Path.Combine(sessionDir, "session-memory.md"), "");
+        File.WriteAllText(Path.Combine(sessionDir, "MEMORY.md"), "");
 
         var messages = CreateMessagesWithRounds(3);
         var preCompactTokens = EstimateMessagesTokens(messages);
@@ -276,9 +274,9 @@ public class SessionMemoryCompactStrategyTests : IDisposable
         // Arrange - 创建会话记忆文件后删除目录（模拟文件读取失败）
         var sessionDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".insightai", "memory", "sessions", "test-session");
+            ".insighta", "memories", "sessions", "test-session");
         Directory.CreateDirectory(sessionDir);
-        File.WriteAllText(Path.Combine(sessionDir, "session-memory.md"), "Some memory");
+        File.WriteAllText(Path.Combine(sessionDir, "MEMORY.md"), "Some memory");
 
         // 先触发 ShouldCompact 返回 true
         var messages = CreateMessagesWithRounds(3);

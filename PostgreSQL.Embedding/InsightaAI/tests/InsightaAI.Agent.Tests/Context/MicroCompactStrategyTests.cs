@@ -424,12 +424,14 @@ public class MicroCompactStrategyTests
             messages.Add(assistantMsg);
 
             // Tool result message - 使用 50 行内容以便截断后能显著减少 token
+            // Timestamp 设为 10 分钟前，确保超过 MicroCompactStrategy 的 ToolResultTTL (5 分钟)
             var toolResultMsg = new Message
             {
                 Role = MessageRole.ToolResult,
                 ToolCallId = toolCallId,
                 ToolName = "bash",
-                Content = [new TextBlock { Text = $"Output for tool {i}\n" + string.Join("\n", Enumerable.Range(1, 50).Select(j => $"Line {j}: This is a longer line of output content for testing truncation")) }]
+                Content = [new TextBlock { Text = $"Output for tool {i}\n" + string.Join("\n", Enumerable.Range(1, 50).Select(j => $"Line {j}: This is a longer line of output content for testing truncation")) }],
+                Timestamp = DateTimeOffset.UtcNow.AddMinutes(-10)
             };
             messages.Add(toolResultMsg);
         }

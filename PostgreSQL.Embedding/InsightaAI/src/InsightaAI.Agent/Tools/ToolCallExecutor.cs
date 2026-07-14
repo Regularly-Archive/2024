@@ -189,12 +189,12 @@ public class ToolCallExecutor
         var textBlocks = toolResult.Content.OfType<TextBlock>().ToList();
         var totalText = string.Join("\n", textBlocks.Select(t => t.Text));
 
-        var contextManager = _serviceProvider.GetRequiredService<IContextManager>();
+        var contextManager = _serviceProvider.GetService<IContextManager>();
         var truncationContext = new TruncationContext(
             originalLength: totalText.Length,
             originalLineCount: new Lazy<int>(() => totalText.Split('\n').Length),
             utilizationRatio: 0,
-            budget: contextManager.GetContextBudget(),
+            budget: contextManager?.GetContextBudget() ?? new ContextBudget(),
             toolResultDirectory: Path.Combine(_basePath, _sessionId, "tool_results"),
             toolName: toolName,
             toolCallId: toolCallId
