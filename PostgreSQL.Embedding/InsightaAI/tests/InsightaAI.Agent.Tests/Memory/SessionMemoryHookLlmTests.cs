@@ -52,16 +52,16 @@ public class SessionMemoryHookLlmTests : IDisposable
         var messages = new List<Message> { Message.FromUser("test message") };
 
         // Round 1, 2: 不应触发 LLM（关键词模式）
-        await hook.OnRoundEndAsync(hookContext, 1, messages, null);
+        await hook.OnAgentRoundEndedAsync(hookContext, 1, messages, null);
         await Task.Delay(300);
         var mem1 = await hook.GetSessionMemoryAsync();
 
-        await hook.OnRoundEndAsync(hookContext, 2, messages, null);
+        await hook.OnAgentRoundEndedAsync(hookContext, 2, messages, null);
         await Task.Delay(300);
         var mem2 = await hook.GetSessionMemoryAsync();
 
         // Round 3: 应触发 LLM
-        await hook.OnRoundEndAsync(hookContext, 3, messages, null);
+        await hook.OnAgentRoundEndedAsync(hookContext, 3, messages, null);
         await Task.Delay(500);
         var mem3 = await hook.GetSessionMemoryAsync();
 
@@ -92,7 +92,7 @@ public class SessionMemoryHookLlmTests : IDisposable
         var hookContext = new HookContext { Services = services.BuildServiceProvider(), SessionId = sessionId };
         var messages = new List<Message> { Message.FromUser("implement session memory") };
 
-        await hook.OnRoundEndAsync(hookContext, 1, messages, null);
+        await hook.OnAgentRoundEndedAsync(hookContext, 1, messages, null);
         await Task.Delay(500);
 
         var memory = await hook.GetSessionMemoryAsync();
@@ -117,7 +117,7 @@ public class SessionMemoryHookLlmTests : IDisposable
         var messages = new List<Message> { Message.FromUser("first round") };
 
         // Round 1
-        await hook.OnRoundEndAsync(hookContext, 1, messages, null);
+        await hook.OnAgentRoundEndedAsync(hookContext, 1, messages, null);
         await Task.Delay(500);
         var mem1 = await hook.GetSessionMemoryAsync();
 
@@ -127,7 +127,7 @@ public class SessionMemoryHookLlmTests : IDisposable
         services2.AddSingleton<ILlmClient>(llmClient2);
         var hookContext2 = new HookContext { Services = services2.BuildServiceProvider(), SessionId = sessionId };
 
-        await hook.OnRoundEndAsync(hookContext2, 2, messages, null);
+        await hook.OnAgentRoundEndedAsync(hookContext2, 2, messages, null);
         await Task.Delay(500);
         var mem2 = await hook.GetSessionMemoryAsync();
 
@@ -149,7 +149,7 @@ public class SessionMemoryHookLlmTests : IDisposable
         var hookContext = new HookContext { Services = services.BuildServiceProvider(), SessionId = sessionId };
         var messages = new List<Message> { Message.FromUser("我喜欢使用 C# 编程") };
 
-        await hook.OnRoundEndAsync(hookContext, 1, messages, null);
+        await hook.OnAgentRoundEndedAsync(hookContext, 1, messages, null);
         await Task.Delay(500);
 
         var memory = await hook.GetSessionMemoryAsync();
@@ -171,7 +171,7 @@ public class SessionMemoryHookLlmTests : IDisposable
         var hookContext = new HookContext { SessionId = sessionId };
         var messages = new List<Message> { Message.FromUser("项目目标是在 Q2 完成") };
 
-        await hook.OnRoundEndAsync(hookContext, 1, messages, null);
+        await hook.OnAgentRoundEndedAsync(hookContext, 1, messages, null);
         await Task.Delay(500);
 
         var memory = await hook.GetSessionMemoryAsync();
@@ -194,7 +194,7 @@ public class SessionMemoryHookLlmTests : IDisposable
         var ctx1 = new HookContext { Services = s1.BuildServiceProvider(), SessionId = sessionId };
         var msgs1 = new List<Message> { Message.FromUser("build an agent") };
 
-        await hook.OnRoundEndAsync(ctx1, 1, msgs1, null);
+        await hook.OnAgentRoundEndedAsync(ctx1, 1, msgs1, null);
         await Task.Delay(500);
 
         // Round 2: LLM 应收到 previous-summary 并合并
@@ -204,7 +204,7 @@ public class SessionMemoryHookLlmTests : IDisposable
         var ctx2 = new HookContext { Services = s2.BuildServiceProvider(), SessionId = sessionId };
         var msgs2 = new List<Message> { Message.FromUser("I started working on it") };
 
-        await hook.OnRoundEndAsync(ctx2, 2, msgs2, null);
+        await hook.OnAgentRoundEndedAsync(ctx2, 2, msgs2, null);
         await Task.Delay(500);
 
         var finalMemory = await hook.GetSessionMemoryAsync();
@@ -222,11 +222,11 @@ public class SessionMemoryHookLlmTests : IDisposable
         var hookContext = new HookContext { SessionId = sessionId };
 
         var msgs1 = new List<Message> { Message.FromUser("我喜欢 Python") };
-        await hook.OnRoundEndAsync(hookContext, 1, msgs1, null);
+        await hook.OnAgentRoundEndedAsync(hookContext, 1, msgs1, null);
         await Task.Delay(300);
 
         var msgs2 = new List<Message> { Message.FromUser("项目 deadline 是周五") };
-        await hook.OnRoundEndAsync(hookContext, 2, msgs2, null);
+        await hook.OnAgentRoundEndedAsync(hookContext, 2, msgs2, null);
         await Task.Delay(300);
 
         var memory = await hook.GetSessionMemoryAsync();

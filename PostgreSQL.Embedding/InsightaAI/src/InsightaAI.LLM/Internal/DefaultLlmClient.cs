@@ -16,7 +16,7 @@ internal class DefaultLlmClient : ILlmClient
     private readonly bool _ownsHttpClient;
     private bool _disposed;
 
-    public string ProviderName => _adapter.Name;
+    public string AdapterName => _adapter.Name;
     public bool SupportsReasoning => _adapter.SupportsReasoning;
 
     public DefaultLlmClient(IProviderAdapter adapter, ProviderConfig config, HttpClient? httpClient = null)

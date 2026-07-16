@@ -37,8 +37,9 @@ public class ChatSession
     /// <summary>
     /// 获取 LLM 兼容的历史消息
     /// </summary>
-    public List<Message> GetLlmHistory()
+    public async Task<List<Message>> GetLlmHistoryAsync()
     {
+        await LoadHistoryAsync();
         return _messages.Select(r => r.ToLlmMessage()).ToList();
     }
 

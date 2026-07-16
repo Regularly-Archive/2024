@@ -62,7 +62,7 @@ public sealed record SessionMemoryOptions
 /// ├── MEMORY.md    # 会话级记忆（短期）
 /// └── metadata.json        # 会话元数据
 /// </summary>
-public sealed class SessionMemoryHook : IAgentHook
+public sealed class SessionMemoryHook : IAgentEventHook
 {
     private readonly string _sessionId;
     private readonly string _userId;
@@ -124,7 +124,7 @@ public sealed class SessionMemoryHook : IAgentHook
     /// <summary>
     /// 每轮结束后触发，异步提取记忆
     /// </summary>
-    public Task OnRoundEndAsync(
+    public Task OnAgentRoundEndedAsync(
         HookContext context,
         int round,
         IReadOnlyList<Message> messages,
@@ -138,7 +138,7 @@ public sealed class SessionMemoryHook : IAgentHook
     /// <summary>
     /// 会话结束时触发
     /// </summary>
-    public Task OnSessionEndAsync(
+    public Task OnAgentSessionEndedAsync(
         HookContext context,
         IReadOnlyList<Message> messages,
         CancellationToken cancellationToken = default)

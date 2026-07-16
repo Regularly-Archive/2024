@@ -220,7 +220,7 @@ public class AgentSkillIntegrationTests
         private readonly Action<string> _onCaptureSystemPrompt;
         private int _callCount = 0;
 
-        public string ProviderName => "mock";
+        public string AdapterName => "mock";
         public bool SupportsReasoning => false;
 
         public void Dispose() { GC.SuppressFinalize(this); }

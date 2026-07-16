@@ -30,7 +30,7 @@ public class EventRenderer : IDisposable
     {
         switch (agentEvent)
         {
-            case AgentStartEvent:
+            case AgentSessionStartEvent:
                 break;
 
             case AgentLlmStreamEvent llmEvent:
@@ -45,7 +45,7 @@ public class EventRenderer : IDisposable
                 HandleToolEnd(toolEnd);
                 break;
 
-            case AgentCompleteEvent completeEvent:
+            case AgentSessionEndEvent completeEvent:
                 await HandleCompleteAsync(completeEvent);
                 break;
 
@@ -148,7 +148,7 @@ public class EventRenderer : IDisposable
         _lastText = string.Empty;
     }
 
-    private async Task HandleCompleteAsync(AgentCompleteEvent completeEvent)
+    private async Task HandleCompleteAsync(AgentSessionEndEvent completeEvent)
     {
         await StopThinkingAsync();
 
@@ -227,7 +227,7 @@ public class EventRenderer : IDisposable
         }
 
         AnsiConsole.MarkupLine("[dim]● The task has been cancelled by user [/]");
-        AnsiConsole.MarkupLine("[red]⎿ Interrupted[/]");
+        AnsiConsole.MarkupLine("[red]⎿ Interrupted [dim]· What should Claude do instead?[/] [/]");
     }
 
     /// <summary>

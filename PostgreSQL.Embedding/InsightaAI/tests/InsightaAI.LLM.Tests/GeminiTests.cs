@@ -26,7 +26,7 @@ public class GeminiTests : TestBase
             var config = new ProviderConfig { ApiKey = "test-key" };
             var client = Factory.Create("gemini", config);
             Assert.NotNull(client);
-            Assert.Equal("gemini", client.ProviderName);
+            Assert.Equal("gemini", client.AdapterName);
             return;
         }
 

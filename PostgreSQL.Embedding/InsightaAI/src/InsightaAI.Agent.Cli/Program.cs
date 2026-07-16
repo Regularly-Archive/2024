@@ -1,7 +1,12 @@
 using System.CommandLine;
 using System.Text;
 using InsightaAI.Agent.Cli.Commands;
+using InsightaAI.Agent.Diagnostics;
 using InsightaAI.Agent.Storage;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 namespace InsightaAI.Agent.Cli;
 
@@ -13,6 +18,9 @@ public class Program
     {
         // 设置控制台编码为 UTF-8（修复全局工具模式下特殊字符显示为问号的问题）
         Console.OutputEncoding = Encoding.UTF8;
+
+        // 初始化 OpenTelemetry（通过环境变量 INSIGHTA_TELEMETRY=1 启用）
+        using var telemetry = InitTelemetry();
 
         var rootCommand = new RootCommand("InsightaAI Agent CLI - Yet Another AI Agent");
 
@@ -37,5 +45,39 @@ public class Program
         }
 
         return await rootCommand.InvokeAsync(args);
+    }
+
+    private static IDisposable? InitTelemetry()
+    {
+
+        var endpoint = Environment.GetEnvironmentVariable("INSIGHTA_OTEL_ENDPOINT") ?? "http://localhost:4317";
+
+        var resourceBuilder = ResourceBuilder.CreateDefault()
+            .AddService("insighta-cli");
+
+        var tracerProvider = Sdk.CreateTracerProviderBuilder()
+            .SetResourceBuilder(resourceBuilder)
+            .AddSource("InsightaAI.Agent")
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter(o => o.Endpoint = new Uri(endpoint))
+            .Build();
+
+        var meterProvider = Sdk.CreateMeterProviderBuilder()
+            .SetResourceBuilder(resourceBuilder)
+            .AddMeter("InsightaAI.Agent")
+            .AddOtlpExporter(o => o.Endpoint = new Uri(endpoint))
+            .Build();
+
+        return new CompositeDisposable(tracerProvider, meterProvider);
+    }
+
+    private sealed class CompositeDisposable : IDisposable
+    {
+        private readonly IDisposable[] _disposables;
+        public CompositeDisposable(params IDisposable[] disposables) => _disposables = disposables;
+        public void Dispose()
+        {
+            foreach (var d in _disposables) d.Dispose();
+        }
     }
 }

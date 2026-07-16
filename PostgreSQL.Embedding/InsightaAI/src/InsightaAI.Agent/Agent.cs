@@ -37,11 +37,23 @@ public class Agent : IDisposable
     private readonly IMemoryManager? _memoryManager;
     private readonly IMessageStorage? _messageStorage;
     private readonly List<IToolHook> _toolHooks = [];
-    private readonly List<IAgentHook> _agentHooks = [];
+    private readonly List<IAgentEventHook> _agentHooks = [];
     private readonly HashSet<string> _alwaysAllowedTools = [];
     private string _skillInstructions = "";
     private readonly IServiceProvider _serviceProvider;
     private bool _disposed;
+
+    /// <summary>
+    /// 可选的 ToolCallHandler 装饰器 — 用于注入 telemetry 等横切关注点。
+    /// 设置后，RunStreamAsync 中创建的 handler 会先经过此装饰器包装。
+    /// </summary>
+    public Func<ToolCallHandler, ToolCallHandler>? ToolCallHandlerDecorator { get; set; }
+
+    /// <summary>
+    /// 可选的 ILlmClient 装饰器 — 用于注入 telemetry 等横切关注点。
+    /// 设置后，RunStreamAsync 中传给 AgentLoop 的 LLM 客户端会经过此装饰器包装。
+    /// </summary>
+    public Func<ILlmClient, ILlmClient>? LlmClientDecorator { get; set; }
 
     /// <summary>
     /// 创建 Agent 实例（手动注入依赖）
@@ -153,7 +165,7 @@ public class Agent : IDisposable
     /// <summary>
     /// 添加 Agent 级别钩子（轮次/会话级别）
     /// </summary>
-    public Agent AddAgentHook(IAgentHook hook)
+    public Agent AddAgentHook(IAgentEventHook hook)
     {
         ArgumentNullException.ThrowIfNull(hook);
         _agentHooks.Add(hook);
@@ -276,10 +288,59 @@ public class Agent : IDisposable
     }
 
     /// <summary>
+    /// 触发 agent 级别的启动钩子（在任何轮次开始前调用）
+    /// </summary>
+    private async Task TriggerSessionStartedHooksAsync(
+        HookContext context,
+        string message,
+        CancellationToken cancellationToken)
+    {
+        if (_agentHooks.Count == 0)
+            return;
+
+        foreach (var hook in _agentHooks)
+        {
+            try
+            {
+                await hook.OnAgentSessionStartedAsync(context, message, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[AgentHook] Agent started hook '{hook.Id}' failed: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// 触发 agent 级别的轮次开始钩子（同步等待，确保 Activity.Current 在 LLM 调用前就位）
+    /// </summary>
+    private async Task TriggerRoundStartedHooksAsync(
+        string message,
+        CancellationToken cancellationToken)
+    {
+        if (_agentHooks.Count == 0)
+            return;
+
+        foreach (var hook in _agentHooks)
+        {
+            try
+            {
+                await hook.OnAgentRoundStartedAsync(message, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[AgentHook] Round start hook '{hook.Id}' failed: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// 触发 agent 级别的轮次结束钩子（fire-and-forget）
     /// 注意：此方法返回 void，明确表示不等待完成
     /// </summary>
-    private void TriggerAgentRoundEndHooks(
+    private void TriggerRoundEndedHooks(
         HookContext hookContext,
         int round,
         List<Message> messages,
@@ -291,7 +352,7 @@ public class Agent : IDisposable
 
         // Fire-and-forget: 并行触发所有 hooks，不阻塞主流程
         var tasks = _agentHooks.Select(hook =>
-            hook.OnRoundEndAsync(hookContext, round, messages, assistantMessage, cancellationToken));
+            hook.OnAgentRoundEndedAsync(hookContext, round, messages, assistantMessage, cancellationToken));
 
         _ = Task.WhenAll(tasks).ContinueWith(t =>
         {
@@ -314,7 +375,7 @@ public class Agent : IDisposable
     /// <summary>
     /// 触发 agent 级别的会话结束钩子
     /// </summary>
-    private async Task TriggerAgentSessionEndHooksAsync(
+    private async Task TriggerSessionEndedHooksAsync(
         HookContext context,
         List<Message> messages,
         CancellationToken cancellationToken)
@@ -326,7 +387,7 @@ public class Agent : IDisposable
         {
             try
             {
-                await hook.OnSessionEndAsync(context, messages, cancellationToken);
+                await hook.OnAgentSessionEndedAsync(context, messages, cancellationToken);
             }
             catch (Exception e)
             {
@@ -395,12 +456,16 @@ public class Agent : IDisposable
         };
 
         // 每次调用创建 AgentLoop，确保 sessionId 正确
-        var toolCallExecutor = new ToolCallExecutor(_config.Id, sessionId, async (request, ct) =>
+        ToolCallHandler handler = async (request, ct) =>
         {
             var (allowed, result) = await ExecuteSingleToolAsync(request.ToolCall, request.Arguments, request.SessionId, ct);
             return new ToolCallReponse(allowed, result);
-        }, _serviceProvider);
-        var agentLoop = new AgentLoop(_config, _llmClient, _toolRegistry, toolCallExecutor, () => _skillInstructions);
+        };
+        if (ToolCallHandlerDecorator != null)
+            handler = ToolCallHandlerDecorator(handler);
+        var toolCallExecutor = new ToolCallExecutor(_config.Id, sessionId, handler, _serviceProvider);
+        var llmClient = LlmClientDecorator != null ? LlmClientDecorator(_llmClient) : _llmClient;
+        var agentLoop = new AgentLoop(_config, llmClient, _toolRegistry, toolCallExecutor, () => _skillInstructions);
 
         // 构建 LoopContext（System Prompt + History + User Input）
         var loopContext = new LoopContext(sessionId, _config.Id, _contextManager);
@@ -447,25 +512,24 @@ public class Agent : IDisposable
 
         // 运行 AgentLoop，消费事件并触发 hooks
         Message? lastAssistantMessage = null;
-        int lastRound = 0;
 
         await foreach (var evt in agentLoop.RunAsync(loopContext, cancellationToken))
         {
-            // 跟踪状态用于 hook 触发
-            if (evt is AgentRoundEndEvent roundEnd)
-            {
-                lastRound = roundEnd.Round;
-            }
-
             // 转发事件给调用方
             yield return evt;
 
             // 事件后处理
             switch (evt)
             {
+                case AgentSessionStartEvent:
+                    await TriggerSessionStartedHooksAsync(hookContext, input, cancellationToken);
+                    break;
+
+                case AgentRoundStartEvent:
+                    await TriggerRoundStartedHooksAsync(input, cancellationToken);
+                    break;
+
                 case AgentContextCompactedEvent compactedEvt:
-                    // 压缩策略直接修改了 LoopContext 的 _messages 列表
-                    // 需要同步到存储：清空旧消息，写入压缩后的新消息
                     if (_messageStorage != null && compactedEvt.CompactedMessages is { Length: > 0 } compacted)
                     {
                         await _messageStorage.ClearMessagesAsync(sessionId);
@@ -479,15 +543,14 @@ public class Agent : IDisposable
                     break;
 
                 case AgentRoundEndEvent roundEndEvt:
-                    // 从 LoopContext 获取最后一条助手消息
                     lastAssistantMessage = loopContext.Messages
                         .LastOrDefault(m => m.Role == MessageRole.Assistant);
-                    TriggerAgentRoundEndHooks(hookContext, roundEndEvt.Round,
+                    TriggerRoundEndedHooks(hookContext, roundEndEvt.Round,
                         loopContext.Messages.ToList(), lastAssistantMessage, cancellationToken);
                     break;
 
-                case AgentCompleteEvent:
-                    await TriggerAgentSessionEndHooksAsync(hookContext,
+                case AgentSessionEndEvent sessionEndEvent:
+                    await TriggerSessionEndedHooksAsync(hookContext,
                         loopContext.Messages.ToList(), cancellationToken);
                     break;
             }
@@ -571,7 +634,7 @@ public class Agent : IDisposable
 
         await foreach (var evt in RunStreamAsync(input, context, cancellationToken))
         {
-            if (evt is AgentCompleteEvent completeEvent)
+            if (evt is AgentSessionEndEvent completeEvent)
             {
                 result = completeEvent.Result;
             }

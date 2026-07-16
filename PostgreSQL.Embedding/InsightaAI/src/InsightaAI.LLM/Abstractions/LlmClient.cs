@@ -20,7 +20,7 @@ public interface ILlmClient : IDisposable
     /// <summary>
     /// Provider 名称
     /// </summary>
-    string ProviderName { get; }
+    string AdapterName { get; }
 
     /// <summary>
     /// Provider 是否支持推理 (thinking/reasoning)

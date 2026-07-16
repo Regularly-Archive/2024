@@ -53,7 +53,7 @@ public sealed class AgentLoop
         var stopwatch = Stopwatch.StartNew();
 
         // 发送开始事件
-        yield return new AgentStartEvent
+        yield return new AgentSessionStartEvent
         {
             AgentId = _config.Id,
             AgentName = _config.Name,
@@ -154,7 +154,7 @@ public sealed class AgentLoop
                     HasToolCalls = false
                 };
 
-                yield return new AgentCompleteEvent
+                yield return new AgentSessionEndEvent
                 {
                     AgentId = _config.Id,
                     Result = new AgentResult
@@ -279,7 +279,7 @@ public sealed class AgentLoop
 
         stopwatch.Stop();
 
-        yield return new AgentCompleteEvent
+        yield return new AgentSessionEndEvent
         {
             AgentId = _config.Id,
             Result = new AgentResult

@@ -241,15 +241,15 @@ public class AgentTests
 
         // Assert
         Assert.NotEmpty(events);
-        Assert.IsType<AgentStartEvent>(events[0]);
-        Assert.IsType<AgentCompleteEvent>(events.Last());
+        Assert.IsType<AgentSessionStartEvent>(events[0]);
+        Assert.IsType<AgentSessionEndEvent>(events.Last());
 
         // Should have: Start, RoundStart, LlmStream(s), RoundEnd, Complete
-        Assert.Contains(events, e => e.Type == AgentEventType.Start);
+        Assert.Contains(events, e => e.Type == AgentEventType.SessionStart);
         Assert.Contains(events, e => e.Type == AgentEventType.RoundStart);
         Assert.Contains(events, e => e.Type == AgentEventType.LlmStream);
         Assert.Contains(events, e => e.Type == AgentEventType.RoundEnd);
-        Assert.Contains(events, e => e.Type == AgentEventType.Complete);
+        Assert.Contains(events, e => e.Type == AgentEventType.SessionEnd);
     }
 
     [Fact]

@@ -68,7 +68,7 @@ public class ChatRenderer
     {
         AnsiConsole.WriteLine();
         return AnsiConsole.Prompt(
-            new TextPrompt<string>("[bold green]> [/]")
+            new TextPrompt<string>("[bold green]>[/]")
                 .AllowEmpty());
     }
 

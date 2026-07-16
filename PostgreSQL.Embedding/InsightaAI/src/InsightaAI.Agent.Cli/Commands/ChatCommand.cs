@@ -6,6 +6,7 @@ using InsightaAI.Agent.Cli.Services;
 using InsightaAI.Agent.Cli.UI;
 using InsightaAI.Agent.Context;
 using InsightaAI.Agent.Context.Compaction;
+using InsightaAI.Agent.Diagnostics;
 using InsightaAI.Agent.Extensions;
 using InsightaAI.Agent.Mcp;
 using InsightaAI.Agent.Mcp.Local;
@@ -171,7 +172,7 @@ public class ChatCommand
             var context = new AgentContext
             {
                 SessionId = session.SessionId,
-                History = session.GetLlmHistory()
+                History = await session.GetLlmHistoryAsync()
             };
 
             // 执行 Agent（消息持久化由 Agent 通过 IMessageStorage 自动处理）
@@ -262,7 +263,7 @@ public class ChatCommand
         var context = new AgentContext
         {
             SessionId = session.SessionId,
-            History = session.GetLlmHistory()
+            History = await session.GetLlmHistoryAsync()
         };
 
         _renderer.ShowInfo($"[yellow]⟳[/] Compacting context ([dim]{strategy}[/])...");
@@ -448,6 +449,12 @@ public class ChatCommand
         if (sessionMemoryHook != null)
         {
             agent.AddAgentHook(sessionMemoryHook);
+        }
+
+        // 注册 OpenTelemetry 诊断钩子（如果 INSIGHTA_TELEMETRY=1）
+        if (Environment.GetEnvironmentVariable("INSIGHTA_TELEMETRY") == "1")
+        {
+            agent.AddTelemetry(sessionId);
         }
 
         return agent;

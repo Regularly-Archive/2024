@@ -25,7 +25,7 @@ public class AnthropicTests : TestBase
             var config = new ProviderConfig { ApiKey = "test-key" };
             var client = Factory.Create("anthropic", config);
             Assert.NotNull(client);
-            Assert.Equal("anthropic", client.ProviderName);
+            Assert.Equal("anthropic", client.AdapterName);
             Assert.True(client.SupportsReasoning);
             return;
         }

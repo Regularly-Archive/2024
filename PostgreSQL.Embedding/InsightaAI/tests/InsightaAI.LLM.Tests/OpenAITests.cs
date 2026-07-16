@@ -26,7 +26,7 @@ public class OpenAITests : TestBase
             var config = new ProviderConfig { ApiKey = "test-key" };
             var client = Factory.Create("openai", config);
             Assert.NotNull(client);
-            Assert.Equal("openai", client.ProviderName);
+            Assert.Equal("openai", client.AdapterName);
             return;
         }
 

@@ -59,7 +59,7 @@ public abstract class AgentTestBase : IClassFixture<AgentFixture>
 
         await foreach (var evt in agent.RunStreamAsync(input))
         {
-            if (evt is AgentCompleteEvent completeEvent)
+            if (evt is AgentSessionEndEvent completeEvent)
             {
                 result = completeEvent.Result;
             }
@@ -77,7 +77,7 @@ public abstract class AgentTestBase : IClassFixture<AgentFixture>
         {
             switch (evt)
             {
-                case AgentStartEvent start:
+                case AgentSessionStartEvent start:
                     Console.WriteLine($"[AgentStart] Agent: {start.AgentName}, Model: {start.Model}");
                     break;
 
@@ -104,7 +104,7 @@ public abstract class AgentTestBase : IClassFixture<AgentFixture>
                     Console.WriteLine($"<< Result: {toolEnd.ResultPreview}");
                     break;
 
-                case AgentCompleteEvent complete:
+                case AgentSessionEndEvent complete:
                     Console.WriteLine($"\n[Complete] Rounds: {complete.Result.Rounds}, Duration: {complete.Result.DurationMs}ms");
                     break;
             }
@@ -125,7 +125,7 @@ public abstract class AgentTestBase : IClassFixture<AgentFixture>
     /// </summary>
     protected static void AssertAgentCompleted(List<AgentEvent> events, int? expectedRounds = null)
     {
-        var completeEvent = events.OfType<AgentCompleteEvent>().FirstOrDefault();
+        var completeEvent = events.OfType<AgentSessionEndEvent>().FirstOrDefault();
         Assert.NotNull(completeEvent);
         Assert.Equal(AgentStatus.Completed, completeEvent.Result.Status);
 

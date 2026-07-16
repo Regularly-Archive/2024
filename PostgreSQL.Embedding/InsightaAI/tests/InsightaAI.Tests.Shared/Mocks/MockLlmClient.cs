@@ -16,7 +16,7 @@ public class MockLlmClient : ILlmClient
     private readonly ToolCallBlock[]? _alwaysToolCalls;
     private int _callCount = 0;
 
-    public string ProviderName => "mock";
+    public string AdapterName => "mock";
     public bool SupportsReasoning => false;
 
     public MockLlmClient(

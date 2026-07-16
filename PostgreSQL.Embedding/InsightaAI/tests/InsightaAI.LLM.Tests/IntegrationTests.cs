@@ -175,11 +175,11 @@ public class IntegrationTests : TestBase
     public void Factory_FromModel_Should_Parse_Correctly()
     {
         var (client1, model1) = Factory.FromModel("openai/gpt-4o", new ProviderConfig { ApiKey = "test" });
-        Assert.Equal("openai", client1.ProviderName);
+        Assert.Equal("openai", client1.AdapterName);
         Assert.Equal("gpt-4o", model1);
 
         var (client2, model2) = Factory.FromModel("anthropic/claude-3-opus", new ProviderConfig { ApiKey = "test" });
-        Assert.Equal("anthropic", client2.ProviderName);
+        Assert.Equal("anthropic", client2.AdapterName);
         Assert.Equal("claude-3-opus", model2);
     }
 

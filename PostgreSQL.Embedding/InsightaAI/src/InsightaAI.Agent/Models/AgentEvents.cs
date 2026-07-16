@@ -8,7 +8,7 @@ namespace InsightaAI.Agent.Models;
 public enum AgentEventType
 {
     /// <summary>Agent 开始执行</summary>
-    Start,
+    SessionStart,
 
     /// <summary>新一轮 LLM 调用开始</summary>
     RoundStart,
@@ -26,7 +26,7 @@ public enum AgentEventType
     RoundEnd,
 
     /// <summary>Agent 完成</summary>
-    Complete,
+    SessionEnd,
 
     /// <summary>错误</summary>
     Error,
@@ -48,9 +48,9 @@ public abstract record AgentEvent
 /// <summary>
 /// Agent 开始事件
 /// </summary>
-public sealed record AgentStartEvent : AgentEvent
+public sealed record AgentSessionStartEvent : AgentEvent
 {
-    public override AgentEventType Type => AgentEventType.Start;
+    public override AgentEventType Type => AgentEventType.SessionStart;
     public required string AgentName { get; init; }
     public required string Model { get; init; }
 }
@@ -109,9 +109,9 @@ public sealed record AgentRoundEndEvent : AgentEvent
 /// <summary>
 /// Agent 完成事件
 /// </summary>
-public sealed record AgentCompleteEvent : AgentEvent
+public sealed record AgentSessionEndEvent : AgentEvent
 {
-    public override AgentEventType Type => AgentEventType.Complete;
+    public override AgentEventType Type => AgentEventType.SessionEnd;
     public required AgentResult Result { get; init; }
 }
 

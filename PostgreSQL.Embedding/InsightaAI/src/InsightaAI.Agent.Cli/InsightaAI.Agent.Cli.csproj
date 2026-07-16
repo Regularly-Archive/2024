@@ -19,6 +19,9 @@
   <ItemGroup>
     <PackageReference Include="DiffPlex" Version="1.9.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
+    <PackageReference Include="OpenTelemetry" Version="1.9.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.9.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.9.0" />
     <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
     <PackageReference Include="Spectre.Console" Version="0.55.2" />
   </ItemGroup>
@@ -28,6 +31,7 @@
     <ProjectReference Include="..\InsightaAI.LLM.OpenAI\InsightaAI.LLM.OpenAI.csproj" />
     <ProjectReference Include="..\InsightaAI.LLM.Anthropic\InsightaAI.LLM.Anthropic.csproj" />
     <ProjectReference Include="..\InsightaAI.LLM.Gemini\InsightaAI.LLM.Gemini.csproj" />
+    <ProjectReference Include="..\InsightaAI.Agent.Diagnostics\InsightaAI.Agent.Diagnostics.csproj" />
   </ItemGroup>
 
 </Project>

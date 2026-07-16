@@ -61,7 +61,7 @@ public class SessionMemoryHookTests : IDisposable
         };
 
         // Act
-        var task = hook.OnRoundEndAsync(_hookContext, 1, messages, null);
+        var task = hook.OnAgentRoundEndedAsync(_hookContext, 1, messages, null);
 
         // Assert - 应立即返回 Task.CompletedTask（fire-and-forget）
         Assert.Equal(Task.CompletedTask, task);
@@ -79,7 +79,7 @@ public class SessionMemoryHookTests : IDisposable
 
         // Act - 应该立即返回，不阻塞
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        await hook.OnRoundEndAsync(_hookContext, 1, messages, null);
+        await hook.OnAgentRoundEndedAsync(_hookContext, 1, messages, null);
         stopwatch.Stop();
 
         // Assert - 应该在 100ms 内返回
@@ -113,7 +113,7 @@ public class SessionMemoryHookTests : IDisposable
         };
 
         // Act
-        await hook.OnRoundEndAsync(_hookContext, 1, messages, null);
+        await hook.OnAgentRoundEndedAsync(_hookContext, 1, messages, null);
 
         // 等待后台任务完成
         await Task.Delay(500);
@@ -138,7 +138,7 @@ public class SessionMemoryHookTests : IDisposable
         };
 
         // Act
-        await hook.OnRoundEndAsync(_hookContext, 1, messages, null);
+        await hook.OnAgentRoundEndedAsync(_hookContext, 1, messages, null);
         await Task.Delay(500);
 
         // Assert
@@ -158,7 +158,7 @@ public class SessionMemoryHookTests : IDisposable
         };
 
         // Act
-        await hook.OnRoundEndAsync(_hookContext, 1, messages, null);
+        await hook.OnAgentRoundEndedAsync(_hookContext, 1, messages, null);
         await Task.Delay(500);
 
         // Assert
@@ -174,7 +174,7 @@ public class SessionMemoryHookTests : IDisposable
         var messages = new List<Message>();
 
         // Act & Assert - 不应抛异常
-        await hook.OnRoundEndAsync(_hookContext, 1, messages, null);
+        await hook.OnAgentRoundEndedAsync(_hookContext, 1, messages, null);
     }
 
     [Fact]
@@ -190,7 +190,7 @@ public class SessionMemoryHookTests : IDisposable
         var assistantMessage = Message.FromAssistant("我建议使用递归方式实现，这样代码更简洁");
 
         // Act
-        await hook.OnRoundEndAsync(_hookContext, 1, messages, assistantMessage);
+        await hook.OnAgentRoundEndedAsync(_hookContext, 1, messages, assistantMessage);
         await Task.Delay(500);
 
         // Assert
@@ -209,6 +209,6 @@ public class SessionMemoryHookTests : IDisposable
         };
 
         // Act & Assert - 不应抛异常
-        await hook.OnSessionEndAsync(null, messages);
+        await hook.OnAgentSessionEndedAsync(null, messages);
     }
 }
