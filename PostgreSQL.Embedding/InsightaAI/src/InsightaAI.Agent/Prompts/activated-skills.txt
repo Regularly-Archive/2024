@@ -1,0 +1,5 @@
+﻿## Activated Skills
+
+The following skills have been activated and their instructions are in effect:
+
+{activated_skills_list}

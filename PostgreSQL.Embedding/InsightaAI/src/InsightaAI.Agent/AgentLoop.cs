@@ -18,26 +18,26 @@ public sealed class AgentLoop
     private readonly ILlmClient _llmClient;
     private readonly ToolRegistry _toolRegistry;
     private readonly ToolCallExecutor _toolCallExecutor;
-    private readonly Func<string> _getSkillInstructions;
+    private readonly Func<CancellationToken, Task<string>> _systemPromptBuilder;
 
     public AgentLoop(
         AgentConfig config,
         ILlmClient llmClient,
         ToolRegistry toolRegistry,
         ToolCallExecutor toolCallExecutor,
-        Func<string> getSkillInstructions)
+        Func<CancellationToken, Task<string>> buildSystemPrompt)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(llmClient);
         ArgumentNullException.ThrowIfNull(toolRegistry);
         ArgumentNullException.ThrowIfNull(toolCallExecutor);
-        ArgumentNullException.ThrowIfNull(getSkillInstructions);
+        ArgumentNullException.ThrowIfNull(buildSystemPrompt);
 
         _config = config;
         _llmClient = llmClient;
         _toolRegistry = toolRegistry;
         _toolCallExecutor = toolCallExecutor;
-        _getSkillInstructions = getSkillInstructions;
+        _systemPromptBuilder = buildSystemPrompt;
     }
 
     /// <summary>
@@ -88,14 +88,14 @@ public sealed class AgentLoop
                 };
             }
 
-            // 构建 LLM 请求（动态注入已激活 Skill 的 Instructions）
-            var requestMessages = context.Messages.ToArray();
-            var skillInstructions = _getSkillInstructions();
-            if (!string.IsNullOrEmpty(skillInstructions) && requestMessages.Length > 0 && requestMessages[0].Role == MessageRole.System)
+            // 每轮重建 System Prompt（反映最新的 Skills 激活、Memory 等动态状态）
+            var messages = context.Messages.ToList();
+            if (messages.Count > 0 && messages[0].Role == MessageRole.System)
             {
-                var updatedSystemMessage = Message.FromSystem(requestMessages[0].GetTextContent() + skillInstructions);
-                requestMessages = [updatedSystemMessage, .. requestMessages[1..]];
+                var rebuilt = await _systemPromptBuilder(cancellationToken);
+                messages[0] = Message.FromSystem(rebuilt);
             }
+            var requestMessages = messages.ToArray();
 
             var request = new LlmRequest
             {

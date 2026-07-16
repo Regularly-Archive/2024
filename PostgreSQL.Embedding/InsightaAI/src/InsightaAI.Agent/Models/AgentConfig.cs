@@ -60,6 +60,9 @@ public sealed record AgentConfig
     /// <summary>用户 ID（用于记忆系统）</summary>
     public string? UserId { get; init; }
 
+    /// <summary>工作目录（用于加载 AGENTS.md 等项目上下文）</summary>
+    public string? WorkingDirectory { get; init; }
+
     /// <summary>自定义元数据</summary>
     public Dictionary<string, object>? Metadata { get; init; }
 }

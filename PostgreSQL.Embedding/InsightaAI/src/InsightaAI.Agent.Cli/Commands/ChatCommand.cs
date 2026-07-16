@@ -401,6 +401,7 @@ public class ChatCommand
             MaxTokens = model.MaxTokens,
             MaxToolRounds = config.MaxToolRounds,
             UserId = userId,
+            WorkingDirectory = Directory.GetCurrentDirectory(),
         };
 
         // 创建会话记忆钩子（需先于 ContextManager，供 SessionMemoryCompactStrategy 使用）

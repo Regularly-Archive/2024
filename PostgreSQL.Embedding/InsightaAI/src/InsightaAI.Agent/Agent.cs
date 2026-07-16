@@ -38,8 +38,10 @@ public class Agent : IDisposable
     private readonly List<IToolHook> _toolHooks = [];
     private readonly List<IAgentEventHook> _agentHooks = [];
     private readonly HashSet<string> _alwaysAllowedTools = [];
-    private string _skillInstructions = "";
+    private readonly List<ISkill> _activatedSkills = [];
     private readonly IServiceProvider _serviceProvider;
+    private string? _agentsMd;
+    private bool _agentsMdLoaded;
     private bool _disposed;
 
     /// <summary>
@@ -205,85 +207,70 @@ public class Agent : IDisposable
                     return ToolResult.FromError($"Skill '{skillName}' not found");
                 }
 
-                // 追加 Instructions
-                _skillInstructions += "\n\n" + skill.Instructions;
+                // 记录已激活的 Skill（去重）
+                if (!_activatedSkills.Any(s => s.Metadata.Name.Equals(skillName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    _activatedSkills.Add(skill);
+                }
 
                 return ToolResult.FromText($"Skill '{skillName}' activated successfully. Instructions have been loaded.");
             });
     }
 
     /// <summary>
-    /// 获取可用 Skills 信息（用于构建 SystemPrompt）
+    /// 构建完整的 System Prompt（每轮发送前调用，保证反映最新的 Skills/MCP/Memory 状态）
     /// </summary>
-    private async Task<string> GetAvailableSkillsAsync(CancellationToken cancellationToken = default)
+    private async Task<string> BuildSystemPromptAsync(CancellationToken cancellationToken = default)
     {
-        if (_skillRegistry == null)
-        {
-            return "";
-        }
+        var allSkills = _skillRegistry != null
+            ? await _skillRegistry.ListAllSkillsAsync(cancellationToken)
+            : null;
 
-        var skills = await _skillRegistry.ListAllSkillsAsync(cancellationToken);
-        if (skills.Count == 0)
-        {
-            return "";
-        }
+        var mcps = _mcpRegistry != null
+            ? await _mcpRegistry.ListAllServersAsync(cancellationToken)
+            : null;
 
-        var skillsList = string.Join("\n", skills.Select(s => $"- **{s.Name}**: {s.Description}"));
-        return await PromptTemplate.RenderAsync("available-skills", new Dictionary<string, string>
+        string? memoryIndex = null;
+        if (_memoryManager != null && !string.IsNullOrEmpty(_config.UserId))
         {
-            ["skills_list"] = skillsList
-        });
-    }
-
-    /// <summary>
-    /// 获取可用 MCP 服务器信息（用于构建 SystemPrompt）
-    /// </summary>
-    private async Task<string> GetAvailableMcpServersAsync(CancellationToken cancellationToken = default)
-    {
-        if (_mcpRegistry == null)
-        {
-            return "";
-        }
-
-        var servers = await _mcpRegistry.ListAllServersAsync(cancellationToken);
-        if (servers.Count == 0)
-        {
-            return "";
-        }
-
-        var serversList = string.Join("\n", servers.Select(s => $"- **{s.Name}**: {s.Description}"));
-        return await PromptTemplate.RenderAsync("available-mcps", new Dictionary<string, string>
-        {
-            ["mcp_servers_list"] = serversList
-        });
-    }
-
-    /// <summary>
-    /// 获取记忆上下文（注入到 SystemPrompt）
-    /// </summary>
-    private async Task<string> GetMemoryContextAsync(CancellationToken cancellationToken = default)
-    {
-        if (_memoryManager == null || string.IsNullOrEmpty(_config.UserId))
-        {
-            return "";
-        }
-
-        try
-        {
-            // 获取 MEMORY.md 索引（按需加载，不加载全部内容）
-            var memoryIndex = await _memoryManager.GetMemoryIndexAsync(
-                _config.UserId, null, cancellationToken);
-
-            return await PromptTemplate.RenderAsync("available-memories", new Dictionary<string, string>
+            try
             {
-                ["memory_index"] = string.IsNullOrWhiteSpace(memoryIndex) ? "_No memories stored yet._" : memoryIndex
-            });
+                memoryIndex = await _memoryManager.GetMemoryIndexAsync(
+                    _config.UserId, null, cancellationToken);
+            }
+            catch
+            {
+                // 记忆系统出错不应阻止对话
+            }
         }
-        catch
+
+        return await Context.SystemPrompt.SystemPromptBuilder.BuildAsync(new Context.SystemPrompt.SystemPromptParams
         {
-            // 记忆系统出错不应阻止对话
-            return "";
-        }
+            SystemPrompt = _config.SystemPrompt ?? "",
+            AgentsMd = LoadAgentsMd(),
+            AllSkills = allSkills,
+            ActivatedSkills = _activatedSkills,
+            McpServers = mcps,
+            MemoryIndex = memoryIndex,
+        });
+    }
+
+    /// <summary>
+    /// 加载工作目录中的 AGENTS.md（懒加载，仅加载一次）
+    /// </summary>
+    private string? LoadAgentsMd()
+    {
+        if (_agentsMdLoaded) return _agentsMd;
+        _agentsMdLoaded = true;
+
+        var workDir = _config.WorkingDirectory;
+        if (string.IsNullOrWhiteSpace(workDir)) return null;
+
+        var path = Path.Combine(workDir, "AGENTS.md");
+        if (!File.Exists(path)) return null;
+
+        _agentsMd = File.ReadAllText(path);
+        return _agentsMd;
     }
 
     /// <summary>
@@ -464,26 +451,13 @@ public class Agent : IDisposable
             handler = ToolCallHandlerProxyFactory(handler);
         var toolCallExecutor = new ToolCallExecutor(_config.Id, sessionId, handler, _serviceProvider);
         var llmClient = LlmClientProxyFactory != null ? LlmClientProxyFactory(_llmClient) : _llmClient;
-        var agentLoop = new AgentLoop(_config, llmClient, _toolRegistry, toolCallExecutor, () => _skillInstructions);
+        var agentLoop = new AgentLoop(_config, llmClient, _toolRegistry, toolCallExecutor, cancellationToken => BuildSystemPromptAsync(cancellationToken));
 
         // 构建 LoopContext（System Prompt + History + User Input）
         var loopContext = new LoopContext(sessionId, _config.Id, _contextManager);
 
-        // 构建系统提示词（包含可用 Skills 信息和记忆索引）
-        var systemPrompt = _config.SystemPrompt ?? "";
-        systemPrompt += await GetAvailableSkillsAsync(cancellationToken);
-        systemPrompt += await GetAvailableMcpServersAsync(cancellationToken);
-
-        // 注入记忆索引（按需加载 MEMORY.md）
-        if (_memoryManager != null && !string.IsNullOrEmpty(_config.UserId))
-        {
-            var memoryContext = await GetMemoryContextAsync(cancellationToken);
-            if (!string.IsNullOrWhiteSpace(memoryContext))
-            {
-                systemPrompt += memoryContext;
-            }
-        }
-
+        // 构建系统提示词（每轮 AgentLoop 内部会重建以反映 Skills 激活等动态状态）
+        var systemPrompt = await BuildSystemPromptAsync(cancellationToken);
         if (!string.IsNullOrEmpty(systemPrompt))
         {
             loopContext.AddMessage(Message.FromSystem(systemPrompt));

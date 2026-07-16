@@ -1,8 +1,5 @@
-
+﻿
 ## Available Skills
 You can activate the following skills when needed:
 
 {skills_list}
-
-Use the `activate_skill` tool to activate a skill before using its guidance.
-You can activate multiple skills if the task requires.
