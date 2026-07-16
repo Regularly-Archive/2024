@@ -46,13 +46,13 @@ public class Agent : IDisposable
     /// 可选的 ToolCallHandler 装饰器 — 用于注入 telemetry 等横切关注点。
     /// 设置后，RunStreamAsync 中创建的 handler 会先经过此装饰器包装。
     /// </summary>
-    public Func<ToolCallHandler, ToolCallHandler>? ToolCallHandlerDecorator { get; set; }
+    public Func<ToolCallHandler, ToolCallHandler>? ToolCallHandlerProxyFactory { get; set; }
 
     /// <summary>
     /// 可选的 ILlmClient 装饰器 — 用于注入 telemetry 等横切关注点。
     /// 设置后，RunStreamAsync 中传给 AgentLoop 的 LLM 客户端会经过此装饰器包装。
     /// </summary>
-    public Func<ILlmClient, ILlmClient>? LlmClientDecorator { get; set; }
+    public Func<ILlmClient, ILlmClient>? LlmClientProxyFactory { get; set; }
 
     /// <summary>
     /// 创建 Agent 实例（手动注入依赖）
@@ -460,10 +460,10 @@ public class Agent : IDisposable
             var (allowed, result) = await ExecuteSingleToolAsync(request.ToolCall, request.Arguments, request.SessionId, ct);
             return new ToolCallReponse(allowed, result);
         };
-        if (ToolCallHandlerDecorator != null)
-            handler = ToolCallHandlerDecorator(handler);
+        if (ToolCallHandlerProxyFactory != null)
+            handler = ToolCallHandlerProxyFactory(handler);
         var toolCallExecutor = new ToolCallExecutor(_config.Id, sessionId, handler, _serviceProvider);
-        var llmClient = LlmClientDecorator != null ? LlmClientDecorator(_llmClient) : _llmClient;
+        var llmClient = LlmClientProxyFactory != null ? LlmClientProxyFactory(_llmClient) : _llmClient;
         var agentLoop = new AgentLoop(_config, llmClient, _toolRegistry, toolCallExecutor, () => _skillInstructions);
 
         // 构建 LoopContext（System Prompt + History + User Input）

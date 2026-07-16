@@ -7,12 +7,12 @@ namespace InsightaAI.Agent.Diagnostics;
 /// <summary>
 /// ILlmClient 装饰器 — 为每次 LLM 调用添加 OpenTelemetry span 和 metrics
 /// </summary>
-public sealed class TelemetryLlmClient : ILlmClient
+public sealed class LlmClientTelemetryProxy : ILlmClient
 {
     private readonly ILlmClient _inner;
     private readonly string? _agentId;
 
-    public TelemetryLlmClient(ILlmClient inner, string? agentId = null)
+    public LlmClientTelemetryProxy(ILlmClient inner, string? agentId = null)
     {
         _inner = inner ?? throw new ArgumentNullException(nameof(inner));
         _agentId = agentId;
@@ -34,7 +34,7 @@ public sealed class TelemetryLlmClient : ILlmClient
         }
 
         var innerStream = _inner.Streaming(request);
-        return new TelemetryLlmStream(innerStream, activity, _inner.AdapterName, request.Model);
+        return new LlmStreamTelemetryProxy(innerStream, activity, _inner.AdapterName, request.Model);
     }
 
     public async Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken cancellationToken = default)

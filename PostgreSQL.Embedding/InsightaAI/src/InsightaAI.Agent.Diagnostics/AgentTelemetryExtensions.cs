@@ -12,13 +12,13 @@ public static class AgentTelemetryExtensions
     /// 用 telemetry 装饰 ILlmClient
     /// </summary>
     public static ILlmClient WithTelemetry(this ILlmClient client)
-        => new TelemetryLlmClient(client);
+        => new LlmClientTelemetryProxy(client);
 
     /// <summary>
     /// 用 telemetry 包装 ToolCallHandler 委托
     /// </summary>
     public static Tools.ToolCallHandler WithTelemetry(this Tools.ToolCallHandler handler)
-        => TelemetryToolCallHandler.Wrap(handler);
+        => ToolCallHandlerTelemetryWrapper.Wrap(handler);
 
     /// <summary>
     /// 为 Agent 添加完整的 OpenTelemetry 插桩（LLM + Tool + Session/Round）
@@ -26,18 +26,18 @@ public static class AgentTelemetryExtensions
     /// <param name="agent">Agent 实例</param>
     /// <param name="sessionId">会话 ID（可选，用于 session span 标记）</param>
     /// <returns>TelemetryHook 实例（可用于后续 SetSessionContext 更新）</returns>
-    public static AgentTelemetryHook AddTelemetry(this Agent agent, string? sessionId = null)
+    public static AgentEventTelemetryHook AddTelemetry(this Agent agent, string? sessionId = null)
     {
         var agentId = agent.Config.Id;
 
         // 设置 LLM client 包装器（构造时持有 agentId，运行时从字典查找 round Activity）
-        agent.LlmClientDecorator = client => new TelemetryLlmClient(client, agentId);
+        agent.LlmClientProxyFactory = client => new LlmClientTelemetryProxy(client, agentId);
 
         // 设置 tool handler 包装器（同上）
-        agent.ToolCallHandlerDecorator = handler => TelemetryToolCallHandler.Wrap(handler, agentId);
+        agent.ToolCallHandlerProxyFactory = handler => ToolCallHandlerTelemetryWrapper.Wrap(handler, agentId);
 
         // 添加 session/round hook
-        var hook = new AgentTelemetryHook();
+        var hook = new AgentEventTelemetryHook();
         hook.SetSessionContext(
             agent.Config.Id,
             agent.Config.Name,
@@ -66,7 +66,7 @@ public static class AgentTelemetryExtensions
         Storage.IMessageStorage? messageStorage = null,
         string? sessionId = null)
     {
-        var instrumentedLlm = new TelemetryLlmClient(llmClient);
+        var instrumentedLlm = new LlmClientTelemetryProxy(llmClient);
 
         var agent = new Agent(
             config, instrumentedLlm, toolRegistry,

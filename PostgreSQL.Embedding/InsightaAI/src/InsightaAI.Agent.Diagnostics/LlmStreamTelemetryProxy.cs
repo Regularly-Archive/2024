@@ -7,7 +7,7 @@ namespace InsightaAI.Agent.Diagnostics;
 /// <summary>
 /// LlmStream 装饰器 — 在流完成时记录 token 用量和延迟
 /// </summary>
-public sealed class TelemetryLlmStream : LlmStream
+public sealed class LlmStreamTelemetryProxy : LlmStream
 {
     private readonly LlmStream _inner;
     private Activity? _activity;
@@ -17,7 +17,7 @@ public sealed class TelemetryLlmStream : LlmStream
     private bool _metricsRecorded;
     private bool _disposed;
 
-    public TelemetryLlmStream(LlmStream inner, Activity? activity, string provider, string model)
+    public LlmStreamTelemetryProxy(LlmStream inner, Activity? activity, string provider, string model)
     {
         _inner = inner;
         _activity = activity;
@@ -57,7 +57,7 @@ public sealed class TelemetryLlmStream : LlmStream
         var response = await _inner.GetResponseAsync(cancellationToken);
         if (!_stopwatch.IsRunning) _stopwatch.Stop();
 
-        TelemetryLlmClient.RecordMetricsAndTags(
+        LlmClientTelemetryProxy.RecordMetricsAndTags(
             _activity, response.Usage, _stopwatch.ElapsedMilliseconds, null);
         FinishActivity();
 
@@ -87,7 +87,7 @@ public sealed class TelemetryLlmStream : LlmStream
             if (!_metricsRecorded && _activity != null)
             {
                 if (_stopwatch.IsRunning) _stopwatch.Stop();
-                TelemetryLlmClient.RecordMetricsAndTags(
+                LlmClientTelemetryProxy.RecordMetricsAndTags(
                     _activity, null, _stopwatch.ElapsedMilliseconds, null);
             }
             _activity?.Dispose();

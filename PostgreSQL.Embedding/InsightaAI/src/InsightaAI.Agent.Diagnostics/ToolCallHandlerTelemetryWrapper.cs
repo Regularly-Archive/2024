@@ -7,7 +7,7 @@ namespace InsightaAI.Agent.Diagnostics;
 /// <summary>
 /// 包装 ToolCallHandler 委托 — 为每次工具执行添加 OpenTelemetry span 和 metrics
 /// </summary>
-public static class TelemetryToolCallHandler
+public static class ToolCallHandlerTelemetryWrapper
 {
     /// <summary>
     /// 用 telemetry 包装给定的 handler

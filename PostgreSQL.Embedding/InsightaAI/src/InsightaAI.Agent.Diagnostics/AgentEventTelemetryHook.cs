@@ -12,7 +12,7 @@ namespace InsightaAI.Agent.Diagnostics;
 /// 假设单线程顺序调用（Agent 按 round 顺序依次调用 hook 方法）。
 /// 如果未来支持并发 round，需要对 _sessionActivity / _roundActivity 加锁。
 /// </remarks>
-public sealed class AgentTelemetryHook : IAgentEventHook
+public sealed class AgentEventTelemetryHook : IAgentEventHook
 {
     private ActivityContext _sessionActivityContext;
     private Activity? _roundActivity;

@@ -125,7 +125,7 @@ public sealed class SessionMemoryHook : IAgentEventHook
     /// 每轮结束后触发，异步提取记忆
     /// </summary>
     public Task OnAgentRoundEndedAsync(
-        HookContext context,
+        AgentEventHookContext context,
         int round,
         IReadOnlyList<Message> messages,
         Message? assistantMessage,
@@ -139,7 +139,7 @@ public sealed class SessionMemoryHook : IAgentEventHook
     /// 会话结束时触发
     /// </summary>
     public Task OnAgentSessionEndedAsync(
-        HookContext context,
+        AgentEventHookContext context,
         IReadOnlyList<Message> messages,
         CancellationToken cancellationToken = default)
     {
@@ -150,7 +150,7 @@ public sealed class SessionMemoryHook : IAgentEventHook
     /// <summary>
     /// 在后台执行记忆提取（创建快照避免并发问题）
     /// </summary>
-    private void ExtractMemoryInBackground(HookContext context, IReadOnlyList<Message> messages)
+    private void ExtractMemoryInBackground(AgentEventHookContext context, IReadOnlyList<Message> messages)
     {
         var messagesSnapshot = messages.ToList();
 
@@ -183,7 +183,7 @@ public sealed class SessionMemoryHook : IAgentEventHook
     /// 提取并保存会话记忆
     /// </summary>
     private async Task ExtractAndSaveMemoryAsync(
-        HookContext context,
+        AgentEventHookContext context,
         IReadOnlyList<Message> messages,
         CancellationToken cancellationToken)
     {
