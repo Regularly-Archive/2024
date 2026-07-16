@@ -18,7 +18,7 @@ public interface IAgentEventHook
     /// <param name="message">用户输入消息</param>
     /// <param name="cancellationToken">取消令牌</param>
     Task OnAgentSessionStartedAsync(
-        HookContext context,
+        AgentEventHookContext context,
         string message,
         CancellationToken cancellationToken = default) => Task.CompletedTask;
 
@@ -40,7 +40,7 @@ public interface IAgentEventHook
     /// <param name="assistantMessage">本轮助手回复</param>
     /// <param name="cancellationToken">取消令牌</param>
     Task OnAgentRoundEndedAsync(
-        HookContext context,
+        AgentEventHookContext context,
         int round,
         IReadOnlyList<Message> messages,
         Message? assistantMessage,
@@ -52,7 +52,7 @@ public interface IAgentEventHook
     /// <param name="messages">完整对话历史</param>
     /// <param name="cancellationToken">取消令牌</param>
     Task OnAgentSessionEndedAsync(
-        HookContext context,
+        AgentEventHookContext context,
         IReadOnlyList<Message> messages,
         CancellationToken cancellationToken = default) => Task.CompletedTask;
 }

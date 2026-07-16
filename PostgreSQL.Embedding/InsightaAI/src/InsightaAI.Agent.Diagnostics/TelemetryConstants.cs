@@ -28,17 +28,17 @@ internal static class TelemetryConstants
 
     // Counter instruments
     public static readonly Counter<long> InputTokenCounter =
-        Meter.CreateCounter<long>("insighta.llm.tokens.input", "tokens", "Input/prompt tokens consumed");
+        Meter.CreateCounter<long>("gen_ai.client.tokens.input", "tokens", "Input/prompt tokens consumed");
     public static readonly Counter<long> OutputTokenCounter =
-        Meter.CreateCounter<long>("insighta.llm.tokens.output", "tokens", "Output/completion tokens consumed");
+        Meter.CreateCounter<long>("gen_ai.client.tokens.output", "tokens", "Output/completion tokens consumed");
     public static readonly Counter<long> CacheHitTokenCounter =
-        Meter.CreateCounter<long>("insighta.llm.tokens.cache_hit", "tokens", "Cache hit tokens");
+        Meter.CreateCounter<long>("gen_ai.client.tokens.cache_hit", "tokens", "Cache hit tokens");
     public static readonly Counter<long> AgentRunCounter =
         Meter.CreateCounter<long>("insighta.agent.run.total", "runs", "Total agent runs");
 
     // Histogram instruments
     public static readonly Histogram<double> LlmRequestDuration =
-        Meter.CreateHistogram<double>("insighta.llm.request.duration", "ms", "LLM request duration");
+        Meter.CreateHistogram<double>("gen_ai.client.operation.duration", "ms", "LLM request duration");
     public static readonly Histogram<double> ToolExecutionDuration =
         Meter.CreateHistogram<double>("insighta.tool.execution.duration", "ms", "Tool execution duration");
     public static readonly Histogram<double> AgentRoundDuration =

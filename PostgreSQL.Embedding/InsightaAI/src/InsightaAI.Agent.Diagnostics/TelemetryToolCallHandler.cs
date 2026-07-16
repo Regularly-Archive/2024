@@ -1,5 +1,6 @@
-using System.Diagnostics;
+using Azure;
 using InsightaAI.Agent.Tools;
+using System.Diagnostics;
 
 namespace InsightaAI.Agent.Diagnostics;
 
@@ -72,7 +73,8 @@ public static class TelemetryToolCallHandler
                 TelemetryConstants.ToolExecutionDuration.Record(sw.ElapsedMilliseconds,
                 [
                     new KeyValuePair<string, object?>("gen_ai.tool.name", request.ToolCall.Name),
-                    new KeyValuePair<string, object?>("gen_ai.tool.is_error", true)
+                    new KeyValuePair<string, object?>("gen_ai.tool.is_error", true),
+                    new KeyValuePair<string, object?>("gen_ai.tool.is_allowed", true)
                 ]);
 
                 throw;

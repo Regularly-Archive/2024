@@ -19,7 +19,6 @@ public sealed class AgentTelemetryHook : IAgentEventHook
     private ActivityContext _roundActivityContext;
     private Stopwatch? _roundStopwatch;
     private int _currentRound;
-    private Exception? _lastError;
 
     private string? _agentId;
     private string? _agentName;
@@ -39,7 +38,7 @@ public sealed class AgentTelemetryHook : IAgentEventHook
         _sessionId = sessionId;
     }
 
-    public Task OnAgentSessionStartedAsync(HookContext context, string message, CancellationToken cancellationToken = default)
+    public Task OnAgentSessionStartedAsync(AgentEventHookContext context, string message, CancellationToken cancellationToken = default)
     {
         // 创建 session span
         using var sessionActivity = TelemetryConstants.ActivitySource.StartActivity(
@@ -92,7 +91,7 @@ public sealed class AgentTelemetryHook : IAgentEventHook
     }
 
     public Task OnAgentSessionEndedAsync(
-        HookContext context,
+        AgentEventHookContext context,
         IReadOnlyList<Message> messages,
         CancellationToken cancellationToken = default)
     {
@@ -101,19 +100,13 @@ public sealed class AgentTelemetryHook : IAgentEventHook
         using var sessionActivity = TelemetryConstants.ActivitySource.StartActivity(
             "insighta.agent.session_end", ActivityKind.Internal, parentContext: _sessionActivityContext);
 
+        sessionActivity.SetTag("session.id", _sessionId);
         sessionActivity.SetTag("session.total_rounds", _currentRound);
 
-        if (_lastError != null)
-        {
-            sessionActivity.SetStatus(ActivityStatusCode.Error, _lastError.Message);
-            sessionActivity.SetTag("error.type", _lastError.GetType().Name);
-            sessionActivity.SetTag("error.message", _lastError.Message);
-        }
-        else
-        {
-            sessionActivity.SetStatus(ActivityStatusCode.Ok);
-        }
+        var sessionEndEvt = context.Event as AgentSessionEndEvent;
+        sessionActivity.SetTag("session.duration_ms", sessionEndEvt.Result.DurationMs);
 
+        sessionActivity.SetStatus(ActivityStatusCode.Ok);
 
         if (_agentId != null)
         {
@@ -121,14 +114,6 @@ public sealed class AgentTelemetryHook : IAgentEventHook
         }
 
         return Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// 记录会话级错误（可选，由调用方在捕获异常时调用）
-    /// </summary>
-    public void RecordError(Exception error)
-    {
-        _lastError = error;
     }
 
     private void EndRoundActivity()

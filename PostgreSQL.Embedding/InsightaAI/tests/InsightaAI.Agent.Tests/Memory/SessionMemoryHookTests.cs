@@ -14,7 +14,7 @@ public class SessionMemoryHookTests : IDisposable
     private readonly string _tempHome;
     private const string TestSessionId = "test-session-001";
     private const string TestUserId = "test-user-001";
-    private readonly HookContext _hookContext;
+    private readonly AgentEventHookContext _hookContext;
 
     public SessionMemoryHookTests()
     {
@@ -24,7 +24,7 @@ public class SessionMemoryHookTests : IDisposable
         Directory.CreateDirectory(_tempHome);
 
         // 创建测试用的 HookContext（不含 LLM 客户端）
-        _hookContext = new HookContext
+        _hookContext = new AgentEventHookContext
         {
             SessionId = TestSessionId
         };

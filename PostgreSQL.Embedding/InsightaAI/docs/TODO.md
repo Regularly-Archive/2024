@@ -112,6 +112,30 @@ _toolRegistry = serviceProvider.GetRequiredService<ToolRegistry>();  // 会抛�
 
 ---
 
+### 6. Telemetry 防御性与规范化（优先级：中）
+
+**问题描述：**
+OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
+
+**子项：**
+
+6.1 `CurrentRoundContext` 安全索引（低风险）
+- **位置**: `TelemetryLlmClient.cs`、`TelemetryToolCallHandler.cs`
+- **问题**: 直接使用字典索引 `CurrentRoundContext[_agentId]`，若 `AddTelemetry()` 未先调用会抛 `KeyNotFoundException`
+- **修复**: 改用 `TryGetValue`，未命中时记录非 parented 的 Activity
+
+6.2 `LlmRequestDuration` 标签维度不一致
+- **位置**: `TelemetryLlmClient.cs` `RecordMetricsAndTags`
+- **问题**: `LlmRequestDuration` 直方图 Record 时只传了 duration，未携带 `gen_ai.adapter`、`gen_ai.system`、`gen_ai.request.model` 标签，导致无法按模型维度做细粒度分析
+- **建议**: 统一使用与 Counter 相同的 TagList，确保 histogram 维度与 counter 一致
+
+**已完成：**
+- [x] 第 5 点已修复：`TelemetryToolCallHandler` catch 块补充 `gen_ai.tool.is_allowed` 标签
+- [x] 第 5.1 点已修复：`LlmRequestDuration` metric 名从 `insighta.llm.request.duration` 改为 `gen_ai.client.operation.duration`
+- [x] Token counter 命名统一为 `gen_ai.client.tokens.input/output/cache_hit`（保持独立 counter 结构，仅改前缀与 OTel GenAI 对齐）
+
+---
+
 ### 6. 修复已有测试失败（优先级：中）
 
 **问题描述：**

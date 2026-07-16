@@ -13,7 +13,6 @@ using InsightaAI.Agent.Tools.BuiltIn;
 using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
 using Microsoft.Extensions.DependencyInjection;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 
@@ -291,7 +290,7 @@ public class Agent : IDisposable
     /// 触发 agent 级别的启动钩子（在任何轮次开始前调用）
     /// </summary>
     private async Task TriggerSessionStartedHooksAsync(
-        HookContext context,
+        AgentEventHookContext context,
         string message,
         CancellationToken cancellationToken)
     {
@@ -341,7 +340,7 @@ public class Agent : IDisposable
     /// 注意：此方法返回 void，明确表示不等待完成
     /// </summary>
     private void TriggerRoundEndedHooks(
-        HookContext hookContext,
+        AgentEventHookContext hookContext,
         int round,
         List<Message> messages,
         Message? assistantMessage,
@@ -376,7 +375,7 @@ public class Agent : IDisposable
     /// 触发 agent 级别的会话结束钩子
     /// </summary>
     private async Task TriggerSessionEndedHooksAsync(
-        HookContext context,
+        AgentEventHookContext context,
         List<Message> messages,
         CancellationToken cancellationToken)
     {
@@ -449,7 +448,7 @@ public class Agent : IDisposable
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var sessionId = context?.SessionId ?? Guid.NewGuid().ToString("N");
-        var hookContext = new HookContext
+        var hookContext = new AgentEventHookContext
         {
             SessionId = sessionId,
             Services = _serviceProvider
@@ -510,9 +509,6 @@ public class Agent : IDisposable
 
         loopContext.AddMessage(Message.FromUser(input));
 
-        // 运行 AgentLoop，消费事件并触发 hooks
-        Message? lastAssistantMessage = null;
-
         await foreach (var evt in agentLoop.RunAsync(loopContext, cancellationToken))
         {
             // 转发事件给调用方
@@ -521,11 +517,13 @@ public class Agent : IDisposable
             // 事件后处理
             switch (evt)
             {
-                case AgentSessionStartEvent:
+                case AgentSessionStartEvent sessionStartEvt:
+                    hookContext.AttachEvent(sessionStartEvt);
                     await TriggerSessionStartedHooksAsync(hookContext, input, cancellationToken);
                     break;
 
-                case AgentRoundStartEvent:
+                case AgentRoundStartEvent roundStartEvt:
+                    hookContext.AttachEvent(roundStartEvt);
                     await TriggerRoundStartedHooksAsync(input, cancellationToken);
                     break;
 
@@ -543,13 +541,15 @@ public class Agent : IDisposable
                     break;
 
                 case AgentRoundEndEvent roundEndEvt:
-                    lastAssistantMessage = loopContext.Messages
+                    hookContext.AttachEvent(roundEndEvt);
+                    var lastAssistantMessage = loopContext.Messages
                         .LastOrDefault(m => m.Role == MessageRole.Assistant);
                     TriggerRoundEndedHooks(hookContext, roundEndEvt.Round,
                         loopContext.Messages.ToList(), lastAssistantMessage, cancellationToken);
                     break;
 
                 case AgentSessionEndEvent sessionEndEvent:
+                    hookContext.AttachEvent(sessionEndEvent);
                     await TriggerSessionEndedHooksAsync(hookContext,
                         loopContext.Messages.ToList(), cancellationToken);
                     break;
@@ -616,7 +616,7 @@ public class Agent : IDisposable
         }
         else
         {
-            toolResult = ToolResult.FromError("Tool execution denied by user.");
+            toolResult = ToolResult.FromError("Tool execution denied by user. Use `ask_user` if need to understand reason.");
         }
 
         return (allowed, toolResult);

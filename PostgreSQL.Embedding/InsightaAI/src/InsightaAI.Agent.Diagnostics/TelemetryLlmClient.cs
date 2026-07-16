@@ -92,7 +92,7 @@ public sealed class TelemetryLlmClient : ILlmClient
             activity?.SetTag("gen_ai.usage.cache_hit_tokens", usage.CacheHitTokens);
         }
 
-        activity?.SetTag("llm.duration_ms", durationMs);
+        activity?.SetTag("gen_ai.client.operation.duration", durationMs);
 
         if (error != null)
         {

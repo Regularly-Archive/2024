@@ -48,7 +48,7 @@ public class SessionMemoryHookLlmTests : IDisposable
         var llmClient = new MockLlmClient(response: "<summary>Test summary</summary>");
         var services = new ServiceCollection();
         services.AddSingleton<ILlmClient>(llmClient);
-        var hookContext = new HookContext { Services = services.BuildServiceProvider(), SessionId = sessionId };
+        var hookContext = new AgentEventHookContext { Services = services.BuildServiceProvider(), SessionId = sessionId };
         var messages = new List<Message> { Message.FromUser("test message") };
 
         // Round 1, 2: 不应触发 LLM（关键词模式）
@@ -89,7 +89,7 @@ public class SessionMemoryHookLlmTests : IDisposable
         var llmClient = new MockLlmClient(response: llmResponse);
         var services = new ServiceCollection();
         services.AddSingleton<ILlmClient>(llmClient);
-        var hookContext = new HookContext { Services = services.BuildServiceProvider(), SessionId = sessionId };
+        var hookContext = new AgentEventHookContext { Services = services.BuildServiceProvider(), SessionId = sessionId };
         var messages = new List<Message> { Message.FromUser("implement session memory") };
 
         await hook.OnAgentRoundEndedAsync(hookContext, 1, messages, null);
@@ -113,7 +113,7 @@ public class SessionMemoryHookLlmTests : IDisposable
         var llmClient = new MockLlmClient(response: "<summary>Round 1 summary</summary>");
         var services = new ServiceCollection();
         services.AddSingleton<ILlmClient>(llmClient);
-        var hookContext = new HookContext { Services = services.BuildServiceProvider(), SessionId = sessionId };
+        var hookContext = new AgentEventHookContext { Services = services.BuildServiceProvider(), SessionId = sessionId };
         var messages = new List<Message> { Message.FromUser("first round") };
 
         // Round 1
@@ -125,7 +125,7 @@ public class SessionMemoryHookLlmTests : IDisposable
         var llmClient2 = new MockLlmClient(response: "<summary>Updated summary</summary>");
         var services2 = new ServiceCollection();
         services2.AddSingleton<ILlmClient>(llmClient2);
-        var hookContext2 = new HookContext { Services = services2.BuildServiceProvider(), SessionId = sessionId };
+        var hookContext2 = new AgentEventHookContext { Services = services2.BuildServiceProvider(), SessionId = sessionId };
 
         await hook.OnAgentRoundEndedAsync(hookContext2, 2, messages, null);
         await Task.Delay(500);
@@ -146,7 +146,7 @@ public class SessionMemoryHookLlmTests : IDisposable
         var llmClient = new MockLlmClient(response: ""); // 空响应
         var services = new ServiceCollection();
         services.AddSingleton<ILlmClient>(llmClient);
-        var hookContext = new HookContext { Services = services.BuildServiceProvider(), SessionId = sessionId };
+        var hookContext = new AgentEventHookContext { Services = services.BuildServiceProvider(), SessionId = sessionId };
         var messages = new List<Message> { Message.FromUser("我喜欢使用 C# 编程") };
 
         await hook.OnAgentRoundEndedAsync(hookContext, 1, messages, null);
@@ -168,7 +168,7 @@ public class SessionMemoryHookLlmTests : IDisposable
             options: new SessionMemoryOptions { EnableLlmSummary = true, MinRoundsBeforeLlm = 1, SummaryInterval = TimeSpan.FromMinutes(5) });
 
         // 不注册 LlmClient 触发降级（Services 中无 ILlmClient）
-        var hookContext = new HookContext { SessionId = sessionId };
+        var hookContext = new AgentEventHookContext { SessionId = sessionId };
         var messages = new List<Message> { Message.FromUser("项目目标是在 Q2 完成") };
 
         await hook.OnAgentRoundEndedAsync(hookContext, 1, messages, null);
@@ -191,7 +191,7 @@ public class SessionMemoryHookLlmTests : IDisposable
         // Round 1: 初始摘要
         var llm1 = new MockLlmClient(response: "<summary>## Goal\n- Build agent</summary>");
         var s1 = new ServiceCollection(); s1.AddSingleton<ILlmClient>(llm1);
-        var ctx1 = new HookContext { Services = s1.BuildServiceProvider(), SessionId = sessionId };
+        var ctx1 = new AgentEventHookContext { Services = s1.BuildServiceProvider(), SessionId = sessionId };
         var msgs1 = new List<Message> { Message.FromUser("build an agent") };
 
         await hook.OnAgentRoundEndedAsync(ctx1, 1, msgs1, null);
@@ -201,7 +201,7 @@ public class SessionMemoryHookLlmTests : IDisposable
         string? capturedPrompt = null;
         var llm2 = new MockLlmClient(response: "<summary>## Goal\n- Build agent\n\n## Progress\n### Done\n- [x] Started</summary>");
         var s2 = new ServiceCollection(); s2.AddSingleton<ILlmClient>(llm2);
-        var ctx2 = new HookContext { Services = s2.BuildServiceProvider(), SessionId = sessionId };
+        var ctx2 = new AgentEventHookContext { Services = s2.BuildServiceProvider(), SessionId = sessionId };
         var msgs2 = new List<Message> { Message.FromUser("I started working on it") };
 
         await hook.OnAgentRoundEndedAsync(ctx2, 2, msgs2, null);
@@ -219,7 +219,7 @@ public class SessionMemoryHookLlmTests : IDisposable
     {
         var sessionId = $"keyword-append-{Guid.NewGuid():N}";
         var hook = new SessionMemoryHook(sessionId, TestUserId, options: new SessionMemoryOptions { EnableLlmSummary = false });
-        var hookContext = new HookContext { SessionId = sessionId };
+        var hookContext = new AgentEventHookContext { SessionId = sessionId };
 
         var msgs1 = new List<Message> { Message.FromUser("我喜欢 Python") };
         await hook.OnAgentRoundEndedAsync(hookContext, 1, msgs1, null);
