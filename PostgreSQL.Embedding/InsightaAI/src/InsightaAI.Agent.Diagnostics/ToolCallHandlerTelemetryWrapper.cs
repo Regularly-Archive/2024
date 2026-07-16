@@ -1,4 +1,3 @@
-using Azure;
 using InsightaAI.Agent.Tools;
 using System.Diagnostics;
 

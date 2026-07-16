@@ -27,17 +27,17 @@ internal static class TelemetryConstants
     internal static readonly ConcurrentDictionary<string, ActivityContext> CurrentRoundContext = new();
 
     // Counter instruments
-    public static readonly Counter<long> ClientInputTokenCounter =
+    public static readonly Counter<long> InputTokenCounter =
         Meter.CreateCounter<long>("gen_ai.client.tokens.input", "tokens", "Input/prompt tokens consumed");
-    public static readonly Counter<long> ClientOutputTokenCounter =
+    public static readonly Counter<long> OutputTokenCounter =
         Meter.CreateCounter<long>("gen_ai.client.tokens.output", "tokens", "Output/completion tokens consumed");
-    public static readonly Counter<long> ClientCacheHitTokenCounter =
+    public static readonly Counter<long> CacheHitTokenCounter =
         Meter.CreateCounter<long>("gen_ai.client.tokens.cache_hit", "tokens", "Cache hit tokens");
     public static readonly Counter<long> AgentRunCounter =
         Meter.CreateCounter<long>("insighta.agent.run.total", "runs", "Total agent runs");
 
     // Histogram instruments
-    public static readonly Histogram<double> ClientOperationDuration =
+    public static readonly Histogram<double> LlmRequestDuration =
         Meter.CreateHistogram<double>("gen_ai.client.operation.duration", "ms", "LLM request duration");
     public static readonly Histogram<double> ToolExecutionDuration =
         Meter.CreateHistogram<double>("insighta.tool.execution.duration", "ms", "Tool execution duration");
