@@ -303,18 +303,6 @@ public class CliConfig
     }
 
     /// <summary>
-    /// 解析 secondary_model 的 ModelId（如果配置了的话）
-    /// </summary>
-    public string? ResolveSecondaryModelId()
-    {
-        if (string.IsNullOrWhiteSpace(SecondaryModel))
-            return null;
-
-        var model = GetModel(SecondaryModel);
-        return model.ModelId;
-    }
-
-    /// <summary>
     /// 加载配置
     /// </summary>
     public static CliConfig Load()

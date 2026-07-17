@@ -1,5 +1,6 @@
 using InsightaAI.Agent.Extensions;
 using InsightaAI.Agent.Prompts;
+using InsightaAI.LLM;
 using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
 using System.Collections.Immutable;
@@ -21,13 +22,15 @@ public sealed class TraditionalCompactStrategy : ICompactStrategy
     public string Name => "TraditionalCompact";
     public int Priority => 3; // 低于 MicroCompact(1) 和 SessionMemoryCompact(2)
 
-    private readonly ILlmClient _llmClient;
-    private readonly string _summaryModel;
+    private readonly Func<string, ILlmClient> _summaryClientFactory;
+    private readonly string _summaryModelRef;
 
-    public TraditionalCompactStrategy(ILlmClient llmClient, string defaultModel, string? summaryModel = null)
+    /// <param name="summaryClientFactory">创建摘要 LLM 客户端的工厂，接受 modelId（格式：provider/model）</param>
+    /// <param name="summaryModelRef">摘要使用的模型引用，格式：provider/model</param>
+    public TraditionalCompactStrategy(Func<string, ILlmClient> summaryClientFactory, string summaryModelRef)
     {
-        _llmClient = llmClient ?? throw new ArgumentNullException(nameof(llmClient));
-        _summaryModel = summaryModel ?? defaultModel;
+        _summaryClientFactory = summaryClientFactory ?? throw new ArgumentNullException(nameof(summaryClientFactory));
+        _summaryModelRef = summaryModelRef ?? throw new ArgumentNullException(nameof(summaryModelRef));
     }
 
     public bool ShouldCompact(IReadOnlyList<Message> messages, int estimatedTokens, ContextBudget budget)
@@ -192,11 +195,14 @@ public sealed class TraditionalCompactStrategy : ICompactStrategy
         summaryMessages.Add(Message.FromUser(summaryPrompt));
 
         // 调用 LLM 生成摘要
-        var model = _summaryModel;
+        var modelName = ModelRef.TryParse(_summaryModelRef, out var modelRef)
+            ? modelRef.ModelId
+            : _summaryModelRef;
+        var summaryClient = _summaryClientFactory(_summaryModelRef);
 
         var request = new LlmRequest
         {
-            Model = model,
+            Model = modelName,
             Messages = summaryMessages.ToArray(),
             Tools = [], // 不使用工具
             Temperature = 0.3, // 低温度，更确定性的摘要
@@ -204,7 +210,7 @@ public sealed class TraditionalCompactStrategy : ICompactStrategy
         };
 
 
-        var response = await _llmClient.CompleteAsync(request, cancellationToken);
+        var response = await summaryClient.CompleteAsync(request, cancellationToken);
         return ExtractSummary(response.GetTextContent()) ?? "[Summary generation failed]";
     }
 

@@ -1,11 +1,12 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Azure.Identity;
 using InsightaAI.Agent.Hooks;
 using InsightaAI.Agent.Prompts;
+using InsightaAI.LLM;
 using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace InsightaAI.Agent.Memory;
 
@@ -45,13 +46,20 @@ public sealed record SessionMemoryOptions
     public TimeSpan SummaryInterval { get; init; } = TimeSpan.FromMinutes(5);
 
     /// <summary>摘要使用的模型</summary>
-    public string SummaryModel { get; init; } = "deepseek-v4-flash";
+    public string SummaryModel { get; init; } = "deepseek/deepseek-v4-flash";
 
     /// <summary>摘要最大 token 数</summary>
     public int SummaryMaxTokens { get; init; } = 2048;
 
     /// <summary>摘要温度</summary>
     public double SummaryTemperature { get; init; } = 0.3;
+
+    /// <summary>
+    /// 创建摘要用 LLM 客户端的工厂委托。
+    /// 接受 modelId（格式：provider/model），返回 ILlmClient。
+    /// 未设置时，LLM 摘要功能不生效。
+    /// </summary>
+    public Func<string, ILlmClient>? SummaryClientFactory { get; init; }
 }
 
 /// <summary>
@@ -188,8 +196,7 @@ public sealed class SessionMemoryHook : IAgentEventHook
         CancellationToken cancellationToken)
     {
         // Step 0: 检查是否满足 LLM 摘要条件
-        var llmClient = context.Services?.GetService<ILlmClient>();
-        if (_options.EnableLlmSummary && llmClient != null)
+        if (_options.EnableLlmSummary && _options.SummaryClientFactory != null)
         {
             // Step 0.1: 检查时间间隔，避免频繁调用 LLM
             var metadata = await LoadMetadataAsync(cancellationToken);
@@ -208,8 +215,9 @@ public sealed class SessionMemoryHook : IAgentEventHook
             var previousSummary = await GetSessionMemoryAsync(cancellationToken);
 
             // Step 2: 使用 LLM 锚定增量摘要（读取旧摘要 → 合并新事实 → 替换文件）
+            var summaryClient = _options.SummaryClientFactory(_options.SummaryModel);
             var mergedSummary = await GenerateAnchoredSummaryAsync(
-                llmClient, previousSummary, messages, cancellationToken);
+                summaryClient, previousSummary, messages, cancellationToken);
 
             if (!string.IsNullOrWhiteSpace(mergedSummary))
             {
@@ -272,9 +280,13 @@ public sealed class SessionMemoryHook : IAgentEventHook
                 ["PREVIOUS_SUMMARY"] = string.IsNullOrEmpty(previousSummary) ? "(none)" : previousSummary
             });
 
+            var modelName = ModelRef.TryParse(_options.SummaryModel, out var modelRef)
+                ? modelRef.ModelId
+                : _options.SummaryModel;
+
             var request = new LlmRequest
             {
-                Model = _options.SummaryModel,
+                Model = modelName,
                 Messages = [
                     Message.FromSystem("You are a conversation summarizer. Be concise but preserve important details."),
                     Message.FromUser(prompt)

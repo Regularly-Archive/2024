@@ -405,16 +405,22 @@ public class ChatCommand
         };
 
         // 创建会话记忆钩子（需先于 ContextManager，供 SessionMemoryCompactStrategy 使用）
+        Func<string, ILlmClient> summaryClientFactory = modelRef => LlmClientFactory.Create(auth, config, modelRef);
+        var summaryModelRef = config.SecondaryModel ?? config.PrimaryModel;
+
         SessionMemoryHook? sessionMemoryHook = null;
         if (!string.IsNullOrEmpty(sessionId))
         {
-            var summaryModelId = config.ResolveSecondaryModelId();
-            var memoryOptions = new SessionMemoryOptions { SummaryModel = summaryModelId ?? model.ModelId };
+            var memoryOptions = new SessionMemoryOptions
+            {
+                SummaryModel = summaryModelRef,
+                SummaryClientFactory = summaryClientFactory
+            };
             sessionMemoryHook = new SessionMemoryHook(sessionId, userId, options: memoryOptions);
         }
 
         // 创建上下文管理器
-        var contextManager = CreateContextManager(config, llmClient, model, sessionMemoryHook, toolRegistry);
+        var contextManager = CreateContextManager(config, model, summaryClientFactory, sessionMemoryHook, toolRegistry);
 
         // 创建记忆系统
         var memoryManager = CreateMemoryManager();
@@ -435,6 +441,8 @@ public class ChatCommand
             {
                 sp.AddScoped<IFileSystem, LocalFileSystem>();
                 sp.AddScoped<IShellExecutor, LocalShellExecutor>();
+                sp.AddScoped<AuthConfig>();
+                sp.AddScoped<CliConfig>();
             })
             .Build();
 
@@ -486,7 +494,7 @@ public class ChatCommand
         return userId;
     }
 
-    private static IContextManager? CreateContextManager(CliConfig config, ILlmClient llmClient, ModelEntry model, SessionMemoryHook? sessionMemoryHook = null, ToolRegistry? toolRegistry = null)
+    private static IContextManager? CreateContextManager(CliConfig config, ModelEntry model, Func<string, ILlmClient> summaryClientFactory, SessionMemoryHook? sessionMemoryHook = null, ToolRegistry? toolRegistry = null)
     {
         // 优先使用 model 配置的 context_window，否则从硬编码字典匹配
         var contextWindowTokens = model.ContextWindow > 0
@@ -512,8 +520,8 @@ public class ChatCommand
         }
 
         // 传统 LLM 摘要压缩（兜底，优先级 3）
-        var summaryModelId = config.ResolveSecondaryModelId();
-        strategies.Add(new TraditionalCompactStrategy(llmClient, model.ModelId, summaryModelId));
+        var summaryModelRef = config.SecondaryModel ?? config.PrimaryModel;
+        strategies.Add(new TraditionalCompactStrategy(summaryClientFactory, summaryModelRef));
 
         return new ContextManager(tokenEstimator, budget, strategies);
     }

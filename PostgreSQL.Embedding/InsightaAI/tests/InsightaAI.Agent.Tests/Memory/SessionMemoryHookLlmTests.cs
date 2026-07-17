@@ -1,9 +1,7 @@
-using InsightaAI.Agent.Hooks;
+﻿using InsightaAI.Agent.Hooks;
 using InsightaAI.Agent.Memory;
-using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
 using InsightaAI.Tests.Shared;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace InsightaAI.Agent.Tests.Memory;
 
@@ -33,39 +31,39 @@ public class SessionMemoryHookLlmTests : IDisposable
     [Fact]
     public void Id_Should_ReturnSessionMemory()
     {
-        var hook = new SessionMemoryHook("test-id", TestUserId, options: new SessionMemoryOptions { EnableLlmSummary = false });
+        var hook = new SessionMemoryHook("test-id", TestUserId,
+            options: new SessionMemoryOptions { EnableLlmSummary = false });
         Assert.Equal("session-memory", hook.Id);
     }
 
     [Fact]
     public async Task LlmSummary_Should_TriggerAtCorrectRounds()
     {
-        // minRoundsBeforeLlm=3, summaryInterval=1 → 触发于 round 3, 4, 5, ...
         var sessionId = $"trigger-test-{Guid.NewGuid():N}";
-        var hook = new SessionMemoryHook(sessionId, TestUserId,
-            options: new SessionMemoryOptions { EnableLlmSummary = true, MinRoundsBeforeLlm = 3, SummaryInterval = TimeSpan.FromMinutes(5) });
-
         var llmClient = new MockLlmClient(response: "<summary>Test summary</summary>");
-        var services = new ServiceCollection();
-        services.AddSingleton<ILlmClient>(llmClient);
-        var hookContext = new AgentEventHookContext { Services = services.BuildServiceProvider(), SessionId = sessionId };
+        var hook = new SessionMemoryHook(sessionId, TestUserId,
+            options: new SessionMemoryOptions
+            {
+                EnableLlmSummary = true,
+                MinRoundsBeforeLlm = 3,
+                SummaryInterval = TimeSpan.Zero,
+                SummaryClientFactory = _ => llmClient
+            });
+
+        var hookContext = new AgentEventHookContext { SessionId = sessionId };
         var messages = new List<Message> { Message.FromUser("test message") };
 
-        // Round 1, 2: 不应触发 LLM（关键词模式）
+        // Round 1, 2: 不应触发 LLM
         await hook.OnAgentRoundEndedAsync(hookContext, 1, messages, null);
         await Task.Delay(300);
-        var mem1 = await hook.GetSessionMemoryAsync();
-
         await hook.OnAgentRoundEndedAsync(hookContext, 2, messages, null);
         await Task.Delay(300);
-        var mem2 = await hook.GetSessionMemoryAsync();
 
         // Round 3: 应触发 LLM
         await hook.OnAgentRoundEndedAsync(hookContext, 3, messages, null);
         await Task.Delay(500);
         var mem3 = await hook.GetSessionMemoryAsync();
 
-        // Round 3 的内容应包含 LLM 生成的摘要
         Assert.Contains("Test summary", mem3);
     }
 
@@ -73,8 +71,6 @@ public class SessionMemoryHookLlmTests : IDisposable
     public async Task LlmSummary_Should_ParseSummaryTags()
     {
         var sessionId = $"parse-test-{Guid.NewGuid():N}";
-        var hook = new SessionMemoryHook(sessionId, TestUserId,
-            options: new SessionMemoryOptions { EnableLlmSummary = true, MinRoundsBeforeLlm = 1, SummaryInterval = TimeSpan.FromMinutes(5) });
 
         var llmResponse = @"Some analysis text here...
 <summary>
@@ -87,9 +83,16 @@ public class SessionMemoryHookLlmTests : IDisposable
 </summary>";
 
         var llmClient = new MockLlmClient(response: llmResponse);
-        var services = new ServiceCollection();
-        services.AddSingleton<ILlmClient>(llmClient);
-        var hookContext = new AgentEventHookContext { Services = services.BuildServiceProvider(), SessionId = sessionId };
+        var hook = new SessionMemoryHook(sessionId, TestUserId,
+            options: new SessionMemoryOptions
+            {
+                EnableLlmSummary = true,
+                MinRoundsBeforeLlm = 1,
+                SummaryInterval = TimeSpan.Zero,
+                SummaryClientFactory = _ => llmClient
+            });
+
+        var hookContext = new AgentEventHookContext { SessionId = sessionId };
         var messages = new List<Message> { Message.FromUser("implement session memory") };
 
         await hook.OnAgentRoundEndedAsync(hookContext, 1, messages, null);
@@ -97,7 +100,6 @@ public class SessionMemoryHookLlmTests : IDisposable
 
         var memory = await hook.GetSessionMemoryAsync();
 
-        // 应提取 <summary> 标签内的内容
         Assert.Contains("## Goal", memory);
         Assert.Contains("Implement session memory", memory);
         Assert.DoesNotContain("Some analysis text here", memory);
@@ -107,132 +109,130 @@ public class SessionMemoryHookLlmTests : IDisposable
     public async Task LlmSummary_Should_ReplaceFile_NotAppend()
     {
         var sessionId = $"replace-test-{Guid.NewGuid():N}";
+        var llmClient = new MockLlmClient(
+            response: "<summary>Round 1 summary</summary>",
+            secondResponse: "<summary>Updated summary</summary>");
         var hook = new SessionMemoryHook(sessionId, TestUserId,
-            options: new SessionMemoryOptions { EnableLlmSummary = true, MinRoundsBeforeLlm = 1, SummaryInterval = TimeSpan.FromMinutes(5) });
+            options: new SessionMemoryOptions
+            {
+                EnableLlmSummary = true,
+                MinRoundsBeforeLlm = 1,
+                SummaryInterval = TimeSpan.Zero,
+                SummaryClientFactory = _ => llmClient
+            });
 
-        var llmClient = new MockLlmClient(response: "<summary>Round 1 summary</summary>");
-        var services = new ServiceCollection();
-        services.AddSingleton<ILlmClient>(llmClient);
-        var hookContext = new AgentEventHookContext { Services = services.BuildServiceProvider(), SessionId = sessionId };
+        var hookContext = new AgentEventHookContext { SessionId = sessionId };
         var messages = new List<Message> { Message.FromUser("first round") };
 
         // Round 1
         await hook.OnAgentRoundEndedAsync(hookContext, 1, messages, null);
         await Task.Delay(500);
-        var mem1 = await hook.GetSessionMemoryAsync();
 
-        // Round 2 - 更新摘要
-        var llmClient2 = new MockLlmClient(response: "<summary>Updated summary</summary>");
-        var services2 = new ServiceCollection();
-        services2.AddSingleton<ILlmClient>(llmClient2);
-        var hookContext2 = new AgentEventHookContext { Services = services2.BuildServiceProvider(), SessionId = sessionId };
-
-        await hook.OnAgentRoundEndedAsync(hookContext2, 2, messages, null);
+        // Round 2: MockLlmClient 返回 secondResponse
+        await hook.OnAgentRoundEndedAsync(hookContext, 2, messages, null);
         await Task.Delay(500);
         var mem2 = await hook.GetSessionMemoryAsync();
 
-        // 文件应被替换，不是追加
         Assert.Contains("Updated summary", mem2);
         Assert.DoesNotContain("Round 1 summary", mem2);
     }
 
     [Fact]
-    public async Task LlmSummary_Should_FallbackToKeyword_WhenLlmReturnsEmpty()
+    public async Task LlmSummary_Should_NotWriteMemory_WhenLlmReturnsEmpty()
     {
-        var sessionId = $"fallback-empty-{Guid.NewGuid():N}";
+        var sessionId = $"empty-llm-{Guid.NewGuid():N}";
+        var llmClient = new MockLlmClient(response: "");
         var hook = new SessionMemoryHook(sessionId, TestUserId,
-            options: new SessionMemoryOptions { EnableLlmSummary = true, MinRoundsBeforeLlm = 1, SummaryInterval = TimeSpan.FromMinutes(5) });
+            options: new SessionMemoryOptions
+            {
+                EnableLlmSummary = true,
+                MinRoundsBeforeLlm = 1,
+                SummaryInterval = TimeSpan.Zero,
+                SummaryClientFactory = _ => llmClient
+            });
 
-        var llmClient = new MockLlmClient(response: ""); // 空响应
-        var services = new ServiceCollection();
-        services.AddSingleton<ILlmClient>(llmClient);
-        var hookContext = new AgentEventHookContext { Services = services.BuildServiceProvider(), SessionId = sessionId };
-        var messages = new List<Message> { Message.FromUser("我喜欢使用 C# 编程") };
+        var hookContext = new AgentEventHookContext { SessionId = sessionId };
+        var messages = new List<Message> { Message.FromUser("test message") };
 
         await hook.OnAgentRoundEndedAsync(hookContext, 1, messages, null);
         await Task.Delay(500);
 
         var memory = await hook.GetSessionMemoryAsync();
 
-        // 应降级到关键词提取
-        Assert.NotNull(memory);
-        // 关键词提取会追加 "## Round 1" 格式
-        Assert.Contains("Round 1", memory);
+        // LLM 返回空内容时不写入文件，内存为空
+        Assert.Equal("", memory);
     }
 
     [Fact]
-    public async Task LlmSummary_Should_FallbackToKeyword_WhenLlmThrows()
+    public async Task LlmSummary_Should_NotWriteMemory_WhenFactoryIsNull()
     {
-        var sessionId = $"fallback-error-{Guid.NewGuid():N}";
+        var sessionId = $"no-factory-{Guid.NewGuid():N}";
         var hook = new SessionMemoryHook(sessionId, TestUserId,
-            options: new SessionMemoryOptions { EnableLlmSummary = true, MinRoundsBeforeLlm = 1, SummaryInterval = TimeSpan.FromMinutes(5) });
+            options: new SessionMemoryOptions
+            {
+                EnableLlmSummary = true,
+                MinRoundsBeforeLlm = 1,
+                SummaryInterval = TimeSpan.Zero,
+                SummaryClientFactory = null
+            });
 
-        // 不注册 LlmClient 触发降级（Services 中无 ILlmClient）
         var hookContext = new AgentEventHookContext { SessionId = sessionId };
-        var messages = new List<Message> { Message.FromUser("项目目标是在 Q2 完成") };
+        var messages = new List<Message> { Message.FromUser("test message") };
 
         await hook.OnAgentRoundEndedAsync(hookContext, 1, messages, null);
         await Task.Delay(500);
 
         var memory = await hook.GetSessionMemoryAsync();
 
-        // 应降级到关键词提取
-        Assert.NotNull(memory);
-        Assert.Contains("Round 1", memory);
+        // 没有工厂 → LLM 分支不执行 → 无记忆写入
+        Assert.Equal("", memory);
     }
 
     [Fact]
     public async Task LlmSummary_Should_PreserveAnchoredSummary_AcrossRounds()
     {
         var sessionId = $"anchored-{Guid.NewGuid():N}";
+        var llmClient = new MockLlmClient(
+            response: "<summary>## Goal\n- Build agent</summary>",
+            secondResponse: "<summary>## Goal\n- Build agent\n\n## Progress\n### Done\n- [x] Started</summary>");
         var hook = new SessionMemoryHook(sessionId, TestUserId,
-            options: new SessionMemoryOptions { EnableLlmSummary = true, MinRoundsBeforeLlm = 1, SummaryInterval = TimeSpan.FromMinutes(5) });
+            options: new SessionMemoryOptions
+            {
+                EnableLlmSummary = true,
+                MinRoundsBeforeLlm = 1,
+                SummaryInterval = TimeSpan.Zero,
+                SummaryClientFactory = _ => llmClient
+            });
 
-        // Round 1: 初始摘要
-        var llm1 = new MockLlmClient(response: "<summary>## Goal\n- Build agent</summary>");
-        var s1 = new ServiceCollection(); s1.AddSingleton<ILlmClient>(llm1);
-        var ctx1 = new AgentEventHookContext { Services = s1.BuildServiceProvider(), SessionId = sessionId };
+        var hookContext = new AgentEventHookContext { SessionId = sessionId };
+
         var msgs1 = new List<Message> { Message.FromUser("build an agent") };
-
-        await hook.OnAgentRoundEndedAsync(ctx1, 1, msgs1, null);
+        await hook.OnAgentRoundEndedAsync(hookContext, 1, msgs1, null);
         await Task.Delay(500);
 
-        // Round 2: LLM 应收到 previous-summary 并合并
-        string? capturedPrompt = null;
-        var llm2 = new MockLlmClient(response: "<summary>## Goal\n- Build agent\n\n## Progress\n### Done\n- [x] Started</summary>");
-        var s2 = new ServiceCollection(); s2.AddSingleton<ILlmClient>(llm2);
-        var ctx2 = new AgentEventHookContext { Services = s2.BuildServiceProvider(), SessionId = sessionId };
         var msgs2 = new List<Message> { Message.FromUser("I started working on it") };
-
-        await hook.OnAgentRoundEndedAsync(ctx2, 2, msgs2, null);
+        await hook.OnAgentRoundEndedAsync(hookContext, 2, msgs2, null);
         await Task.Delay(500);
 
         var finalMemory = await hook.GetSessionMemoryAsync();
 
-        // 最终摘要应包含合并后的内容
         Assert.Contains("Build agent", finalMemory);
         Assert.Contains("Started", finalMemory);
     }
 
     [Fact]
-    public async Task KeywordFallback_Should_AppendWithRoundHeader()
+    public async Task NoMemoryWritten_WhenLlmDisabled()
     {
-        var sessionId = $"keyword-append-{Guid.NewGuid():N}";
-        var hook = new SessionMemoryHook(sessionId, TestUserId, options: new SessionMemoryOptions { EnableLlmSummary = false });
+        var sessionId = $"no-llm-{Guid.NewGuid():N}";
+        var hook = new SessionMemoryHook(sessionId, TestUserId,
+            options: new SessionMemoryOptions { EnableLlmSummary = false });
         var hookContext = new AgentEventHookContext { SessionId = sessionId };
 
-        var msgs1 = new List<Message> { Message.FromUser("我喜欢 Python") };
-        await hook.OnAgentRoundEndedAsync(hookContext, 1, msgs1, null);
-        await Task.Delay(300);
-
-        var msgs2 = new List<Message> { Message.FromUser("项目 deadline 是周五") };
-        await hook.OnAgentRoundEndedAsync(hookContext, 2, msgs2, null);
+        var messages = new List<Message> { Message.FromUser("test message") };
+        await hook.OnAgentRoundEndedAsync(hookContext, 1, messages, null);
         await Task.Delay(300);
 
         var memory = await hook.GetSessionMemoryAsync();
-
-        // 关键词模式应追加多个 Round
-        Assert.Contains("Round 1", memory);
-        Assert.Contains("Round 2", memory);
+        Assert.Equal("", memory);
     }
 }
