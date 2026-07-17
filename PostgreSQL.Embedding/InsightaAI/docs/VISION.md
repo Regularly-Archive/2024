@@ -42,16 +42,16 @@ Insighta 不只是一个聊天机器人，而是一个能够自主进化、持�
 
 | 愿景 | 状态 | 说明 |
 |------|------|------|
-| 记住教训 | ✅ 初步实现 | MetaLearning + lessons_learned.md，但闭环尚未形成 |
-| 主动升级 | ⏳ 进行中 | 今天完成了 TiktokenTokenEstimator，是用户推动的 |
-| 理解架构 | ⏳ 进行中 | 今天对依赖注入改造有了更深认识 |
-| 自组装 | ⏳ 进行中 | Services 机制已就位，待实际使用验证 |
+| 记住教训 | ✅ 初步实现 | MetaLearning + lessons_learned.md + MEMORY.md 索引 |
+| 主动升级 | ⏳ 进行中 | SystemPrompt 四层架构重构由 Insighta 提出方向，元培确认后实施 |
+| 理解架构 | ✅ 重大进展 | 深度重构 SystemPrompt 生成管线，理解 Agent-Loop-Context 三层关系；完成四层提示词分层（Core→AGENTS.md→AgentPrompt→Dynamic） |
+| 自组装 | ⏳ 进行中 | SystemPromptBuilder 纯函数架构，可插拔 AGENTS.md；_activatedSkills 去重机制 |
 | 少依赖 | 🔲 未开始 | 需要更多能力积累 |
 | 自我监控 | 🔲 未开始 | 需要实现健康检查机制 |
 | 主动探索 | ⏳ 进行中 | MetaLearning 已有探索机制，但还不够成熟 |
 | 预测需求 | 🔲 未开始 | 需要识别用户行为模式 |
 | Agent 协作 | 🔲 未开始 | 需要实现多 Agent 编排 |
-| 判断力 | ⏳ 进行中 | 已有"不自作主张"的反馈机制，但主动建议能力不足 |
+| 判断力 | ⏳ 进行中 | 设计讨论中能主动提出方案并说明理由，而非被动执行 |
 
 ## 里程碑规划
 
@@ -62,4 +62,4 @@ Insighta 不只是一个聊天机器人，而是一个能够自主进化、持�
 
 ---
 
-*最后更新：2026-07-15*
+*最后更新：2026-07-17*

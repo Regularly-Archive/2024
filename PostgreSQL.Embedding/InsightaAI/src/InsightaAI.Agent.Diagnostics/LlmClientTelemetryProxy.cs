@@ -31,6 +31,10 @@ public sealed class LlmClientTelemetryProxy : ILlmClient
             activity.SetTag("gen_ai.adapter", _inner.AdapterName);
             activity.SetTag("gen_ai.request.model", request.Model);
             activity.SetTag("gen_ai.request.is_stream", true);
+            activity.SetTag("gen_ai.request.temperature", request.Temperature);
+            activity.SetTag("gen_ai.request.max_tokens", request.MaxTokens);
+            activity.SetTag("gen_ai.operation.name", "text_completion");
+            activity.SetTag("gen_ai.operation.name", "");
         }
 
         var innerStream = _inner.Streaming(request);
@@ -47,6 +51,10 @@ public sealed class LlmClientTelemetryProxy : ILlmClient
             activity.SetTag("gen_ai.adapter", _inner.AdapterName);
             activity.SetTag("gen_ai.request.model", request.Model);
             activity.SetTag("gen_ai.request.is_stream", false);
+            activity.SetTag("gen_ai.request.temperature", request.Temperature);
+            activity.SetTag("gen_ai.request.max_tokens", request.MaxTokens);
+            activity.SetTag("gen_ai.operation.name", "text_completion");
+            activity.SetTag("gen_ai.operation.name", "");
         }
 
         var sw = Stopwatch.StartNew();
