@@ -14,7 +14,7 @@ public interface IMcpConnectionPool : IAsyncDisposable
     Task<IList<McpClientTool>> ListToolsAsync(McpServerConfig config, CancellationToken cancellationToken = default);
 
     /// <summary>调用工具</summary>
-    Task<string> CallToolAsync(McpServerConfig config, string toolName, Dictionary<string, object> arguments, CancellationToken cancellationToken = default);
+    Task<McpToolCallResult> CallToolAsync(McpServerConfig config, string toolName, Dictionary<string, object> arguments, CancellationToken cancellationToken = default);
 
     /// <summary>移除连接</summary>
     Task RemoveAsync(string serverName);

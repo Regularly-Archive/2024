@@ -14,6 +14,11 @@ public class McpRegistry
     private readonly IMcpConnectionPool _connectionPool;
     private readonly ConcurrentDictionary<string, McpServerConfig> _serverCache = new();
     private readonly ConcurrentDictionary<string, McpToolMetadata> _activeTools = new();
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+    };
 
     public McpRegistry(IMcpConnectionPool connectionPool)
     {
@@ -97,8 +102,23 @@ public class McpRegistry
             async (args, ctx) =>
             {
                 var arguments = args.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-                var result = await _connectionPool.CallToolAsync(config, toolName, arguments, ctx.CancellationToken);
-                return ToolResult.FromText(result);
+                var callResult = await _connectionPool.CallToolAsync(config, toolName, arguments, ctx.CancellationToken);
+                var metadata = new Dictionary<string, object?>(callResult.Metadata ?? new Dictionary<string, object?>())
+                {
+                    ["mcp.client.name"] = config.Name,
+                    ["mcp.client.description"] = config.Description,
+                    ["mcp.client.endpoint"] = config.Endpoint,
+                    ["mcp.client.transport"] = config.Transport,
+                    ["mcp.method.name"] = toolName,
+                    ["mcp.method.arguments"] = JsonSerializer.Serialize(arguments,JsonOptions),
+                };
+
+                return new ToolResult
+                {
+                    Content = [new TextBlock { Text = callResult.Text }],
+                    IsError = callResult.IsError,
+                    Metadata = metadata,
+                };
             });
 
         var metadata = new McpToolMetadata

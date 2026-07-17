@@ -248,6 +248,29 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 
 ---
 
+### 12. MCP Telemetry Tag 命名清理（优先级：低）
+
+**问题描述：**
+`ToolCallHandlerTelemetryWrapper` 消费 `ToolResult.Metadata` 后，MCP span 上出现语义重叠的 tag：
+
+| 来源 | tag | 问题 |
+|------|-----|------|
+| MCP SDK | `mcp.client.transport` | 与我们的 `mcp.server.transport` 重复 |
+| MCP SDK | `mcp.client.description` | 与我们的 `mcp.server.description` 重复 |
+| 我们的 Registry | `mcp.server.description` | 值来自本地 `McpServerConfig.Description`，非 server 自报，放 `mcp.server.*` 下语义有误导 |
+
+**建议方案：**
+- `McpRegistry` 中 `mcp.server.description` → `mcp.config.description`
+- `McpRegistry` 中移除 `mcp.server.transport`（MCP SDK 已有）
+- `SimpleMcpConnectionPool` 保持 `mcp.server.name`/`mcp.server.version`（来自 server `initialize` 握手，语义正确）
+
+**最终 tag 分层：**
+- `mcp.server.*` — 远端 server 身份（连接池层，来自握手）
+- `mcp.config.*` — 本地配置（Registry 层）
+- `mcp.client.*` / `mcp.method.*` — SDK 运行时（保持不变）
+
+---
+
 ## 记录时间
 - 2026-07-03: 创建文档，记录当前待办事项
 - 2026-07-15: 新增 Agent 依赖注入待办、TiktokenTokenEstimator、测试失败清单
@@ -255,3 +278,4 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 - 2026-07-21: 新增 Tool Result Interception 功能待办（Phase 1-3 已完成）
 - 2026-07-13: 新增 ESC 打断 LLM 生成功能（已完成，待优化 Spectre.Console 兼容性和单元测试）
 - 2026-07-13: 新增 -c/--continue 恢复最近会话、reasoning 事件支持、工具调用 ID 一致性修复、Spectre.Console Status spinner 兼容性修复
+- 2026-07-21: 新增 MCP Telemetry Tag 命名清理待办

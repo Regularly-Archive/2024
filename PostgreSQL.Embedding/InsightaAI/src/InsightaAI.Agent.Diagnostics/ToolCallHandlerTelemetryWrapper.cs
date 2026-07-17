@@ -46,6 +46,14 @@ public static class ToolCallHandlerTelemetryWrapper
                     var isError = !response.IsAllowed || response.ToolResult.IsError;
                     activity.SetTag("gen_ai.tool.is_error", isError);
                     activity.SetTag("gen_ai.tool.duration_ms", sw.ElapsedMilliseconds);
+
+                    // 消费工具执行层产出的元数据（如 MCP server 信息等）
+                    if (response.ToolResult.Metadata is { } meta)
+                    {
+                        foreach (var kv in meta)
+                            activity.SetTag(kv.Key, kv.Value);
+                    }
+
                     activity.SetStatus(isError ? ActivityStatusCode.Error : ActivityStatusCode.Ok);
                 }
 

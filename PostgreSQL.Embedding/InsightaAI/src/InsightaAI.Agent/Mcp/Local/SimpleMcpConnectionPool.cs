@@ -31,19 +31,36 @@ public class SimpleMcpConnectionPool : IMcpConnectionPool
         return tools;
     }
 
-    public async Task<string> CallToolAsync(McpServerConfig config, string toolName, Dictionary<string, object> arguments, CancellationToken cancellationToken = default)
+    public async Task<McpToolCallResult> CallToolAsync(McpServerConfig config, string toolName, Dictionary<string, object> arguments, CancellationToken cancellationToken = default)
     {
         var client = await GetConnectionAsync(config, cancellationToken);
         var args = arguments.ToDictionary(kvp => kvp.Key, kvp => (object?)kvp.Value);
         var result = await client.CallToolAsync(toolName, args, cancellationToken: cancellationToken);
-        return string.Join("\n", result.Content.Where(c => c.Type == "text").Select(c => c.ToString()));
+
+        var text = string.Join("\n", result.Content.Where(c => c.Type == "text").Select(c => c.ToString()));
+
+        var metadata = new Dictionary<string, object?>
+        {
+            ["mcp.session.id"] = client.SessionId,
+            ["mcp.server.name"] = client.ServerInfo?.Name,
+            ["mcp.server.version"] = client.ServerInfo?.Version,
+            ["mcp.server.title"] = client.ServerInfo?.Title,
+            ["mcp.server.description"] = client.ServerInfo?.Description,
+        };
+
+        return new McpToolCallResult
+        {
+            Text = text,
+            IsError = result.IsError.HasValue ? result.IsError.Value : false,
+            Metadata = metadata,
+        };
     }
 
     public async Task RemoveAsync(string serverName)
     {
         if (_connections.TryRemove(serverName, out var lazyTask))
         {
-            if (lazyTask.IsValueCreated && lazyTask.Value.IsCompletedSuccessfully)
+            if (lazyTask.IsValueCreated && lazyTask.Value.IsCompletedSuccessfully == true)
             {
                 await lazyTask.Value.Result.DisposeAsync();
             }
@@ -55,7 +72,7 @@ public class SimpleMcpConnectionPool : IMcpConnectionPool
     {
         foreach (var kvp in _connections)
         {
-            if (kvp.Value.IsValueCreated && kvp.Value.Value.IsCompletedSuccessfully)
+            if (kvp.Value.IsValueCreated && kvp.Value.Value.IsCompletedSuccessfully == true)
             {
                 await kvp.Value.Value.Result.DisposeAsync();
             }

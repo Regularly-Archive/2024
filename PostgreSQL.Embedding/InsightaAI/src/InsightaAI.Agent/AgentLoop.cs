@@ -1,5 +1,6 @@
 using InsightaAI.Agent.Abstractions;
 using InsightaAI.Agent.Models;
+using InsightaAI.Agent.Prompts;
 using InsightaAI.Agent.Tools;
 using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
@@ -226,22 +227,16 @@ public sealed class AgentLoop
         Stopwatch stopwatch,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        // 添加提示让 LLM 总结当前结果
-        var content = "You have reached the maximum number of tool rounds. " +
-            "Please provide a final response to the user based on the information gathered so far. " +
-            "Do not attempt to use any more tools." +
-            "Do not generate <tool_call></tool_call> block.";
-        context.AddMessage(Message.FromToolResult(
-            toolCallId: Guid.NewGuid().ToString(),
-            toolName: "max_iter_reached",
-            content: [new TextBlock() { Text = content }]
-         ));
+
+        var snapshot = context.Messages.ToList();
+        var prompt = await PromptTemplate.RenderAsync("reached-max-rounds");
+        snapshot.Add(Message.FromUser(prompt));
 
         // 最后一次调用 LLM 获取总结
         var finalRequest = new LlmRequest
         {
             Model = _config.Model,
-            Messages = context.Messages.ToArray(),
+            Messages = snapshot.ToArray(),
             Tools = [],
             Temperature = 0,
             MaxTokens = _config.MaxTokens,
@@ -277,6 +272,8 @@ public sealed class AgentLoop
             Content = finalResponse.Content
         };
 
+        // 添加最后一条助手消息
+        context.AddMessage(finalMessage);
         stopwatch.Stop();
 
         yield return new AgentSessionEndEvent

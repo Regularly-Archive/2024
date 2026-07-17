@@ -42,6 +42,9 @@ public sealed record ToolResult
     /// <summary>是否为错误</summary>
     public bool IsError { get; init; }
 
+    /// <summary>工具执行层产出的元数据（遥测层消费，如 MCP server name/description/transport）</summary>
+    public IReadOnlyDictionary<string, object?>? Metadata { get; init; }
+
     /// <summary>
     /// 从纯文本创建成功结果
     /// </summary>
