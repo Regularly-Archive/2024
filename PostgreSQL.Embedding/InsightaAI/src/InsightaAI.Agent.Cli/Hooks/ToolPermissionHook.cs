@@ -84,11 +84,13 @@ public class ToolPermissionHook : IToolHook
             var root = doc.RootElement;
 
             if (!root.TryGetProperty("old_string", out var oldElement) ||
-                !root.TryGetProperty("new_string", out var newElement))
+                !root.TryGetProperty("new_string", out var newElement) ||
+                !root.TryGetProperty("file_path", out var filePathElement))
                 return;
 
             var oldText = oldElement.GetString() ?? "";
             var newText = newElement.GetString() ?? "";
+            var filePath = filePathElement.GetString() ?? "";
 
             var diffBuilder = new InlineDiffBuilder(new Differ());
             var diffModel = diffBuilder.BuildDiffModel(oldText, newText);
@@ -101,7 +103,8 @@ public class ToolPermissionHook : IToolHook
                 return;
 
             AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine($"[dim][green]+{added}[/] lines, [red]-{removed}[/] lines[/]");
+            AnsiConsole.MarkupLine($"[dim]File: {EscapeMarkup(filePath)}[/]");
+            AnsiConsole.MarkupLine($"[dim]Changes Preview: [green]+{added}[/] lines, [red]-{removed}[/] lines[/]");
 
             var panelLines = new List<Markup>();
             foreach (var line in diffModel.Lines)

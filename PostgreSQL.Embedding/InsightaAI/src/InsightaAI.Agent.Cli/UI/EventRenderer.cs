@@ -227,7 +227,7 @@ public class EventRenderer : IDisposable
         }
 
         AnsiConsole.MarkupLine("[dim]● The task has been cancelled by user [/]");
-        AnsiConsole.MarkupLine("[red]⎿ Interrupted [dim]· What should Claude do instead?[/] [/]");
+        AnsiConsole.MarkupLine("[red]⎿ Interrupted [dim]· What should Insighta do instead?[/] [/]");
     }
 
     /// <summary>
