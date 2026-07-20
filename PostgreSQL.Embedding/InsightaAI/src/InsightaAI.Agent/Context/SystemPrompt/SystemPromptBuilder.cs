@@ -47,6 +47,7 @@ public static class SystemPromptBuilder
 
             var available = p.AllSkills
                 .Where(s => !activatedNames.Contains(s.Name))
+                .OrderBy(s => s.Name, StringComparer.Ordinal)
                 .ToList();
 
             if (available.Count > 0)
@@ -63,7 +64,8 @@ public static class SystemPromptBuilder
         if (p.McpServers is { Count: > 0 })
         {
             var serversList = string.Join("\n",
-                p.McpServers.Select(s => $"- **{s.Name}**: {s.Description}"));
+                p.McpServers.OrderBy(s => s.Name, StringComparer.Ordinal)
+                    .Select(s => $"- **{s.Name}**: {s.Description}"));
 
             sb.Append(await PromptTemplate.RenderAsync("available-mcps",
                 new Dictionary<string, string> { ["mcp_servers_list"] = serversList }));
@@ -85,7 +87,9 @@ public static class SystemPromptBuilder
         if (p.ActivatedSkills is { Count: > 0 })
         {
             var instructionsText = string.Join("\n\n",
-                p.ActivatedSkills.Select(s => s.Instructions));
+                p.ActivatedSkills
+                    .OrderBy(s => s.Metadata.Name, StringComparer.Ordinal)
+                    .Select(s => s.Instructions));
 
             sb.Append(await PromptTemplate.RenderAsync("activated-skills",
                 new Dictionary<string, string> { ["activated_skills_list"] = instructionsText }));
