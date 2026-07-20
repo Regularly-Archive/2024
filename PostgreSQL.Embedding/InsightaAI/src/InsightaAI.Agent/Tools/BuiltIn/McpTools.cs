@@ -30,7 +30,7 @@ public static class McpTools
             ""properties"": {
                 ""server_name"": {
                     ""type"": ""string"",
-                    ""description"": ""MCP 服务器名称。如果为空，则列出所有服务器及其工具。""
+                    ""description"": ""MCP server name. If empty, lists all servers and their tools.""
                 }
             },
             ""required"": []
@@ -38,7 +38,7 @@ public static class McpTools
 
         registry.RegisterFunction(
             "list_mcp_tools",
-            "列出 MCP 服务器及其工具。不传 server_name 则列出所有服务器概览；传入 server_name 则列出该服务器的所有工具详情。",
+            "List MCP servers and their tools. If server_name is not provided, lists an overview of all servers; if provided, lists all tool details for that server.",
             schema,
             async (args, ctx) =>
             {
@@ -95,11 +95,11 @@ public static class McpTools
             ""properties"": {
                 ""server_name"": {
                     ""type"": ""string"",
-                    ""description"": ""MCP 服务器名称""
+                    ""description"": ""MCP server name""
                 },
                 ""tool_name"": {
                     ""type"": ""string"",
-                    ""description"": ""要激活的工具名称""
+                    ""description"": ""The name of the tool to activate""
                 }
             },
             ""required"": [""server_name"", ""tool_name""]
@@ -107,7 +107,7 @@ public static class McpTools
 
         registry.RegisterFunction(
             "activate_mcp_tool",
-            "激活一个 MCP 工具，使其可用于 Agent 调用。激活后工具名为 mcp__{server}__{tool}。",
+            "Activate an MCP tool so it can be called by the agent. After activation, the tool name becomes mcp__{server}__{tool}.",
             schema,
             async (args, ctx) =>
             {
@@ -141,7 +141,7 @@ public static class McpTools
             ""properties"": {
                 ""registered_name"": {
                     ""type"": ""string"",
-                    ""description"": ""已激活工具的注册名称（格式：mcp__{server}__{tool}）""
+                    ""description"": ""The registered name of the activated tool (format: mcp__{server}__{tool})""
                 }
             },
             ""required"": [""registered_name""]
@@ -149,7 +149,7 @@ public static class McpTools
 
         registry.RegisterFunction(
             "deactivate_mcp_tool",
-            "停用一个已激活的 MCP 工具。",
+            "Deactivate an activated MCP tool.",
             schema,
             (args, ctx) =>
             {

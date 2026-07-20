@@ -1,6 +1,5 @@
-﻿using System.Text;
-using InsightaAI.Agent.Prompts;
-using InsightaAI.Agent.Skills;
+﻿using InsightaAI.Agent.Prompts;
+using System.Text;
 
 namespace InsightaAI.Agent.Context.SystemPrompt;
 

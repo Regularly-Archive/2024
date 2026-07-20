@@ -27,10 +27,10 @@ public class AskUserTool : ITool
         Definition = new ToolDefinition
         {
             Name = Name,
-            Description = "向用户提问以获取澄清或做出决策。支持三种模式：\n" +
-                          "1. 是/否问题：不传 choices，自动显示 Yes/No 选项\n" +
-                          "2. 单选问题：传入 choices 数组，用户选择一项\n" +
-                          "3. 多选问题：传入 choices 数组并设置 multiple_select=true，用户可选择多项",
+            Description = "Ask the user a question to get clarification or make a decision. Supports three modes:\n" +
+                          "1. Yes/No question: don't pass choices, automatically shows Yes/No options\n" +
+                          "2. Single choice: pass a choices array, user selects one option\n" +
+                          "3. Multiple choice: pass a choices array with multiple_select=true, user can select multiple options",
             Schema = JsonSerializer.SerializeToElement(new
             {
                 type = "object",
@@ -39,18 +39,18 @@ public class AskUserTool : ITool
                     question = new
                     {
                         type = "string",
-                        description = "要问用户的问题"
+                        description = "The question to ask the user"
                     },
                     choices = new
                     {
                         type = "array",
                         items = new { type = "string" },
-                        description = "可选项列表。如果不提供，默认使用 [Yes, No]"
+                        description = "List of options. If not provided, defaults to [Yes, No]"
                     },
                     multiple_select = new
                     {
                         type = "boolean",
-                        description = "是否允许多选，默认 false（单选）"
+                        description = "Whether to allow multiple selection, default is false (single selection)"
                     }
                 },
                 required = new[] { "question", "choices" }

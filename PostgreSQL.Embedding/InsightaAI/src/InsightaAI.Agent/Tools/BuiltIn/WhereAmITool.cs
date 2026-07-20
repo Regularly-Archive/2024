@@ -21,7 +21,7 @@ public class WhereAmITool : ITool
         Definition = new ToolDefinition
         {
             Name = Name,
-            Description = "获取当前环境信息，包括时间、操作系统、工作目录、会话 ID、模型信息等。当你需要了解当前上下文时使用。",
+            Description = "Get current environment information, including time, OS, working directory, session ID, model info, etc. Use when you need to understand the current context.",
             Schema = JsonSerializer.SerializeToElement(new
             {
                 type = "object",

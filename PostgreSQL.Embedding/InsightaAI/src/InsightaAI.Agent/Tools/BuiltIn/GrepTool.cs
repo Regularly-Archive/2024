@@ -23,7 +23,7 @@ public class GrepTool : ITool
         Definition = new ToolDefinition
         {
             Name = Name,
-            Description = "在文件中搜索关键词或正则表达式。返回匹配的行及其行号。适用于查找代码中的函数、变量、错误信息等。",
+            Description = "Search for keywords or regex patterns in files. Returns matching lines with line numbers. Suitable for finding functions, variables, error messages, etc. in code.",
             Schema = JsonSerializer.SerializeToElement(new
             {
                 type = "object",
@@ -32,42 +32,42 @@ public class GrepTool : ITool
                     pattern = new
                     {
                         type = "string",
-                        description = "要搜索的关键词或正则表达式"
+                        description = "The keyword or regex pattern to search for"
                     },
                     path = new
                     {
                         type = "string",
-                        description = "要搜索的文件或目录路径"
+                        description = "The file or directory path to search"
                     },
                     recursive = new
                     {
                         type = "boolean",
-                        description = "是否递归搜索子目录。默认 true。"
+                        description = "Whether to search subdirectories recursively. Default is true."
                     },
                     ignore_case = new
                     {
                         type = "boolean",
-                        description = "是否忽略大小写。默认 false。"
+                        description = "Whether to ignore case. Default is false."
                     },
                     use_regex = new
                     {
                         type = "boolean",
-                        description = "是否使用正则表达式。默认 true。"
+                        description = "Whether to use regex for the pattern. Default is true."
                     },
                     files_only = new
                     {
                         type = "boolean",
-                        description = "是否只显示匹配的文件名。默认 false。"
+                        description = "Whether to show only matching file names. Default is false."
                     },
                     exclude = new
                     {
                         type = "string",
-                        description = "要排除的文件或目录模式，多个用逗号分隔。如：'*.log,node_modules'"
+                        description = "File or directory patterns to exclude, separated by commas. e.g. '*.log,node_modules'"
                     },
                     max_results = new
                     {
                         type = "integer",
-                        description = "最大返回结果数。默认 100。"
+                        description = "Maximum number of results to return. Default is 100."
                     }
                 },
                 required = new[] { "pattern" }

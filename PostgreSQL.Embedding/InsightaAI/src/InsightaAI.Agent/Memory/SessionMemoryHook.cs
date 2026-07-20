@@ -295,7 +295,7 @@ public sealed class SessionMemoryHook : IAgentEventHook
                 ToolChoice = ToolChoiceMode.None,
                 MaxTokens = _options.SummaryMaxTokens,
                 Temperature = _options.SummaryTemperature,
-                Reasoning = new ReasoningConfig { Enabled = false, Effort = ReasoningEffort.Low }
+                Reasoning = new ReasoningConfig { Enabled = false, Effort = ReasoningEffort.Low },
             };
 
             var response = await llmClient.CompleteAsync(request, cancellationToken);

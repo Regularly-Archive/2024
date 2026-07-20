@@ -26,7 +26,7 @@ public class FileReadTool : ITool
         Definition = new ToolDefinition
         {
             Name = Name,
-            Description = "读取文本文件内容。支持读取全部内容或指定范围的行。适用于查看代码、日志、配置文件等。",
+            Description = "Read text file content. Supports reading full content or a range of lines. Suitable for viewing code, logs, configuration files, etc.",
             Schema = JsonSerializer.SerializeToElement(new
             {
                 type = "object",
@@ -35,17 +35,17 @@ public class FileReadTool : ITool
                     file_path = new
                     {
                         type = "string",
-                        description = "要读取的文件路径"
+                        description = "The file path to read"
                     },
                     offset = new
                     {
                         type = "integer",
-                        description = "起始行号（从 0 开始）。用于跳过文件开头的行。"
+                        description = "Starting line number (0-based). Used to skip lines at the beginning of the file."
                     },
                     limit = new
                     {
                         type = "integer",
-                        description = "要读取的行数。不指定则默认读取 120 行。"
+                        description = "Number of lines to read. Defaults to 120 if not specified."
                     }
                 },
                 required = new[] { "file_path" }

@@ -21,7 +21,7 @@ public class WebFetchTool : ITool
     public ToolDefinition Definition => new()
     {
         Name = Name,
-        Description = "获取网页内容。返回 Markdown 格式的文本内容。适用于读取文档、文章、API 文档等。",
+        Description = "Fetch web page content. Returns Markdown-formatted text. Suitable for reading documentation, articles, API docs, etc.",
         Schema = JsonSerializer.SerializeToElement(new
         {
             type = "object",
@@ -30,12 +30,12 @@ public class WebFetchTool : ITool
                 url = new
                 {
                     type = "string",
-                    description = "要获取的 URL"
+                    description = "The URL to fetch"
                 },
                 extract_text = new
                 {
                     type = "boolean",
-                    description = "是否提取纯文本（去掉 HTML 标签）"
+                    description = "Whether to extract plain text (strip HTML tags)"
                 }
             },
             required = new[] { "url", "extract_text" }

@@ -26,9 +26,9 @@ public class FileEditTool : ITool
         Definition = new ToolDefinition
         {
             Name = Name,
-            Description = "精确编辑文件内容。通过字符串匹配找到要修改的部分并替换。" +
-                         "必须先用 read_file 读取文件，确认文件未被修改后才能编辑。" +
-                         "适用于修改函数、更新配置、修复 bug 等精确编辑场景。",
+            Description = "Precisely edit file content. Finds and replaces content by exact string matching." +
+                         "Must read the file with read_file first, and confirm the file hasn't been modified since." +
+                         "Suitable for modifying functions, updating config, fixing bugs, and other precise editing scenarios.",
             Schema = JsonSerializer.SerializeToElement(new
             {
                 type = "object",
@@ -37,22 +37,22 @@ public class FileEditTool : ITool
                     file_path = new
                     {
                         type = "string",
-                        description = "要编辑的文件路径"
+                        description = "The file path to edit"
                     },
                     old_string = new
                     {
                         type = "string",
-                        description = "要查找并替换的原始字符串（必须完全匹配，包括空格和缩进）"
+                        description = "The original string to find and replace (must match exactly, including whitespace and indentation)"
                     },
                     new_string = new
                     {
                         type = "string",
-                        description = "替换后的新字符串"
+                        description = "The replacement string"
                     },
                     replace_all = new
                     {
                         type = "boolean",
-                        description = "是否替换所有匹配项（默认 false，只替换第一个匹配）"
+                        description = "Whether to replace all occurrences (default false, only replaces the first match)"
                     }
                 },
                 required = new[] { "file_path", "old_string", "new_string" }

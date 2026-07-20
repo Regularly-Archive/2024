@@ -23,10 +23,10 @@ public class BashTool : ITool
         Definition = new ToolDefinition
         {
             Name = Name,
-            Description = "执行 Shell 命令。适用于运行系统命令、脚本、编译代码等。" +
-                         "在 Windows 上使用 PowerShell，在 Linux/Mac 上使用 Bash。" +
-                         "Windows 平台请优先使用 PowerShell cmdlet，避免原生命令（中文输出可能乱码）。" +
-                         "常用映射：ipconfig → Get-NetIPAddress, tasklist → Get-Process, dir → Get-ChildItem, " +
+            Description = "Execute shell commands. Suitable for running system commands, scripts, building code, etc." +
+                         "On Windows, uses PowerShell; on Linux/Mac, uses Bash." +
+                         "On Windows, prefer PowerShell cmdlets over native commands (Chinese output may be garbled)." +
+                         "Common mappings: ipconfig → Get-NetIPAddress, tasklist → Get-Process, dir → Get-ChildItem, " +
                          "findstr → Select-String, mkdir → New-Item -ItemType Directory, del → Remove-Item, " +
                          "copy → Copy-Item, move → Move-Item, type → Get-Content, echo → Write-Output",
             Schema = JsonSerializer.SerializeToElement(new
@@ -37,12 +37,12 @@ public class BashTool : ITool
                     command = new
                     {
                         type = "string",
-                        description = "要执行的 Shell 命令"
+                        description = "The shell command to execute"
                     },
                     working_directory = new
                     {
                         type = "string",
-                        description = "命令执行的工作目录。默认为当前目录。"
+                        description = "The working directory for command execution. Defaults to the current directory."
                     }
                 },
                 required = new[] { "command" }

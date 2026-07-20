@@ -23,7 +23,7 @@ public class GlobTool : ITool
         Definition = new ToolDefinition
         {
             Name = Name,
-            Description = "按文件名模式搜索文件。支持通配符 * 和 ?。适用于查找特定类型的文件或匹配特定命名规则的文件。",
+            Description = "Search for files by name pattern. Supports wildcards * and ?. Suitable for finding specific file types or files matching a naming pattern.",
             Schema = JsonSerializer.SerializeToElement(new
             {
                 type = "object",
@@ -32,12 +32,12 @@ public class GlobTool : ITool
                     pattern = new
                     {
                         type = "string",
-                        description = "文件搜索模式，如 '*.cs'、'*.txt'、'test_*.*'"
+                        description = "File search pattern, e.g. '*.cs', '*.txt', 'test_*.*'"
                     },
                     path = new
                     {
                         type = "string",
-                        description = "搜索的目录路径。默认当前目录。"
+                        description = "The directory path to search. Defaults to the current directory."
                     }
                 },
                 required = new[] { "pattern" }

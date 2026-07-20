@@ -20,7 +20,7 @@ public class WebSearchTool : ITool
     public ToolDefinition Definition => new()
     {
         Name = Name,
-        Description = "搜索互联网获取实时信息。适用于查找最新资讯、文档、教程等。",
+        Description = "Search the internet for real-time information. Suitable for finding latest news, documentation, tutorials, etc.",
         Schema = JsonSerializer.SerializeToElement(new
         {
             type = "object",
@@ -29,22 +29,22 @@ public class WebSearchTool : ITool
                 query = new
                 {
                     type = "string",
-                    description = "搜索关键词"
+                    description = "Search query"
                 },
                 max_results = new
                 {
                     type = "integer",
-                    description = "搜索结果数量限制（默认 5）"
+                    description = "Maximum number of search results (default 5)"
                 },
                 search_depth = new
                 {
                     type = "string",
-                    description = "搜索深度：basic 或 advanced（默认 basic）"
+                    description = "Search depth: 'basic' or 'advanced' (default 'basic')"
                 },
                 topic = new
                 {
                     type = "string",
-                    description = "搜索主题：general 或 news（默认 general）"
+                    description = "Search topic: 'general' or 'news' (default 'general')"
                 }
             },
             required = new[] { "query" }

@@ -24,7 +24,7 @@ public class FileWriteTool : ITool
         Definition = new ToolDefinition
         {
             Name = Name,
-            Description = "创建或写入文件。支持覆盖写入和追加写入模式。",
+            Description = "Create or write to a file. Supports overwrite and append modes.",
             Schema = JsonSerializer.SerializeToElement(new
             {
                 type = "object",
@@ -33,17 +33,17 @@ public class FileWriteTool : ITool
                     file_path = new
                     {
                         type = "string",
-                        description = "要写入的文件路径"
+                        description = "The file path to write to"
                     },
                     content = new
                     {
                         type = "string",
-                        description = "要写入的内容"
+                        description = "The content to write"
                     },
                     append = new
                     {
                         type = "boolean",
-                        description = "是否追加模式。true 表示追加到文件末尾，false 表示覆盖。默认 false。"
+                        description = "Whether to append. true appends to the end of the file, false overwrites. Default is false."
                     }
                 },
                 required = new[] { "file_path", "content" }

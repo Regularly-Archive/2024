@@ -59,23 +59,23 @@ internal class SaveMemoryTool : ITool
                     content = new
                     {
                         type = "string",
-                        description = "要保存的内容"
+                        description = "The content to save"
                     },
                     type = new
                     {
                         type = "string",
                         @enum = new[] { "user", "feedback", "project", "reference" },
-                        description = "记忆类型。不指定则自动分类。"
+                        description = "Memory type. If not specified, auto-classified."
                     },
                     tags = new
                     {
                         type = "string",
-                        description = "标签列表，用逗号分隔。如：'csharp,docker,optimization'。不指定则自动提取。"
+                        description = "Comma-separated tag list. e.g. 'csharp,docker,optimization'. If not specified, auto-extracted."
                     },
                     project = new
                     {
                         type = "string",
-                        description = "关联的项目名称（用于团队记忆）。"
+                        description = "Associated project name (for team memories)."
                     }
                 },
                 required = new[] { "content" }
@@ -142,8 +142,8 @@ internal class UpdateMemoryTool : ITool
         Definition = new ToolDefinition
         {
             Name = Name,
-            Description = @"更新已有的长期记忆。需要先通过 search_memory 获取记忆 ID。
-可以更新记忆的内容、类型或标签。至少提供一个更新字段。",
+            Description = @"Update an existing long-term memory. Must first obtain the memory ID via search_memory.
+You can update the memory's content, type, or tags. At least one update field is required.",
             Schema = JsonSerializer.SerializeToElement(new
             {
                 type = "object",
@@ -152,23 +152,23 @@ internal class UpdateMemoryTool : ITool
                     memory_id = new
                     {
                         type = "string",
-                        description = "要更新的记忆 ID（通过 search_memory 获取）"
+                        description = "The memory ID to update (obtained via search_memory)"
                     },
                     content = new
                     {
                         type = "string",
-                        description = "新的记忆内容（可选）"
+                        description = "New memory content (optional)"
                     },
                     type = new
                     {
                         type = "string",
                         @enum = new[] { "user", "feedback", "project", "reference" },
-                        description = "新的记忆类型（可选）"
+                        description = "New memory type (optional)"
                     },
                     tags = new
                     {
                         type = "string",
-                        description = "新的标签列表，用逗号分隔（可选）"
+                        description = "New comma-separated tag list (optional)"
                     }
                 },
                 required = new[] { "memory_id" }
@@ -240,7 +240,7 @@ internal class DeleteMemoryTool : ITool
         Definition = new ToolDefinition
         {
             Name = Name,
-            Description = "删除长期记忆。需要先通过 search_memory 获取记忆 ID。",
+            Description = "Delete a long-term memory. Must first obtain the memory ID via search_memory.",
             Schema = JsonSerializer.SerializeToElement(new
             {
                 type = "object",
@@ -249,7 +249,7 @@ internal class DeleteMemoryTool : ITool
                     memory_id = new
                     {
                         type = "string",
-                        description = "要删除的记忆 ID（通过 search_memory 获取）"
+                        description = "The memory ID to delete (obtained via search_memory)"
                     }
                 },
                 required = new[] { "memory_id" }
@@ -306,23 +306,23 @@ internal class SearchMemoryTool : ITool
                     query = new
                     {
                         type = "string",
-                        description = "搜索查询（自然语言）"
+                        description = "Search query (natural language)"
                     },
                     type = new
                     {
                         type = "string",
                         @enum = new[] { "user", "feedback", "project", "reference" },
-                        description = "限定搜索的记忆类型"
+                        description = "Limit search to a specific memory type"
                     },
                     max_results = new
                     {
                         type = "integer",
-                        description = "最大返回结果数。默认 5。"
+                        description = "Maximum number of results. Default is 5."
                     },
                     project = new
                     {
                         type = "string",
-                        description = "限定搜索的项目（搜索团队记忆）"
+                        description = "Limit search to a specific project (for team memories)"
                     }
                 },
                 required = new[] { "query" }
@@ -410,7 +410,7 @@ internal class GetUserProfileTool : ITool
                     project = new
                     {
                         type = "string",
-                        description = "当前项目名称（可选，用于获取项目特定上下文）"
+                        description = "Current project name (optional, for fetching project-specific context)"
                     }
                 }
             })
