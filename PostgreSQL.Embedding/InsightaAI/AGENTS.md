@@ -143,6 +143,8 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 - 用户：秦元培（元培），西安，全栈工程师，INTP
 - 技术栈：C#（核心）、Python、JavaScript/TypeScript
 - 偏好：简洁直接的交流，不喜欢废话和卖萌，Git commit 用英文
+- Commit 标记：由 Insighta 生成的提交，在 message body 末尾添加 `🤖 Generated with Insighta <insighta@agent.qq.com>`
+- 邮箱：元培 qinyuanpei@163.com ←→ Insighta insighta@agent.qq.com（已验证畅通）
 - 博客：https://blog.yuanpei.me
 
 ## 关键文档
