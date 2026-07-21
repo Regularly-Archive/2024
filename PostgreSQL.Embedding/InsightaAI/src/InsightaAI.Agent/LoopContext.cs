@@ -55,4 +55,6 @@ public sealed class LoopContext : ILoopContext
     }
 
     public int MaxContextTokens => _contextManager?.MaxContextTokens ?? 0;
+
+    public int AvailableInputTokens => _contextManager?.AvailableInputTokens ?? 0;
 }

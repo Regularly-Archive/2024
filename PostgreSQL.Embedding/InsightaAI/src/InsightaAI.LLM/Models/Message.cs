@@ -17,8 +17,8 @@ public sealed record Message
     /// <summary>工具名称 (仅 ToolResult 角色使用)</summary>
     public string? ToolName { get; init; }
 
-    /// <summary>工具结果是否已被拦截（截断/持久化），用于避免双重处理</summary>
-    public bool ToolResultIntercepted { get; init; }
+    /// <summary>工具结果的结构化生命周期状态。</summary>
+    public ToolResultState? ToolResultState { get; init; }
 
     /// <summary>时间戳</summary>
     public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
@@ -53,13 +53,12 @@ public sealed record Message
     /// <summary>
     /// 创建工具结果消息
     /// </summary>
-    public static Message FromToolResult(string toolCallId, string toolName, ContentBlock[] content, bool isError = false, bool toolResultIntercepted = false) => new()
+    public static Message FromToolResult(string toolCallId, string toolName, ContentBlock[] content, bool isError = false) => new()
     {
         Role = MessageRole.ToolResult,
         ToolCallId = toolCallId,
         ToolName = toolName,
-        Content = content,
-        ToolResultIntercepted = toolResultIntercepted
+        Content = content
     };
 
     /// <summary>

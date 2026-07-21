@@ -166,7 +166,8 @@ public sealed class AgentLoop
                         Rounds = round,
                         DurationMs = stopwatch.ElapsedMilliseconds,
                         EstimatedContextTokens = context.EstimateTokens(),
-                        MaxContextTokens = context.MaxContextTokens
+                        MaxContextTokens = context.MaxContextTokens,
+                        AvailableInputTokens = context.AvailableInputTokens
                     }
                 };
 
@@ -206,7 +207,7 @@ public sealed class AgentLoop
                     ToolCallId = result.ToolCall.Id,
                     ToolName = result.ToolCall.Name,
                     Content = result.Result.Content,
-                    ToolResultIntercepted = result.Intercepted
+                    ToolResultState = result.State
                 });
             }
         }
@@ -287,7 +288,8 @@ public sealed class AgentLoop
                 Rounds = _config.MaxToolRounds,
                 DurationMs = stopwatch.ElapsedMilliseconds,
                 EstimatedContextTokens = context.EstimateTokens(),
-                MaxContextTokens = context.MaxContextTokens
+                MaxContextTokens = context.MaxContextTokens,
+                AvailableInputTokens = context.AvailableInputTokens
             }
         };
     }

@@ -1,5 +1,3 @@
-using System.Reflection.Metadata.Ecma335;
-using System.Text.Json;
 using InsightaAI.Agent.Abstractions;
 using InsightaAI.LLM.Models;
 
@@ -11,15 +9,13 @@ namespace InsightaAI.Agent.Context.Compaction;
 /// <remarks>
 /// 策略逻辑：
 /// 1. 保留最近 N 个工具结果的完整内容
-/// 2. 跳过已在执行时被拦截的结果（ToolResultIntercepted = true）
-/// 3. 对于有 Intercept 方法的工具，委托给工具自己处理
-/// 4. 对于其他工具，使用内置的截断策略
-/// 5. 保留 Tool Use/Result 配对结构
+/// 2. 按 Full → Preview → Placeholder → Removed 逐级降低保留等级
+/// 3. 工具只提供语义化投影，策略负责推进生命周期
+/// 4. 删除时同时维护 ToolCall/ToolResult 配对结构
 /// </remarks>
 public sealed class MicroCompactStrategy : ICompactStrategy
 {
     private readonly ToolRegistry? _toolRegistry;
-    private readonly double ToolResultTTL = 5 * 60 * 1000;
 
     public string Name => "MicroCompact";
     public int Priority => 1; // 最高优先级
@@ -29,32 +25,14 @@ public sealed class MicroCompactStrategy : ICompactStrategy
         _toolRegistry = toolRegistry;
     }
 
-    /// <summary>
-    /// 可压缩的工具及其截断策略
-    /// </summary>
-    private static readonly Dictionary<string, ToolTruncationStrategy> CompactableTools = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["bash"] = new BashTruncationStrategy(),
-        ["read_file"] = new FileReadTruncationStrategy(),
-        ["grep"] = new GrepTruncationStrategy(),
-        ["glob"] = new GlobTruncationStrategy(),
-        ["web_search"] = new WebSearchTruncationStrategy(),
-        ["web_fetch"] = new WebFetchTruncationStrategy(),
-        ["edit_file"] = new EditFileTruncationStrategy(),
-        ["write_file"] = new WriteFileTruncationStrategy(),
-    };
-
     public bool ShouldCompact(IReadOnlyList<Message> messages, int estimatedTokens, ContextBudget budget)
     {
         // 检查是否达到微压缩阈值
         if (estimatedTokens < budget.MicroCompactTriggerTokens)
             return false;
 
-        if (estimatedTokens >= budget.SessionCompactTriggerTokens)
-            return false;
-
-        // 检查是否有可压缩的工具结果
-        return HasCompactableToolResults(messages, budget.KeepRecentToolResults);
+        // 各级阈值是可叠加的资格线；高压区仍应先尝试零成本的 MicroCompact。
+        return HasCompactableToolResults(messages, estimatedTokens, budget);
     }
 
     public Task<CompactionResult> CompactAsync(
@@ -64,95 +42,74 @@ public sealed class MicroCompactStrategy : ICompactStrategy
         int preCompactTokens,
         CancellationToken cancellationToken = default)
     {
-        var currentTimestamp = DateTimeOffset.UtcNow;
         var preCompactMessages = messages.Count;
-
-        // 找出所有 tool_use + tool_result 配对
         var toolPairs = FindToolPairs(messages);
-
-        // 按时间倒序排列（最新的在前）
         toolPairs.Reverse();
-
-        int compactedCount = 0;
+        var targetLevel = GetTargetLevel(preCompactTokens, budget);
+        var removedToolCallIds = new HashSet<string>(StringComparer.Ordinal);
 
         for (int i = 0; i < toolPairs.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var (toolUseIndex, toolResultIndex, toolName) = toolPairs[i];
+            var (_, toolResultIndex, toolName) = toolPairs[i];
 
             // 保留最近 N 个工具结果
             if (i < budget.KeepRecentToolResults)
                 continue;
 
-            // 获取工具结果消息
             var toolResultMessage = messages[toolResultIndex];
-
-            // 跳过已在执行时被拦截的结果
-            if (toolResultMessage.ToolResultIntercepted)
+            var projector = _toolRegistry?.GetExecutor(toolName) as IToolResultProjector;
+            var state = GetState(toolResultMessage, projector);
+            var currentLevel = state.RetentionLevel;
+            if (currentLevel >= targetLevel || currentLevel >= state.MinimumLevel)
                 continue;
 
-            // 跳过有效期内的工具调用
-            var timespan = (currentTimestamp - toolResultMessage.Timestamp).TotalMilliseconds;
-            if (timespan <= ToolResultTTL)
-                continue;
+            var projectionContext = CreateProjectionContext(toolResultMessage, toolName, state);
+            var currentTokens = EstimateContentTokens(toolResultMessage.Content, tokenEstimator);
+            var maximumLevel = (ToolResultRetentionLevel)Math.Min((int)targetLevel, (int)state.MinimumLevel);
 
-            // 尝试委托给工具自己的 Intercept 方法
-            if (_toolRegistry?.GetExecutor(toolName) is { } executor)
+            // 保留有效的渐进降级；若某一级投影没有收益，则继续试探下一允许等级。
+            for (var levelValue = (int)currentLevel + 1; levelValue <= (int)maximumLevel; levelValue++)
             {
-                var toolResult = new ToolResult
+                var candidateLevel = (ToolResultRetentionLevel)levelValue;
+                if (candidateLevel == ToolResultRetentionLevel.Removed)
                 {
-                    Content = toolResultMessage.Content,
-                    IsError = IsErrorMessage(toolResultMessage)
-                };
+                    if (!string.IsNullOrEmpty(toolResultMessage.ToolCallId))
+                        removedToolCallIds.Add(toolResultMessage.ToolCallId);
+                    break;
+                }
 
-                var truncationContext = CreateTruncationContext(toolResultMessage, toolName);
-                var intercepted = executor.Intercept(toolResult, truncationContext);
-
-                if (intercepted.ToolResultIntercepted)
+                ToolResultProjection projection;
+                if (candidateLevel == ToolResultRetentionLevel.Preview)
                 {
-                    messages[toolResultIndex] = new Message
+                    var result = new ToolResult
                     {
-                        Role = MessageRole.ToolResult,
-                        ToolCallId = toolResultMessage.ToolCallId,
-                        ToolName = toolResultMessage.ToolName,
-                        Content = intercepted.Result.Content,
-                        ToolResultIntercepted = true
+                        Content = toolResultMessage.Content,
+                        IsError = IsErrorMessage(toolResultMessage)
                     };
-                    compactedCount++;
-                    continue;
+                    projection = (projector ?? DefaultMicroCompactProjector.Instance)
+                        .CreatePreview(result, projectionContext);
                 }
                 else
                 {
-                    messages[toolResultIndex] = new Message
-                    {
-                        Role = MessageRole.ToolResult,
-                        ToolCallId = toolResultMessage.ToolCallId,
-                        ToolName = toolResultMessage.ToolName,
-                        Content = [new TextBlock() { Text = "[Content snipped - call this tool again if needed]" }],
-                        ToolResultIntercepted = true,
-                    };
-                    compactedCount++;
-                    continue;
+                    projection = (projector ?? DefaultMicroCompactProjector.Instance)
+                        .CreatePlaceholder(projectionContext);
                 }
+
+                if (EstimateContentTokens(projection.Content, tokenEstimator) >= currentTokens)
+                    continue;
+
+                messages[toolResultIndex] = toolResultMessage with
+                {
+                    Content = projection.Content,
+                    ToolResultState = state with { RetentionLevel = projection.Level }
+                };
+                break;
             }
-
-            // 回退到内置截断策略
-            if (!CompactableTools.TryGetValue(toolName, out var truncationStrategy))
-                continue;
-
-            var truncatedContent = TruncateToolResult(toolResultMessage, toolName, truncationStrategy);
-
-            messages[toolResultIndex] = new Message
-            {
-                Role = MessageRole.ToolResult,
-                ToolCallId = toolResultMessage.ToolCallId,
-                ToolName = toolResultMessage.ToolName,
-                Content = [new TextBlock { Text = truncatedContent }]
-            };
-
-            compactedCount++;
         }
+
+        RemoveToolPairs(messages, removedToolCallIds);
 
         // 估算压缩后的 token 数量
         var postCompactTokens = EstimateMessagesTokens(messages, tokenEstimator);
@@ -166,6 +123,73 @@ public sealed class MicroCompactStrategy : ICompactStrategy
             PostCompactMessages = messages.Count,
             RequestMessages = messages.ToArray()
         });
+    }
+
+    private static ToolResultRetentionLevel GetTargetLevel(int estimatedTokens, ContextBudget budget)
+    {
+        if (estimatedTokens >= budget.TraditionalCompactTriggerTokens)
+            return ToolResultRetentionLevel.Removed;
+        if (estimatedTokens >= budget.SessionCompactTriggerTokens)
+            return ToolResultRetentionLevel.Placeholder;
+        return ToolResultRetentionLevel.Preview;
+    }
+
+    private static ToolResultState GetState(Message message, IToolResultProjector? projector)
+    {
+        if (message.ToolResultState != null)
+            return message.ToolResultState;
+
+        var policy = projector?.RetentionPolicy ?? DefaultMicroCompactProjector.Policy;
+        return new ToolResultState
+        {
+            RetentionLevel = ToolResultRetentionLevel.Full,
+            OriginalLength = message.GetTextContent().Length,
+            CanReplay = policy.CanReplay,
+            HasSideEffects = policy.HasSideEffects,
+            MinimumLevel = policy.MinimumLevel
+        };
+    }
+
+    private static ToolResultProjectionContext CreateProjectionContext(
+        Message message, string toolName, ToolResultState state)
+    {
+        var text = message.GetTextContent();
+        return new ToolResultProjectionContext
+        {
+            ToolName = toolName,
+            ToolCallId = message.ToolCallId ?? string.Empty,
+            OriginalLength = state.OriginalLength > 0 ? state.OriginalLength : text.Length,
+            OriginalLineCount = new Lazy<int>(() => text.Length == 0 ? 0 : text.Count(c => c == '\n') + 1),
+            Artifact = state.Artifact
+        };
+    }
+
+    private static void RemoveToolPairs(List<Message> messages, HashSet<string> toolCallIds)
+    {
+        if (toolCallIds.Count == 0)
+            return;
+
+        messages.RemoveAll(message => message.Role == MessageRole.ToolResult &&
+            message.ToolCallId != null && toolCallIds.Contains(message.ToolCallId));
+
+        // 一条 Assistant 消息可能包含多个并行 ToolCall。
+        // 这里只删除命中的内容块，其他 ToolCall 和文本内容必须原样保留。
+        for (var i = messages.Count - 1; i >= 0; i--)
+        {
+            var message = messages[i];
+            if (message.Role != MessageRole.Assistant)
+                continue;
+
+            var content = message.Content
+                .Where(block => block is not ToolCallBlock call || !toolCallIds.Contains(call.Id))
+                .ToArray();
+            if (content.Length == message.Content.Length)
+                continue;
+            if (content.Length == 0)
+                messages.RemoveAt(i);
+            else
+                messages[i] = message with { Content = content };
+        }
     }
 
     /// <summary>
@@ -218,29 +242,14 @@ public sealed class MicroCompactStrategy : ICompactStrategy
     /// <summary>
     /// 创建截断上下文
     /// </summary>
-    private static TruncationContext CreateTruncationContext(Message message, string toolName)
-    {
-        var text = message.GetTextContent() ?? "";
-        return new TruncationContext(
-            originalLength: text.Length,
-            originalLineCount: new Lazy<int>(() => text.Split('\n').Length),
-            utilizationRatio: 0,
-            budget: null,
-            toolResultDirectory: 
-            Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "InsightaAI", "ToolResults"),
-            toolName: toolName,
-            toolCallId: message.ToolCallId ?? ""
-        );
-    }
-
     /// <summary>
     /// 检查是否有可压缩的工具结果
     /// </summary>
-    private static bool HasCompactableToolResults(IReadOnlyList<Message> messages, int keepRecent)
+    private bool HasCompactableToolResults(
+        IReadOnlyList<Message> messages, int estimatedTokens, ContextBudget budget)
     {
         int toolResultCount = 0;
+        var targetLevel = GetTargetLevel(estimatedTokens, budget);
 
         for (int i = messages.Count - 1; i >= 0; i--)
         {
@@ -249,10 +258,12 @@ public sealed class MicroCompactStrategy : ICompactStrategy
                 toolResultCount++;
 
                 // 超过保留数量后，检查是否有可压缩的
-                if (toolResultCount > keepRecent)
+                if (toolResultCount > budget.KeepRecentToolResults)
                 {
                     var toolName = messages[i].ToolName ?? "";
-                    if (CompactableTools.ContainsKey(toolName))
+                    var projector = _toolRegistry?.GetExecutor(toolName) as IToolResultProjector;
+                    var state = GetState(messages[i], projector);
+                    if (state.RetentionLevel < targetLevel && state.RetentionLevel < state.MinimumLevel)
                         return true;
                 }
             }
@@ -298,194 +309,60 @@ public sealed class MicroCompactStrategy : ICompactStrategy
         return total;
     }
 
-    /// <summary>
-    /// 截断工具结果
-    /// </summary>
-    private static string TruncateToolResult(Message toolResultMessage, string toolName, ToolTruncationStrategy strategy)
+    private static int EstimateContentTokens(IEnumerable<ContentBlock> content, ITokenEstimator tokenEstimator)
     {
-        var originalContent = toolResultMessage.GetTextContent();
-        var isError = toolResultMessage.Content.OfType<TextBlock>().Any(t => t.Text.Contains("error", StringComparison.OrdinalIgnoreCase));
-
-        // 构建元数据头
-        var metadata = $"[Tool: {toolName}] {(isError ? "Error" : "Success")}";
-
-        // 应用工具特定的截断策略
-        var truncated = strategy.Truncate(originalContent, toolName);
-
-        return $"{metadata}\n{truncated}";
-    }
-}
-
-/// <summary>
-/// 工具截断策略基类
-/// </summary>
-public abstract class ToolTruncationStrategy
-{
-    /// <summary>
-    /// 截断工具输出
-    /// </summary>
-    /// <param name="content">原始内容</param>
-    /// <param name="toolName">工具名称</param>
-    /// <returns>截断后的内容</returns>
-    public abstract string Truncate(string content, string toolName);
-}
-
-/// <summary>
-/// Bash/PowerShell 截断策略 - 保留最后 N 行
-/// </summary>
-public sealed class BashTruncationStrategy : ToolTruncationStrategy
-{
-    private const int KeepLastLines = 5;
-
-    public override string Truncate(string content, string toolName)
-    {
-        if (string.IsNullOrEmpty(content))
-            return "[empty output]";
-
-        var lines = content.Split('\n');
-
-        if (lines.Length <= KeepLastLines)
-            return content;
-
-        var lastLines = lines[^KeepLastLines..];
-        return $"[output truncated, showing last {KeepLastLines} lines]\n{string.Join("\n", lastLines)}";
-    }
-}
-
-/// <summary>
-/// 文件读取截断策略 - 保留文件路径和行数信息
-/// </summary>
-public sealed class FileReadTruncationStrategy : ToolTruncationStrategy
-{
-    public override string Truncate(string content, string toolName)
-    {
-        if (string.IsNullOrEmpty(content))
-            return "[empty file]";
-
-        var lines = content.Split('\n');
-
-        // 尝试从内容中提取文件路径
-        var filePath = ExtractFilePath(content);
-
-        return $"[file content truncated: {filePath ?? "unknown"}, {lines.Length} lines]";
-    }
-
-    private static string? ExtractFilePath(string content)
-    {
-        // 尝试匹配常见的文件路径模式
-        var lines = content.Split('\n');
-        if (lines.Length > 0)
+        var total = 0;
+        foreach (var block in content)
         {
-            var firstLine = lines[0].Trim();
-            if (firstLine.Contains('/') || firstLine.Contains('\\'))
-                return firstLine;
-        }
-        return null;
-    }
-}
-
-/// <summary>
-/// Grep 截断策略 - 保留匹配数量和搜索模式
-/// </summary>
-public sealed class GrepTruncationStrategy : ToolTruncationStrategy
-{
-    public override string Truncate(string content, string toolName)
-    {
-        if (string.IsNullOrEmpty(content))
-            return "[no results]";
-
-        var lines = content.Split('\n');
-        var matchCount = lines.Count(l => !string.IsNullOrWhiteSpace(l));
-
-        return $"[grep results truncated: {matchCount} matches]";
-    }
-}
-
-/// <summary>
-/// Glob 截断策略 - 保留文件数量
-/// </summary>
-public sealed class GlobTruncationStrategy : ToolTruncationStrategy
-{
-    public override string Truncate(string content, string toolName)
-    {
-        if (string.IsNullOrEmpty(content))
-            return "[no files found]";
-
-        var lines = content.Split('\n');
-        var fileCount = lines.Count(l => !string.IsNullOrWhiteSpace(l));
-
-        return $"[glob results truncated: {fileCount} files found]";
-    }
-}
-
-/// <summary>
-/// Web Search 截断策略 - 保留搜索结果数量
-/// </summary>
-public sealed class WebSearchTruncationStrategy : ToolTruncationStrategy
-{
-    public override string Truncate(string content, string toolName)
-    {
-        if (string.IsNullOrEmpty(content))
-            return "[no results]";
-
-        // 尝试解析 JSON 获取结果数量
-        try
-        {
-            using var doc = JsonDocument.Parse(content);
-            if (doc.RootElement.TryGetProperty("results", out var results) && results.ValueKind == JsonValueKind.Array)
+            total += block switch
             {
-                return $"[search results truncated: {results.GetArrayLength()} results]";
-            }
+                TextBlock text => tokenEstimator.EstimateTokens(text.Text),
+                ThinkingBlock thinking => tokenEstimator.EstimateTokens(thinking.Thinking),
+                ImageBlock => 2000,
+                ToolCallBlock call => tokenEstimator.EstimateTokens(call.Name) +
+                    tokenEstimator.EstimateTokens(call.Arguments.GetRawText()),
+                ToolResultBlock result => EstimateContentTokens(result.Content, tokenEstimator),
+                _ => 0
+            };
         }
-        catch
+
+        return total;
+    }
+
+    private sealed class DefaultMicroCompactProjector : IToolResultProjector
+    {
+        public static readonly DefaultMicroCompactProjector Instance = new();
+        public static readonly ToolResultRetentionPolicy Policy = new();
+        public ToolResultRetentionPolicy RetentionPolicy => Policy;
+
+        public ToolResultProjection CreatePreview(ToolResult result, ToolResultProjectionContext context)
         {
-            // JSON 解析失败，使用简单计数
+            var text = string.Join("\n", result.Content.OfType<TextBlock>().Select(block => block.Text));
+            var lines = text.Split('\n');
+            var preview = string.Join("\n", lines.Take(50));
+            if (lines.Length > 100)
+                preview += $"\n\n[... omitted {lines.Length - 100} lines ...]\n\n" + string.Join("\n", lines.TakeLast(50));
+            if (context.Artifact != null)
+                preview += $"\n\n[Full output available as artifact {context.Artifact.Id}.]";
+            return new ToolResultProjection
+            {
+                Content = [new TextBlock { Text = preview }],
+                Level = ToolResultRetentionLevel.Preview
+            };
         }
 
-        var lines = content.Split('\n');
-        return $"[search results truncated: {lines.Length} lines]";
-    }
-}
-
-/// <summary>
-/// Web Fetch 截断策略 - 保留 URL 和内容长度
-/// </summary>
-public sealed class WebFetchTruncationStrategy : ToolTruncationStrategy
-{
-    public override string Truncate(string content, string toolName)
-    {
-        if (string.IsNullOrEmpty(content))
-            return "[empty content]";
-
-        return $"[web content truncated: {content.Length} chars]";
-    }
-}
-
-/// <summary>
-/// Edit File 截断策略 - 保留文件路径和操作状态
-/// </summary>
-public sealed class EditFileTruncationStrategy : ToolTruncationStrategy
-{
-    public override string Truncate(string content, string toolName)
-    {
-        // Edit 结果通常很短，保留原样
-        if (string.IsNullOrEmpty(content))
-            return "[edit completed]";
-
-        return content.Length > 100 ? "[edit completed]" : content;
-    }
-}
-
-/// <summary>
-/// Write File 截断策略 - 保留文件路径和写入大小
-/// </summary>
-public sealed class WriteFileTruncationStrategy : ToolTruncationStrategy
-{
-    public override string Truncate(string content, string toolName)
-    {
-        if (string.IsNullOrEmpty(content))
-            return "[file written]";
-
-        return $"[file written: {content.Length} bytes]";
+        public ToolResultProjection CreatePlaceholder(ToolResultProjectionContext context) => new()
+        {
+            Content =
+            [
+                new TextBlock
+                {
+                    Text = context.Artifact != null
+                        ? $"[Previous {context.ToolName} result omitted. Full output is available as artifact {context.Artifact.Id} ({context.Artifact.Path}).]"
+                        : $"[Previous {context.ToolName} result omitted. Re-run the tool if needed.]"
+                }
+            ],
+            Level = ToolResultRetentionLevel.Placeholder
+        };
     }
 }

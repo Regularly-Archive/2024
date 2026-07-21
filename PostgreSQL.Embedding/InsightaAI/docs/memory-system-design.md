@@ -602,11 +602,12 @@ public sealed class SessionMemoryHook : IAgentHook
 
 ```
 对话轮次 1-10 → SessionMemoryHook 异步提取 → session-memory.md
-当上下文达到 60% → MicroCompact (L1)
-当上下文达到 75% → SessionMemoryCompact (L2)
+占用率分母：AvailableInputTokens = MaxContextTokens - ReservedForOutput
+当上下文达到 45% → MicroCompact (L1)
+当上下文达到 65% → SessionMemoryCompact (L2)
   └── 读取 session-memory.md 作为摘要
   └── 替换旧消息，保留最近 N 轮
-当上下文达到 90% → TraditionalCompact (L3)
+当上下文达到 80% → TraditionalCompact (L3)
   └── 调用 LLM 生成摘要
 ```
 

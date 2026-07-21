@@ -9,7 +9,7 @@ namespace InsightaAI.Agent.Tools.BuiltIn;
 /// 文件读取工具
 /// 支持全文读取、按行读取（offset/limit）、读取头部/尾部
 /// </summary>
-public class FileReadTool : ITool
+public class FileReadTool : ITool, IToolResultProjector
 {
     private readonly IFileSystem _fileSystem;
     private readonly FileReadState _readState;
@@ -117,37 +117,31 @@ public class FileReadTool : ITool
         return sb.ToString();
     }
 
-    /// <summary>
-    /// 拦截大文件读取结果：持久化到磁盘，上下文只保留预览
-    /// </summary>
-    public InterceptionResult Intercept(ToolResult result, TruncationContext context)
+    public ToolResultRetentionPolicy RetentionPolicy { get; } = new()
     {
-        var text = result.Content.OfType<TextBlock>().FirstOrDefault()?.Text;
-        if (text == null || context.OriginalLength <= 30_000)
-            return InterceptionResult.NotIntercepted(result);
+        CanReplay = true,
+        PreferPersistence = true,
+        MinimumLevel = ToolResultRetentionLevel.Removed
+    };
 
-        // 持久化到磁盘
-        Directory.CreateDirectory(context.ToolResultDirectory);
-        var path = Path.Combine(context.ToolResultDirectory,
-            $"FileRead_{DateTime.Now:yyyyMMdd_HHmmss}_{context.ToolCallId}.txt");
-        
-        using (var writer = new StreamWriter(path))
+    public ToolResultProjection CreatePreview(ToolResult result, ToolResultProjectionContext context)
+    {
+        var text = result.Content.OfType<TextBlock>().FirstOrDefault()?.Text ?? string.Empty;
+        var preview = string.Join("\n", text.Split('\n').Take(200));
+        if (context.Artifact != null)
+            preview += $"\n\n[Full output saved as artifact {context.Artifact.Id}: {context.Artifact.Path}]";
+        return new ToolResultProjection
         {
-            writer.Write(text);
-        }
-
-        // 保留 200 行预览
-        var lines = text.Split('\n');
-        var preview = string.Join("\n", lines.Take(200));
-        var lineCount = context.OriginalLineCount.Value;
-
-        return new InterceptionResult(
-            ToolResult.FromText($"{preview}\n\n[完整内容已保存: {path}] (共 {lineCount} 行)"),
-            toolResultIntercepted: true,
-            persistedPath: path,
-            originalLength: context.OriginalLength
-        );
+            Content = [new TextBlock { Text = preview }],
+            Level = ToolResultRetentionLevel.Preview
+        };
     }
+
+    public ToolResultProjection CreatePlaceholder(ToolResultProjectionContext context) => new()
+    {
+        Content = [new TextBlock { Text = DefaultToolResultProjector.CreatePlaceholderText(context) }],
+        Level = ToolResultRetentionLevel.Placeholder
+    };
 
     private static string? GetStringValue(IDictionary<string, object> args, string key, string? defaultValue = null)
     {

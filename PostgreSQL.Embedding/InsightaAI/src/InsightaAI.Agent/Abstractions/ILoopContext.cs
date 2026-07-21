@@ -32,6 +32,9 @@ public interface ILoopContext
     /// <summary>最大上下文窗口大小</summary>
     int MaxContextTokens { get; }
 
+    /// <summary>扣除输出预留后的可用输入预算</summary>
+    int AvailableInputTokens { get; }
+
     /// <summary>
     /// 消息添加回调（可选，用于自动持久化）
     /// 当 LoopContext.AddMessage 被调用时触发

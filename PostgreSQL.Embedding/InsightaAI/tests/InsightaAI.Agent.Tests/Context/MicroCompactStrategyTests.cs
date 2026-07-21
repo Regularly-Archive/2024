@@ -190,7 +190,7 @@ public class MicroCompactStrategyTests
     }
 
     [Fact]
-    public async Task CompactAsync_Should_AddMetadataToTruncatedResults()
+    public async Task CompactAsync_Should_MarkTruncatedResultsAsPreview()
     {
         // Arrange
         var messages = CreateMessagesWithToolResults(4);
@@ -199,7 +199,7 @@ public class MicroCompactStrategyTests
         // Act
         await _strategy.CompactAsync(messages, _budget, _estimator, preCompactTokens);
 
-        // Assert - 被截断的工具结果应该包含元数据
+        // Assert - 被截断的工具结果应该进入 Preview 状态
         var toolResults = messages
             .Where(m => m.Role == MessageRole.ToolResult)
             .ToList();
@@ -207,164 +207,152 @@ public class MicroCompactStrategyTests
         // 前 2 个应该被截断（保留后 2 个）
         for (int i = 0; i < toolResults.Count - 2; i++)
         {
-            var content = toolResults[i].Content.OfType<TextBlock>().FirstOrDefault()?.Text;
-            Assert.NotNull(content);
-            Assert.Contains("[Tool:", content);
+            Assert.Equal(ToolResultRetentionLevel.Preview,
+                toolResults[i].ToolResultState?.RetentionLevel);
         }
     }
 
-    #region Truncation Strategies
-
     [Fact]
-    public void BashTruncationStrategy_Should_TruncateLongOutput()
+    public async Task CompactAsync_Should_AdvancePreviewToPlaceholder()
     {
-        // Arrange
-        var strategy = new BashTruncationStrategy();
-        var lines = Enumerable.Range(1, 20).Select(i => $"Line {i}").ToArray();
-        var content = string.Join("\n", lines);
+        var budget = _budget with { KeepRecentToolResults = 0 };
+        var messages = CreateMessagesWithToolResults(1);
+        var resultIndex = messages.FindIndex(message => message.Role == MessageRole.ToolResult);
+        messages[resultIndex] = messages[resultIndex] with
+        {
+            ToolResultState = new ToolResultState
+            {
+                RetentionLevel = ToolResultRetentionLevel.Preview,
+                OriginalLength = 10_000,
+                CanReplay = true,
+                MinimumLevel = ToolResultRetentionLevel.Removed
+            }
+        };
 
-        // Act
-        var result = strategy.Truncate(content, "bash");
+        await _strategy.CompactAsync(
+            messages, budget, _estimator, budget.SessionCompactTriggerTokens + 1);
 
-        // Assert
-        Assert.Contains("[output truncated", result);
-        Assert.Contains("Line 20", result); // 保留最后几行
-        // 使用精确匹配避免 "Line 1" 被 "Line 16" 匹配
-        Assert.DoesNotContain("Line 1\n", result); // 截断前面的行
+        var compacted = messages.Single(message => message.Role == MessageRole.ToolResult);
+        Assert.Equal(ToolResultRetentionLevel.Placeholder, compacted.ToolResultState?.RetentionLevel);
+        Assert.Contains("omitted", compacted.GetTextContent(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void BashTruncationStrategy_Should_NotTruncateShortOutput()
+    public async Task CompactAsync_Should_NotAdvanceToPreview_WhenPreviewHasNoBenefit()
     {
-        // Arrange
-        var strategy = new BashTruncationStrategy();
-        var content = "Short output";
+        var budget = _budget with { KeepRecentToolResults = 0 };
+        var messages = CreateMessagesWithToolResults(1);
+        var resultIndex = messages.FindIndex(message => message.Role == MessageRole.ToolResult);
+        messages[resultIndex] = messages[resultIndex] with
+        {
+            Content = [new TextBlock { Text = "short result" }]
+        };
 
-        // Act
-        var result = strategy.Truncate(content, "bash");
+        await _strategy.CompactAsync(
+            messages, budget, _estimator, budget.MicroCompactTriggerTokens + 1);
 
-        // Assert
-        Assert.Equal("Short output", result);
+        var result = messages.Single(message => message.Role == MessageRole.ToolResult);
+        Assert.Null(result.ToolResultState);
+        Assert.Equal("short result", result.GetTextContent());
     }
 
     [Fact]
-    public void BashTruncationStrategy_Should_HandleEmptyOutput()
+    public async Task CompactAsync_Should_SkipNoBenefitPreviewAndUsePlaceholder_WhenAllowed()
     {
-        // Arrange
-        var strategy = new BashTruncationStrategy();
+        var budget = _budget with { KeepRecentToolResults = 0 };
+        var messages = CreateMessagesWithToolResults(1);
+        var resultIndex = messages.FindIndex(message => message.Role == MessageRole.ToolResult);
+        var mediumResult = string.Join("\n",
+            Enumerable.Range(1, 20).Select(i => $"line {i}: reusable output data"));
+        messages[resultIndex] = messages[resultIndex] with
+        {
+            Content = [new TextBlock { Text = mediumResult }]
+        };
 
-        // Act
-        var result = strategy.Truncate("", "bash");
+        await _strategy.CompactAsync(
+            messages, budget, _estimator, budget.SessionCompactTriggerTokens + 1);
 
-        // Assert
-        Assert.Equal("[empty output]", result);
+        var result = messages.Single(message => message.Role == MessageRole.ToolResult);
+        Assert.Equal(ToolResultRetentionLevel.Placeholder, result.ToolResultState?.RetentionLevel);
+        Assert.Contains("omitted", result.GetTextContent(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void FileReadTruncationStrategy_Should_TruncateLargeFile()
+    public async Task CompactAsync_Should_RemoveToolCallAndResultAsPair()
     {
-        // Arrange
-        var strategy = new FileReadTruncationStrategy();
-        var lines = Enumerable.Range(1, 100).Select(i => $"Line {i}").ToArray();
-        var content = string.Join("\n", lines);
+        var budget = _budget with { KeepRecentToolResults = 0 };
+        var messages = CreateMessagesWithToolResults(1);
+        var resultIndex = messages.FindIndex(message => message.Role == MessageRole.ToolResult);
+        messages[resultIndex] = messages[resultIndex] with
+        {
+            ToolResultState = new ToolResultState
+            {
+                RetentionLevel = ToolResultRetentionLevel.Placeholder,
+                OriginalLength = 10_000,
+                CanReplay = true,
+                MinimumLevel = ToolResultRetentionLevel.Removed
+            }
+        };
 
-        // Act
-        var result = strategy.Truncate(content, "read_file");
+        await _strategy.CompactAsync(
+            messages, budget, _estimator, budget.TraditionalCompactTriggerTokens + 1);
 
-        // Assert
-        Assert.Contains("[file content truncated", result);
-        Assert.Contains("100 lines", result);
+        Assert.DoesNotContain(messages, message => message.Role == MessageRole.ToolResult);
+        Assert.DoesNotContain(messages.SelectMany(message => message.Content), block => block is ToolCallBlock);
     }
 
     [Fact]
-    public void GrepTruncationStrategy_Should_ShowMatchCount()
+    public async Task CompactAsync_Should_PreserveSiblingParallelToolCall_WhenRemovingOnePair()
     {
-        // Arrange
-        var strategy = new GrepTruncationStrategy();
-        var content = "match1\nmatch2\nmatch3\nmatch4\nmatch5";
+        var budget = _budget with { KeepRecentToolResults = 1 };
+        var arguments = JsonSerializer.SerializeToElement(new { path = "test.txt" });
+        var messages = new List<Message>
+        {
+            Message.FromSystem("You are a helpful assistant."),
+            new()
+            {
+                Role = MessageRole.Assistant,
+                Content =
+                [
+                    new TextBlock { Text = "Running two tools." },
+                    new ToolCallBlock { Id = "call_a", Name = "read_file", Arguments = arguments },
+                    new ToolCallBlock { Id = "call_b", Name = "read_file", Arguments = arguments }
+                ]
+            },
+            new()
+            {
+                Role = MessageRole.ToolResult,
+                ToolCallId = "call_a",
+                ToolName = "read_file",
+                Content = [new TextBlock { Text = "[Previous result omitted.]" }],
+                ToolResultState = new ToolResultState
+                {
+                    RetentionLevel = ToolResultRetentionLevel.Placeholder,
+                    OriginalLength = 10_000,
+                    CanReplay = true,
+                    MinimumLevel = ToolResultRetentionLevel.Removed
+                }
+            },
+            new()
+            {
+                Role = MessageRole.ToolResult,
+                ToolCallId = "call_b",
+                ToolName = "read_file",
+                Content = [new TextBlock { Text = "result b" }]
+            }
+        };
 
-        // Act
-        var result = strategy.Truncate(content, "grep");
+        await _strategy.CompactAsync(
+            messages, budget, _estimator, budget.TraditionalCompactTriggerTokens + 1);
 
-        // Assert
-        Assert.Contains("[grep results truncated", result);
-        Assert.Contains("5 matches", result);
+        var assistant = Assert.Single(messages, message => message.Role == MessageRole.Assistant);
+        Assert.Equal("Running two tools.", Assert.Single(assistant.Content.OfType<TextBlock>()).Text);
+        Assert.Equal("call_b", Assert.Single(assistant.Content.OfType<ToolCallBlock>()).Id);
+        Assert.DoesNotContain(messages, message => message.ToolCallId == "call_a");
+        Assert.Contains(messages, message => message.Role == MessageRole.ToolResult && message.ToolCallId == "call_b");
     }
 
-    [Fact]
-    public void GlobTruncationStrategy_Should_ShowFileCount()
-    {
-        // Arrange
-        var strategy = new GlobTruncationStrategy();
-        var content = "file1.cs\nfile2.cs\nfile3.cs";
 
-        // Act
-        var result = strategy.Truncate(content, "glob");
-
-        // Assert
-        Assert.Contains("[glob results truncated", result);
-        Assert.Contains("3 files", result);
-    }
-
-    [Fact]
-    public void WebFetchTruncationStrategy_Should_ShowCharCount()
-    {
-        // Arrange
-        var strategy = new WebFetchTruncationStrategy();
-        var content = new string('A', 5000);
-
-        // Act
-        var result = strategy.Truncate(content, "web_fetch");
-
-        // Assert
-        Assert.Contains("[web content truncated", result);
-        Assert.Contains("5000 chars", result);
-    }
-
-    [Fact]
-    public void EditFileTruncationStrategy_Should_KeepShortContent()
-    {
-        // Arrange
-        var strategy = new EditFileTruncationStrategy();
-        var content = "File edited successfully";
-
-        // Act
-        var result = strategy.Truncate(content, "edit_file");
-
-        // Assert
-        Assert.Equal("File edited successfully", result);
-    }
-
-    [Fact]
-    public void EditFileTruncationStrategy_Should_TruncateLongContent()
-    {
-        // Arrange
-        var strategy = new EditFileTruncationStrategy();
-        var content = new string('A', 200);
-
-        // Act
-        var result = strategy.Truncate(content, "edit_file");
-
-        // Assert
-        Assert.Equal("[edit completed]", result);
-    }
-
-    [Fact]
-    public void WriteFileTruncationStrategy_Should_ShowByteCount()
-    {
-        // Arrange
-        var strategy = new WriteFileTruncationStrategy();
-        var content = new string('X', 1234);
-
-        // Act
-        var result = strategy.Truncate(content, "write_file");
-
-        // Assert
-        Assert.Contains("[file written", result);
-        Assert.Contains("1234 bytes", result);
-    }
-
-    #endregion
 
     #region Helpers
 

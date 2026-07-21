@@ -350,7 +350,7 @@ public class OpenAIResponseAdapterTests
         var result = _adapter.ParseStreamEvent(eventType, data);
 
         var toolEnd = Assert.IsType<ToolCallEndEvent>(result);
-        Assert.Equal("item_fc_1", toolEnd.ToolCall.Id);
+        Assert.Equal("call_abc", toolEnd.ToolCall.Id);
         Assert.Equal("get_weather", toolEnd.ToolCall.Name);
         Assert.Equal("Beijing", toolEnd.ToolCall.Arguments.GetProperty("location").GetString());
     }
@@ -508,7 +508,7 @@ public class OpenAIResponseAdapterTests
 
         Assert.Single(result.Content);
         var toolCall = Assert.IsType<ToolCallBlock>(result.Content[0]);
-        Assert.Equal("fc_1", toolCall.Id);
+        Assert.Equal("call_xyz", toolCall.Id);
         Assert.Equal("get_weather", toolCall.Name);
         Assert.Equal("Tokyo", toolCall.Arguments.GetProperty("location").GetString());
     }

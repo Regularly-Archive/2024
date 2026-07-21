@@ -8,7 +8,7 @@ namespace InsightaAI.Agent.Tools.BuiltIn;
 /// 文件内容搜索工具
 /// 支持正则表达式、递归搜索、忽略大小写等选项
 /// </summary>
-public class GrepTool : ITool
+public class GrepTool : ITool, IToolResultProjector
 {
     private readonly IFileSystem _fileSystem;
 
@@ -186,48 +186,38 @@ public class GrepTool : ITool
         }
     }
 
-    /// <summary>
-    /// 拦截大搜索结果：只保留文件名和匹配数量
-    /// </summary>
-    public InterceptionResult Intercept(ToolResult result, TruncationContext context)
+    public ToolResultRetentionPolicy RetentionPolicy { get; } = new()
     {
-        var text = result.Content.OfType<TextBlock>().FirstOrDefault()?.Text;
-        if (text == null || context.OriginalLength <= 30_000)
-            return InterceptionResult.NotIntercepted(result);
+        CanReplay = true,
+        MinimumLevel = ToolResultRetentionLevel.Removed
+    };
 
-        // 提取文件名（格式：filepath:linenum: content 或 filepath:linenum）
-        var lines = text.Split('\n');
-        var fileMatches = new Dictionary<string, int>();
-        
-        foreach (var line in lines)
+    public ToolResultProjection CreatePreview(ToolResult result, ToolResultProjectionContext context)
+    {
+        var text = result.Content.OfType<TextBlock>().FirstOrDefault()?.Text ?? string.Empty;
+        var fileMatches = text.Split('\n')
+            .Select(line => line.IndexOf(':') is var index && index > 0 ? line[..index] : null)
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .GroupBy(path => path!, StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(group => group.Count());
+        var summary = new System.Text.StringBuilder();
+        summary.AppendLine($"[Large grep result summarized; original length: {context.OriginalLength} chars]");
+        foreach (var group in fileMatches)
+            summary.AppendLine($"  {group.Count(),4} matches in {group.Key}");
+        if (context.Artifact != null)
+            summary.AppendLine($"Full output saved as artifact {context.Artifact.Id}: {context.Artifact.Path}");
+        return new ToolResultProjection
         {
-            var colonIdx = line.IndexOf(':');
-            if (colonIdx > 0)
-            {
-                var filePath = line[..colonIdx];
-                // 跳过统计行
-                if (filePath.StartsWith("Found ") || filePath.StartsWith("(")) continue;
-                
-                if (!fileMatches.ContainsKey(filePath))
-                    fileMatches[filePath] = 0;
-                fileMatches[filePath]++;
-            }
-        }
-
-        var sb = new System.Text.StringBuilder();
-        sb.AppendLine($"[搜索结果过大，已截断。匹配文件: {fileMatches.Count} 个]");
-        sb.AppendLine();
-        foreach (var (filePath, count) in fileMatches.OrderByDescending(x => x.Value))
-        {
-            sb.AppendLine($"  {count,4} matches in {filePath}");
-        }
-
-        return new InterceptionResult(
-            ToolResult.FromText(sb.ToString()),
-            toolResultIntercepted: true,
-            originalLength: context.OriginalLength
-        );
+            Content = [new TextBlock { Text = summary.ToString() }],
+            Level = ToolResultRetentionLevel.Preview
+        };
     }
+
+    public ToolResultProjection CreatePlaceholder(ToolResultProjectionContext context) => new()
+    {
+        Content = [new TextBlock { Text = DefaultToolResultProjector.CreatePlaceholderText(context) }],
+        Level = ToolResultRetentionLevel.Placeholder
+    };
 
     private static string? GetStringValue(IDictionary<string, object> args, string key)
     {

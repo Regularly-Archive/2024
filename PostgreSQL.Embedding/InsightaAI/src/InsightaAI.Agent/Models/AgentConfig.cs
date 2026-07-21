@@ -95,6 +95,9 @@ public sealed record AgentResult
 
     /// <summary>最大上下文窗口大小</summary>
     public int MaxContextTokens { get; init; }
+
+    /// <summary>扣除输出预留后的可用输入预算</summary>
+    public int AvailableInputTokens { get; init; }
 }
 
 /// <summary>

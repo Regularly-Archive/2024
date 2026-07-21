@@ -46,18 +46,20 @@ Adapter (IAdapter)       → OpenAI / Anthropic / Gemini / StepFun / DeepSeek
 
 | Level | 策略 | 触发阈值 | 效果 |
 |-------|------|---------|------|
-| 1 | MicroCompact | 55% | 替换旧 tool_result（保留参数，摘要内容） |
+| 1 | MicroCompact | 45% | Full → Preview → Placeholder → Removed 渐进降级 |
 | 2 | SessionMemoryCompact | 65% | Anchored Summary + 生成会话记忆 |
-| 3 | TraditionalCompact | 75% | 全文摘要替代历史消息 |
+| 3 | TraditionalCompact | 80% | 全文摘要替代历史消息 |
 
 ### 上下文配置
+
+压缩阈值和 CLI 上下文占用率统一基于可用输入预算：`MaxContextTokens - ReservedForOutput`。
 
 ```yaml
 MaxContextTokens: 64,000
 ReservedForOutput: 16,384
-MicroCompactThreshold: 55%
+MicroCompactThreshold: 45%
 SessionCompactThreshold: 65%
-TraditionalCompactThreshold: 75%
+TraditionalCompactThreshold: 80%
 ```
 
 ### Hook 体系
@@ -112,7 +114,7 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 
 ### 已知问题
 
-1. **MicroCompact 收益递减** — 只压缩内容不减少消息数，多次压缩后失效，阈值间距过密（55%→65%→75%）。讨论中的改进方向：降至 45-65-80，增加最小收益检查避免无用压缩。
+1. **MicroCompact 生命周期重构（已完成核心链路）** — 阈值调整为 45-65-80，工具结果按 Full → Preview → Placeholder → Removed 渐进降级；Artifact 与上下文表示分离。策略先在消息副本上试算，有实际收益才提交；自动压缩可按阈值级联，手动 `/compact auto` 按优先级提交第一个有效策略。
 
 2. **Memory 全量注入** — `GetMemoryIndexAsync` 返回全量 MEMORY.md 文本（80+ 条），改轻量为统计信息 + `search_memory` 工具按需检索。
 
@@ -123,7 +125,7 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 ### TODO.md 重点项
 
 - [ ] 摘要服务统一（`CompactionHelper` 或 `SummaryService`）
-- [ ] MicroCompact 阈值优化（45-65-80）
+- [x] MicroCompact 阈值优化与工具结果生命周期重构（45-65-80）
 - [ ] Memory 轻量化索引
 - [ ] AgentBuilder 默认注册 `ToolRegistry`
 - [ ] L3 Orchestrator 继续开发
@@ -151,8 +153,10 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 
 | 文档 | 路径 |
 |------|------|
+| 使用说明 | `README.md` |
 | 项目愿景 | `docs/VISION.md` |
 | 待办事项 | `docs/TODO.md` |
+| 工具结果生命周期 | `docs/tool-result-lifecycle-design-v2.md` |
 | 提示词设计 | `docs/core-instructions-design.md` |
 | Agent Loop 研究 | `docs/agent-loop-research.md` |
 | 可观测性设计 | `docs/observability-design.md` |

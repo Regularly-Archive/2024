@@ -60,6 +60,7 @@ public static class MessageConverters
             Content = contentItems,
             ToolCallId = message.ToolCallId,
             ToolName = message.ToolName,
+            ToolResultState = message.ToolResultState,
             CreatedAt = message.Timestamp.UtcDateTime,
         };
     }
@@ -104,6 +105,7 @@ public static class MessageConverters
                 ToolCallId = record.ToolCallId,
                 ToolName = record.ToolName,
                 Content = contentBlocks.ToArray(),
+                ToolResultState = record.ToolResultState,
                 Timestamp = record.CreatedAt
             },
             _ => new Message { Role = MessageRole.User, Content = contentBlocks.ToArray(), Timestamp = record.CreatedAt }

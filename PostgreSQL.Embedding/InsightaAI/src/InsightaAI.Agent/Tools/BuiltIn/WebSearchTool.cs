@@ -11,7 +11,7 @@ namespace InsightaAI.Agent.Tools.BuiltIn;
 /// Web 搜索工具（IToolExecutor 模式，支持 Intercept）
 /// 使用 Tavily API 进行搜索
 /// </summary>
-public class WebSearchTool : ITool
+public class WebSearchTool : ITool, IToolResultProjector
 {
     private static readonly HttpClient _httpClient = new();
 
@@ -126,24 +126,30 @@ public class WebSearchTool : ITool
         }
     }
 
-    /// <summary>
-    /// 拦截大搜索结果：只保留摘要和前 N 条结果
-    /// </summary>
-    public InterceptionResult Intercept(ToolResult result, TruncationContext context)
+    public ToolResultRetentionPolicy RetentionPolicy { get; } = new()
     {
-        var text = result.Content.OfType<TextBlock>().FirstOrDefault()?.Text;
-        if (text == null || context.OriginalLength <= 30_000)
-            return InterceptionResult.NotIntercepted(result);
+        CanReplay = true,
+        MinimumLevel = ToolResultRetentionLevel.Removed
+    };
 
-        // 保留前 10000 字符作为预览
+    public ToolResultProjection CreatePreview(ToolResult result, ToolResultProjectionContext context)
+    {
+        var text = result.Content.OfType<TextBlock>().FirstOrDefault()?.Text ?? string.Empty;
         var preview = text[..Math.Min(10000, text.Length)];
-
-        return new InterceptionResult(
-            ToolResult.FromText($"{preview}\n\n[搜索结果过大，已截断。原始大小: {context.OriginalLength} 字符]"),
-            toolResultIntercepted: true,
-            originalLength: context.OriginalLength
-        );
+        if (context.Artifact != null)
+            preview += $"\n\n[Full output saved as artifact {context.Artifact.Id}: {context.Artifact.Path}]";
+        return new ToolResultProjection
+        {
+            Content = [new TextBlock { Text = preview }],
+            Level = ToolResultRetentionLevel.Preview
+        };
     }
+
+    public ToolResultProjection CreatePlaceholder(ToolResultProjectionContext context) => new()
+    {
+        Content = [new TextBlock { Text = DefaultToolResultProjector.CreatePlaceholderText(context) }],
+        Level = ToolResultRetentionLevel.Placeholder
+    };
 
     private static string? GetStringValue(IDictionary<string, object> args, string key)
     {

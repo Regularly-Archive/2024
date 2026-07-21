@@ -14,6 +14,11 @@ public interface IContextManager
     int MaxContextTokens { get; }
 
     /// <summary>
+    /// 扣除输出预留后的可用输入预算（token 数）
+    /// </summary>
+    int AvailableInputTokens { get; }
+
+    /// <summary>
     /// 估算消息列表的 token 数量
     /// </summary>
     int EstimateTokens(IReadOnlyList<Message> messages);

@@ -38,6 +38,8 @@ public sealed class ContextManager : IContextManager
     /// </summary>
     public int MaxContextTokens => _budget.MaxContextTokens;
 
+    public int AvailableInputTokens => _budget.AvailableInputTokens;
+
     /// <summary>
     /// 估算消息列表的 token 数量
     /// </summary>
@@ -100,20 +102,43 @@ public sealed class ContextManager : IContextManager
         try
         {
             var estimatedTokens = EstimateTokens(messages);
+            var originalTokens = estimatedTokens;
+            var originalMessages = messages.Count;
+            var appliedStrategies = new List<string>();
+            var restoredAttachments = new List<string>();
+            Message? boundaryMarker = null;
 
-            // 按优先级检查策略
+            // 阈值是可叠加的资格线：每层执行后重新估算，仍超限则继续下一层。
             foreach (var strategy in _strategies)
             {
                 if (strategy.ShouldCompact(messages, estimatedTokens, _budget))
                 {
-                    var result = await strategy.CompactAsync(
-                        messages, _budget, _tokenEstimator, estimatedTokens, cancellationToken);
+                    var result = await TryCompactAsync(
+                        strategy, messages, estimatedTokens, cancellationToken);
+                    if (result == null)
+                        continue;
 
-                    return result;
+                    appliedStrategies.Add(strategy.Name);
+                    restoredAttachments.AddRange(result.RestoredAttachments);
+                    boundaryMarker = result.BoundaryMarker ?? boundaryMarker;
+                    estimatedTokens = result.PostCompactTokens;
                 }
             }
 
-            return null;
+            if (appliedStrategies.Count == 0)
+                return null;
+
+            return new CompactionResult
+            {
+                StrategyName = string.Join("+", appliedStrategies),
+                PreCompactTokens = originalTokens,
+                PostCompactTokens = estimatedTokens,
+                PreCompactMessages = originalMessages,
+                PostCompactMessages = messages.Count,
+                RequestMessages = messages.ToArray(),
+                RestoredAttachments = restoredAttachments,
+                BoundaryMarker = boundaryMarker
+            };
         }
         finally
         {
@@ -137,21 +162,33 @@ public sealed class ContextManager : IContextManager
         {
             var estimatedTokens = EstimateTokens(messages);
 
+            if (strategy.Equals("auto", StringComparison.OrdinalIgnoreCase))
+            {
+                // 手动 auto 不受自动触发阈值限制：按优先级试算，提交第一个真正产生收益的策略。
+                foreach (var candidate in _strategies)
+                {
+                    var result = await TryCompactAsync(
+                        candidate, messages, estimatedTokens, cancellationToken);
+                    if (result != null)
+                        return result;
+                }
+
+                return null;
+            }
+
             ICompactStrategy? targetStrategy = strategy.ToLowerInvariant() switch
             {
                 "micro" => _strategies.FirstOrDefault(s => s.Name == "MicroCompact"),
                 "traditional" => _strategies.FirstOrDefault(s => s.Name == "TraditionalCompact"),
-                "sessionMemory" => _strategies.FirstOrDefault(s => s.Name == "SessionMemoryCompact"),
-                "auto" => _strategies.FirstOrDefault(s => s.ShouldCompact(messages, estimatedTokens, _budget))
-                    ?? _strategies.LastOrDefault(),
+                "sessionmemory" => _strategies.FirstOrDefault(s => s.Name == "SessionMemoryCompact"),
                 _ => null
             };
 
             if (targetStrategy == null)
                 return null;
 
-            return await targetStrategy.CompactAsync(
-                messages, _budget, _tokenEstimator, estimatedTokens, cancellationToken);
+            return await TryCompactAsync(
+                targetStrategy, messages, estimatedTokens, cancellationToken);
         }
         finally
         {
@@ -162,5 +199,37 @@ public sealed class ContextManager : IContextManager
     public ContextBudget GetContextBudget()
     {
         return _budget;
+    }
+
+    /// <summary>
+    /// 在消息副本上试算压缩；只有实际 token 或消息数下降时才提交。
+    /// </summary>
+    private async Task<CompactionResult?> TryCompactAsync(
+        ICompactStrategy strategy,
+        List<Message> messages,
+        int preCompactTokens,
+        CancellationToken cancellationToken)
+    {
+        var preCompactMessages = messages.Count;
+        var trialMessages = messages.ToList();
+        var trialResult = await strategy.CompactAsync(
+            trialMessages, _budget, _tokenEstimator, preCompactTokens, cancellationToken);
+        var postCompactTokens = EstimateTokens(trialMessages);
+        var postCompactMessages = trialMessages.Count;
+
+        if (postCompactTokens >= preCompactTokens && postCompactMessages >= preCompactMessages)
+            return null;
+
+        messages.Clear();
+        messages.AddRange(trialMessages);
+
+        return trialResult with
+        {
+            PreCompactTokens = preCompactTokens,
+            PostCompactTokens = postCompactTokens,
+            PreCompactMessages = preCompactMessages,
+            PostCompactMessages = postCompactMessages,
+            RequestMessages = messages.ToArray()
+        };
     }
 }

@@ -159,7 +159,8 @@ public class EventRenderer : IDisposable
             AnsiConsole.WriteLine();
         }
 
-        ShowTokenUsage(completeEvent.Result!.Usage, completeEvent.Result!.EstimatedContextTokens, completeEvent.Result!.MaxContextTokens);
+        ShowTokenUsage(completeEvent.Result!.Usage, completeEvent.Result!.EstimatedContextTokens,
+            completeEvent.Result!.AvailableInputTokens);
     }
 
     private void HandleContextCompacted(AgentContextCompactedEvent compactedEvent)
@@ -172,7 +173,7 @@ public class EventRenderer : IDisposable
         AnsiConsole.WriteLine();
     }
 
-    private void ShowTokenUsage(TokenUsage? usage, int estimatedContextTokens = 0, int maxContextTokens = 0)
+    private void ShowTokenUsage(TokenUsage? usage, int estimatedContextTokens = 0, int availableInputTokens = 0)
     {
         if (usage == null) return;
 
@@ -189,9 +190,9 @@ public class EventRenderer : IDisposable
 
         // 上下文百分比
         var contextText = "[dim]🧠 -[/]";
-        if (maxContextTokens > 0 && estimatedContextTokens > 0)
+        if (availableInputTokens > 0 && estimatedContextTokens > 0)
         {
-            var contextPercent = (double)estimatedContextTokens / maxContextTokens * 100;
+            var contextPercent = (double)estimatedContextTokens / availableInputTokens * 100;
             var contextColor = contextPercent switch
             {
                 >= 90 => "red",

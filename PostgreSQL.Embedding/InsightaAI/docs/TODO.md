@@ -1,4 +1,4 @@
-﻿# InsightaAI Agent - 待办事项
+# InsightaAI Agent - 待办事项
 
 > 愿景与期待详见 [VISION.md](VISION.md)
 
@@ -83,22 +83,23 @@ _toolRegistry = serviceProvider.GetRequiredService<ToolRegistry>();  // 会抛�
 ### 5. 上下文用量显示（优先级：中）
 
 **问题描述：**
-用户希望在 Tokens Usage 显示区域增加上下文用量百分比，类似内存占用，通过预估当前消息列表的 token 总数和上下文窗口大小做对比。
+用户希望在 Tokens Usage 显示区域增加上下文用量百分比，类似内存占用，通过预估当前消息列表的 token 总数和可用输入预算做对比。
 
 **已完成：**
 - [x] 创建 `TokenEstimatorExtensions` 扩展方法（放在 `Extensions` 目录）
 - [x] 替换 `TraditionalCompactStrategy` 和 `SessionMemoryCompactStrategy` 中的 `EstimateMessagesTokens` 方法
 - [x] `IContextManager` 接口新增 `MaxContextTokens` 属性
 - [x] `ContextManager` 实现 `MaxContextTokens` 属性
-- [x] `AgentResult` 新增 `EstimatedContextTokens` 和 `MaxContextTokens` 字段
-- [x] `Agent.cs` 填充新字段
+- [x] `AgentResult` 新增 `EstimatedContextTokens`、`MaxContextTokens` 和 `AvailableInputTokens` 字段
+- [x] 压缩阈值与 CLI 占用率统一使用 `AvailableInputTokens`（上下文窗口减输出预留）
+- [x] `AgentLoop.cs` 填充新字段
 - [x] `EventRenderer` 显示上下文用量百分比（带颜色：绿<70%、黄70-90%、红>90%）
 
 ---
 
 ## 代码质量
 
-### 5. SessionMemoryHook 代码清理
+### 5.1 SessionMemoryHook 代码清理
 
 **已完成：**
 - [x] 删除死代码 `Truncate` 方法
@@ -136,56 +137,62 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 
 ---
 
-### 6. 修复已有测试失败（优先级：中）
+### 6.3 修复已有测试失败（优先级：中）
 
 **问题描述：**
-9 个测试失败需要修复（均为已有问题，非本次改动引入）。
+历史上存在 9 个相关测试失败，目前已修复并纳入完整 Agent 测试集。
 
 **失败清单：**
-- [ ] 4 个 `SessionMemoryCompactStrategy` 相关测试
-- [ ] 5 个 `SessionMemoryHookLlm` 相关测试（关键词降级逻辑未实现）
+- [x] 4 个 `SessionMemoryCompactStrategy` 相关测试
+- [x] 5 个 `SessionMemoryHookLlm` 相关测试
 
 ---
 
 ## 功能特性
 
-### 7. Tool Result Interception（优先级：高）
+### 7. Tool Result Lifecycle v2（优先级：高）
 
 **问题描述：**
 大型工具结果（如读取大文件、大范围搜索）会迅速消耗上下文窗口，导致压缩频繁触发。
 
 **设计方案：**
-在工具结果进入上下文前拦截，根据工具类型进行预处理（持久化、截断等）。
+将工具结果作为具有独立数据生命周期和上下文生命周期的资源管理，由 Runtime 统一持久化并按 `Full → Preview → Placeholder → Removed` 渐进降级，工具仅定义语义化投影。
 
 **已完成：**
 - [x] Phase 1: Core Infrastructure
-  - `TruncationContext`、`InterceptionResult` 类
-  - `IToolExecutor.Intercept()` 默认接口方法
-  - `ToolExecutor.TryInterceptResult()` 集成
-  - `Message.ToolResultIntercepted` 标志
-  - Feature flag（构造参数控制）
-- [x] Phase 2: Built-in Tool Overrides
-  - `FileReadTool.Intercept` — 持久化 + 200 行预览
-  - `GrepTool.Intercept` — 文件名 + 匹配数量
-  - `BashTool.Intercept` — 头尾各 50 行
-  - `WebFetchTool.Intercept` — 重构为 IToolExecutor + 持久化 + 5000 字符预览
-  - `WebSearchTool.Intercept` — 重构为 IToolExecutor + 10000 字符预览
+  - `ToolResultRetentionLevel`、`ProcessedToolResult`、`ToolResultArtifactInfo` 模型
+  - `IToolResultProjector` 工具语义投影接口
+  - `ToolResultProcessor` + `ToolResultArtifactStore` 统一处理链
+  - `Message.ToolResultState` 结构化生命周期状态
+  - Message 与 Storage 结构化状态贯通
+- [x] Phase 2: Built-in Tool Projectors
+  - `FileReadTool` Projector — 200 行预览
+  - `GrepTool` Projector — 文件名 + 匹配数量
+  - `BashTool` Projector — 头尾各 50 行
+  - `WebFetchTool` Projector — 5000 字符预览
+  - `WebSearchTool` Projector — 10000 字符预览
 - [x] Phase 3: MicroCompactStrategy Refactoring
-  - 跳过已拦截结果（`ToolResultIntercepted = true`）
-  - 委托给 `tool.Intercept()`
+  - `Full → Preview → Placeholder → Removed` 状态推进
+  - ToolCall/ToolResult 成对删除，并保留同一 Assistant 消息中的其他并行 ToolCall
+  - 两阶段压缩：先在消息副本试算，只有 token 或消息数量实际下降时才提交
+  - `/compact auto` 按优先级逐个尝试，跳过无收益策略
+  - 45% / 65% / 80% 阈值，压缩后级联到 L2/L3
+  - 压缩阈值与 CLI Usage 统一使用可用输入预算
 
 **待优化：**
 - [ ] Phase 4: Testing & Polish
-  - [ ] 单元测试：各工具的 `Intercept` 方法
+  - [x] 单元测试：原始结果落盘、状态推进、消息配对删除、存储恢复
   - [ ] 集成测试：大文件读取 → 持久化 → 重新读取
   - [ ] CLI 显示截断/持久化状态
   - [ ] 监控指标：截断频率、持久化频率
 - [ ] Phase 5: Cleanup & Documentation
-  - [ ] `ToolResultDirectory` 生命周期清理（正常退出 + 异常退出）
+  - [ ] Tool Result Artifact 生命周期清理（正常退出 + 异常退出）
   - [ ] 性能基准测试
-  - [ ] 移除冗余的 `ToolTruncationStrategy` 类（可选）
+  - [x] 移除 `InterceptionResult`、`TruncationContext`、`Intercept()` 和冗余 `ToolTruncationStrategy`
+  - [x] 更新生命周期 v2、压缩、Memory 与项目入口文档；旧设计标记为历史文档
 
-**详细设计文档：** [tool-result-truncation-design.md](tool-result-truncation-design.md)
+**当前设计文档：** [tool-result-lifecycle-design-v2.md](tool-result-lifecycle-design-v2.md)
+**历史设计文档：** [tool-result-truncation-design.md](tool-result-truncation-design.md)
 
 ---
 

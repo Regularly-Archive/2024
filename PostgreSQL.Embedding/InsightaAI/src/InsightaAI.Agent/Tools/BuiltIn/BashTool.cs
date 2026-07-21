@@ -8,7 +8,7 @@ namespace InsightaAI.Agent.Tools.BuiltIn;
 /// Shell 命令执行工具
 /// 通过 IShellExecutor 接口支持多种执行环境（本地、Docker、远程等）
 /// </summary>
-public class BashTool : ITool
+public class BashTool : ITool, IToolResultProjector
 {
     private readonly IShellExecutor _shellExecutor;
 
@@ -120,32 +120,33 @@ public class BashTool : ITool
         }
     }
 
-    /// <summary>
-    /// 拦截大命令输出：保留头尾各 50 行
-    /// </summary>
-    public InterceptionResult Intercept(ToolResult result, TruncationContext context)
+    public ToolResultRetentionPolicy RetentionPolicy { get; } = new()
     {
-        var text = result.Content.OfType<TextBlock>().FirstOrDefault()?.Text;
-        if (text == null || context.OriginalLength <= 30_000)
-            return InterceptionResult.NotIntercepted(result);
+        HasSideEffects = true,
+        MinimumLevel = ToolResultRetentionLevel.Placeholder
+    };
 
+    public ToolResultProjection CreatePreview(ToolResult result, ToolResultProjectionContext context)
+    {
+        var text = result.Content.OfType<TextBlock>().FirstOrDefault()?.Text ?? string.Empty;
         var lines = text.Split('\n');
-        if (lines.Length <= 100)
-            return InterceptionResult.NotIntercepted(result);
-
-        // 保留头尾各 50 行
-        var head = lines.Take(50);
-        var tail = lines.TakeLast(50);
-        var truncated = string.Join("\n", head)
-            + $"\n\n[... 截断 {lines.Length - 100} 行 ...]\n\n"
-            + string.Join("\n", tail);
-
-        return new InterceptionResult(
-            ToolResult.FromText(truncated),
-            toolResultIntercepted: true,
-            originalLength: context.OriginalLength
-        );
+        var preview = string.Join("\n", lines.Take(50));
+        if (lines.Length > 100)
+            preview += $"\n\n[... omitted {lines.Length - 100} lines ...]\n\n" + string.Join("\n", lines.TakeLast(50));
+        if (context.Artifact != null)
+            preview += $"\n\n[Full output saved as artifact {context.Artifact.Id}: {context.Artifact.Path}]";
+        return new ToolResultProjection
+        {
+            Content = [new TextBlock { Text = preview }],
+            Level = ToolResultRetentionLevel.Preview
+        };
     }
+
+    public ToolResultProjection CreatePlaceholder(ToolResultProjectionContext context) => new()
+    {
+        Content = [new TextBlock { Text = DefaultToolResultProjector.CreatePlaceholderText(context) }],
+        Level = ToolResultRetentionLevel.Placeholder
+    };
 
     private static bool IsDangerousCommand(string command)
     {

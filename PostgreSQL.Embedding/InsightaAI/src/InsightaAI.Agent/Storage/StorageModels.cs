@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using InsightaAI.LLM.Models;
 using SqlSugar;
 
 namespace InsightaAI.Agent.Storage;
@@ -75,6 +76,10 @@ public class MessageRecord
     [SugarColumn(IsNullable = true, Length = 100)]
     [JsonPropertyName("tool_name")]
     public string? ToolName { get; set; }
+
+    [SugarColumn(ColumnDataType = "jsonb", IsNullable = true)]
+    [JsonPropertyName("tool_result_state")]
+    public ToolResultState? ToolResultState { get; set; }
 
     [JsonPropertyName("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

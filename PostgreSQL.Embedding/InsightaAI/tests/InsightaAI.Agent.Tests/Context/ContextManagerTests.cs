@@ -129,22 +129,26 @@ public class ContextManagerTests
     }
 
     [Fact]
-    public async Task CompactIfNeededAsync_Should_ExecuteHigherPriorityFirst()
+    public async Task CompactIfNeededAsync_Should_ExecuteEligibleStrategiesInPriorityOrder()
     {
         // Arrange
         var lowPriority = new MockCompactStrategy("Low", 2, shouldCompact: true);
         var highPriority = new MockCompactStrategy("High", 1, shouldCompact: true);
         var manager = CreateManager(strategies: [lowPriority, highPriority]);
-        var messages = new List<Message> { Message.FromUser("Test") };
+        var messages = new List<Message>
+        {
+            Message.FromUser("First message"),
+            Message.FromUser("Second message")
+        };
 
         // Act
         var result = await manager.CompactIfNeededAsync(messages);
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal("High", result.StrategyName);
+        Assert.Equal("High+Low", result.StrategyName);
         Assert.True(highPriority.CompactCalled);
-        Assert.False(lowPriority.CompactCalled);
+        Assert.True(lowPriority.CompactCalled);
     }
 
     [Fact]
@@ -212,14 +216,15 @@ public class ContextManagerTests
 
         // Assert
         Assert.NotNull(result);
-        Assert.True(micro.CompactCalled); // shouldCompact=true, so it's selected
+        Assert.True(micro.CompactCalled);
+        Assert.False(traditional.CompactCalled);
     }
 
     [Fact]
-    public async Task ForceCompactAsync_Should_FallBackToLastStrategy_WhenNoneShouldCompact()
+    public async Task ForceCompactAsync_Should_TryNextStrategy_WhenFirstHasNoBenefit()
     {
         // Arrange
-        var micro = new MockCompactStrategy("MicroCompact", 1, shouldCompact: false);
+        var micro = new MockCompactStrategy("MicroCompact", 1, shouldCompact: false, producesBenefit: false);
         var traditional = new MockCompactStrategy("TraditionalCompact", 2, shouldCompact: false);
         var manager = CreateManager(strategies: [micro, traditional]);
         var messages = new List<Message> { Message.FromUser("Test") };
@@ -229,7 +234,22 @@ public class ContextManagerTests
 
         // Assert
         Assert.NotNull(result);
-        Assert.True(traditional.CompactCalled); // Last strategy selected
+        Assert.Equal("TraditionalCompact", result.StrategyName);
+        Assert.True(micro.CompactCalled);
+        Assert.True(traditional.CompactCalled);
+    }
+
+    [Fact]
+    public async Task ForceCompactAsync_Should_DiscardTrialChanges_WhenThereIsNoBenefit()
+    {
+        var strategy = new MockCompactStrategy("MicroCompact", 1, shouldCompact: true, producesBenefit: false);
+        var manager = CreateManager(strategies: [strategy]);
+        var messages = new List<Message> { Message.FromUser("Original") };
+
+        var result = await manager.ForceCompactAsync(messages, "micro");
+
+        Assert.Null(result);
+        Assert.Equal("Original", Assert.Single(messages).GetTextContent());
     }
 
     [Fact]
@@ -320,13 +340,14 @@ public class ContextManagerTests
         var budget = new ContextBudget
         {
             MaxContextTokens = 100_000,
+            ReservedForOutput = 20_000,
             MicroCompactThreshold = 0.60,
             TraditionalCompactThreshold = 0.75
         };
 
         // Assert
-        Assert.Equal(60_000, budget.MicroCompactTriggerTokens);
-        Assert.Equal(75_000, budget.TraditionalCompactTriggerTokens);
+        Assert.Equal(48_000, budget.MicroCompactTriggerTokens);
+        Assert.Equal(60_000, budget.TraditionalCompactTriggerTokens);
     }
 
     [Fact]
@@ -364,16 +385,18 @@ public class ContextManagerTests
     private class MockCompactStrategy : ICompactStrategy
     {
         private readonly bool _shouldCompact;
+        private readonly bool _producesBenefit;
 
         public string Name { get; }
         public int Priority { get; }
         public bool CompactCalled { get; private set; }
 
-        public MockCompactStrategy(string name, int priority, bool shouldCompact)
+        public MockCompactStrategy(string name, int priority, bool shouldCompact, bool producesBenefit = true)
         {
             Name = name;
             Priority = priority;
             _shouldCompact = shouldCompact;
+            _producesBenefit = producesBenefit;
         }
 
         public bool ShouldCompact(IReadOnlyList<Message> messages, int estimatedTokens, ContextBudget budget)
@@ -389,12 +412,22 @@ public class ContextManagerTests
             CancellationToken cancellationToken = default)
         {
             CompactCalled = true;
+            if (_producesBenefit && messages.Count > 0)
+            {
+                messages.RemoveAt(messages.Count - 1);
+            }
+            else if (messages.Count > 0)
+            {
+                // 用于验证无收益试算的修改不会泄漏到原始列表。
+                messages[0] = Message.FromUser(messages[0].GetTextContent() + " expanded trial");
+            }
+
             return Task.FromResult(new CompactionResult
             {
                 StrategyName = Name,
                 PreCompactTokens = preCompactTokens,
-                PostCompactTokens = preCompactTokens / 2,
-                PreCompactMessages = messages.Count,
+                PostCompactTokens = _producesBenefit ? preCompactTokens / 2 : preCompactTokens,
+                PreCompactMessages = _producesBenefit ? messages.Count + 1 : messages.Count,
                 PostCompactMessages = messages.Count,
                 RequestMessages = messages.ToArray()
             });

@@ -419,16 +419,14 @@ public class OpenAIResponseAdapter : IProviderAdapter
             // item.id 是 output item 的 ID（如 "fc_xxx"），不是工具调用的 ID
             var id = !string.IsNullOrEmpty(callId) ? callId : (item.TryGetProperty("id", out var idEl) ? idEl.GetString() ?? "" : "");
 
-            // 优先使用通过 delta 累积的参数，fallback 到事件中的 arguments
-            string argumentsStr;
-            if (_pendingToolCalls.TryGetValue(callId, out var pending) && pending.Args.Length > 0)
-            {
-                argumentsStr = pending.Args.ToString();
-            }
-            else
-            {
-                argumentsStr = item.TryGetProperty("arguments", out var args) ? args.GetString() ?? "{}" : "{}";
-            }
+            // done 事件中的 arguments 是最终值；仅在缺失时使用流式 delta 的累积结果。
+            var argumentsStr = item.TryGetProperty("arguments", out var args) &&
+                               args.ValueKind == JsonValueKind.String &&
+                               !string.IsNullOrEmpty(args.GetString())
+                ? args.GetString()!
+                : (_pendingToolCalls.TryGetValue(callId, out var pending) && pending.Args.Length > 0
+                    ? pending.Args.ToString()
+                    : "{}");
 
             // 从 pending 中移除
             _pendingToolCalls.Remove(callId);
@@ -533,7 +531,11 @@ public class OpenAIResponseAdapter : IProviderAdapter
 
     private static void ParseFunctionCallOutput(JsonElement item, List<ContentBlock> content)
     {
-        var id = item.TryGetProperty("id", out var idEl) ? idEl.GetString() ?? "" : "";
+        // function_call_output 必须通过 call_id 关联原调用；item.id 只是响应输出项 ID。
+        var callId = item.TryGetProperty("call_id", out var callIdEl) ? callIdEl.GetString() ?? "" : "";
+        var id = !string.IsNullOrEmpty(callId)
+            ? callId
+            : (item.TryGetProperty("id", out var idEl) ? idEl.GetString() ?? "" : "");
         var name = item.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
         var argumentsStr = item.TryGetProperty("arguments", out var args) ? args.GetString() ?? "{}" : "{}";
 

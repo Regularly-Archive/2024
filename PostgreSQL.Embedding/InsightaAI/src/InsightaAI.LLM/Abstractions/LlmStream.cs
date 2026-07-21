@@ -137,8 +137,6 @@ public class LlmStreamImpl : LlmStream
                     break;
 
                 case ToolCallStartEvent toolCallStart:
-                    // 开始新的工具调用，先完成之前的
-                    FinalizePendingToolCalls(finalToolCalls, pendingToolCalls);
                     pendingToolCalls[toolCallStart.ContentIndex] = new ToolCallBlock
                     {
                         Id = toolCallStart.ToolCallId ?? $"call_{toolCallStart.ContentIndex}_{Guid.NewGuid():N}",
@@ -163,14 +161,14 @@ public class LlmStreamImpl : LlmStream
                     break;
 
                 case ToolCallEndEvent toolCallEnd:
-                    finalToolCalls.Add(toolCallEnd.ToolCall);
-                    // 从 pending 中移除
-                    var removeKey = pendingToolCalls
+                    AddToolCallIfUnique(finalToolCalls, toolCallEnd.ToolCall);
+                    // 同一调用 ID 只能表示一个逻辑工具调用，清除所有重复的 pending 项。
+                    var removeKeys = pendingToolCalls
                         .Where(kvp => kvp.Value.Id == toolCallEnd.ToolCall.Id)
-                        .Select(kvp => (int?)kvp.Key)
-                        .FirstOrDefault();
-                    if (removeKey.HasValue)
-                        pendingToolCalls.Remove(removeKey.Value);
+                        .Select(kvp => kvp.Key)
+                        .ToArray();
+                    foreach (var removeKey in removeKeys)
+                        pendingToolCalls.Remove(removeKey);
                     break;
 
                 case DoneEvent done:
@@ -242,9 +240,17 @@ public class LlmStreamImpl : LlmStream
                 parsedArgs = JsonSerializer.SerializeToElement(new { });
             }
 
-            target.Add(toolCall with { Arguments = parsedArgs });
+            AddToolCallIfUnique(target, toolCall with { Arguments = parsedArgs });
         }
         pending.Clear();
+    }
+
+    private static void AddToolCallIfUnique(List<ToolCallBlock> target, ToolCallBlock toolCall)
+    {
+        if (!target.Any(existing => string.Equals(existing.Id, toolCall.Id, StringComparison.Ordinal)))
+        {
+            target.Add(toolCall);
+        }
     }
 
     public void Abort()

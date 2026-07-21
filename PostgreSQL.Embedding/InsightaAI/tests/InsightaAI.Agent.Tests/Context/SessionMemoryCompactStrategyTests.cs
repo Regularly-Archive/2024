@@ -88,7 +88,8 @@ public class SessionMemoryCompactStrategyTests : IDisposable
             Message.FromSystem("You are a helpful assistant."),
             Message.FromUser("Hello")
         };
-        var estimatedTokens = 70_000; // 超过阈值但没有会话记忆
+        var estimatedTokens = (_budget.SessionCompactTriggerTokens +
+            _budget.TraditionalCompactTriggerTokens) / 2; // 位于 Session 压缩区间，但没有会话记忆
 
         // Act
         var result = _strategy.ShouldCompact(messages, estimatedTokens, _budget);
@@ -112,7 +113,8 @@ public class SessionMemoryCompactStrategyTests : IDisposable
             Message.FromSystem("You are a helpful assistant."),
             Message.FromUser("Hello")
         };
-        var estimatedTokens = 70_000; // 超过阈值
+        var estimatedTokens = (_budget.SessionCompactTriggerTokens +
+            _budget.TraditionalCompactTriggerTokens) / 2; // 位于 Session 压缩区间
 
         try
         {

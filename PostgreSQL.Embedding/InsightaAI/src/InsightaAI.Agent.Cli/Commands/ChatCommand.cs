@@ -504,6 +504,7 @@ public class ChatCommand
         var budget = new ContextBudget
         {
             MaxContextTokens = contextWindowTokens,
+            ReservedForOutput = model.MaxTokens ?? 16_384,
             Enabled = true
         };
 
