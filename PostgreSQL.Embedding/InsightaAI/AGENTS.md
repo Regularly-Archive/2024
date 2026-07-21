@@ -110,6 +110,29 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 
 **遗留：** MCP Telemetry Tag 命名优化（`mcp.server.description` → `mcp.config.description`，去重 `mcp.server.transport`），见 TODO.md #12
 
+### 统一摘要服务与会话标题（2026-07-21）
+
+- 新增 `Context/Summary/ISummaryService` 与 `SummaryService`，统一承载三种轻量 LLM 场景：
+  - `SummarizeAsync` — 全量摘要，供 `TraditionalCompactStrategy` 使用
+  - `UpdateAsync` — 增量摘要，供 `SessionMemoryHook` 使用
+  - `GenerateTitleAsync` — 根据新会话首条用户消息生成短标题
+- `SummaryResult` 显式返回成功状态、`FinishReason`、尝试次数和错误，摘要失败时不再保存残缺内容
+- 全量/增量摘要统一使用 `summary-output-template.txt`，固定 Goal、Constraints、Progress、Key Decisions、Next Steps、Critical Context、Relevant Files 等章节
+- 摘要遇到 `DoneReason.MaxTokens` 时执行一次更激进的完整重生成；连续失败则保留旧 Session Memory 或放弃本次 TraditionalCompact
+- 标题生成默认 256 tokens；无正文且命中 `MaxTokens` 时以 512 tokens 重试，并接受已生成的可用短标题
+- 标题 LLM 连续失败时，从首条用户输入确定性降级：取第一行、清理 Markdown/空白、按 Unicode 字符安全截断到 30 字符并添加省略号
+- `SessionMemoryHook` 移除模型/客户端工厂等重复配置，改为依赖 `ISummaryService`；`MinRoundsBeforeLlm` 现在实际生效
+- `IMessageStorage.UpdateSessionTitleAsync` 只原子更新标题和时间，避免与消息计数并发更新相互覆盖；JSONL 与 PostgreSQL 均已实现
+- CLI 在首条普通用户消息时并行生成标题，`insighta sessions` 增加 Title 列
+
+**关键文件：**
+- `src/InsightaAI.Agent/Context/Summary/` — 摘要服务接口、实现、配置和结果模型
+- `src/InsightaAI.Agent/Prompts/full-summary.txt` — 全量摘要 Prompt
+- `src/InsightaAI.Agent/Prompts/incremental-summary.txt` — 增量摘要 Prompt
+- `src/InsightaAI.Agent/Prompts/summary-output-template.txt` — 共享输出结构
+- `src/InsightaAI.Agent/Prompts/session-title.txt` — 会话标题 Prompt
+- `tests/InsightaAI.Agent.Tests/Context/SummaryServiceTests.cs` — 摘要、MaxTokens、标题和 fallback 测试
+
 ## 当前问题与改进方向
 
 ### 已知问题
@@ -118,13 +141,13 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 
 2. **Memory 全量注入** — `GetMemoryIndexAsync` 返回全量 MEMORY.md 文本（80+ 条），改轻量为统计信息 + `search_memory` 工具按需检索。
 
-3. **摘要服务重复** — `TraditionalCompactStrategy.GenerateSummaryAsync` 与 `SessionMemoryHook.GenerateAnchoredSummaryAsync` 存在 LLM 调用、摘要提取等重复代码，待提取到公共 `SummaryService`。
+3. **摘要服务统一（已完成）** — 全量摘要、增量摘要和会话标题已统一到 `SummaryService`；共享结构模板，并具备 MaxTokens 重试、完整性校验与标题 fallback。
 
 4. **AgentBuilder 生命周期** — 构造函数未默认注册 `ToolRegistry`，用户不调用 `WithToolRegistry()` 会抛异常。
 
 ### TODO.md 重点项
 
-- [ ] 摘要服务统一（`CompactionHelper` 或 `SummaryService`）
+- [x] 摘要服务统一（全量/增量摘要、会话标题、MaxTokens 恢复与 fallback）
 - [x] MicroCompact 阈值优化与工具结果生命周期重构（45-65-80）
 - [ ] Memory 轻量化索引
 - [ ] AgentBuilder 默认注册 `ToolRegistry`

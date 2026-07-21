@@ -1,0 +1,15 @@
+Update the previous summary using the new conversation messages provided before this instruction.
+
+<previous-summary>
+{{PREVIOUS_SUMMARY}}
+</previous-summary>
+
+{{COMPRESSION_INSTRUCTION}}
+
+Preserve still-true details, merge new facts, and remove stale or duplicated information.
+Return only one complete <summary> element. Keep its content under {{TARGET_TOKENS}} tokens.
+Use this exact output structure:
+
+{{SUMMARY_OUTPUT_TEMPLATE}}
+
+Preserve exact paths, commands, identifiers, and unresolved errors. Do not describe the summarization process.

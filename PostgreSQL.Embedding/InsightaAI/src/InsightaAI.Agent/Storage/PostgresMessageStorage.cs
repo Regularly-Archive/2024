@@ -89,6 +89,15 @@ public class PostgresMessageStorage : IMessageStorage
             .ExecuteCommandAsync();
     }
 
+    public async Task UpdateSessionTitleAsync(string sessionId, string title)
+    {
+        await _db.Updateable<SessionRecord>()
+            .SetColumns(s => s.Title, title)
+            .SetColumns(s => s.UpdatedAt, DateTime.UtcNow)
+            .Where(s => s.Id == sessionId)
+            .ExecuteCommandAsync();
+    }
+
     public async Task DeleteSessionAsync(string sessionId)
     {
         await _db.Deleteable<MessageRecord>()

@@ -1,0 +1,14 @@
+Generate a short title for a new conversation based on its first user message.
+
+<initial-user-message>
+{{INITIAL_USER_MESSAGE}}
+</initial-user-message>
+
+Rules:
+- Capture the user's main intent, not incidental details.
+- Use the same language as the user.
+- Prefer 2-8 words; for Chinese, prefer a few concise characters or words.
+- Keep the title within {{MAX_CHARACTERS}} characters.
+- Do not use quotes, Markdown, labels, explanations, or ending punctuation.
+- Do not call any tools.
+- Return the title only.

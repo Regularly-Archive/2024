@@ -6,6 +6,7 @@ using InsightaAI.Agent.Cli.Services;
 using InsightaAI.Agent.Cli.UI;
 using InsightaAI.Agent.Context;
 using InsightaAI.Agent.Context.Compaction;
+using InsightaAI.Agent.Context.Summary;
 using InsightaAI.Agent.Diagnostics;
 using InsightaAI.Agent.Extensions;
 using InsightaAI.Agent.Mcp;
@@ -107,6 +108,8 @@ public class ChatCommand
         var session = await GetOrCreateSessionAsync(sessionId, continueLast, config, providerName);
         if (session == null) return 1;
 
+        var summaryService = CreateSummaryService(config, auth);
+
         // 创建 Agent（传入 sessionId 以注册会话记忆钩子）
         var agent = await CreateAgentAsync(config, auth, llmClient, model, toolRegistry, skillRegistry, mcpRegistry, session.SessionId);
 
@@ -115,7 +118,7 @@ public class ChatCommand
         _renderer.ShowHistory(session.Messages);
 
         // 运行对话循环
-        await RunChatLoopAsync(session, agent, config, auth, toolRegistry, skillRegistry, mcpRegistry);
+        await RunChatLoopAsync(session, agent, summaryService, config, auth, toolRegistry, skillRegistry, mcpRegistry);
 
         _renderer.ShowInfo($"Session saved: {session.SessionId}");
         _renderer.ShowInfo($"Resume with: insighta chat --session {session.SessionId}");
@@ -123,7 +126,7 @@ public class ChatCommand
         return 0;
     }
 
-    private async Task RunChatLoopAsync(ChatSession session, Agent agent, CliConfig config, AuthConfig auth, ToolRegistry toolRegistry, SkillRegistry skillRegistry, McpRegistry? mcpRegistry)
+    private async Task RunChatLoopAsync(ChatSession session, Agent agent, ISummaryService summaryService, CliConfig config, AuthConfig auth, ToolRegistry toolRegistry, SkillRegistry skillRegistry, McpRegistry? mcpRegistry)
     {
         var currentAgent = agent;
 
@@ -168,6 +171,10 @@ public class ChatCommand
                 continue;
             }
 
+            var titleTask = session.TryBeginTitleGeneration()
+                ? GenerateAndSaveSessionTitleAsync(session, summaryService, userInput)
+                : Task.CompletedTask;
+
             // 构建上下文（用户消息由 Agent 自动持久化）
             var context = new AgentContext
             {
@@ -177,7 +184,18 @@ public class ChatCommand
 
             // 执行 Agent（消息持久化由 Agent 通过 IMessageStorage 自动处理）
             await ExecuteAgentAsync(currentAgent, userInput, context);
+            await titleTask;
         }
+    }
+
+    private static async Task GenerateAndSaveSessionTitleAsync(
+        ChatSession session,
+        ISummaryService summaryService,
+        string initialUserMessage)
+    {
+        var title = await summaryService.GenerateTitleAsync(initialUserMessage);
+        if (!string.IsNullOrWhiteSpace(title))
+            await session.UpdateTitleAsync(title);
     }
 
     /// <summary>
@@ -405,22 +423,21 @@ public class ChatCommand
         };
 
         // 创建会话记忆钩子（需先于 ContextManager，供 SessionMemoryCompactStrategy 使用）
-        Func<string, ILlmClient> summaryClientFactory = modelRef => LlmClientFactory.Create(auth, config, modelRef);
-        var summaryModelRef = config.SecondaryModel ?? config.PrimaryModel;
+        var summaryService = CreateSummaryService(config, auth);
 
         SessionMemoryHook? sessionMemoryHook = null;
         if (!string.IsNullOrEmpty(sessionId))
         {
             var memoryOptions = new SessionMemoryOptions
             {
-                SummaryModel = summaryModelRef,
-                SummaryClientFactory = summaryClientFactory
+                EnableLlmSummary = true
             };
-            sessionMemoryHook = new SessionMemoryHook(sessionId, userId, options: memoryOptions);
+            sessionMemoryHook = new SessionMemoryHook(
+                sessionId, userId, options: memoryOptions, summaryService: summaryService);
         }
 
         // 创建上下文管理器
-        var contextManager = CreateContextManager(config, model, summaryClientFactory, sessionMemoryHook, toolRegistry);
+        var contextManager = CreateContextManager(model, summaryService, sessionMemoryHook, toolRegistry);
 
         // 创建记忆系统
         var memoryManager = CreateMemoryManager();
@@ -494,7 +511,7 @@ public class ChatCommand
         return userId;
     }
 
-    private static IContextManager? CreateContextManager(CliConfig config, ModelEntry model, Func<string, ILlmClient> summaryClientFactory, SessionMemoryHook? sessionMemoryHook = null, ToolRegistry? toolRegistry = null)
+    private static IContextManager? CreateContextManager(ModelEntry model, ISummaryService summaryService, SessionMemoryHook? sessionMemoryHook = null, ToolRegistry? toolRegistry = null)
     {
         // 优先使用 model 配置的 context_window，否则从硬编码字典匹配
         var contextWindowTokens = model.ContextWindow > 0
@@ -521,10 +538,19 @@ public class ChatCommand
         }
 
         // 传统 LLM 摘要压缩（兜底，优先级 3）
-        var summaryModelRef = config.SecondaryModel ?? config.PrimaryModel;
-        strategies.Add(new TraditionalCompactStrategy(summaryClientFactory, summaryModelRef));
+        strategies.Add(new TraditionalCompactStrategy(summaryService));
 
         return new ContextManager(tokenEstimator, budget, strategies);
+    }
+
+    private static ISummaryService CreateSummaryService(CliConfig config, AuthConfig auth)
+    {
+        Func<string, ILlmClient> clientFactory = modelRef => LlmClientFactory.Create(auth, config, modelRef);
+        return new SummaryService(new SummaryOptions
+        {
+            Model = config.SecondaryModel ?? config.PrimaryModel,
+            ClientFactory = clientFactory
+        });
     }
 
     private static SkillRegistry CreateSkillRegistry()

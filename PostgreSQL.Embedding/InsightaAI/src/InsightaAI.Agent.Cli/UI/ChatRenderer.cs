@@ -118,6 +118,7 @@ public class ChatRenderer
         var table = new Table()
             .Border(TableBorder.Rounded)
             .AddColumn("ID")
+            .AddColumn("Title")
             .AddColumn("Provider")
             .AddColumn("Model")
             .AddColumn("Messages")
@@ -127,6 +128,7 @@ public class ChatRenderer
         {
             table.AddRow(
                 s.Id,
+                Markup.Escape(s.Title ?? "-"),
                 s.Provider,
                 s.Model,
                 s.MessageCount.ToString(),

@@ -1,7 +1,6 @@
 using InsightaAI.Agent.Extensions;
+using InsightaAI.Agent.Context.Summary;
 using InsightaAI.Agent.Prompts;
-using InsightaAI.LLM;
-using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
 using System.Collections.Immutable;
 
@@ -22,15 +21,11 @@ public sealed class TraditionalCompactStrategy : ICompactStrategy
     public string Name => "TraditionalCompact";
     public int Priority => 3; // 低于 MicroCompact(1) 和 SessionMemoryCompact(2)
 
-    private readonly Func<string, ILlmClient> _summaryClientFactory;
-    private readonly string _summaryModelRef;
+    private readonly ISummaryService _summaryService;
 
-    /// <param name="summaryClientFactory">创建摘要 LLM 客户端的工厂，接受 modelId（格式：provider/model）</param>
-    /// <param name="summaryModelRef">摘要使用的模型引用，格式：provider/model</param>
-    public TraditionalCompactStrategy(Func<string, ILlmClient> summaryClientFactory, string summaryModelRef)
+    public TraditionalCompactStrategy(ISummaryService summaryService)
     {
-        _summaryClientFactory = summaryClientFactory ?? throw new ArgumentNullException(nameof(summaryClientFactory));
-        _summaryModelRef = summaryModelRef ?? throw new ArgumentNullException(nameof(summaryModelRef));
+        _summaryService = summaryService ?? throw new ArgumentNullException(nameof(summaryService));
     }
 
     public bool ShouldCompact(IReadOnlyList<Message> messages, int estimatedTokens, ContextBudget budget)
@@ -56,7 +51,11 @@ public sealed class TraditionalCompactStrategy : ICompactStrategy
         if (!strippedOldMessages.Any()) return CreateNoCompactionResult(preCompactTokens, preCompactMessages, messages);
 
         // Step 3: 生成摘要
-        var summary = await GenerateFullSummaryAsync(strippedOldMessages, cancellationToken);
+        var summaryResult = await _summaryService.SummarizeAsync(strippedOldMessages, cancellationToken);
+        if (!summaryResult.Success || string.IsNullOrWhiteSpace(summaryResult.Summary))
+            return CreateNoCompactionResult(preCompactTokens, preCompactMessages, messages);
+
+        var summary = summaryResult.Summary;
 
         // Step 4: 构建边界标记
         var boundaryMarker = await CreateCompactedContextBoundaryMarkerAsync(summary, preCompactTokens, preCompactMessages);
@@ -179,62 +178,6 @@ public sealed class TraditionalCompactStrategy : ICompactStrategy
         }
 
         return result;
-    }
-
-    /// <summary>
-    /// 生成全量对话摘要
-    /// </summary>
-    private async Task<string> GenerateFullSummaryAsync(List<Message> messages, CancellationToken cancellationToken)
-    {
-        // 从嵌入资源加载摘要提示词
-        var summaryPrompt = await PromptTemplate.RenderAsync("traditional-summary");
-
-        // 构建消息列表（摘要提示 + 待摘要的消息）
-        var summaryMessages = new List<Message>();
-        summaryMessages.AddRange(messages.Where(x => x.Role != MessageRole.System));
-        summaryMessages.Add(Message.FromUser(summaryPrompt));
-
-        // 调用 LLM 生成摘要
-        var modelName = ModelRef.TryParse(_summaryModelRef, out var modelRef)
-            ? modelRef.ModelId
-            : _summaryModelRef;
-        var summaryClient = _summaryClientFactory(_summaryModelRef);
-
-        var request = new LlmRequest
-        {
-            Model = modelName,
-            Messages = summaryMessages.ToArray(),
-            Tools = [], // 不使用工具
-            Temperature = 0.3, // 低温度，更确定性的摘要
-            MaxTokens = 4096
-        };
-
-
-        var response = await summaryClient.CompleteAsync(request, cancellationToken);
-        return ExtractSummary(response.GetTextContent()) ?? "[Summary generation failed]";
-    }
-
-    /// <summary>
-    /// 从响应中提取摘要内容（支持 XML 标签包裹）
-    /// </summary>
-    private static string? ExtractSummary(string? responseText)
-    {
-        if (string.IsNullOrWhiteSpace(responseText))
-            return null;
-
-        var trimmed = responseText.Trim();
-
-        // 尝试提取 <summary> 标签中的内容
-        var summaryStart = trimmed.IndexOf("<summary>", StringComparison.OrdinalIgnoreCase);
-        var summaryEnd = trimmed.IndexOf("</summary>", StringComparison.OrdinalIgnoreCase);
-
-        if (summaryStart >= 0 && summaryEnd > summaryStart)
-        {
-            var start = summaryStart + "<summary>".Length;
-            return trimmed[start..summaryEnd].Trim();
-        }
-
-        return trimmed;
     }
 
     /// <summary>

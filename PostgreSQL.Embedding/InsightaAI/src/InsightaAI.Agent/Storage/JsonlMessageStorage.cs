@@ -112,6 +112,26 @@ public class JsonlMessageStorage : IMessageStorage
         }
     }
 
+    public async Task UpdateSessionTitleAsync(string sessionId, string title)
+    {
+        await _lock.WaitAsync();
+        try
+        {
+            var sessions = await ReadAllSessionsAsync();
+            var session = sessions.FirstOrDefault(s => s.Id == sessionId);
+            if (session != null)
+            {
+                session.Title = title;
+                session.UpdatedAt = DateTime.UtcNow;
+                await WriteAllSessionsAsync(sessions);
+            }
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
     public async Task DeleteSessionAsync(string sessionId)
     {
         await _lock.WaitAsync();

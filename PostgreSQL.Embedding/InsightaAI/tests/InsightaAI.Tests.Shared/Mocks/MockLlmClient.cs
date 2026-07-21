@@ -14,7 +14,12 @@ public class MockLlmClient : ILlmClient
     private readonly ToolCallBlock[]? _firstResponseToolCalls;
     private readonly string? _secondResponse;
     private readonly ToolCallBlock[]? _alwaysToolCalls;
+    private readonly DoneReason _firstFinishReason;
+    private readonly DoneReason _secondFinishReason;
     private int _callCount = 0;
+
+    public int CallCount => _callCount;
+    public List<LlmRequest> Requests { get; } = [];
 
     public string AdapterName => "mock";
     public bool SupportsReasoning => false;
@@ -23,12 +28,16 @@ public class MockLlmClient : ILlmClient
         string? response = null,
         ToolCallBlock[]? firstResponseToolCalls = null,
         string? secondResponse = null,
-        ToolCallBlock[]? alwaysToolCalls = null)
+        ToolCallBlock[]? alwaysToolCalls = null,
+        DoneReason firstFinishReason = DoneReason.Complete,
+        DoneReason secondFinishReason = DoneReason.Complete)
     {
         _response = response ?? "Default response";
         _firstResponseToolCalls = firstResponseToolCalls;
         _secondResponse = secondResponse;
         _alwaysToolCalls = alwaysToolCalls;
+        _firstFinishReason = firstFinishReason;
+        _secondFinishReason = secondFinishReason;
     }
 
     public LlmStream Streaming(LlmRequest request)
@@ -59,6 +68,7 @@ public class MockLlmClient : ILlmClient
     public Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken cancellationToken = default)
     {
         _callCount++;
+        Requests.Add(request);
         var text = _callCount == 1 ? _response : (_secondResponse ?? _response);
 
         var content = new List<ContentBlock> { new TextBlock { Text = text } };
@@ -74,7 +84,7 @@ public class MockLlmClient : ILlmClient
             Content = content.ToArray(),
             FinishReason = _firstResponseToolCalls != null && _callCount == 1
                 ? DoneReason.ToolCalls
-                : DoneReason.Complete,
+                : (_callCount == 1 ? _firstFinishReason : _secondFinishReason),
             Usage = new TokenUsage { InputTokens = 10, OutputTokens = 20 }
         });
     }

@@ -9,19 +9,42 @@ namespace InsightaAI.Agent.Cli.Services;
 public class ChatSession
 {
     private readonly IMessageStorage _storage;
+    private readonly SessionRecord _session;
     private readonly List<MessageRecord> _messages = [];
+    private bool _titleGenerationAttempted;
 
     public string SessionId { get; }
     public string Model { get; }
     public string Provider { get; }
+    public string? Title => _session.Title;
     public IReadOnlyList<MessageRecord> Messages => _messages;
 
     public ChatSession(IMessageStorage storage, SessionRecord session)
     {
         _storage = storage;
+        _session = session;
         SessionId = session.Id;
         Model = session.Model;
         Provider = session.Provider;
+    }
+
+    public async Task UpdateTitleAsync(string title)
+    {
+        if (string.IsNullOrWhiteSpace(title) || !string.IsNullOrWhiteSpace(_session.Title))
+            return;
+
+        _session.Title = title;
+        _session.UpdatedAt = DateTime.UtcNow;
+        await _storage.UpdateSessionTitleAsync(SessionId, title);
+    }
+
+    public bool TryBeginTitleGeneration()
+    {
+        if (_titleGenerationAttempted || !string.IsNullOrWhiteSpace(_session.Title) || _session.MessageCount != 0)
+            return false;
+
+        _titleGenerationAttempted = true;
+        return true;
     }
 
     /// <summary>

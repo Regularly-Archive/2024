@@ -16,11 +16,26 @@
 
 **当前状态：**
 - [x] TraditionalCompactStrategy 已添加 `ExtractSummary` 方法
-- [ ] 创建公共的 `SummaryService` 或 `CompactionHelper` 类
-- [ ] SessionMemoryHook 改用公共方法
+- [x] 创建公共 `ISummaryService` / `SummaryService`
+- [x] SessionMemoryHook 改用 `ISummaryService.UpdateAsync`
+- [x] TraditionalCompactStrategy 改用 `ISummaryService.SummarizeAsync`
+- [x] 全量和增量摘要统一共享结构模板
+- [x] 检查 `FinishReason`，MaxTokens 时执行激进压缩重试
+- [x] 摘要失败时不覆盖已有 Session Memory、不提交无效 TraditionalCompact
 
-**建议方案：**
-提取 `ExtractSummary` 到 `CompactionHelper` 静态类，`GenerateSummaryAsync` 作为静态方法接受 `ILlmClient` 参数。
+**最终方案：**
+在 `Context/Summary` 下建立独立服务，集中负责请求构建、模型解析、摘要提取、完整性校验、错误处理和重试；调用方只负责提供消息并消费 `SummaryResult`。
+
+### 1.1 会话标题生成（已完成）
+
+- [x] `ISummaryService.GenerateTitleAsync` 根据首条用户消息生成简短标题
+- [x] 独立 `session-title.txt` Prompt，同语言输出且禁用工具
+- [x] 标题请求与首轮 Agent 请求并行，不阻塞主要生成流程
+- [x] 推理模型输出预算从 256 tokens 起步，MaxTokens 时扩容到 512 tokens 重试
+- [x] LLM 失败时使用首条用户输入降级，Unicode 安全截断到 30 字符
+- [x] JSONL/PostgreSQL 使用 `UpdateSessionTitleAsync` 原子更新标题
+- [x] `insighta sessions` 展示 Title 列
+- [x] 覆盖全量、增量、MaxTokens、标题规范化和 fallback 的单元测试
 
 ---
 
@@ -286,3 +301,4 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 - 2026-07-13: 新增 ESC 打断 LLM 生成功能（已完成，待优化 Spectre.Console 兼容性和单元测试）
 - 2026-07-13: 新增 -c/--continue 恢复最近会话、reasoning 事件支持、工具调用 ID 一致性修复、Spectre.Console Status spinner 兼容性修复
 - 2026-07-21: 新增 MCP Telemetry Tag 命名清理待办
+- 2026-07-21: 完成统一 SummaryService、全量/增量共享模板、MaxTokens 恢复、会话标题生成及输入截取 fallback

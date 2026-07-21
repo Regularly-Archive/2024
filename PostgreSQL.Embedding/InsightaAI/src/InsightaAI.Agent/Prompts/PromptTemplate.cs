@@ -13,7 +13,7 @@ internal static class PromptTemplate
     /// <summary>
     /// 加载嵌入资源中的提示词模板
     /// </summary>
-    /// <param name="name">文件名（不含扩展名），如 "anchored-summary"</param>
+    /// <param name="name">文件名（不含扩展名），如 "incremental-summary"</param>
     /// <returns>模板内容</returns>
     public static async Task<string> LoadAsync(string name)
     {

@@ -20,6 +20,9 @@ public interface IMessageStorage
     /// <summary>更新会话</summary>
     Task UpdateSessionAsync(SessionRecord session);
 
+    /// <summary>仅更新会话标题，避免覆盖并发更新的消息计数等字段</summary>
+    Task UpdateSessionTitleAsync(string sessionId, string title);
+
     /// <summary>删除会话及其消息</summary>
     Task DeleteSessionAsync(string sessionId);
 

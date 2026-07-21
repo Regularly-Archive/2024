@@ -46,9 +46,8 @@ public class SessionMemoryHookLlmTests : IDisposable
             {
                 EnableLlmSummary = true,
                 MinRoundsBeforeLlm = 3,
-                SummaryInterval = TimeSpan.Zero,
-                SummaryClientFactory = _ => llmClient
-            });
+                SummaryInterval = TimeSpan.Zero
+            }, summaryService: CreateSummaryService(llmClient));
 
         var hookContext = new AgentEventHookContext { SessionId = sessionId };
         var messages = new List<Message> { Message.FromUser("test message") };
@@ -88,9 +87,8 @@ public class SessionMemoryHookLlmTests : IDisposable
             {
                 EnableLlmSummary = true,
                 MinRoundsBeforeLlm = 1,
-                SummaryInterval = TimeSpan.Zero,
-                SummaryClientFactory = _ => llmClient
-            });
+                SummaryInterval = TimeSpan.Zero
+            }, summaryService: CreateSummaryService(llmClient));
 
         var hookContext = new AgentEventHookContext { SessionId = sessionId };
         var messages = new List<Message> { Message.FromUser("implement session memory") };
@@ -117,9 +115,8 @@ public class SessionMemoryHookLlmTests : IDisposable
             {
                 EnableLlmSummary = true,
                 MinRoundsBeforeLlm = 1,
-                SummaryInterval = TimeSpan.Zero,
-                SummaryClientFactory = _ => llmClient
-            });
+                SummaryInterval = TimeSpan.Zero
+            }, summaryService: CreateSummaryService(llmClient));
 
         var hookContext = new AgentEventHookContext { SessionId = sessionId };
         var messages = new List<Message> { Message.FromUser("first round") };
@@ -147,9 +144,8 @@ public class SessionMemoryHookLlmTests : IDisposable
             {
                 EnableLlmSummary = true,
                 MinRoundsBeforeLlm = 1,
-                SummaryInterval = TimeSpan.Zero,
-                SummaryClientFactory = _ => llmClient
-            });
+                SummaryInterval = TimeSpan.Zero
+            }, summaryService: CreateSummaryService(llmClient));
 
         var hookContext = new AgentEventHookContext { SessionId = sessionId };
         var messages = new List<Message> { Message.FromUser("test message") };
@@ -172,8 +168,7 @@ public class SessionMemoryHookLlmTests : IDisposable
             {
                 EnableLlmSummary = true,
                 MinRoundsBeforeLlm = 1,
-                SummaryInterval = TimeSpan.Zero,
-                SummaryClientFactory = null
+                SummaryInterval = TimeSpan.Zero
             });
 
         var hookContext = new AgentEventHookContext { SessionId = sessionId };
@@ -200,9 +195,8 @@ public class SessionMemoryHookLlmTests : IDisposable
             {
                 EnableLlmSummary = true,
                 MinRoundsBeforeLlm = 1,
-                SummaryInterval = TimeSpan.Zero,
-                SummaryClientFactory = _ => llmClient
-            });
+                SummaryInterval = TimeSpan.Zero
+            }, summaryService: CreateSummaryService(llmClient));
 
         var hookContext = new AgentEventHookContext { SessionId = sessionId };
 
@@ -235,4 +229,13 @@ public class SessionMemoryHookLlmTests : IDisposable
         var memory = await hook.GetSessionMemoryAsync();
         Assert.Equal("", memory);
     }
+
+    private static InsightaAI.Agent.Context.Summary.ISummaryService CreateSummaryService(
+        InsightaAI.LLM.Abstractions.ILlmClient client) =>
+        new InsightaAI.Agent.Context.Summary.SummaryService(
+            new InsightaAI.Agent.Context.Summary.SummaryOptions
+            {
+                Model = "mock/test-model",
+                ClientFactory = _ => client
+            });
 }

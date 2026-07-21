@@ -1,0 +1,11 @@
+Summarize the conversation messages provided before this instruction.
+
+{{COMPRESSION_INSTRUCTION}}
+
+Return only one complete <summary> element. Keep its content under {{TARGET_TOKENS}} tokens.
+
+Use this exact output structure:
+
+{{SUMMARY_OUTPUT_TEMPLATE}}
+
+Preserve exact paths, commands, identifiers, and unresolved errors. Do not describe the summarization process.
