@@ -58,7 +58,7 @@ public class PostgresMessageStorage : IMessageStorage
             .FirstAsync();
     }
 
-    public async Task<List<SessionRecord>> GetSessionsAsync(string? userId = null, int limit = 50)
+    public async Task<List<SessionRecord>> GetSessionsAsync(string? userId = null, int offset = 0, int limit = 50)
     {
         var query = _db.Queryable<SessionRecord>();
 
@@ -69,6 +69,7 @@ public class PostgresMessageStorage : IMessageStorage
 
         return await query
             .OrderByDescending(s => s.UpdatedAt)
+            .Skip(offset)
             .Take(limit)
             .ToListAsync();
     }

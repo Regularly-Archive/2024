@@ -1,6 +1,7 @@
 using System.CommandLine;
 using InsightaAI.Agent.Cli.UI;
 using InsightaAI.Agent.Storage;
+using Spectre.Console;
 
 namespace InsightaAI.Agent.Cli.Commands;
 
@@ -9,6 +10,7 @@ namespace InsightaAI.Agent.Cli.Commands;
 /// </summary>
 public class SessionsCommand
 {
+    private const int PageSize = 10;
     private readonly IMessageStorage _storage;
     private readonly ChatRenderer _renderer = new();
 
@@ -22,18 +24,102 @@ public class SessionsCommand
     /// </summary>
     public Command Create()
     {
-        var command = new Command("sessions", "查看历史会话");
-        command.SetHandler(() => ExecuteAsync());
+        var command = new Command("sessions", "管理历史会话");
+        var listCommand = new Command("list", "查看历史会话");
+        listCommand.SetHandler(() => ListAsync());
+
+        var deleteCommand = new Command("delete", "删除指定会话");
+        var sessionIdOption = new Option<string?>("--sessionId", "要删除的会话 ID")
+        {
+            IsRequired = true
+        };
+        deleteCommand.AddOption(sessionIdOption);
+        deleteCommand.SetHandler((sessionId) => DeleteAsync(sessionId), sessionIdOption);
+
+        command.AddCommand(listCommand);
+        command.AddCommand(deleteCommand);
         return command;
     }
 
     /// <summary>
     /// 执行命令
     /// </summary>
-    public async Task<int> ExecuteAsync()
+    public async Task<int> ListAsync()
     {
-        var sessions = await _storage.GetSessionsAsync();
-        _renderer.ShowSessions(sessions);
+        var pageIndex = 0;
+        var sessions = await GetPageAsync(pageIndex);
+
+        if (Console.IsInputRedirected || Console.IsOutputRedirected || sessions.Count == 0)
+        {
+            _renderer.ShowSessions(sessions);
+            return 0;
+        }
+
+        var reachedEnd = sessions.Count < PageSize;
+        while (true)
+        {
+            _renderer.ShowSessions(sessions, pageIndex + 1, interactive: true, reachedEnd: reachedEnd);
+
+            var key = Console.ReadKey(intercept: true).Key;
+            if (key is ConsoleKey.Q or ConsoleKey.Escape)
+            {
+                break;
+            }
+
+            if (key is ConsoleKey.UpArrow or ConsoleKey.PageUp)
+            {
+                if (pageIndex == 0)
+                {
+                    continue;
+                }
+
+                pageIndex--;
+                sessions = await GetPageAsync(pageIndex);
+                reachedEnd = sessions.Count < PageSize;
+                continue;
+            }
+
+            if (key is not (ConsoleKey.DownArrow or ConsoleKey.PageDown) || reachedEnd)
+            {
+                continue;
+            }
+
+            var nextPage = await GetPageAsync(pageIndex + 1);
+            if (nextPage.Count == 0)
+            {
+                reachedEnd = true;
+                continue;
+            }
+
+            pageIndex++;
+            sessions = nextPage;
+            reachedEnd = sessions.Count < PageSize;
+        }
+
         return 0;
+    }
+
+    public async Task DeleteAsync(string? sessionId)
+    {
+        if (string.IsNullOrWhiteSpace(sessionId))
+        {
+            _renderer.ShowError("Session ID cannot be empty.");
+            return;
+        }
+
+        var session = await _storage.GetSessionAsync(sessionId);
+        if (session == null)
+        {
+            _renderer.ShowWarning($"Session not found: {Markup.Escape(sessionId)}");
+            return;
+        }
+
+        await _storage.DeleteSessionAsync(sessionId);
+        _renderer.ShowSuccess($"Session deleted: {Markup.Escape(sessionId)}");
+    }
+
+    private Task<List<SessionRecord>> GetPageAsync(int pageIndex)
+    {
+        return _storage.GetSessionsAsync(offset: pageIndex * PageSize, limit: PageSize);
     }
 }

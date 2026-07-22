@@ -68,7 +68,7 @@ public class JsonlMessageStorage : IMessageStorage
         return sessions.FirstOrDefault(s => s.Id == sessionId);
     }
 
-    public async Task<List<SessionRecord>> GetSessionsAsync(string? userId = null, int limit = 50)
+    public async Task<List<SessionRecord>> GetSessionsAsync(string? userId = null, int offset = 0, int limit = 50)
     {
         var sessions = await ReadAllSessionsAsync();
 
@@ -79,6 +79,7 @@ public class JsonlMessageStorage : IMessageStorage
 
         return sessions
             .OrderByDescending(s => s.UpdatedAt)
+            .Skip(offset)
             .Take(limit)
             .ToList();
     }

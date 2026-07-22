@@ -107,8 +107,17 @@ public class ChatRenderer
     /// <summary>
     /// 显示会话列表
     /// </summary>
-    public void ShowSessions(List<SessionRecord> sessions)
+    public void ShowSessions(
+        IReadOnlyList<SessionRecord> sessions,
+        int pageNumber = 1,
+        bool interactive = false,
+        bool reachedEnd = false)
     {
+        if (interactive)
+        {
+            AnsiConsole.Clear();
+        }
+
         if (sessions.Count == 0)
         {
             AnsiConsole.MarkupLine("[grey]暂无历史会话[/]");
@@ -136,6 +145,12 @@ public class ChatRenderer
         }
 
         AnsiConsole.Write(table);
+        if (interactive)
+        {
+            var previous = pageNumber > 1 ? "[blue]↑ Previous[/]" : "[grey]↑ Previous[/]";
+            var next = reachedEnd ? "[grey]↓ Next[/]" : "[blue]↓ Next[/]";
+            AnsiConsole.MarkupLine($"[grey]Page {pageNumber}[/]  {previous}  {next}  [blue]Q Quit[/]");
+        }
         AnsiConsole.MarkupLine("[grey]使用 'chat --session <id>' 继续已有会话[/]");
     }
 }
