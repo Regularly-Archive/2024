@@ -1,6 +1,8 @@
 using System.CommandLine;
 using System.Text;
 using InsightaAI.Agent.Cli.Commands;
+using InsightaAI.Agent.Cli.Localization;
+using InsightaAI.Agent.Cli.Models;
 using InsightaAI.Agent.Diagnostics;
 using InsightaAI.Agent.Storage;
 using OpenTelemetry;
@@ -18,6 +20,9 @@ public class Program
     {
         // 设置控制台编码为 UTF-8（修复全局工具模式下特殊字符显示为问号的问题）
         Console.OutputEncoding = Encoding.UTF8;
+        var language = Environment.GetEnvironmentVariable("INSIGHTA_LANGUAGE")
+            ?? CliConfig.Load().Language;
+        CliCulture.Configure(language);
 
         // 初始化 OpenTelemetry（通过环境变量 INSIGHTA_TELEMETRY=1 启用）
         using var telemetry = InitTelemetry();

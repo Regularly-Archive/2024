@@ -1,3 +1,4 @@
+using InsightaAI.Agent.Cli.Localization;
 using InsightaAI.Agent.Storage;
 using Spectre.Console;
 
@@ -77,7 +78,7 @@ public class ChatRenderer
     /// </summary>
     public void ShowError(string message)
     {
-        AnsiConsole.MarkupLine($"[red]错误: {message}[/]");
+        AnsiConsole.MarkupLine($"[red]{CliStrings.ErrorPrefix}: {message}[/]");
     }
 
     /// <summary>
@@ -120,18 +121,18 @@ public class ChatRenderer
 
         if (sessions.Count == 0)
         {
-            AnsiConsole.MarkupLine("[grey]暂无历史会话[/]");
+            AnsiConsole.MarkupLine($"[grey]{CliStrings.SessionListEmpty}[/]");
             return;
         }
 
         var table = new Table()
             .Border(TableBorder.Rounded)
-            .AddColumn("ID")
-            .AddColumn("Title")
-            .AddColumn("Provider")
-            .AddColumn("Model")
-            .AddColumn("Messages")
-            .AddColumn("Created At");
+            .AddColumn(CliStrings.SessionListFieldId)
+            .AddColumn(CliStrings.SessionListFieldTitle)
+            .AddColumn(CliStrings.SessionListFieldProvider)
+            .AddColumn(CliStrings.SessionListFieldModel)
+            .AddColumn(CliStrings.SessionListFieldMessages)
+            .AddColumn(CliStrings.SessionListFieldCreatedAt);
 
         foreach (var s in sessions)
         {
@@ -147,10 +148,15 @@ public class ChatRenderer
         AnsiConsole.Write(table);
         if (interactive)
         {
-            var previous = pageNumber > 1 ? "[blue]↑ Previous[/]" : "[grey]↑ Previous[/]";
-            var next = reachedEnd ? "[grey]↓ Next[/]" : "[blue]↓ Next[/]";
-            AnsiConsole.MarkupLine($"[grey]Page {pageNumber}[/]  {previous}  {next}  [blue]Q Quit[/]");
+            var previous = pageNumber > 1
+                ? $"[blue]↑ {CliStrings.SessionListPrevious}[/]"
+                : $"[grey]↑ {CliStrings.SessionListPrevious}[/]";
+            var next = reachedEnd
+                ? $"[grey]↓ {CliStrings.SessionListNext}[/]"
+                : $"[blue]↓ {CliStrings.SessionListNext}[/]";
+            var page = CliStrings.Format("SessionListPageFormat", pageNumber);
+            AnsiConsole.MarkupLine($"[grey]{page}[/]  {previous}  {next}  [blue]Q {CliStrings.SessionListQuit}[/]");
         }
-        AnsiConsole.MarkupLine("[grey]使用 'chat --session <id>' 继续已有会话[/]");
+        AnsiConsole.MarkupLine($"[grey]{CliStrings.SessionListContinueHint}[/]");
     }
 }

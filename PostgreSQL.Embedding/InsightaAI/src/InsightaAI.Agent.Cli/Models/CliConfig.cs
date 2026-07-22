@@ -199,6 +199,12 @@ public class CliConfig
         ".skills");
 
     /// <summary>
+    /// CLI display language: auto, en-US, or zh-CN.
+    /// </summary>
+    [JsonPropertyName("language")]
+    public string Language { get; set; } = "auto";
+
+    /// <summary>
     /// 模型配置字典，key 为 "provider/model_key" 格式
     /// </summary>
     [JsonPropertyName("models")]

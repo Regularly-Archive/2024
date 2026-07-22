@@ -1,4 +1,5 @@
 using System.CommandLine;
+using InsightaAI.Agent.Cli.Localization;
 using InsightaAI.Agent.Cli.UI;
 using InsightaAI.Agent.Storage;
 using Spectre.Console;
@@ -24,12 +25,12 @@ public class SessionsCommand
     /// </summary>
     public Command Create()
     {
-        var command = new Command("sessions", "管理历史会话");
-        var listCommand = new Command("list", "查看历史会话");
+        var command = new Command("sessions", CliStrings.SessionsDescription);
+        var listCommand = new Command("list", CliStrings.SessionsListDescription);
         listCommand.SetHandler(() => ListAsync());
 
-        var deleteCommand = new Command("delete", "删除指定会话");
-        var sessionIdOption = new Option<string?>("--sessionId", "要删除的会话 ID")
+        var deleteCommand = new Command("delete", CliStrings.SessionsDeleteDescription);
+        var sessionIdOption = new Option<string?>("--sessionId", CliStrings.SessionsDeleteSessionIdOption)
         {
             IsRequired = true
         };
@@ -103,19 +104,19 @@ public class SessionsCommand
     {
         if (string.IsNullOrWhiteSpace(sessionId))
         {
-            _renderer.ShowError("Session ID cannot be empty.");
+            _renderer.ShowError(CliStrings.SessionIdEmpty);
             return;
         }
 
         var session = await _storage.GetSessionAsync(sessionId);
         if (session == null)
         {
-            _renderer.ShowWarning($"Session not found: {Markup.Escape(sessionId)}");
+            _renderer.ShowWarning(CliStrings.Format("SessionNotFoundFormat", Markup.Escape(sessionId)));
             return;
         }
 
         await _storage.DeleteSessionAsync(sessionId);
-        _renderer.ShowSuccess($"Session deleted: {Markup.Escape(sessionId)}");
+        _renderer.ShowSuccess(CliStrings.Format("SessionDeletedFormat", Markup.Escape(sessionId)));
     }
 
     private Task<List<SessionRecord>> GetPageAsync(int pageIndex)

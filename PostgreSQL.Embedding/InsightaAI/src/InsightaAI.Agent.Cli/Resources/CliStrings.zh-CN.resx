@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="SessionsDescription" xml:space="preserve"><value>管理历史会话</value></data>
+  <data name="SessionsListDescription" xml:space="preserve"><value>查看历史会话</value></data>
+  <data name="SessionsDeleteDescription" xml:space="preserve"><value>删除指定会话</value></data>
+  <data name="SessionsDeleteSessionIdOption" xml:space="preserve"><value>要删除的会话 ID</value></data>
+  <data name="SessionIdEmpty" xml:space="preserve"><value>会话 ID 不能为空。</value></data>
+  <data name="SessionNotFoundFormat" xml:space="preserve"><value>未找到会话：{0}</value></data>
+  <data name="SessionDeletedFormat" xml:space="preserve"><value>会话已删除：{0}</value></data>
+  <data name="SessionListEmpty" xml:space="preserve"><value>暂无历史会话</value></data>
+  <data name="ErrorPrefix" xml:space="preserve"><value>错误</value></data>
+  <data name="SessionListFieldId" xml:space="preserve"><value>ID</value></data>
+  <data name="SessionListFieldTitle" xml:space="preserve"><value>标题</value></data>
+  <data name="SessionListFieldProvider" xml:space="preserve"><value>提供商</value></data>
+  <data name="SessionListFieldModel" xml:space="preserve"><value>模型</value></data>
+  <data name="SessionListFieldMessages" xml:space="preserve"><value>消息数</value></data>
+  <data name="SessionListFieldCreatedAt" xml:space="preserve"><value>创建时间</value></data>
+  <data name="SessionListPageFormat" xml:space="preserve"><value>第 {0} 页</value></data>
+  <data name="SessionListPrevious" xml:space="preserve"><value>上一页</value></data>
+  <data name="SessionListNext" xml:space="preserve"><value>下一页</value></data>
+  <data name="SessionListQuit" xml:space="preserve"><value>退出</value></data>
+  <data name="SessionListContinueHint" xml:space="preserve"><value>使用 'chat --session &lt;id&gt;' 继续已有会话</value></data>
+</root>
