@@ -54,7 +54,7 @@ public sealed class AgentLoop
         var stopwatch = Stopwatch.StartNew();
 
         // 发送开始事件
-        yield return new AgentSessionStartEvent
+        yield return new AgentTurnStartEvent
         {
             AgentId = _config.Id,
             AgentName = _config.Name,
@@ -155,7 +155,7 @@ public sealed class AgentLoop
                     HasToolCalls = false
                 };
 
-                yield return new AgentSessionEndEvent
+                yield return new AgentTurnEndEvent
                 {
                     AgentId = _config.Id,
                     Result = new AgentResult
@@ -174,14 +174,6 @@ public sealed class AgentLoop
                 yield break;
             }
 
-            // 有工具调用，执行工具
-            yield return new AgentRoundEndEvent
-            {
-                AgentId = _config.Id,
-                Round = round,
-                HasToolCalls = true
-            };
-
             // 执行工具
             if (_config.ParallelToolExecution && toolCalls.Length > 1)
             {
@@ -197,6 +189,13 @@ public sealed class AgentLoop
                     yield return evt;
                 }
             }
+
+            yield return new AgentRoundEndEvent
+            {
+                AgentId = _config.Id,
+                Round = round,
+                HasToolCalls = true
+            };
 
             // 将工具执行结果加入对话历史
             foreach (var result in _toolCallExecutor.Results)
@@ -277,7 +276,7 @@ public sealed class AgentLoop
         context.AddMessage(finalMessage);
         stopwatch.Stop();
 
-        yield return new AgentSessionEndEvent
+        yield return new AgentTurnEndEvent
         {
             AgentId = _config.Id,
             Result = new AgentResult

@@ -30,7 +30,7 @@ public class EventRenderer : IDisposable
     {
         switch (agentEvent)
         {
-            case AgentSessionStartEvent:
+            case AgentTurnStartEvent:
                 break;
 
             case AgentLlmStreamEvent llmEvent:
@@ -45,7 +45,7 @@ public class EventRenderer : IDisposable
                 HandleToolEnd(toolEnd);
                 break;
 
-            case AgentSessionEndEvent completeEvent:
+            case AgentTurnEndEvent completeEvent:
                 await HandleCompleteAsync(completeEvent);
                 break;
 
@@ -148,7 +148,7 @@ public class EventRenderer : IDisposable
         _lastText = string.Empty;
     }
 
-    private async Task HandleCompleteAsync(AgentSessionEndEvent completeEvent)
+    private async Task HandleCompleteAsync(AgentTurnEndEvent completeEvent)
     {
         await StopThinkingAsync();
 

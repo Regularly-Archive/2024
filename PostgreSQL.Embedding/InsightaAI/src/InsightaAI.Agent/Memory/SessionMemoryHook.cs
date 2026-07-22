@@ -129,7 +129,7 @@ public sealed class SessionMemoryHook : IAgentEventHook
     /// <summary>
     /// 会话结束时触发
     /// </summary>
-    public Task OnAgentSessionEndedAsync(
+    public Task OnAgentTurnEndedAsync(
         AgentEventHookContext context,
         IReadOnlyList<Message> messages,
         CancellationToken cancellationToken = default)

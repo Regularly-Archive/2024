@@ -14,7 +14,7 @@ public sealed record SystemPromptParams
     /// <summary>项目级上下文（AGENTS.md），来自工作目录</summary>
     public string? AgentsMd { get; init; }
 
-    /// <summary>全部可用 Skills（Builder 内部排除已激活的）</summary>
+    /// <summary>全部可用 Skills 的元数据（包含已激活的 Skills）</summary>
     public IReadOnlyList<SkillMetadata>? AllSkills { get; init; }
 
     /// <summary>已激活的 Skills（含 Instructions）</summary>

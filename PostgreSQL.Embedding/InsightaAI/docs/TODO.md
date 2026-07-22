@@ -293,6 +293,29 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 
 ---
 
+### 13. Agent 事件与 Hook 生命周期整理（优先级：高）
+
+**生命周期定义：**
+- `Session`：持久化聊天会话，可包含多次用户交互
+- `Turn`：一次 `RunStreamAsync`，完整处理一条用户输入
+- `Round`：Turn 内的一次 LLM 推理及其工具调用
+- 当前不引入 `TurnId`；单条事件流天然对应一个 Turn，继续使用 `SessionId` 关联持久会话
+
+**已完成：**
+- [x] `AgentSessionStart/End` 统一重命名为 `AgentTurnStart/End`
+- [x] `IAgentEventHook` 生命周期方法同步调整为 `OnAgentTurnStartedAsync` / `OnAgentTurnEndedAsync`
+- [x] Telemetry span 与标签从 session 生命周期语义调整为 turn
+- [x] 串行和并行工具执行均改为在全部 `ToolEnd` 事件之后发送 `AgentRoundEndEvent`
+
+**待处理：**
+- [ ] Hook 必要的内部处理在对外 `yield return` 事件前完成，避免消费者提前停止枚举导致 Hook 未执行
+- [ ] `AgentEventHookContext.Event` 改为不可变事件快照，消除共享可变 Context 在 fire-and-forget Hook 中的竞态
+- [ ] 统一 Hook 调度语义：调度过程可等待，耗时后台工作由具体 Hook 自行启动
+- [ ] 设计并接入 `AgentErrorEvent` 异常生命周期，明确 Failed、Cancelled、Recoverable 和是否重新抛出
+- [ ] 真正的 Chat Session 创建、归档、删除事件由会话存储或应用层负责，不放入 `AgentLoop`
+
+---
+
 ## 记录时间
 - 2026-07-03: 创建文档，记录当前待办事项
 - 2026-07-15: 新增 Agent 依赖注入待办、TiktokenTokenEstimator、测试失败清单
@@ -302,3 +325,4 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 - 2026-07-13: 新增 -c/--continue 恢复最近会话、reasoning 事件支持、工具调用 ID 一致性修复、Spectre.Console Status spinner 兼容性修复
 - 2026-07-21: 新增 MCP Telemetry Tag 命名清理待办
 - 2026-07-21: 完成统一 SummaryService、全量/增量共享模板、MaxTokens 恢复、会话标题生成及输入截取 fallback
+- 2026-07-22: 统一 Agent Turn/Round 生命周期术语，调整 RoundEnd 与工具调用顺序，记录 Hook 与 ErrorEvent 后续工作

@@ -6,15 +6,15 @@ using InsightaAI.LLM.Models;
 namespace InsightaAI.Agent.Diagnostics;
 
 /// <summary>
-/// IAgentEventHook 实现 — 在 session/round 级别创建 OpenTelemetry span 并记录 metrics
+/// IAgentEventHook 实现 — 在 turn/round 级别创建 OpenTelemetry span 并记录 metrics
 /// </summary>
 /// <remarks>
 /// 假设单线程顺序调用（Agent 按 round 顺序依次调用 hook 方法）。
-/// 如果未来支持并发 round，需要对 _sessionActivity / _roundActivity 加锁。
+/// 如果未来支持并发 round，需要对 _turnActivityContext / _roundActivity 加锁。
 /// </remarks>
 public sealed class AgentEventTelemetryHook : IAgentEventHook
 {
-    private ActivityContext _sessionActivityContext;
+    private ActivityContext _turnActivityContext;
     private Activity? _roundActivity;
     private ActivityContext _roundActivityContext;
     private Stopwatch? _roundStopwatch;
@@ -38,19 +38,19 @@ public sealed class AgentEventTelemetryHook : IAgentEventHook
         _sessionId = sessionId;
     }
 
-    public Task OnAgentSessionStartedAsync(AgentEventHookContext context, string message, CancellationToken cancellationToken = default)
+    public Task OnAgentTurnStartedAsync(AgentEventHookContext context, string message, CancellationToken cancellationToken = default)
     {
-        // 创建 session span
-        using var sessionActivity = TelemetryConstants.ActivitySource.StartActivity(
-            "insighta.agent.session_start", ActivityKind.Internal);
+        // 创建 turn span
+        using var turnActivity = TelemetryConstants.ActivitySource.StartActivity(
+            "insighta.agent.turn_start", ActivityKind.Internal);
 
-        if (sessionActivity != null)
+        if (turnActivity != null)
         {
-            sessionActivity.SetTag("agent.id", _agentId);
-            sessionActivity.SetTag("agent.name", _agentName);
-            sessionActivity.SetTag("gen_ai.request.model", _model);
-            sessionActivity.SetTag("session.id", _sessionId);
-            _sessionActivityContext = sessionActivity.Context;
+            turnActivity.SetTag("agent.id", _agentId);
+            turnActivity.SetTag("agent.name", _agentName);
+            turnActivity.SetTag("gen_ai.request.model", _model);
+            turnActivity.SetTag("session.id", _sessionId);
+            _turnActivityContext = turnActivity.Context;
         }
 
         _currentRound = 0;
@@ -71,7 +71,7 @@ public sealed class AgentEventTelemetryHook : IAgentEventHook
 
         _currentRound++;
         _roundActivity = TelemetryConstants.ActivitySource.StartActivity(
-            "insighta.agent.round", ActivityKind.Internal, parentContext: _sessionActivityContext);
+            "insighta.agent.round", ActivityKind.Internal, parentContext: _turnActivityContext);
 
         if (_roundActivity != null)
         {
@@ -90,23 +90,23 @@ public sealed class AgentEventTelemetryHook : IAgentEventHook
         return Task.CompletedTask;
     }
 
-    public Task OnAgentSessionEndedAsync(
+    public Task OnAgentTurnEndedAsync(
         AgentEventHookContext context,
         IReadOnlyList<Message> messages,
         CancellationToken cancellationToken = default)
     {
         EndRoundActivity();
 
-        using var sessionActivity = TelemetryConstants.ActivitySource.StartActivity(
-            "insighta.agent.session_end", ActivityKind.Internal, parentContext: _sessionActivityContext);
+        using var turnActivity = TelemetryConstants.ActivitySource.StartActivity(
+            "insighta.agent.turn_end", ActivityKind.Internal, parentContext: _turnActivityContext);
 
-        sessionActivity.SetTag("session.id", _sessionId);
-        sessionActivity.SetTag("session.total_rounds", _currentRound);
+        turnActivity.SetTag("session.id", _sessionId);
+        turnActivity.SetTag("turn.total_rounds", _currentRound);
 
-        var sessionEndEvt = context.Event as AgentSessionEndEvent;
-        sessionActivity.SetTag("session.duration_ms", sessionEndEvt.Result.DurationMs);
+        var turnEndEvt = context.Event as AgentTurnEndEvent;
+        turnActivity.SetTag("turn.duration_ms", turnEndEvt.Result.DurationMs);
 
-        sessionActivity.SetStatus(ActivityStatusCode.Ok);
+        turnActivity.SetStatus(ActivityStatusCode.Ok);
 
         if (_agentId != null)
         {

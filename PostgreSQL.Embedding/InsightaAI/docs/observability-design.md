@@ -2,7 +2,7 @@
 
 ## 1. Background & Problem
 
-Agent 运行涉及多个异步层次（session → round → LLM request → tool call），排查问题困难：
+Agent 运行涉及多个异步层次（turn → round → LLM request → tool call），排查问题困难：
 
 - **缺少 trace 链路**：无法追踪一次用户请求经过哪些 LLM 调用和工具执行
 - **缺少 metrics**：看不到 token 消耗、延迟分布、缓存命中率
@@ -13,7 +13,7 @@ Agent 运行涉及多个异步层次（session → round → LLM request → too
 1. **OpenTelemetry 原生**：使用 System.Diagnostics 内置 API，零额外依赖（仅 OTel API）
 2. **装饰器模式**：不侵入 Agent 核心逻辑，通过 proxy/wrapper 注入
 3. **跨 AsyncLocal 边界**：通过静态字典解决 yield 边界 Activity.Current 丢失问题
-4. **分层 Span 树**：session → round → llm_request / tool_call
+4. **分层 Span 树**：turn → round → llm_request / tool_call
 
 ## 3. Architecture Overview
 
@@ -26,10 +26,10 @@ TelemetryConstants                    # 集中管理 ActivitySource、Meter、Co
 └── CurrentRoundContext               # ConcurrentDictionary<string, ActivityContext>
 
 AgentEventTelemetryHook               # IAgentEventHook 实现
-├── OnAgentSessionStartedAsync        → 创建 session span，记录 agent.id/model
+├── OnAgentTurnStartedAsync           → 创建 turn span，记录 agent.id/model
 ├── OnAgentRoundStartedAsync          → 创建 round span，写入字典供 proxy 查找
 ├── OnAgentRoundEndedAsync            → 关闭 round span，记录 round.duration_ms
-└── OnAgentSessionEndedAsync          → 关闭 session span，清理字典
+└── OnAgentTurnEndedAsync             → 关闭 turn span，清理字典
 
 LlmClientTelemetryProxy               # ILlmClient 装饰器
 ├── Streaming()                       → 创建 llm_request span，包装 LlmStream
@@ -52,7 +52,7 @@ AgentTelemetryExtensions              # 便捷扩展方法
 ## 4. Span Hierarchy
 
 ```
-insighta.agent.session_start
+insighta.agent.turn_start
 ├── insighta.agent.round (round 1)
 │   ├── insighta.llm.request
 │   │   └── gen_ai.usage.* (tags + metrics)
@@ -61,7 +61,7 @@ insighta.agent.session_start
 ├── insighta.agent.round (round 2)
 │   ├── insighta.llm.request
 │   └── insighta.agent.tool_call (glob)
-└── insighta.agent.session_end
+└── insighta.agent.turn_end
 ```
 
 ## 5. Key Design Decisions
@@ -93,9 +93,9 @@ return TelemetryConstants.ActivitySource.StartActivity(
     name, ActivityKind.Client, parentContext: roundActivityContext);
 ```
 
-### 5.2 Session Span 生命周期
+### 5.2 Turn Span 生命周期
 
-Session span 在 `OnAgentSessionStartedAsync` 中创建并立即 Dispose。设计意图是让 session span 仅作为 trace 链路的锚点，实际时长通过 `session_end` span 记录。
+Turn span 在 `OnAgentTurnStartedAsync` 中创建并立即 Dispose。设计意图是让 turn span 仅作为 trace 链路的锚点，实际时长通过 `turn_end` span 记录。持久会话仍通过 `session.id` 关联多个 turn。
 
 ### 5.3 Metrics 命名
 

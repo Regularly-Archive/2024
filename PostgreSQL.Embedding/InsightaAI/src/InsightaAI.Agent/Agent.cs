@@ -274,9 +274,9 @@ public class Agent : IDisposable
     }
 
     /// <summary>
-    /// 触发 agent 级别的启动钩子（在任何轮次开始前调用）
+    /// 触发 Agent Turn 启动钩子（在任何轮次开始前调用）
     /// </summary>
-    private async Task TriggerSessionStartedHooksAsync(
+    private async Task TriggerTurnStartedHooksAsync(
         AgentEventHookContext context,
         string message,
         CancellationToken cancellationToken)
@@ -288,7 +288,7 @@ public class Agent : IDisposable
         {
             try
             {
-                await hook.OnAgentSessionStartedAsync(context, message, cancellationToken);
+                await hook.OnAgentTurnStartedAsync(context, message, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -359,9 +359,9 @@ public class Agent : IDisposable
     }
 
     /// <summary>
-    /// 触发 agent 级别的会话结束钩子
+    /// 触发 Agent Turn 结束钩子
     /// </summary>
-    private async Task TriggerSessionEndedHooksAsync(
+    private async Task TriggerTurnEndedHooksAsync(
         AgentEventHookContext context,
         List<Message> messages,
         CancellationToken cancellationToken)
@@ -373,7 +373,7 @@ public class Agent : IDisposable
         {
             try
             {
-                await hook.OnAgentSessionEndedAsync(context, messages, cancellationToken);
+                await hook.OnAgentTurnEndedAsync(context, messages, cancellationToken);
             }
             catch (Exception e)
             {
@@ -491,9 +491,9 @@ public class Agent : IDisposable
             // 事件后处理
             switch (evt)
             {
-                case AgentSessionStartEvent sessionStartEvt:
-                    hookContext.AttachEvent(sessionStartEvt);
-                    await TriggerSessionStartedHooksAsync(hookContext, input, cancellationToken);
+                case AgentTurnStartEvent turnStartEvt:
+                    hookContext.AttachEvent(turnStartEvt);
+                    await TriggerTurnStartedHooksAsync(hookContext, input, cancellationToken);
                     break;
 
                 case AgentRoundStartEvent roundStartEvt:
@@ -522,9 +522,9 @@ public class Agent : IDisposable
                         loopContext.Messages.ToList(), lastAssistantMessage, cancellationToken);
                     break;
 
-                case AgentSessionEndEvent sessionEndEvent:
-                    hookContext.AttachEvent(sessionEndEvent);
-                    await TriggerSessionEndedHooksAsync(hookContext,
+                case AgentTurnEndEvent turnEndEvent:
+                    hookContext.AttachEvent(turnEndEvent);
+                    await TriggerTurnEndedHooksAsync(hookContext,
                         loopContext.Messages.ToList(), cancellationToken);
                     break;
             }
@@ -608,7 +608,7 @@ public class Agent : IDisposable
 
         await foreach (var evt in RunStreamAsync(input, context, cancellationToken))
         {
-            if (evt is AgentSessionEndEvent completeEvent)
+            if (evt is AgentTurnEndEvent completeEvent)
             {
                 result = completeEvent.Result;
             }

@@ -199,7 +199,7 @@ public class SessionMemoryHookTests : IDisposable
     }
 
     [Fact]
-    public async Task OnSessionEndAsync_Should_NotThrow()
+    public async Task OnTurnEndAsync_Should_NotThrow()
     {
         // Arrange
         var hook = new SessionMemoryHook(TestSessionId, TestUserId, options: new SessionMemoryOptions { EnableLlmSummary = false });
@@ -209,6 +209,6 @@ public class SessionMemoryHookTests : IDisposable
         };
 
         // Act & Assert - 不应抛异常
-        await hook.OnAgentSessionEndedAsync(null, messages);
+        await hook.OnAgentTurnEndedAsync(null, messages);
     }
 }

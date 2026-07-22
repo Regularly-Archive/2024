@@ -12,12 +12,12 @@ public interface IAgentEventHook
     string Id { get; }
 
     /// <summary>
-    /// Agent 启动时的钩子（在任何轮次开始前触发，用于初始化会话级资源）
+    /// Agent Turn 启动时的钩子（在任何轮次开始前触发）
     /// </summary>
     /// <param name="context">Hook 上下文</param>
     /// <param name="message">用户输入消息</param>
     /// <param name="cancellationToken">取消令牌</param>
-    Task OnAgentSessionStartedAsync(
+    Task OnAgentTurnStartedAsync(
         AgentEventHookContext context,
         string message,
         CancellationToken cancellationToken = default) => Task.CompletedTask;
@@ -47,11 +47,11 @@ public interface IAgentEventHook
         CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     /// <summary>
-    /// 会话结束时的钩子
+    /// Agent Turn 结束时的钩子
     /// </summary>
     /// <param name="messages">完整对话历史</param>
     /// <param name="cancellationToken">取消令牌</param>
-    Task OnAgentSessionEndedAsync(
+    Task OnAgentTurnEndedAsync(
         AgentEventHookContext context,
         IReadOnlyList<Message> messages,
         CancellationToken cancellationToken = default) => Task.CompletedTask;

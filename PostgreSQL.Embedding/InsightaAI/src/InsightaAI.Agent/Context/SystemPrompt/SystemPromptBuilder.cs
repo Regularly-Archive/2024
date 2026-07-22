@@ -37,15 +37,10 @@ public static class SystemPromptBuilder
             sb.Append(p.SystemPrompt);
         }
 
-        // Layer 4A: 可用 Skills（排除已激活的）
+        // Layer 4A: 全部 Skills 的元数据（名称和描述）
         if (p.AllSkills is { Count: > 0 })
         {
-            var activatedNames = p.ActivatedSkills?
-                .Select(s => s.Metadata.Name)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? [];
-
             var available = p.AllSkills
-                .Where(s => !activatedNames.Contains(s.Name))
                 .OrderBy(s => s.Name, StringComparer.Ordinal)
                 .ToList();
 

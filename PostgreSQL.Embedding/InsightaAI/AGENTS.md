@@ -96,7 +96,7 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 
 ### Skills & MCP 动态管理
 
-- 已激活 Skill 从 available 列表自动排除（去重）
+- Layer 4A 始终展示全部 Skill 的名称和描述；已激活 Skill 另外在 Layer 4D 注入完整 Instructions
 - `_activatedSkills` List<ISkill> 替代 `_skillInstructions` 字符串累加
 - `LoadAgentsMd()` 懒加载，仅读一次
 
