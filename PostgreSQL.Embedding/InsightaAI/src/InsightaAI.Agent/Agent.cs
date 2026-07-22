@@ -246,7 +246,7 @@ public class Agent : IDisposable
 
         return await Context.SystemPrompt.SystemPromptBuilder.BuildAsync(new Context.SystemPrompt.SystemPromptParams
         {
-            SystemPrompt = _config.SystemPrompt ?? "",
+            CustomInstructions = _config.CustomInstructions,
             AgentsMd = LoadAgentsMd(),
             AllSkills = allSkills,
             ActivatedSkills = _activatedSkills,
@@ -549,9 +549,9 @@ public class Agent : IDisposable
         // 构建消息列表
         var messages = new List<Message>();
 
-        if (!string.IsNullOrEmpty(_config.SystemPrompt))
+        if (!string.IsNullOrEmpty(_config.CustomInstructions))
         {
-            messages.Add(Message.FromSystem(_config.SystemPrompt));
+            messages.Add(Message.FromSystem(_config.CustomInstructions));
         }
 
         if (context?.History != null)

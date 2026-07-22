@@ -217,19 +217,10 @@ public class CliConfig
     public string? SecondaryModel { get; set; }
 
     /// <summary>
-    /// 系统提示词
+    /// 用户自定义指令（作为动态 System Prompt 的 Layer 3）
     /// </summary>
-    [JsonPropertyName("system_prompt")]
-    public string SystemPrompt { get; set; } = """
-        You are a helpful AI assistant with access to various tools.
-
-        When you need to use a tool:
-        1. First, briefly explain what you're about to do (1-2 sentences)
-        2. Then call the tool
-        3. After getting the result, summarize or explain the outcome
-
-        Keep your responses concise and conversational. Use the user's language to respond.
-        """;
+    [JsonPropertyName("custom_instructions")]
+    public string CustomInstructions { get; set; } = "";
 
     /// <summary>
     /// 最大工具调用轮次

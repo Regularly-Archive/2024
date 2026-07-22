@@ -194,6 +194,7 @@ public class ChatCommand
         string initialUserMessage)
     {
         var title = await summaryService.GenerateTitleAsync(initialUserMessage);
+
         if (!string.IsNullOrWhiteSpace(title))
             await session.UpdateTitleAsync(title);
     }
@@ -414,7 +415,7 @@ public class ChatCommand
         {
             Id = "cli-agent",
             Name = "InsightaAI CLI",
-            SystemPrompt = config.SystemPrompt,
+            CustomInstructions = config.CustomInstructions,
             Model = model.ModelId,
             MaxTokens = model.MaxTokens,
             MaxToolRounds = config.MaxToolRounds,

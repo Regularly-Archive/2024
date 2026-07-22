@@ -106,11 +106,11 @@ internal sealed class NodeExecutor
                 ? _toolRegistryFactory(node.ToolNames)
                 : new ToolRegistry();
 
-            // 3. 覆盖 SystemPrompt
+            // 3. 使用节点指令覆盖 Agent 的 CustomInstructions
             var config = agentConfig;
             if (!string.IsNullOrEmpty(node.SystemPrompt))
             {
-                config = config with { SystemPrompt = node.SystemPrompt };
+                config = config with { CustomInstructions = node.SystemPrompt };
             }
 
             // 4. 构建输入文本

@@ -84,7 +84,7 @@ f806a75 refactor: extract AgentLoop and add auto message persistence
 ```
 Layer 1: core-instructions.txt   框架内置规则（工具协议、安全、格式）
 Layer 2: AGENTS.md（本文件）      项目级上下文
-Layer 3: AgentConfig.SystemPrompt 用户定制指令
+Layer 3: AgentConfig.CustomInstructions 用户自定义指令（默认留空）
 Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 ```
 

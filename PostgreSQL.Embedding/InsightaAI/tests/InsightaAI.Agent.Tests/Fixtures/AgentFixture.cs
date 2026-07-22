@@ -43,7 +43,7 @@ public class AgentFixture : IDisposable
         {
             Id = "openai-agent",
             Name = "OpenAI Agent",
-            SystemPrompt = systemPrompt ?? "You are a helpful assistant. Use tools when appropriate.",
+            CustomInstructions = systemPrompt ?? "You are a helpful assistant. Use tools when appropriate.",
             Model = Config.OpenAIModel,
             MaxToolRounds = maxToolRounds
         };
@@ -63,7 +63,7 @@ public class AgentFixture : IDisposable
         {
             Id = "anthropic-agent",
             Name = "Anthropic Agent",
-            SystemPrompt = systemPrompt ?? "You are a helpful assistant. Use tools when appropriate.",
+            CustomInstructions = systemPrompt ?? "You are a helpful assistant. Use tools when appropriate.",
             Model = Config.AnthropicModel,
             MaxToolRounds = maxToolRounds
         };
@@ -102,7 +102,7 @@ public class AgentFixture : IDisposable
         {
             Id = $"{provider}-agent",
             Name = $"{provider} Agent",
-            SystemPrompt = systemPrompt ?? "You are a helpful assistant.",
+            CustomInstructions = systemPrompt ?? "You are a helpful assistant.",
             Model = model,
             MaxToolRounds = maxToolRounds
         };

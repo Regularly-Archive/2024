@@ -39,8 +39,8 @@ public sealed record AgentConfig
     /// <summary>Agent 名称</summary>
     public required string Name { get; init; }
 
-    /// <summary>系统提示词</summary>
-    public required string SystemPrompt { get; init; }
+    /// <summary>用户自定义指令（作为动态 System Prompt 的 Layer 3）</summary>
+    public string CustomInstructions { get; init; } = "";
 
     /// <summary>使用的模型</summary>
     public required string Model { get; init; }

@@ -6,6 +6,17 @@ namespace InsightaAI.Agent.Tests.Context;
 public class SystemPromptBuilderTests
 {
     [Fact]
+    public async Task BuildAsync_Should_Include_Custom_Instructions()
+    {
+        var result = await SystemPromptBuilder.BuildAsync(new SystemPromptParams
+        {
+            CustomInstructions = "Always answer in Chinese."
+        });
+
+        Assert.Contains("Always answer in Chinese.", result);
+    }
+
+    [Fact]
     public async Task BuildAsync_Should_List_Activated_Skill_In_Available_Skills()
     {
         var metadata = new SkillMetadata
@@ -16,7 +27,7 @@ public class SystemPromptBuilderTests
 
         var result = await SystemPromptBuilder.BuildAsync(new SystemPromptParams
         {
-            SystemPrompt = "",
+            CustomInstructions = "",
             AllSkills = [metadata],
             ActivatedSkills = [new TestSkill(metadata, "Test skill instructions")]
         });
@@ -30,7 +41,7 @@ public class SystemPromptBuilderTests
     {
         var result = await SystemPromptBuilder.BuildAsync(new SystemPromptParams
         {
-            SystemPrompt = "",
+            CustomInstructions = "",
             AllSkills =
             [
                 new SkillMetadata { Name = "zeta", Description = "Zeta description" },

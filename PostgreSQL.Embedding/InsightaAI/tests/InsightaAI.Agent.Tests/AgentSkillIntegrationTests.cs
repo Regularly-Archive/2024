@@ -157,7 +157,7 @@ public class AgentSkillIntegrationTests
     {
         Id = "test-agent",
         Name = "Test Agent",
-        SystemPrompt = "You are a helpful assistant.",
+        CustomInstructions = "You are a helpful assistant.",
         Model = "test-model",
         MaxToolRounds = 5
     };

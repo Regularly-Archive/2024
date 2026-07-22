@@ -8,8 +8,8 @@ namespace InsightaAI.Agent.Context.SystemPrompt;
 /// </summary>
 public sealed record SystemPromptParams
 {
-    /// <summary>Agent 系统提示词（来自 AgentConfig）</summary>
-    public required string SystemPrompt { get; init; }
+    /// <summary>用户自定义指令（来自 AgentConfig）</summary>
+    public string CustomInstructions { get; init; } = "";
 
     /// <summary>项目级上下文（AGENTS.md），来自工作目录</summary>
     public string? AgentsMd { get; init; }

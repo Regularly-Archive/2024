@@ -157,7 +157,10 @@ public sealed partial class TaskPlanner
         var sb = new StringBuilder();
         foreach (var agent in team.Agents)
         {
-            sb.AppendLine($"- {agent.Id}: {agent.SystemPrompt?.Truncate(100) ?? "No description"}");
+            var description = string.IsNullOrWhiteSpace(agent.CustomInstructions)
+                ? "No description"
+                : agent.CustomInstructions.Truncate(100);
+            sb.AppendLine($"- {agent.Id}: {description}");
         }
         return sb.ToString();
     }

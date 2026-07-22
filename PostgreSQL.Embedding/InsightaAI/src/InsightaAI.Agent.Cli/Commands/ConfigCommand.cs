@@ -41,7 +41,7 @@ public class ConfigCommand
                         "管理 Providers（认证配置）",
                         "管理 Models（模型配置）",
                         "选择主模型",
-                        "编辑系统提示词",
+                        "编辑自定义指令",
                         "编辑其他设置",
                         "保存并退出"
                     ]));
@@ -57,8 +57,8 @@ public class ConfigCommand
                 case "选择主模型":
                     SelectPrimaryModel(config);
                     break;
-                case "编辑系统提示词":
-                    EditSystemPrompt(config);
+                case "编辑自定义指令":
+                    EditCustomInstructions(config);
                     break;
                 case "编辑其他设置":
                     EditOtherSettings(config);
@@ -337,11 +337,12 @@ public class ConfigCommand
         }
     }
 
-    private void EditSystemPrompt(CliConfig config)
+    private void EditCustomInstructions(CliConfig config)
     {
-        config.SystemPrompt = AnsiConsole.Prompt(
-            new TextPrompt<string>("系统提示词:")
-                .DefaultValue(config.SystemPrompt));
+        config.CustomInstructions = AnsiConsole.Prompt(
+            new TextPrompt<string>("自定义指令:")
+                .AllowEmpty()
+                .DefaultValue(config.CustomInstructions));
     }
 
     private void EditOtherSettings(CliConfig config)

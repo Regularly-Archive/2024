@@ -13,7 +13,7 @@ public static class SystemPromptBuilder
 
     /// <summary>
     /// 组装 system prompt
-    /// Layer 1: Core Instructions → Layer 2: AGENTS.md → Layer 3: Agent SystemPrompt → Layer 4: Dynamic Context
+    /// Layer 1: Core Instructions → Layer 2: AGENTS.md → Layer 3: Custom Instructions → Layer 4: Dynamic Context
     /// </summary>
     public static async Task<string> BuildAsync(SystemPromptParams p)
     {
@@ -30,11 +30,11 @@ public static class SystemPromptBuilder
             sb.Append(p.AgentsMd);
         }
 
-        // Layer 3: Agent SystemPrompt（用户定制指令）
-        if (!string.IsNullOrWhiteSpace(p.SystemPrompt))
+        // Layer 3: Custom Instructions（用户定制指令）
+        if (!string.IsNullOrWhiteSpace(p.CustomInstructions))
         {
             sb.AppendLine();
-            sb.Append(p.SystemPrompt);
+            sb.Append(p.CustomInstructions);
         }
 
         // Layer 4A: 全部 Skills 的元数据（名称和描述）
