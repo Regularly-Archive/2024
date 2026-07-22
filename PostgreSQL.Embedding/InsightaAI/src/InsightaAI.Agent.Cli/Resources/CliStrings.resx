@@ -24,4 +24,46 @@
   <data name="SessionListNext" xml:space="preserve"><value>Next</value></data>
   <data name="SessionListQuit" xml:space="preserve"><value>Quit</value></data>
   <data name="SessionListContinueHint" xml:space="preserve"><value>Use 'chat --session &lt;id&gt;' to continue a session</value></data>
+  <data name="CommonCancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="ScopeGlobal" xml:space="preserve"><value>Global</value></data>
+  <data name="ScopeProject" xml:space="preserve"><value>Project</value></data>
+  <data name="ScopeOptionDescription" xml:space="preserve"><value>Scope: global or project</value></data>
+  <data name="ScopeOptionDescriptionWithDefault" xml:space="preserve"><value>Scope: global or project (default: global)</value></data>
+  <data name="McpDescription" xml:space="preserve"><value>Manage MCP server configuration</value></data>
+  <data name="McpListDescription" xml:space="preserve"><value>List MCP servers</value></data>
+  <data name="McpAddDescription" xml:space="preserve"><value>Add an MCP server</value></data>
+  <data name="McpRemoveDescription" xml:space="preserve"><value>Remove an MCP server</value></data>
+  <data name="McpNameArgumentDescription" xml:space="preserve"><value>Server name</value></data>
+  <data name="McpTransportOptionDescription" xml:space="preserve"><value>Transport: stdio or sse</value></data>
+  <data name="McpCommandOptionDescription" xml:space="preserve"><value>Executable path for stdio transport</value></data>
+  <data name="McpArgsOptionDescription" xml:space="preserve"><value>Command-line arguments</value></data>
+  <data name="McpUrlOptionDescription" xml:space="preserve"><value>Endpoint URL for SSE transport</value></data>
+  <data name="McpDescriptionOptionDescription" xml:space="preserve"><value>Server description</value></data>
+  <data name="McpListEmpty" xml:space="preserve"><value>No MCP servers configured</value></data>
+  <data name="McpListFieldName" xml:space="preserve"><value>Name</value></data>
+  <data name="McpListFieldTransport" xml:space="preserve"><value>Transport</value></data>
+  <data name="McpListFieldEndpoint" xml:space="preserve"><value>Endpoint / Command</value></data>
+  <data name="McpListFieldDescription" xml:space="preserve"><value>Description</value></data>
+  <data name="McpOverwritePromptFormat" xml:space="preserve"><value>MCP server '{0}' already exists. Overwrite it?</value></data>
+  <data name="McpSseUrlRequired" xml:space="preserve"><value>SSE transport requires --url</value></data>
+  <data name="McpStdioCommandRequired" xml:space="preserve"><value>stdio transport requires --command</value></data>
+  <data name="McpAddedFormat" xml:space="preserve"><value>MCP server '{0}' added to {1} scope</value></data>
+  <data name="McpRemovedFormat" xml:space="preserve"><value>MCP server removed from {0} scope: {1}</value></data>
+  <data name="McpNotFoundFormat" xml:space="preserve"><value>MCP server not found: {0}</value></data>
+  <data name="SkillsDescription" xml:space="preserve"><value>Manage Agent Skills</value></data>
+  <data name="SkillsListDescription" xml:space="preserve"><value>List available Skills</value></data>
+  <data name="SkillsInstallDescription" xml:space="preserve"><value>Install a Skill</value></data>
+  <data name="SkillsUninstallDescription" xml:space="preserve"><value>Uninstall a Skill</value></data>
+  <data name="SkillsPathArgumentDescription" xml:space="preserve"><value>Skill directory path</value></data>
+  <data name="SkillsNameArgumentDescription" xml:space="preserve"><value>Skill name</value></data>
+  <data name="SkillsListEmpty" xml:space="preserve"><value>No Skills found</value></data>
+  <data name="SkillsListFieldName" xml:space="preserve"><value>Name</value></data>
+  <data name="SkillsListFieldDescription" xml:space="preserve"><value>Description</value></data>
+  <data name="SkillSourceDirectoryNotFoundFormat" xml:space="preserve"><value>Directory does not exist: {0}</value></data>
+  <data name="SkillManifestMissing" xml:space="preserve"><value>SKILL.md was not found in the directory</value></data>
+  <data name="SkillManifestInvalid" xml:space="preserve"><value>Could not parse SKILL.md. Check its format</value></data>
+  <data name="SkillOverwritePromptFormat" xml:space="preserve"><value>Skill '{0}' already exists. Overwrite it?</value></data>
+  <data name="SkillInstalledFormat" xml:space="preserve"><value>Skill '{0}' installed to: {1}</value></data>
+  <data name="SkillNotFoundFormat" xml:space="preserve"><value>Skill not found: {0}</value></data>
+  <data name="SkillRemovedFormat" xml:space="preserve"><value>Skill removed from {0} scope: {1}</value></data>
 </root>

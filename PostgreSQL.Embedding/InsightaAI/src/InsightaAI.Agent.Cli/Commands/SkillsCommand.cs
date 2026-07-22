@@ -1,4 +1,5 @@
 using System.CommandLine;
+using InsightaAI.Agent.Cli.Localization;
 using InsightaAI.Agent.Cli.Models;
 using InsightaAI.Agent.Skills;
 using InsightaAI.Agent.Skills.Local;
@@ -16,26 +17,26 @@ public class SkillsCommand
     /// </summary>
     public Command Create()
     {
-        var command = new Command("skills", "管理 Agent Skills");
+        var command = new Command("skills", CliStrings.SkillsDescription);
 
         // list 子命令
-        var listCommand = new Command("list", "列出所有可用的 Skills");
-        var scopeOption = new Option<string?>("--scope", "指定范围: global 或 project");
+        var listCommand = new Command("list", CliStrings.SkillsListDescription);
+        var scopeOption = new Option<string?>("--scope", CliStrings.ScopeOptionDescription);
         listCommand.AddOption(scopeOption);
         listCommand.SetHandler((scope) => ListSkillsAsync(scope), scopeOption);
 
         // install 子命令
-        var installCommand = new Command("install", "安装 Skill");
-        var pathArgument = new Argument<string>("path", "Skill 目录路径");
-        var installScopeOption = new Option<string?>("--scope", "指定范围: global 或 project (默认 global)");
+        var installCommand = new Command("install", CliStrings.SkillsInstallDescription);
+        var pathArgument = new Argument<string>("path", CliStrings.SkillsPathArgumentDescription);
+        var installScopeOption = new Option<string?>("--scope", CliStrings.ScopeOptionDescriptionWithDefault);
         installCommand.AddArgument(pathArgument);
         installCommand.AddOption(installScopeOption);
         installCommand.SetHandler((path, scope) => InstallSkillAsync(path, scope), pathArgument, installScopeOption);
 
         // uninstall 子命令
-        var uninstallCommand = new Command("uninstall", "卸载 Skill");
-        var nameArgument = new Argument<string>("name", "Skill 名称");
-        var uninstallScopeOption = new Option<string?>("--scope", "指定范围: global 或 project");
+        var uninstallCommand = new Command("uninstall", CliStrings.SkillsUninstallDescription);
+        var nameArgument = new Argument<string>("name", CliStrings.SkillsNameArgumentDescription);
+        var uninstallScopeOption = new Option<string?>("--scope", CliStrings.ScopeOptionDescription);
         uninstallCommand.AddArgument(nameArgument);
         uninstallCommand.AddOption(uninstallScopeOption);
         uninstallCommand.SetHandler((name, scope) => UninstallSkillAsync(name, scope), nameArgument, uninstallScopeOption);
@@ -72,11 +73,12 @@ public class SkillsCommand
     /// </summary>
     private async Task ListSkillsInDirectory(string skillsDir, string scopeName)
     {
-        AnsiConsole.MarkupLine($"[bold blue]{scopeName} Skills[/] ({skillsDir})");
+        var directory = Markup.Escape(skillsDir);
+        AnsiConsole.MarkupLine($"[bold blue]{GetScopeDisplayName(scopeName)}[/] [dim]({directory})[/]");
 
         if (!Directory.Exists(skillsDir))
         {
-            AnsiConsole.MarkupLine("[dim]  目录不存在[/]");
+            AnsiConsole.MarkupLine($"[dim]  {CliStrings.SkillsListEmpty}[/]");
             return;
         }
 
@@ -90,18 +92,18 @@ public class SkillsCommand
 
         if (skills.Count == 0)
         {
-            AnsiConsole.MarkupLine("[dim]  没有安装任何 Skills[/]");
+            AnsiConsole.MarkupLine($"[dim]  {CliStrings.SkillsListEmpty}[/]");
             return;
         }
 
         var table = new Table()
-            .AddColumn("Name")
-            .AddColumn("Description")
+            .AddColumn(CliStrings.SkillsListFieldName)
+            .AddColumn(CliStrings.SkillsListFieldDescription)
             .Border(TableBorder.Rounded);
 
         foreach (var skill in skills)
         {
-            table.AddRow(skill.Name, skill.Description);
+            table.AddRow(new Text(skill.Name), new Text(skill.Description ?? string.Empty));
         }
 
         AnsiConsole.Write(table);
@@ -117,14 +119,17 @@ public class SkillsCommand
         // 验证源路径
         if (!Directory.Exists(sourcePath))
         {
-            AnsiConsole.MarkupLine($"[red]错误: 目录不存在: {sourcePath}[/]");
+            var message = CliStrings.Format(
+                "SkillSourceDirectoryNotFoundFormat",
+                Markup.Escape(sourcePath));
+            AnsiConsole.MarkupLine($"[red]{CliStrings.ErrorPrefix}: {message}[/]");
             return;
         }
 
         var skillMdPath = Path.Combine(sourcePath, "SKILL.md");
         if (!File.Exists(skillMdPath))
         {
-            AnsiConsole.MarkupLine("[red]错误: 目录中没有找到 SKILL.md 文件[/]");
+            AnsiConsole.MarkupLine($"[red]{CliStrings.ErrorPrefix}: {CliStrings.SkillManifestMissing}[/]");
             return;
         }
 
@@ -134,7 +139,7 @@ public class SkillsCommand
 
         if (metadata == null)
         {
-            AnsiConsole.MarkupLine("[red]错误: 无法解析 SKILL.md 文件，请检查格式[/]");
+            AnsiConsole.MarkupLine($"[red]{CliStrings.ErrorPrefix}: {CliStrings.SkillManifestInvalid}[/]");
             return;
         }
 
@@ -149,10 +154,11 @@ public class SkillsCommand
         // 检查是否已存在
         if (Directory.Exists(skillTargetDir))
         {
-            var overwrite = AnsiConsole.Confirm($"Skill '{metadata.Name}' 已存在，是否覆盖?");
+            var overwrite = AnsiConsole.Confirm(
+                CliStrings.Format("SkillOverwritePromptFormat", Markup.Escape(metadata.Name)));
             if (!overwrite)
             {
-                AnsiConsole.MarkupLine("[yellow]已取消[/]");
+                AnsiConsole.MarkupLine($"[yellow]{CliStrings.CommonCancelled}[/]");
                 return;
             }
             Directory.Delete(skillTargetDir, true);
@@ -161,7 +167,11 @@ public class SkillsCommand
         // 复制目录
         CopyDirectory(sourcePath, skillTargetDir);
 
-        AnsiConsole.MarkupLine($"[green]✓[/] Skill '{metadata.Name}' 已安装到: {skillTargetDir}");
+        var installed = CliStrings.Format(
+            "SkillInstalledFormat",
+            Markup.Escape(metadata.Name),
+            Markup.Escape(skillTargetDir));
+        AnsiConsole.MarkupLine($"[green]✓[/] {installed}");
     }
 
     /// <summary>
@@ -185,7 +195,8 @@ public class SkillsCommand
 
         if (!removed)
         {
-            AnsiConsole.MarkupLine($"[yellow]未找到 Skill: {skillName}[/]");
+            var message = CliStrings.Format("SkillNotFoundFormat", Markup.Escape(skillName));
+            AnsiConsole.MarkupLine($"[yellow]{message}[/]");
         }
     }
 
@@ -213,8 +224,19 @@ public class SkillsCommand
         }
 
         Directory.Delete(skillDir, true);
-        AnsiConsole.MarkupLine($"[green]✓[/] 已从 {scopeName} 范围删除 Skill: {skillName}");
+        var message = CliStrings.Format(
+            "SkillRemovedFormat",
+            GetScopeDisplayName(scopeName),
+            Markup.Escape(skillName));
+        AnsiConsole.MarkupLine($"[green]✓[/] {message}");
         return true;
+    }
+
+    private static string GetScopeDisplayName(string scope)
+    {
+        return scope.Equals("project", StringComparison.OrdinalIgnoreCase)
+            ? CliStrings.ScopeProject
+            : CliStrings.ScopeGlobal;
     }
 
     /// <summary>

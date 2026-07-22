@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
-using System.Text.RegularExpressions;
+using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.NamingConventions;
 
 namespace InsightaAI.Agent.Skills.Local;
 
@@ -7,8 +8,13 @@ namespace InsightaAI.Agent.Skills.Local;
 /// 本地文件系统 Skill 提供者
 /// 扫描指定目录下的 SKILL.md 文件
 /// </summary>
-public partial class LocalSkillProvider : ISkillProvider
+public class LocalSkillProvider : ISkillProvider
 {
+    private static readonly IDeserializer FrontmatterDeserializer = new DeserializerBuilder()
+        .WithNamingConvention(HyphenatedNamingConvention.Instance)
+        .IgnoreUnmatchedProperties()
+        .Build();
+
     private readonly string _skillsDirectory;
 
     public string ProviderName => "local";
@@ -169,64 +175,39 @@ public partial class LocalSkillProvider : ISkillProvider
     }
 
     /// <summary>
-    /// 简单的 YAML 解析（只支持 flat key-value 和嵌套 metadata）
+    /// 使用标准 YAML 解析器解析 frontmatter
     /// </summary>
     private static SkillMetadata ParseYamlMetadata(string yaml)
     {
-        string? name = null;
-        string? description = null;
-        string? allowedTools = null;
+        var frontmatter = FrontmatterDeserializer.Deserialize<SkillFrontmatter>(yaml)
+            ?? throw new InvalidOperationException("SKILL.md frontmatter is empty");
 
-        var lines = yaml.Split('\n');
-        string? currentKey = null;
-
-        foreach (var rawLine in lines)
-        {
-            var line = rawLine.TrimEnd('\r').TrimEnd();
-
-            // 跳过空行和注释
-            if (string.IsNullOrWhiteSpace(line) || line.TrimStart().StartsWith("#"))
-            {
-                continue;
-            }
-
-            // 检查是否是顶级 key
-            var match = TopLevelKeyRegex().Match(line);
-            if (match.Success)
-            {
-                currentKey = match.Groups[1].Value.Trim();
-                var value = match.Groups[2].Value.Trim().Trim('"', '\'');
-
-                switch (currentKey)
-                {
-                    case "name":
-                        name = value;
-                        break;
-                    case "description":
-                        description = value;
-                        break;
-                    case "allowed-tools":
-                        allowedTools = value;
-                        break;
-                }
-            }
-        }
-
-        if (string.IsNullOrEmpty(name))
+        if (string.IsNullOrWhiteSpace(frontmatter.Name))
         {
             throw new InvalidOperationException("SKILL.md frontmatter must contain 'name' field");
         }
 
-        if (string.IsNullOrEmpty(description))
+        if (string.IsNullOrWhiteSpace(frontmatter.Description))
         {
             throw new InvalidOperationException("SKILL.md frontmatter must contain 'description' field");
         }
 
         return new SkillMetadata
         {
-            Name = name,
-            Description = description,
-            AllowedTools = allowedTools
+            Name = frontmatter.Name,
+            Description = frontmatter.Description,
+            AllowedTools = FormatAllowedTools(frontmatter.AllowedTools)
+        };
+    }
+
+    private static string? FormatAllowedTools(object? allowedTools)
+    {
+        return allowedTools switch
+        {
+            null => null,
+            string value => value,
+            IEnumerable<object> values => string.Join(" ", values),
+            _ => allowedTools.ToString()
         };
     }
 
@@ -236,6 +217,12 @@ public partial class LocalSkillProvider : ISkillProvider
         return Path.Combine(userProfile, ".agents", "skills");
     }
 
-    [GeneratedRegex(@"^(\w[\w-]*):\s*(.*)$")]
-    private static partial Regex TopLevelKeyRegex();
+    private sealed class SkillFrontmatter
+    {
+        public string? Name { get; init; }
+
+        public string? Description { get; init; }
+
+        public object? AllowedTools { get; init; }
+    }
 }

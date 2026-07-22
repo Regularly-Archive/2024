@@ -1,4 +1,5 @@
 using System.CommandLine;
+using InsightaAI.Agent.Cli.Localization;
 using InsightaAI.Agent.Cli.Models;
 using InsightaAI.Agent.Mcp;
 using InsightaAI.Agent.Mcp.Local;
@@ -26,23 +27,23 @@ public class McpCommand
     /// </summary>
     public Command Create()
     {
-        var command = new Command("mcp", "管理 MCP 服务器配置");
+        var command = new Command("mcp", CliStrings.McpDescription);
 
         // list 子命令
-        var listCommand = new Command("list", "列出所有 MCP 服务器");
-        var listScopeOption = new Option<string?>("--scope", "指定范围: global 或 project");
+        var listCommand = new Command("list", CliStrings.McpListDescription);
+        var listScopeOption = new Option<string?>("--scope", CliStrings.ScopeOptionDescription);
         listCommand.AddOption(listScopeOption);
         listCommand.SetHandler((scope) => ListAsync(scope), listScopeOption);
 
         // add 子命令
-        var addCommand = new Command("add", "添加 MCP 服务器");
-        var nameArgument = new Argument<string>("name", "服务器名称");
-        var transportOption = new Option<string>("--transport", () => "stdio", "传输方式: stdio 或 sse");
-        var commandOption = new Option<string?>("--command", "stdio 模式的可执行文件路径");
-        var argsOption = new Option<string?>("--args", "命令行参数");
-        var urlOption = new Option<string?>("--url", "SSE 模式的端点 URL");
-        var descriptionOption = new Option<string?>("--description", "服务器描述");
-        var addScopeOption = new Option<string?>("--scope", "指定范围: global 或 project (默认 global)");
+        var addCommand = new Command("add", CliStrings.McpAddDescription);
+        var nameArgument = new Argument<string>("name", CliStrings.McpNameArgumentDescription);
+        var transportOption = new Option<string>("--transport", () => "stdio", CliStrings.McpTransportOptionDescription);
+        var commandOption = new Option<string?>("--command", CliStrings.McpCommandOptionDescription);
+        var argsOption = new Option<string?>("--args", CliStrings.McpArgsOptionDescription);
+        var urlOption = new Option<string?>("--url", CliStrings.McpUrlOptionDescription);
+        var descriptionOption = new Option<string?>("--description", CliStrings.McpDescriptionOptionDescription);
+        var addScopeOption = new Option<string?>("--scope", CliStrings.ScopeOptionDescriptionWithDefault);
 
         addCommand.AddArgument(nameArgument);
         addCommand.AddOption(transportOption);
@@ -56,9 +57,9 @@ public class McpCommand
             nameArgument, transportOption, commandOption, argsOption, urlOption, descriptionOption, addScopeOption);
 
         // remove 子命令
-        var removeCommand = new Command("remove", "移除 MCP 服务器");
-        var removeNameArgument = new Argument<string>("name", "服务器名称");
-        var removeScopeOption = new Option<string?>("--scope", "指定范围: global 或 project");
+        var removeCommand = new Command("remove", CliStrings.McpRemoveDescription);
+        var removeNameArgument = new Argument<string>("name", CliStrings.McpNameArgumentDescription);
+        var removeScopeOption = new Option<string?>("--scope", CliStrings.ScopeOptionDescription);
         removeCommand.AddArgument(removeNameArgument);
         removeCommand.AddOption(removeScopeOption);
         removeCommand.SetHandler((name, scope) => RemoveAsync(name, scope), removeNameArgument, removeScopeOption);
@@ -99,34 +100,39 @@ public class McpCommand
 
         foreach (var (scopeName, provider) in providers)
         {
-            AnsiConsole.MarkupLine($"[bold blue]{scopeName} MCP Servers[/]");
+            var directory = Markup.Escape(GetScopeDirectory(scopeName));
+            AnsiConsole.MarkupLine($"[bold blue]{GetScopeDisplayName(scopeName)}[/] [dim]({directory})[/]");
 
             var servers = await provider.GetServersAsync();
             if (servers.Count == 0)
             {
-                AnsiConsole.MarkupLine("[dim]  没有配置 MCP 服务器[/]");
+                AnsiConsole.MarkupLine($"[dim]  {CliStrings.McpListEmpty}[/]");
                 if (providers.Count > 1) AnsiConsole.WriteLine();
                 continue;
             }
 
             var table = new Table()
-                .AddColumn("Name")
-                .AddColumn("Transport")
-                .AddColumn("Endpoint / Command")
-                .AddColumn("Description")
+                .AddColumn(CliStrings.McpListFieldName)
+                .AddColumn(CliStrings.McpListFieldTransport)
+                .AddColumn(CliStrings.McpListFieldEndpoint)
+                .AddColumn(CliStrings.McpListFieldDescription)
                 .Border(TableBorder.Rounded);
 
             foreach (var server in servers)
             {
                 var endpoint = server.Transport == "stdio"
-                    ? server.Command ?? ""
+                    ? string.Join(
+                        " ",
+                        new[] { server.Command ?? "" }
+                            .Concat(server.Args ?? [])
+                            .Where(part => !string.IsNullOrWhiteSpace(part)))
                     : server.Endpoint ?? "";
 
                 table.AddRow(
-                    server.Name,
-                    server.Transport,
-                    endpoint,
-                    server.Description ?? "");
+                    new Text(server.Name),
+                    new Text(server.Transport),
+                    new Text(endpoint),
+                    new Text(server.Description ?? ""));
             }
 
             AnsiConsole.Write(table);
@@ -156,23 +162,23 @@ public class McpCommand
         if (existing != null)
         {
             var overwrite = AnsiConsole.Confirm(
-                $"MCP 服务器 '{name}' 已存在，是否覆盖?", false);
+                CliStrings.Format("McpOverwritePromptFormat", Markup.Escape(name)), false);
             if (!overwrite)
             {
-                AnsiConsole.MarkupLine("[yellow]已取消[/]");
+                AnsiConsole.MarkupLine($"[yellow]{CliStrings.CommonCancelled}[/]");
                 return;
             }
         }
 
         if (transport == "sse" && string.IsNullOrEmpty(url))
         {
-            AnsiConsole.MarkupLine("[red]错误: SSE 模式需要指定 --url[/]");
+            AnsiConsole.MarkupLine($"[red]{CliStrings.ErrorPrefix}: {CliStrings.McpSseUrlRequired}[/]");
             return;
         }
 
         if (transport == "stdio" && string.IsNullOrEmpty(command))
         {
-            AnsiConsole.MarkupLine("[red]错误: stdio 模式需要指定 --command[/]");
+            AnsiConsole.MarkupLine($"[red]{CliStrings.ErrorPrefix}: {CliStrings.McpStdioCommandRequired}[/]");
             return;
         }
 
@@ -189,7 +195,11 @@ public class McpCommand
         };
 
         await provider.AddServerAsync(config);
-        AnsiConsole.MarkupLine($"[green]✓[/] MCP 服务器 '{name}' 已添加到 {targetScope} 范围");
+        var added = CliStrings.Format(
+            "McpAddedFormat",
+            Markup.Escape(name),
+            GetScopeDisplayName(targetScope));
+        AnsiConsole.MarkupLine($"[green]✓[/] {added}");
     }
 
     /// <summary>
@@ -206,13 +216,34 @@ public class McpCommand
             if (existing == null) continue;
 
             await provider.RemoveServerAsync(name);
-            AnsiConsole.MarkupLine($"[green]✓[/] 已从 {scopeName} 范围移除 MCP 服务器: {name}");
+            var message = CliStrings.Format(
+                "McpRemovedFormat",
+                GetScopeDisplayName(scopeName),
+                Markup.Escape(name));
+            AnsiConsole.MarkupLine($"[green]✓[/] {message}");
             removed = true;
         }
 
         if (!removed)
         {
-            AnsiConsole.MarkupLine($"[yellow]未找到 MCP 服务器: {name}[/]");
+            var message = CliStrings.Format("McpNotFoundFormat", Markup.Escape(name));
+            AnsiConsole.MarkupLine($"[yellow]{message}[/]");
         }
+    }
+
+    private static string GetScopeDisplayName(string scope)
+    {
+        return scope.Equals("project", StringComparison.OrdinalIgnoreCase)
+            ? CliStrings.ScopeProject
+            : CliStrings.ScopeGlobal;
+    }
+
+    private static string GetScopeDirectory(string scope)
+    {
+        var configPath = scope.Equals("project", StringComparison.OrdinalIgnoreCase)
+            ? ProjectMcpConfigPath
+            : GlobalMcpConfigPath;
+
+        return Path.GetDirectoryName(configPath) ?? configPath;
     }
 }
