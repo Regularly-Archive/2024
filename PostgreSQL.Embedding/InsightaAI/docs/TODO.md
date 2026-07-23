@@ -328,11 +328,16 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 - [x] `IAgentEventHook` 生命周期方法同步调整为 `OnAgentTurnStartedAsync` / `OnAgentTurnEndedAsync`
 - [x] Telemetry span 与标签从 session 生命周期语义调整为 turn
 - [x] 串行和并行工具执行均改为在全部 `ToolEnd` 事件之后发送 `AgentRoundEndEvent`
+- [x] Hook 触发移到 `yield return` 之前，消费者提前退出不丢失 Hook 工作
+- [x] 四个 Trigger 方法统一为 fire-and-forget 并行调度（`SafeInvokeHookAsync`）
+- [x] 移除 `OnHookError` 静态事件，Hook 异常仅写日志
+- [x] Agent 注入 `ILogger<Agent>`，`Debug.WriteLine` 替换为结构化日志
+- [x] `Agent.LogEvent()` 记录 TurnStart/End、RoundStart/End、ToolStart/End、Error、ContextCompacted
+- [x] CLI 层通过 Serilog 配置文件日志（`~/.insighta/logs/{date}.log`）
+- [x] `list_skills` 工具供 Agent 运行时查询可用技能
 
 **待处理：**
-- [ ] Hook 必要的内部处理在对外 `yield return` 事件前完成，避免消费者提前停止枚举导致 Hook 未执行
 - [ ] `AgentEventHookContext.Event` 改为不可变事件快照，消除共享可变 Context 在 fire-and-forget Hook 中的竞态
-- [ ] 统一 Hook 调度语义：调度过程可等待，耗时后台工作由具体 Hook 自行启动
 - [ ] 设计并接入 `AgentErrorEvent` 异常生命周期，明确 Failed、Cancelled、Recoverable 和是否重新抛出
 - [ ] 真正的 Chat Session 创建、归档、删除事件由会话存储或应用层负责，不放入 `AgentLoop`
 
@@ -349,3 +354,4 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 - 2026-07-21: 完成统一 SummaryService、全量/增量共享模板、MaxTokens 恢复、会话标题生成及输入截取 fallback
 - 2026-07-22: 统一 Agent Turn/Round 生命周期术语，调整 RoundEnd 与工具调用顺序，记录 Hook 与 ErrorEvent 后续工作
 - 2026-07-23: 完成 CLI 全命令国际化（ChatCommand + ChatRenderer + EventRenderer，41 处硬编码字符串提取到 resx）
+- 2026-07-23: Hook 调度统一（fire-and-forget、yield 前触发、SafeInvokeHookAsync）、ILogger 注入、Serilog 文件日志、LogEvent 事件日志、list_skills 工具

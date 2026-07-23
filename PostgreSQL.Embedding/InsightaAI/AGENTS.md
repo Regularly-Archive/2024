@@ -29,8 +29,8 @@ src/
 ### Agent 核心三层
 
 ```
-Agent.cs (606行)        → 初始化、依赖管理、系统提示词、事件消费、Hook 触发
-AgentLoop.cs (319行)    → 核心循环（LLM 调用 → 工具执行 → 消息累积）
+Agent.cs                → 初始化、依赖管理、系统提示词、事件消费、Hook 触发、事件日志
+AgentLoop.cs (318行)    → 核心循环（LLM 调用 → 工具执行 → 消息累积）
 ILoopContext.cs (40行)  → 消息管理、上下文压缩
 ```
 
@@ -65,11 +65,22 @@ TraditionalCompactThreshold: 80%
 ### Hook 体系
 
 - `IToolHook` — 工具执行前后拦截（权限控制、日志）
-- `IAgentHook` — Agent 生命周期拦截（会话启动、记忆抽取）
+- `IAgentEventHook` — Agent 生命周期观察（Turn/Round Start/End，记忆抽取、Telemetry）
+- 四个 Trigger 方法统一为 fire-and-forget 并行调度，通过 `SafeInvokeHookAsync` 处理异常（仅日志，不上报前台）
+- Hook 触发在 `yield return` 之前执行，确保消费者提前退出时不丢失关键工作
+
+### 日志系统（2026-07-23）
+
+- Agent 依赖 `ILogger<Agent>`（`Microsoft.Extensions.Logging.Abstractions`），不直接引用日志实现
+- CLI 层通过 Serilog + `Serilog.Sinks.File` 提供文件日志
+- 日志路径：`~/.insighta/logs/{date}.log`（按天滚动，保留 14 天）
+- `Agent.LogEvent()` 记录 TurnStart/End、RoundStart/End、ToolStart/End、Error、ContextCompacted
+- 跳过 `AgentLlmStreamEvent`（避免日志爆炸）
 
 ## 最近提交（2026-07-23）
 
 ```
+6fe63c2 refactor(agent): unify hook dispatch, add ILogger and list_skills tool
 f1f4bff feat(cli): introduce localization for config command and split config into subcommands
 5bb3c69 refactor(agent): implement 4-layer system prompt architecture with AGENTS.md support
 c321d78 fix: resolve naming inconsistencies in telemetry constants
@@ -98,6 +109,8 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 ### Skills & MCP 动态管理
 
 - Layer 4A 始终展示全部 Skill 的名称和描述；已激活 Skill 另外在 Layer 4D 注入完整 Instructions
+- `list_skills` 工具供 Agent 运行时查询所有可用技能及激活状态
+- `activate_skill` 工具激活技能后将 Instructions 注入系统提示词
 - `_activatedSkills` List<ISkill> 替代 `_skillInstructions` 字符串累加
 - `LoadAgentsMd()` 懒加载，仅读一次
 
@@ -161,13 +174,22 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 
 4. **AgentBuilder 生命周期** — 构造函数未默认注册 `ToolRegistry`，用户不调用 `WithToolRegistry()` 会抛异常。
 
+5. **Hook 生命周期整理（部分完成）** — 调度统一、日志注入已完成；剩余：`AgentEventHookContext.Event` 改不可变快照、`AgentErrorEvent` 接入。
+
+6. **日志 Token 用量为 0** — 部分模型（如 `glm-5.2`）在 streaming 模式下不返回 Usage，日志中 `inputTokens=0` 无法区分"未返回"和"真 0"。
+
 ### TODO.md 重点项
 
 - [x] 摘要服务统一（全量/增量摘要、会话标题、MaxTokens 恢复与 fallback）
 - [x] MicroCompact 阈值优化与工具结果生命周期重构（45-65-80）
 - [x] CLI 全命令国际化（ChatCommand + ChatRenderer + EventRenderer，41 处字符串提取到 resx）
+- [x] Hook 调度统一（fire-and-forget 并行、yield 前触发、SafeInvokeHookAsync）
+- [x] Agent 注入 `ILogger<Agent>` + Serilog 文件日志 + `LogEvent` 事件日志
+- [x] `list_skills` 工具（运行时技能发现）
 - [ ] Memory 轻量化索引
 - [ ] AgentBuilder 默认注册 `ToolRegistry`
+- [ ] `AgentEventHookContext.Event` 改不可变事件快照
+- [ ] `AgentErrorEvent` 接入 AgentLoop
 - [ ] L3 Orchestrator 继续开发
 - [ ] MCP Telemetry Tag 命名清理（`mcp.server.description`→`mcp.config.description`，去重 transport）
 
