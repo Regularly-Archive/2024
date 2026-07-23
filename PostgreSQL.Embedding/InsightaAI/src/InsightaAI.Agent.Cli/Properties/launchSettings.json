@@ -2,7 +2,7 @@
   "profiles": {
     "InsightaAI.Agent.Cli": {
       "commandName": "Project",
-      "commandLineArgs": "chat --session d4a6487a7f38"
+      "commandLineArgs": "chat"
     }
   }
 }

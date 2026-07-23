@@ -1,69 +1,489 @@
 <?xml version="1.0" encoding="utf-8"?>
 <root>
-  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
-  <resheader name="version"><value>2.0</value></resheader>
-  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
-  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
-  <data name="SessionsDescription" xml:space="preserve"><value>Manage chat sessions</value></data>
-  <data name="SessionsListDescription" xml:space="preserve"><value>List chat sessions</value></data>
-  <data name="SessionsDeleteDescription" xml:space="preserve"><value>Delete a chat session</value></data>
-  <data name="SessionsDeleteSessionIdOption" xml:space="preserve"><value>ID of the session to delete</value></data>
-  <data name="SessionIdEmpty" xml:space="preserve"><value>Session ID cannot be empty.</value></data>
-  <data name="SessionNotFoundFormat" xml:space="preserve"><value>Session not found: {0}</value></data>
-  <data name="SessionDeletedFormat" xml:space="preserve"><value>Session deleted: {0}</value></data>
-  <data name="SessionListEmpty" xml:space="preserve"><value>No chat sessions found</value></data>
-  <data name="ErrorPrefix" xml:space="preserve"><value>Error</value></data>
-  <data name="SessionListFieldId" xml:space="preserve"><value>ID</value></data>
-  <data name="SessionListFieldTitle" xml:space="preserve"><value>Title</value></data>
-  <data name="SessionListFieldProvider" xml:space="preserve"><value>Provider</value></data>
-  <data name="SessionListFieldModel" xml:space="preserve"><value>Model</value></data>
-  <data name="SessionListFieldMessages" xml:space="preserve"><value>Messages</value></data>
-  <data name="SessionListFieldCreatedAt" xml:space="preserve"><value>Created At</value></data>
-  <data name="SessionListPageFormat" xml:space="preserve"><value>Page {0}</value></data>
-  <data name="SessionListPrevious" xml:space="preserve"><value>Previous</value></data>
-  <data name="SessionListNext" xml:space="preserve"><value>Next</value></data>
-  <data name="SessionListQuit" xml:space="preserve"><value>Quit</value></data>
-  <data name="SessionListContinueHint" xml:space="preserve"><value>Use 'chat --session &lt;id&gt;' to continue a session</value></data>
-  <data name="CommonCancelled" xml:space="preserve"><value>Cancelled</value></data>
-  <data name="ScopeGlobal" xml:space="preserve"><value>Global</value></data>
-  <data name="ScopeProject" xml:space="preserve"><value>Project</value></data>
-  <data name="ScopeOptionDescription" xml:space="preserve"><value>Scope: global or project</value></data>
-  <data name="ScopeOptionDescriptionWithDefault" xml:space="preserve"><value>Scope: global or project (default: global)</value></data>
-  <data name="McpDescription" xml:space="preserve"><value>Manage MCP server configuration</value></data>
-  <data name="McpListDescription" xml:space="preserve"><value>List MCP servers</value></data>
-  <data name="McpAddDescription" xml:space="preserve"><value>Add an MCP server</value></data>
-  <data name="McpRemoveDescription" xml:space="preserve"><value>Remove an MCP server</value></data>
-  <data name="McpNameArgumentDescription" xml:space="preserve"><value>Server name</value></data>
-  <data name="McpTransportOptionDescription" xml:space="preserve"><value>Transport: stdio or sse</value></data>
-  <data name="McpCommandOptionDescription" xml:space="preserve"><value>Executable path for stdio transport</value></data>
-  <data name="McpArgsOptionDescription" xml:space="preserve"><value>Command-line arguments</value></data>
-  <data name="McpUrlOptionDescription" xml:space="preserve"><value>Endpoint URL for SSE transport</value></data>
-  <data name="McpDescriptionOptionDescription" xml:space="preserve"><value>Server description</value></data>
-  <data name="McpListEmpty" xml:space="preserve"><value>No MCP servers configured</value></data>
-  <data name="McpListFieldName" xml:space="preserve"><value>Name</value></data>
-  <data name="McpListFieldTransport" xml:space="preserve"><value>Transport</value></data>
-  <data name="McpListFieldEndpoint" xml:space="preserve"><value>Endpoint / Command</value></data>
-  <data name="McpListFieldDescription" xml:space="preserve"><value>Description</value></data>
-  <data name="McpOverwritePromptFormat" xml:space="preserve"><value>MCP server '{0}' already exists. Overwrite it?</value></data>
-  <data name="McpSseUrlRequired" xml:space="preserve"><value>SSE transport requires --url</value></data>
-  <data name="McpStdioCommandRequired" xml:space="preserve"><value>stdio transport requires --command</value></data>
-  <data name="McpAddedFormat" xml:space="preserve"><value>MCP server '{0}' added to {1} scope</value></data>
-  <data name="McpRemovedFormat" xml:space="preserve"><value>MCP server removed from {0} scope: {1}</value></data>
-  <data name="McpNotFoundFormat" xml:space="preserve"><value>MCP server not found: {0}</value></data>
-  <data name="SkillsDescription" xml:space="preserve"><value>Manage Agent Skills</value></data>
-  <data name="SkillsListDescription" xml:space="preserve"><value>List available Skills</value></data>
-  <data name="SkillsInstallDescription" xml:space="preserve"><value>Install a Skill</value></data>
-  <data name="SkillsUninstallDescription" xml:space="preserve"><value>Uninstall a Skill</value></data>
-  <data name="SkillsPathArgumentDescription" xml:space="preserve"><value>Skill directory path</value></data>
-  <data name="SkillsNameArgumentDescription" xml:space="preserve"><value>Skill name</value></data>
-  <data name="SkillsListEmpty" xml:space="preserve"><value>No Skills found</value></data>
-  <data name="SkillsListFieldName" xml:space="preserve"><value>Name</value></data>
-  <data name="SkillsListFieldDescription" xml:space="preserve"><value>Description</value></data>
-  <data name="SkillSourceDirectoryNotFoundFormat" xml:space="preserve"><value>Directory does not exist: {0}</value></data>
-  <data name="SkillManifestMissing" xml:space="preserve"><value>SKILL.md was not found in the directory</value></data>
-  <data name="SkillManifestInvalid" xml:space="preserve"><value>Could not parse SKILL.md. Check its format</value></data>
-  <data name="SkillOverwritePromptFormat" xml:space="preserve"><value>Skill '{0}' already exists. Overwrite it?</value></data>
-  <data name="SkillInstalledFormat" xml:space="preserve"><value>Skill '{0}' installed to: {1}</value></data>
-  <data name="SkillNotFoundFormat" xml:space="preserve"><value>Skill not found: {0}</value></data>
-  <data name="SkillRemovedFormat" xml:space="preserve"><value>Skill removed from {0} scope: {1}</value></data>
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
+    mimetype set.
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="SessionsDescription" xml:space="preserve">
+    <value>Manage chat sessions</value>
+  </data>
+  <data name="SessionsListDescription" xml:space="preserve">
+    <value>List chat sessions</value>
+  </data>
+  <data name="SessionsDeleteDescription" xml:space="preserve">
+    <value>Delete a chat session</value>
+  </data>
+  <data name="SessionsDeleteSessionIdOption" xml:space="preserve">
+    <value>ID of the session to delete</value>
+  </data>
+  <data name="SessionIdEmpty" xml:space="preserve">
+    <value>Session ID cannot be empty.</value>
+  </data>
+  <data name="SessionNotFoundFormat" xml:space="preserve">
+    <value>Session not found: {0}</value>
+  </data>
+  <data name="SessionDeletedFormat" xml:space="preserve">
+    <value>Session deleted: {0}</value>
+  </data>
+  <data name="SessionListEmpty" xml:space="preserve">
+    <value>No chat sessions found</value>
+  </data>
+  <data name="ErrorPrefix" xml:space="preserve">
+    <value>Error</value>
+  </data>
+  <data name="SessionListFieldId" xml:space="preserve">
+    <value>ID</value>
+  </data>
+  <data name="SessionListFieldTitle" xml:space="preserve">
+    <value>Title</value>
+  </data>
+  <data name="SessionListFieldProvider" xml:space="preserve">
+    <value>Provider</value>
+  </data>
+  <data name="SessionListFieldModel" xml:space="preserve">
+    <value>Model</value>
+  </data>
+  <data name="SessionListFieldMessages" xml:space="preserve">
+    <value>Messages</value>
+  </data>
+  <data name="SessionListFieldCreatedAt" xml:space="preserve">
+    <value>Created At</value>
+  </data>
+  <data name="SessionListPageFormat" xml:space="preserve">
+    <value>Page {0}</value>
+  </data>
+  <data name="SessionListPrevious" xml:space="preserve">
+    <value>Previous</value>
+  </data>
+  <data name="SessionListNext" xml:space="preserve">
+    <value>Next</value>
+  </data>
+  <data name="SessionListQuit" xml:space="preserve">
+    <value>Quit</value>
+  </data>
+  <data name="SessionListContinueHint" xml:space="preserve">
+    <value>Use 'chat --session &lt;id&gt;' to continue a session</value>
+  </data>
+  <data name="CommonCancelled" xml:space="preserve">
+    <value>Cancelled</value>
+  </data>
+  <data name="ScopeGlobal" xml:space="preserve">
+    <value>Global</value>
+  </data>
+  <data name="ScopeProject" xml:space="preserve">
+    <value>Project</value>
+  </data>
+  <data name="ScopeOptionDescription" xml:space="preserve">
+    <value>Scope: global or project</value>
+  </data>
+  <data name="ScopeOptionDescriptionWithDefault" xml:space="preserve">
+    <value>Scope: global or project (default: global)</value>
+  </data>
+  <data name="McpDescription" xml:space="preserve">
+    <value>Manage MCP server configuration</value>
+  </data>
+  <data name="McpListDescription" xml:space="preserve">
+    <value>List MCP servers</value>
+  </data>
+  <data name="McpAddDescription" xml:space="preserve">
+    <value>Add an MCP server</value>
+  </data>
+  <data name="McpRemoveDescription" xml:space="preserve">
+    <value>Remove an MCP server</value>
+  </data>
+  <data name="McpNameArgumentDescription" xml:space="preserve">
+    <value>Server name</value>
+  </data>
+  <data name="McpTransportOptionDescription" xml:space="preserve">
+    <value>Transport: stdio or sse</value>
+  </data>
+  <data name="McpCommandOptionDescription" xml:space="preserve">
+    <value>Executable path for stdio transport</value>
+  </data>
+  <data name="McpArgsOptionDescription" xml:space="preserve">
+    <value>Command-line arguments</value>
+  </data>
+  <data name="McpUrlOptionDescription" xml:space="preserve">
+    <value>Endpoint URL for SSE transport</value>
+  </data>
+  <data name="McpDescriptionOptionDescription" xml:space="preserve">
+    <value>Server description</value>
+  </data>
+  <data name="McpListEmpty" xml:space="preserve">
+    <value>No MCP servers configured</value>
+  </data>
+  <data name="McpListFieldName" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="McpListFieldTransport" xml:space="preserve">
+    <value>Transport</value>
+  </data>
+  <data name="McpListFieldEndpoint" xml:space="preserve">
+    <value>Endpoint / Command</value>
+  </data>
+  <data name="McpListFieldDescription" xml:space="preserve">
+    <value>Description</value>
+  </data>
+  <data name="McpOverwritePromptFormat" xml:space="preserve">
+    <value>MCP server '{0}' already exists. Overwrite it?</value>
+  </data>
+  <data name="McpSseUrlRequired" xml:space="preserve">
+    <value>SSE transport requires --url</value>
+  </data>
+  <data name="McpStdioCommandRequired" xml:space="preserve">
+    <value>stdio transport requires --command</value>
+  </data>
+  <data name="McpAddedFormat" xml:space="preserve">
+    <value>MCP server '{0}' added to {1} scope</value>
+  </data>
+  <data name="McpRemovedFormat" xml:space="preserve">
+    <value>MCP server removed from {0} scope: {1}</value>
+  </data>
+  <data name="McpNotFoundFormat" xml:space="preserve">
+    <value>MCP server not found: {0}</value>
+  </data>
+  <data name="SkillsDescription" xml:space="preserve">
+    <value>Manage Agent Skills</value>
+  </data>
+  <data name="SkillsListDescription" xml:space="preserve">
+    <value>List available Skills</value>
+  </data>
+  <data name="SkillsInstallDescription" xml:space="preserve">
+    <value>Install a Skill</value>
+  </data>
+  <data name="SkillsUninstallDescription" xml:space="preserve">
+    <value>Uninstall a Skill</value>
+  </data>
+  <data name="SkillsPathArgumentDescription" xml:space="preserve">
+    <value>Skill directory path</value>
+  </data>
+  <data name="SkillsNameArgumentDescription" xml:space="preserve">
+    <value>Skill name</value>
+  </data>
+  <data name="SkillsListEmpty" xml:space="preserve">
+    <value>No Skills found</value>
+  </data>
+  <data name="SkillsListFieldName" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="SkillsListFieldDescription" xml:space="preserve">
+    <value>Description</value>
+  </data>
+  <data name="SkillSourceDirectoryNotFoundFormat" xml:space="preserve">
+    <value>Directory does not exist: {0}</value>
+  </data>
+  <data name="SkillManifestMissing" xml:space="preserve">
+    <value>SKILL.md was not found in the directory</value>
+  </data>
+  <data name="SkillManifestInvalid" xml:space="preserve">
+    <value>Could not parse SKILL.md. Check its format</value>
+  </data>
+  <data name="SkillOverwritePromptFormat" xml:space="preserve">
+    <value>Skill '{0}' already exists. Overwrite it?</value>
+  </data>
+  <data name="SkillInstalledFormat" xml:space="preserve">
+    <value>Skill '{0}' installed to: {1}</value>
+  </data>
+  <data name="SkillNotFoundFormat" xml:space="preserve">
+    <value>Skill not found: {0}</value>
+  </data>
+  <data name="SkillRemovedFormat" xml:space="preserve">
+    <value>Skill removed from {0} scope: {1}</value>
+  </data>
+  <data name="CommonBack" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <data name="CommonNone" xml:space="preserve">
+    <value>None</value>
+  </data>
+  <data name="CommonDefault" xml:space="preserve">
+    <value>Default</value>
+  </data>
+  <data name="ConfigDescription" xml:space="preserve">
+    <value>Configure Providers, Models, and system settings</value>
+  </data>
+  <data name="ConfigProviderDescription" xml:space="preserve">
+    <value>Manage Provider authentication</value>
+  </data>
+  <data name="ConfigModelDescription" xml:space="preserve">
+    <value>Manage Models and model selection</value>
+  </data>
+  <data name="ConfigLanguageDescription" xml:space="preserve">
+    <value>Set the CLI display language</value>
+  </data>
+  <data name="ConfigLanguagePrompt" xml:space="preserve">
+    <value>Select a language:</value>
+  </data>
+  <data name="ConfigLanguageAuto" xml:space="preserve">
+    <value>Automatic (system language)</value>
+  </data>
+  <data name="ConfigLanguageEnglish" xml:space="preserve">
+    <value>English</value>
+  </data>
+  <data name="ConfigLanguageChinese" xml:space="preserve">
+    <value>Chinese (Simplified)</value>
+  </data>
+  <data name="ConfigLanguageSetFormat" xml:space="preserve">
+    <value>Language set to {0}</value>
+  </data>
+  <data name="ConfigSelectPrimaryModel" xml:space="preserve">
+    <value>Select primary model</value>
+  </data>
+  <data name="ConfigSaved" xml:space="preserve">
+    <value>Configuration saved</value>
+  </data>
+  <data name="ConfigMenuNavigationHint" xml:space="preserve">
+    <value>Use ↑/↓ to choose and Enter to confirm. Press Esc to go back or Ctrl+C to exit.</value>
+  </data>
+  <data name="ConfigProviderManagementTitle" xml:space="preserve">
+    <value>Provider management:</value>
+  </data>
+  <data name="ConfigAddProvider" xml:space="preserve">
+    <value>Add Provider</value>
+  </data>
+  <data name="ConfigEditProvider" xml:space="preserve">
+    <value>Edit Provider</value>
+  </data>
+  <data name="ConfigDeleteProvider" xml:space="preserve">
+    <value>Delete Provider</value>
+  </data>
+  <data name="ConfigProviderNamePrompt" xml:space="preserve">
+    <value>Provider name (for example: deepseek, kimi, openai):</value>
+  </data>
+  <data name="ConfigProviderExistsFormat" xml:space="preserve">
+    <value>Provider '{0}' already exists and will be overwritten</value>
+  </data>
+  <data name="ConfigSelectAdapter" xml:space="preserve">
+    <value>Select an adapter:</value>
+  </data>
+  <data name="ConfigAdapterOpenAi" xml:space="preserve">
+    <value>openai (ChatCompletion API)</value>
+  </data>
+  <data name="ConfigAdapterOpenAiResponse" xml:space="preserve">
+    <value>openai-response (Response API)</value>
+  </data>
+  <data name="ConfigAdapterAnthropic" xml:space="preserve">
+    <value>anthropic (Messages API)</value>
+  </data>
+  <data name="ConfigAdapterGemini" xml:space="preserve">
+    <value>gemini — Gemini API</value>
+  </data>
+  <data name="ConfigApiKeyPrompt" xml:space="preserve">
+    <value>API Key:</value>
+  </data>
+  <data name="ConfigBaseUrlOptionalPrompt" xml:space="preserve">
+    <value>Base URL (optional; press Enter to skip):</value>
+  </data>
+  <data name="ConfigProviderAddedFormat" xml:space="preserve">
+    <value>Provider '{0}' added</value>
+  </data>
+  <data name="ConfigSelectProviderToEdit" xml:space="preserve">
+    <value>Select a Provider to edit:</value>
+  </data>
+  <data name="ConfigAdapterCurrentFormat" xml:space="preserve">
+    <value>Adapter (current: {0}):</value>
+  </data>
+  <data name="ConfigApiKeyKeepPrompt" xml:space="preserve">
+    <value>API Key (press Enter to keep unchanged):</value>
+  </data>
+  <data name="ConfigBaseUrlCurrentFormat" xml:space="preserve">
+    <value>Base URL (current: {0}; press Enter to keep unchanged):</value>
+  </data>
+  <data name="ConfigProviderUpdatedFormat" xml:space="preserve">
+    <value>Provider '{0}' updated</value>
+  </data>
+  <data name="ConfigSelectProviderToDelete" xml:space="preserve">
+    <value>Select a Provider to delete:</value>
+  </data>
+  <data name="ConfigDeleteProviderConfirmFormat" xml:space="preserve">
+    <value>Delete Provider '{0}'?</value>
+  </data>
+  <data name="ConfigProviderDeletedFormat" xml:space="preserve">
+    <value>Provider '{0}' deleted</value>
+  </data>
+  <data name="ConfigModelManagementTitle" xml:space="preserve">
+    <value>Model management:</value>
+  </data>
+  <data name="ConfigAddModel" xml:space="preserve">
+    <value>Add Model</value>
+  </data>
+  <data name="ConfigEditModel" xml:space="preserve">
+    <value>Edit Model</value>
+  </data>
+  <data name="ConfigDeleteModel" xml:space="preserve">
+    <value>Delete Model</value>
+  </data>
+  <data name="ConfigModelReferencePrompt" xml:space="preserve">
+    <value>Model reference (provider/model_key, for example: deepseek/deepseek-chat):</value>
+  </data>
+  <data name="ConfigModelExistsFormat" xml:space="preserve">
+    <value>Model '{0}' already exists and will be overwritten</value>
+  </data>
+  <data name="ConfigModelIdPrompt" xml:space="preserve">
+    <value>Model ID (the model parameter sent to the API, for example: deepseek-chat):</value>
+  </data>
+  <data name="ConfigMaxTokensOptionalPrompt" xml:space="preserve">
+    <value>Max Tokens (optional; press Enter to skip):</value>
+  </data>
+  <data name="ConfigContextWindowOptionalPrompt" xml:space="preserve">
+    <value>Context Window (optional; press Enter to use the default):</value>
+  </data>
+  <data name="ConfigModelAddedFormat" xml:space="preserve">
+    <value>Model '{0}' added</value>
+  </data>
+  <data name="ConfigSelectModelToEdit" xml:space="preserve">
+    <value>Select a Model to edit:</value>
+  </data>
+  <data name="ConfigModelIdCurrentFormat" xml:space="preserve">
+    <value>Model ID (current: {0}):</value>
+  </data>
+  <data name="ConfigMaxTokensCurrentFormat" xml:space="preserve">
+    <value>Max Tokens (current: {0}; press Enter to keep unchanged):</value>
+  </data>
+  <data name="ConfigContextWindowCurrentFormat" xml:space="preserve">
+    <value>Context Window (current: {0}; press Enter to keep unchanged):</value>
+  </data>
+  <data name="ConfigModelUpdatedFormat" xml:space="preserve">
+    <value>Model '{0}' updated</value>
+  </data>
+  <data name="ConfigSelectModelToDelete" xml:space="preserve">
+    <value>Select a Model to delete:</value>
+  </data>
+  <data name="ConfigDeleteModelConfirmFormat" xml:space="preserve">
+    <value>Delete Model '{0}'?</value>
+  </data>
+  <data name="ConfigModelDeletedFormat" xml:space="preserve">
+    <value>Model '{0}' deleted</value>
+  </data>
+  <data name="ConfigNoModels" xml:space="preserve">
+    <value>No Models configured. Add a Model first</value>
+  </data>
+  <data name="ConfigSelectPrimaryModelCurrentFormat" xml:space="preserve">
+    <value>Select the primary model (current: {0}):</value>
+  </data>
+  <data name="ConfigPrimaryModelSetFormat" xml:space="preserve">
+    <value>Primary model set to '{0}'</value>
+  </data>
+  <data name="ConfigConfigureSecondaryModelPrompt" xml:space="preserve">
+    <value>Configure a separate secondary model for context compaction and other auxiliary tasks?</value>
+  </data>
+  <data name="ConfigSelectSecondaryModel" xml:space="preserve">
+    <value>Select the secondary model:</value>
+  </data>
+  <data name="ConfigSecondaryModelSetFormat" xml:space="preserve">
+    <value>Secondary model set to '{0}'</value>
+  </data>
 </root>
