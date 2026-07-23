@@ -4,6 +4,15 @@
 
 ## 代码重构
 
+### X. CLI 配置向导本地化与子命令拆分
+
+**现状：**
+- `config` 命令已从单入口大循环，拆分为子命令：`config provider`、`config model`、`config language`。
+- 新增 `CliStrings` 资源类与 `CliStrings.resx` / `CliStrings.zh-CN.resx`，提示文案统一抽取。
+- `ConfigCommand.cs` 新增泛型菜单辅助方法：`PromptMenu<TAction>`、`PromptSelection`、`SelectAdapter`。
+- 新增枚举：`ProviderAction`、`ModelAction`、`LanguageAction`、`AdapterAction`，替换硬编码字符串。
+- 新增基础本地化键：`CommonBack`、`CommonNone`、`CommonDefault`。
+
 ### 1. 摘要服务统一（优先级：中）
 
 **问题描述：**

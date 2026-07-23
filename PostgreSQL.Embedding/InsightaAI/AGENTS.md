@@ -67,9 +67,10 @@ TraditionalCompactThreshold: 80%
 - `IToolHook` — 工具执行前后拦截（权限控制、日志）
 - `IAgentHook` — Agent 生命周期拦截（会话启动、记忆抽取）
 
-## 最近提交（2026-07-17）
+## 最近提交（2026-07-23）
 
 ```
+f1f4bff feat(cli): introduce localization for config command and split config into subcommands
 5bb3c69 refactor(agent): implement 4-layer system prompt architecture with AGENTS.md support
 c321d78 fix: resolve naming inconsistencies in telemetry constants
 ce53a2b feat: add OpenTelemetry diagnostics; refactor orchestrator namespace
