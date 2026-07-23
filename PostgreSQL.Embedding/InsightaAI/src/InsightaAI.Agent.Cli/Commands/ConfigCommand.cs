@@ -18,13 +18,13 @@ public class ConfigCommand
         var command = new Command("config", CliStrings.ConfigDescription);
 
         var providerCommand = new Command("provider", CliStrings.ConfigProviderDescription);
-        providerCommand.SetHandler(() => ExecuteProviderAsync());
+        providerCommand.SetHandler(() => HandleProviderManagerAsync());
 
         var modelCommand = new Command("model", CliStrings.ConfigModelDescription);
-        modelCommand.SetHandler(() => ExecuteModelAsync());
+        modelCommand.SetHandler(() => HandleModelManagerAsync());
 
         var languageCommand = new Command("language", CliStrings.ConfigLanguageDescription);
-        languageCommand.SetHandler(() => ExecuteLanguageAsync());
+        languageCommand.SetHandler(() => HandleLanguageDisplayAsync());
 
         command.AddCommand(providerCommand);
         command.AddCommand(modelCommand);
@@ -33,7 +33,7 @@ public class ConfigCommand
         return command;
     }
 
-    private Task<int> ExecuteProviderAsync()
+    private Task<int> HandleProviderManagerAsync()
     {
         var auth = AuthConfig.Load();
         ManageProviders(auth);
@@ -44,7 +44,7 @@ public class ConfigCommand
         return Task.FromResult(0);
     }
 
-    private Task<int> ExecuteModelAsync()
+    private Task<int> HandleModelManagerAsync()
     {
         var config = CliConfig.Load();
         ManageModels(config);
@@ -52,10 +52,10 @@ public class ConfigCommand
 
         AnsiConsole.MarkupLine($"[green]{CliStrings.ConfigSaved}[/]");
         AnsiConsole.MarkupLine($"[dim]  Config: {Markup.Escape(CliConfig.ConfigPath)}[/]");
-        return Task.FromResult(0);
+        return  Task.FromResult(0);
     }
 
-    private Task<int> ExecuteLanguageAsync()
+    private Task<int> HandleLanguageDisplayAsync()
     {
         var config = CliConfig.Load();
         var language = PromptMenu<LanguageAction>(

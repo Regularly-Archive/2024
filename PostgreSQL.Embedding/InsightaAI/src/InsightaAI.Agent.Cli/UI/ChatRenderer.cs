@@ -19,11 +19,11 @@ public class ChatRenderer
     {
         AnsiConsole.Clear();
         AnsiConsole.Write(new FigletText("InsightaAI").Color(Color.Blue));
-        AnsiConsole.MarkupLine($"[white]Provider: {provider} | Model: {model}[/]");
-        AnsiConsole.MarkupLine($"[white]SessionId: {sessionId}[/]");
-        AnsiConsole.MarkupLine($"[white]Tools: {toolCount} registered | Skills: {skillCount} available[/]");
-        AnsiConsole.MarkupLine("[white]输入消息开始对话，输入 '/exit' 或 '/quit' 退出[/]");
-        AnsiConsole.MarkupLine("[white]输入 '/clear' 清空上下文[/]");
+        AnsiConsole.MarkupLine($"[white]{CliStrings.Format("ChatWelcomeProviderModelFormat", provider, model)}[/]");
+        AnsiConsole.MarkupLine($"[white]{CliStrings.Format("ChatWelcomeSessionIdFormat", sessionId)}[/]");
+        AnsiConsole.MarkupLine($"[white]{CliStrings.Format("ChatWelcomeToolsSkillsFormat", toolCount, skillCount)}[/]");
+        AnsiConsole.MarkupLine($"[white]{CliStrings.ChatWelcomeExitHint}[/]");
+        AnsiConsole.MarkupLine($"[white]{CliStrings.ChatWelcomeClearHint}[/]");
         AnsiConsole.WriteLine();
     }
 

@@ -112,4 +112,27 @@ public static class CliStrings
     public static string ConfigNoModels => Get(nameof(ConfigNoModels));
     public static string ConfigConfigureSecondaryModelPrompt => Get(nameof(ConfigConfigureSecondaryModelPrompt));
     public static string ConfigSelectSecondaryModel => Get(nameof(ConfigSelectSecondaryModel));
+
+    // Chat Command
+    public static string ChatDescription => Get(nameof(ChatDescription));
+    public static string ChatSessionOption => Get(nameof(ChatSessionOption));
+    public static string ChatContinueOption => Get(nameof(ChatContinueOption));
+    public static string ChatConfigRequiredHint => Get(nameof(ChatConfigRequiredHint));
+    public static string ChatGoodbye => Get(nameof(ChatGoodbye));
+    public static string ChatContextCleared => Get(nameof(ChatContextCleared));
+    public static string ChatModelUsageHint => Get(nameof(ChatModelUsageHint));
+    public static string ChatAvailableModels => Get(nameof(ChatAvailableModels));
+    public static string ChatCurrentModelMarker => Get(nameof(ChatCurrentModelMarker));
+    public static string ChatNothingToCompact => Get(nameof(ChatNothingToCompact));
+    public static string ChatAskUserYes => Get(nameof(ChatAskUserYes));
+    public static string ChatAskUserNo => Get(nameof(ChatAskUserNo));
+    public static string ChatAskUserMultiSelectTitle => Get(nameof(ChatAskUserMultiSelectTitle));
+    public static string ChatAskUserNoSelection => Get(nameof(ChatAskUserNoSelection));
+    public static string ChatAskUserSelectTitle => Get(nameof(ChatAskUserSelectTitle));
+    public static string ChatWelcomeExitHint => Get(nameof(ChatWelcomeExitHint));
+    public static string ChatWelcomeClearHint => Get(nameof(ChatWelcomeClearHint));
+    public static string ChatTokenUsageLabel => Get(nameof(ChatTokenUsageLabel));
+    public static string ChatInterruptedTitle => Get(nameof(ChatInterruptedTitle));
+    public static string ChatInterruptedHint => Get(nameof(ChatInterruptedHint));
+    public static string ChatThinkingInitial => Get(nameof(ChatThinkingInitial));
 }

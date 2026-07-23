@@ -1,4 +1,5 @@
 using InsightaAI.Agent.Cli.Extensions;
+using InsightaAI.Agent.Cli.Localization;
 using InsightaAI.Agent.Models;
 using InsightaAI.LLM.Models;
 using Spectre.Console;
@@ -167,9 +168,7 @@ public class EventRenderer : IDisposable
     {
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine(
-            $"[yellow]⟳[/] Context compacted ([dim]{compactedEvent.Strategy}[/]): " +
-            $"{compactedEvent.PreCompactMessages} → {compactedEvent.PostCompactMessages} messages, " +
-            $"~{compactedEvent.PreCompactTokens:N0} → ~{compactedEvent.PostCompactTokens:N0} tokens");
+            CliStrings.Format("ChatAutoCompactedFormat", compactedEvent.Strategy, compactedEvent.PreCompactMessages, compactedEvent.PostCompactMessages, compactedEvent.PreCompactTokens, compactedEvent.PostCompactTokens));
         AnsiConsole.WriteLine();
     }
 
@@ -203,7 +202,7 @@ public class EventRenderer : IDisposable
         }
 
         grid.AddRow(
-            "[grey]Usage:[/]",
+            CliStrings.ChatTokenUsageLabel,
             $"[green]{usage.InputTokens:N0} ↑[/]",
             $"[blue]{usage.OutputTokens:N0} ↓[/]",
             cacheText,
@@ -227,8 +226,8 @@ public class EventRenderer : IDisposable
             AnsiConsole.WriteLine();
         }
 
-        AnsiConsole.MarkupLine("[dim]● The task has been cancelled by user [/]");
-        AnsiConsole.MarkupLine("[red]⎿ Interrupted [dim]· What should Insighta do instead?[/] [/]");
+        AnsiConsole.MarkupLine(CliStrings.ChatInterruptedTitle);
+        AnsiConsole.MarkupLine(CliStrings.ChatInterruptedHint);
     }
 
     /// <summary>
@@ -264,13 +263,13 @@ public class EventRenderer : IDisposable
 
                 await AnsiConsole.Status()
                     .Spinner(Spinner.Known.Dots)
-                    .StartAsync("Thinking.", async ctx =>
+                    .StartAsync(CliStrings.ChatThinkingInitial, async ctx =>
                     {
                         while (!ct.IsCancellationRequested)
                         {
                             await Task.Delay(400, ct);
-                            dotCount = (dotCount % 3) + 1; 
-                            ctx.Status = $"Thinking (press esc to interrupt){new string('.', dotCount)}";
+                            dotCount = (dotCount % 3) + 1;
+                            ctx.Status = CliStrings.Format("ChatThinkingProgressFormat", new string('.', dotCount));
                         }
                     });
             }

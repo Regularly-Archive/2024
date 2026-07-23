@@ -1,6 +1,7 @@
 using InsightaAI.Agent;
 using InsightaAI.Agent.Abstractions;
 using InsightaAI.Agent.Cli.Hooks;
+using InsightaAI.Agent.Cli.Localization;
 using InsightaAI.Agent.Cli.Models;
 using InsightaAI.Agent.Cli.Services;
 using InsightaAI.Agent.Cli.UI;
@@ -49,9 +50,9 @@ public class ChatCommand
     /// </summary>
     public Command Create()
     {
-        var command = new Command("chat", "开始对话");
-        var sessionOption = new Option<string?>("--session", "指定会话 ID（继续已有会话）");
-        var continueOption = new Option<bool>(new[] { "-c", "--continue" }, "继续当前目录的最近一次会话");
+        var command = new Command("chat", CliStrings.ChatDescription);
+        var sessionOption = new Option<string?>("--session", CliStrings.ChatSessionOption);
+        var continueOption = new Option<bool>(new[] { "-c", "--continue" }, CliStrings.ChatContinueOption);
         command.AddOption(sessionOption);
         command.AddOption(continueOption);
         command.SetHandler((session, continueLast) => ExecuteAsync(session, continueLast), sessionOption, continueOption);
@@ -74,7 +75,7 @@ public class ChatCommand
 
         if (!ValidateConfig(config, auth))
         {
-            _renderer.ShowWarning("请先运行 'config' 命令进行配置");
+            _renderer.ShowWarning(CliStrings.ChatConfigRequiredHint);
             return 1;
         }
 
@@ -90,7 +91,7 @@ public class ChatCommand
         }
         catch (Exception ex)
         {
-            _renderer.ShowError($"创建 LLM 客户端失败: {ex.Message}");
+            _renderer.ShowError(CliStrings.Format("ChatLlmClientFailedFormat", ex.Message));
             return 1;
         }
 
@@ -120,9 +121,9 @@ public class ChatCommand
         // 运行对话循环
         await RunChatLoopAsync(session, agent, summaryService, config, auth, toolRegistry, skillRegistry, mcpRegistry);
 
-        _renderer.ShowInfo($"Session saved: {session.SessionId}");
-        _renderer.ShowInfo($"Resume with: insighta chat --session {session.SessionId}");
-        _renderer.ShowInfo("See you again!");
+        _renderer.ShowInfo(CliStrings.Format("ChatSessionSavedFormat", session.SessionId));
+        _renderer.ShowInfo(CliStrings.Format("ChatSessionResumeHintFormat", session.SessionId));
+        _renderer.ShowInfo(CliStrings.ChatGoodbye);
         return 0;
     }
 
@@ -155,7 +156,7 @@ public class ChatCommand
             {
                 await session.ClearAsync();
                 AnsiConsole.Clear();
-                _renderer.ShowWarning("上下文已清空");
+                _renderer.ShowWarning(CliStrings.ChatContextCleared);
                 continue;
             }
 
@@ -207,14 +208,14 @@ public class ChatCommand
         var parts = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length < 2)
         {
-            _renderer.ShowWarning("用法: /model provider/model_key");
-            _renderer.ShowInfo($"当前模型: {config.PrimaryModel}");
+            _renderer.ShowWarning(CliStrings.ChatModelUsageHint);
+            _renderer.ShowInfo(CliStrings.Format("ChatCurrentModelFormat", config.PrimaryModel));
             if (config.Models.Count > 0)
             {
-                _renderer.ShowInfo("可用模型:");
+                _renderer.ShowInfo(CliStrings.ChatAvailableModels);
                 foreach (var key in config.Models.Keys)
                 {
-                    var marker = key == config.PrimaryModel ? " ← current" : "";
+                    var marker = key == config.PrimaryModel ? CliStrings.ChatCurrentModelMarker : "";
                     _renderer.ShowInfo($"  {key}{marker}");
                 }
             }
@@ -238,14 +239,14 @@ public class ChatCommand
         // 验证 provider 存在
         if (!auth.Providers.ContainsKey(newProviderName))
         {
-            _renderer.ShowError($"Provider '{newProviderName}' 未在 auth.json 中配置");
+            _renderer.ShowError(CliStrings.Format("ChatProviderNotConfiguredFormat", newProviderName));
             return currentAgent;
         }
 
         // 验证 model 存在
         if (!config.Models.ContainsKey(modelRef))
         {
-            _renderer.ShowError($"Model '{modelRef}' 未在 config.json 中配置");
+            _renderer.ShowError(CliStrings.Format("ChatModelNotConfiguredFormat", modelRef));
             return currentAgent;
         }
 
@@ -259,7 +260,7 @@ public class ChatCommand
         }
         catch (Exception ex)
         {
-            _renderer.ShowError($"创建 LLM 客户端失败: {ex.Message}");
+            _renderer.ShowError(CliStrings.Format("ChatLlmClientFailedFormat", ex.Message));
             return currentAgent;
         }
 
@@ -269,7 +270,7 @@ public class ChatCommand
         // 用新模型重建 Agent
         var newAgent = await CreateAgentAsync(config, auth, newLlmClient, newModel, toolRegistry, skillRegistry, mcpRegistry, session.SessionId);
 
-        _renderer.ShowSuccess($"已切换到 {newProviderName}/{newModel.ModelId}");
+        _renderer.ShowSuccess(CliStrings.Format("ChatModelSwitchedFormat", newProviderName, newModel.ModelId));
         return newAgent;
     }
 
@@ -285,7 +286,7 @@ public class ChatCommand
             History = await session.GetLlmHistoryAsync()
         };
 
-        _renderer.ShowInfo($"[yellow]⟳[/] Compacting context ([dim]{strategy}[/])...");
+        _renderer.ShowInfo(CliStrings.Format("ChatCompactingFormat", strategy));
 
         try
         {
@@ -300,18 +301,16 @@ public class ChatCommand
                 var tokenDelta = result.PreCompactTokens - result.PostCompactTokens;
                 var msgDelta = result.PreCompactMessages - result.PostCompactMessages;
                 _renderer.ShowSuccess(
-                    $"[green]\u2713[/] Compacted ([dim]{result.StrategyName}[/]): " +
-                    $"{result.PreCompactMessages} \u2192 {result.PostCompactMessages} messages ([dim]-{msgDelta}[/]), " +
-                    $"~{result.PreCompactTokens:N0} \u2192 ~{result.PostCompactTokens:N0} tokens ([dim]-{tokenDelta:N0}[/])");
+                    CliStrings.Format("ChatCompactedFormat", result.StrategyName, result.PreCompactMessages, result.PostCompactMessages, msgDelta, result.PreCompactTokens, result.PostCompactTokens, tokenDelta));
             }
             else
             {
-                _renderer.ShowInfo("[dim]Context is clean, nothing to compact.[/]");
+                _renderer.ShowInfo(CliStrings.ChatNothingToCompact);
             }
         }
         catch (Exception ex)
         {
-            _renderer.ShowError($"[red]Compact failed: {ex.Message}[/] ");
+            _renderer.ShowError(CliStrings.Format("ChatCompactFailedFormat", ex.Message));
         }
     }
 
@@ -373,11 +372,11 @@ public class ChatCommand
         registry.Register(new AskUserTool(async (question, choices, multipleSelect) =>
         {
             AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine($"[yellow]●[/] Insighta wants to ask you: {question}");
+            AnsiConsole.MarkupLine(CliStrings.Format("ChatAskUserPromptFormat", Markup.Escape(question)));
             AnsiConsole.WriteLine();
 
             // 如果没有提供选项，默认使用 Yes/No
-            var options = choices is { Length: > 0 } ? choices : ["Yes", "No"];
+            var options = choices is { Length: > 0 } ? choices : [CliStrings.ChatAskUserYes, CliStrings.ChatAskUserNo];
 
 
             if (multipleSelect)
@@ -385,18 +384,18 @@ public class ChatCommand
                 // 多选模式
                 var selected = AnsiConsole.Prompt(
                     new MultiSelectionPrompt<string>()
-                        .Title("选择一个或多个选项（空格选择，回车确认）：")
+                        .Title(CliStrings.ChatAskUserMultiSelectTitle)
                         .NotRequired()
                         .AddChoices(options));
 
-                return selected.Count > 0 ? string.Join(", ", selected) : "(无选择)";
+                return selected.Count > 0 ? string.Join(", ", selected) : CliStrings.ChatAskUserNoSelection;
             }
             else
             {
                 // 单选模式
                 var selected = AnsiConsole.Prompt(
                     new SelectionPrompt<string>()
-                        .Title("选择一个选项：")
+                        .Title(CliStrings.ChatAskUserSelectTitle)
                         .AddChoices(options));
 
                 return selected;
@@ -580,7 +579,7 @@ public class ChatCommand
             var session = await ChatSession.LoadAsync(_storage, sessionId);
             if (session == null)
             {
-                _renderer.ShowError($"会话 {sessionId} 不存在");
+                _renderer.ShowError(CliStrings.Format("ChatSessionNotFoundFormat", sessionId));
                 return null;
             }
             return session;
@@ -592,16 +591,16 @@ public class ChatCommand
             var record = await _storage.GetLastSessionForWorkDirAsync(workDir);
             if (record == null)
             {
-                _renderer.ShowError($"当前目录没有历史会话: {workDir}");
+                _renderer.ShowError(CliStrings.Format("ChatNoHistoryForWorkDirFormat", workDir));
                 return null;
             }
             var session = await ChatSession.LoadAsync(_storage, record.Id);
             if (session == null)
             {
-                _renderer.ShowError($"会话 {record.Id} 数据损坏");
+                _renderer.ShowError(CliStrings.Format("ChatSessionCorruptedFormat", record.Id));
                 return null;
             }
-            _renderer.ShowInfo($"已恢复会话: {session.SessionId}");
+            _renderer.ShowInfo(CliStrings.Format("ChatSessionResumedFormat", session.SessionId));
             return session;
         }
 

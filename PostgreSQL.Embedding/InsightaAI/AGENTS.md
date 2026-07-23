@@ -134,6 +134,21 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 - `src/InsightaAI.Agent/Prompts/session-title.txt` — 会话标题 Prompt
 - `tests/InsightaAI.Agent.Tests/Context/SummaryServiceTests.cs` — 摘要、MaxTokens、标题和 fallback 测试
 
+### CLI 全命令国际化（2026-07-23）
+
+- `ChatCommand`、`ChatRenderer`、`EventRenderer` 中 41 处硬编码字符串提取到 resx
+- `CliStrings.resx` / `CliStrings.zh-CN.resx` 新增 41 个 `Chat*` 资源条目（21 个静态属性 + 20 个 Format 格式化）
+- Spectre.Console markup 标签整体存入 resx 值中，翻译时保留 `[yellow]`、`[dim]` 等标签
+- `ask_user` 工具的 `question` 参数增加 `Markup.Escape` 防护
+- 5 个命令的国际化资源清单文档存放在 `docs/i18n/`
+- 全部 5 个 CLI 命令（config、sessions、mcp、skills、chat）已完成国际化
+
+**关键文件：**
+- `src/InsightaAI.Agent.Cli/Resources/CliStrings.resx` — 默认英文资源
+- `src/InsightaAI.Agent.Cli/Resources/CliStrings.zh-CN.resx` — 中文资源
+- `src/InsightaAI.Agent.Cli/Localization/CliStrings.cs` — 资源访问入口
+- `docs/i18n/` — 5 个命令的国际化资源清单文档
+
 ## 当前问题与改进方向
 
 ### 已知问题
@@ -150,6 +165,7 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 
 - [x] 摘要服务统一（全量/增量摘要、会话标题、MaxTokens 恢复与 fallback）
 - [x] MicroCompact 阈值优化与工具结果生命周期重构（45-65-80）
+- [x] CLI 全命令国际化（ChatCommand + ChatRenderer + EventRenderer，41 处字符串提取到 resx）
 - [ ] Memory 轻量化索引
 - [ ] AgentBuilder 默认注册 `ToolRegistry`
 - [ ] L3 Orchestrator 继续开发
@@ -185,6 +201,7 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 | Agent Loop 研究 | `docs/agent-loop-research.md` |
 | 可观测性设计 | `docs/observability-design.md` |
 | Core Instructions | `src/InsightaAI.Agent/Prompts/core-instructions.txt` |
+| CLI 国际化资源清单 | `docs/i18n/` |
 
 ---
 

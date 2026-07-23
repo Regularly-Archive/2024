@@ -486,4 +486,128 @@
   <data name="ConfigSecondaryModelSetFormat" xml:space="preserve">
     <value>副模型已设为“{0}”</value>
   </data>
+  <!-- Chat Command -->
+  <data name="ChatDescription" xml:space="preserve">
+    <value>开始对话</value>
+  </data>
+  <data name="ChatSessionOption" xml:space="preserve">
+    <value>指定会话 ID（继续已有会话）</value>
+  </data>
+  <data name="ChatContinueOption" xml:space="preserve">
+    <value>继续当前目录的最近一次会话</value>
+  </data>
+  <data name="ChatConfigRequiredHint" xml:space="preserve">
+    <value>请先运行 'config' 命令进行配置</value>
+  </data>
+  <data name="ChatGoodbye" xml:space="preserve">
+    <value>下次再见！</value>
+  </data>
+  <data name="ChatContextCleared" xml:space="preserve">
+    <value>上下文已清空</value>
+  </data>
+  <data name="ChatModelUsageHint" xml:space="preserve">
+    <value>用法: /model provider/model_key</value>
+  </data>
+  <data name="ChatAvailableModels" xml:space="preserve">
+    <value>可用模型:</value>
+  </data>
+  <data name="ChatCurrentModelMarker" xml:space="preserve">
+    <value> ← 当前</value>
+  </data>
+  <data name="ChatNothingToCompact" xml:space="preserve">
+    <value>[dim]上下文已清洁，无需压缩。[/]</value>
+  </data>
+  <data name="ChatAskUserYes" xml:space="preserve">
+    <value>是</value>
+  </data>
+  <data name="ChatAskUserNo" xml:space="preserve">
+    <value>否</value>
+  </data>
+  <data name="ChatAskUserMultiSelectTitle" xml:space="preserve">
+    <value>选择一个或多个选项（空格选择，回车确认）：</value>
+  </data>
+  <data name="ChatAskUserNoSelection" xml:space="preserve">
+    <value>(无选择)</value>
+  </data>
+  <data name="ChatAskUserSelectTitle" xml:space="preserve">
+    <value>选择一个选项：</value>
+  </data>
+  <data name="ChatWelcomeExitHint" xml:space="preserve">
+    <value>输入消息开始对话，输入 '/exit' 或 '/quit' 退出</value>
+  </data>
+  <data name="ChatWelcomeClearHint" xml:space="preserve">
+    <value>输入 '/clear' 清空上下文</value>
+  </data>
+  <data name="ChatTokenUsageLabel" xml:space="preserve">
+    <value>[grey]用量:[/]</value>
+  </data>
+  <data name="ChatInterruptedTitle" xml:space="preserve">
+    <value>[dim]● 任务已被用户取消 [/]</value>
+  </data>
+  <data name="ChatInterruptedHint" xml:space="preserve">
+    <value>[red]⎿ 已中断 [dim]· Insighta 应该改做什么？[/] [/]</value>
+  </data>
+  <data name="ChatThinkingInitial" xml:space="preserve">
+    <value>思考中.</value>
+  </data>
+  <data name="ChatLlmClientFailedFormat" xml:space="preserve">
+    <value>创建 LLM 客户端失败: {0}</value>
+  </data>
+  <data name="ChatSessionSavedFormat" xml:space="preserve">
+    <value>会话已保存: {0}</value>
+  </data>
+  <data name="ChatSessionResumeHintFormat" xml:space="preserve">
+    <value>恢复命令: insighta chat --session {0}</value>
+  </data>
+  <data name="ChatSessionNotFoundFormat" xml:space="preserve">
+    <value>会话 {0} 不存在</value>
+  </data>
+  <data name="ChatNoHistoryForWorkDirFormat" xml:space="preserve">
+    <value>当前目录没有历史会话: {0}</value>
+  </data>
+  <data name="ChatSessionCorruptedFormat" xml:space="preserve">
+    <value>会话 {0} 数据损坏</value>
+  </data>
+  <data name="ChatSessionResumedFormat" xml:space="preserve">
+    <value>已恢复会话: {0}</value>
+  </data>
+  <data name="ChatCurrentModelFormat" xml:space="preserve">
+    <value>当前模型: {0}</value>
+  </data>
+  <data name="ChatProviderNotConfiguredFormat" xml:space="preserve">
+    <value>供应商 '{0}' 未在 auth.json 中配置</value>
+  </data>
+  <data name="ChatModelNotConfiguredFormat" xml:space="preserve">
+    <value>模型 '{0}' 未在 config.json 中配置</value>
+  </data>
+  <data name="ChatModelSwitchedFormat" xml:space="preserve">
+    <value>已切换到 {0}/{1}</value>
+  </data>
+  <data name="ChatCompactingFormat" xml:space="preserve">
+    <value>[yellow]⟳[/] 正在压缩上下文 ([dim]{0}[/])...</value>
+  </data>
+  <data name="ChatCompactedFormat" xml:space="preserve">
+    <value>[green]✓[/] 已压缩 ([dim]{0}[/]): {1} → {2} 条消息 ([dim]-{3}[/]), ~{4:N0} → ~{5:N0} tokens ([dim]-{6:N0}[/])</value>
+  </data>
+  <data name="ChatCompactFailedFormat" xml:space="preserve">
+    <value>[red]压缩失败: {0}[/] </value>
+  </data>
+  <data name="ChatAutoCompactedFormat" xml:space="preserve">
+    <value>[yellow]⟳[/] 上下文已压缩 ([dim]{0}[/]): {1} → {2} 条消息, ~{3:N0} → ~{4:N0} tokens</value>
+  </data>
+  <data name="ChatAskUserPromptFormat" xml:space="preserve">
+    <value>[yellow]●[/] Insighta 想问你: {0}</value>
+  </data>
+  <data name="ChatWelcomeProviderModelFormat" xml:space="preserve">
+    <value>供应商: {0} | 模型: {1}</value>
+  </data>
+  <data name="ChatWelcomeSessionIdFormat" xml:space="preserve">
+    <value>会话 ID: {0}</value>
+  </data>
+  <data name="ChatWelcomeToolsSkillsFormat" xml:space="preserve">
+    <value>工具: {0} 个已注册 | Skills: {1} 个可用</value>
+  </data>
+  <data name="ChatThinkingProgressFormat" xml:space="preserve">
+    <value>思考中（按 esc 中断）{0}</value>
+  </data>
 </root>

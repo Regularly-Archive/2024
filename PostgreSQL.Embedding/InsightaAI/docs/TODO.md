@@ -13,6 +13,19 @@
 - 新增枚举：`ProviderAction`、`ModelAction`、`LanguageAction`、`AdapterAction`，替换硬编码字符串。
 - 新增基础本地化键：`CommonBack`、`CommonNone`、`CommonDefault`。
 
+### X.1 ChatCommand 全命令国际化（已完成）
+
+**完成内容：**
+- [x] 整理 5 个 CLI 命令的国际化资源清单（`docs/i18n/`）
+- [x] `CliStrings.resx` / `CliStrings.zh-CN.resx` 新增 41 个 `Chat*` 资源条目
+- [x] `CliStrings.cs` 新增 21 个非格式化 Key 的静态属性
+- [x] `ChatCommand.cs` 30 处硬编码字符串替换为 `CliStrings` 引用
+- [x] `ChatRenderer.cs` 5 处硬编码字符串替换为 `CliStrings` 引用
+- [x] `EventRenderer.cs` 6 处硬编码字符串替换为 `CliStrings` 引用
+- [x] Spectre.Console markup 标签整体存入 resx，翻译时保留标签
+- [x] `ask_user` 工具 `question` 参数增加 `Markup.Escape` 防护
+- [x] 构建通过，0 Error / 0 Warning，202 个单元测试全部通过
+
 ### 1. 摘要服务统一（优先级：中）
 
 **问题描述：**
@@ -335,3 +348,4 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 - 2026-07-21: 新增 MCP Telemetry Tag 命名清理待办
 - 2026-07-21: 完成统一 SummaryService、全量/增量共享模板、MaxTokens 恢复、会话标题生成及输入截取 fallback
 - 2026-07-22: 统一 Agent Turn/Round 生命周期术语，调整 RoundEnd 与工具调用顺序，记录 Hook 与 ErrorEvent 后续工作
+- 2026-07-23: 完成 CLI 全命令国际化（ChatCommand + ChatRenderer + EventRenderer，41 处硬编码字符串提取到 resx）
