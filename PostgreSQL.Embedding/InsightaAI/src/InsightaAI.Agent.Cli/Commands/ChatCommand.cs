@@ -22,6 +22,8 @@ using InsightaAI.Agent.Tools;
 using InsightaAI.Agent.Tools.BuiltIn;
 using InsightaAI.LLM.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Serilog;
 using Spectre.Console;
 using System.CommandLine;
 
@@ -460,6 +462,7 @@ public class ChatCommand
                 sp.AddScoped<IShellExecutor, LocalShellExecutor>();
                 sp.AddScoped<AuthConfig>();
                 sp.AddScoped<CliConfig>();
+                sp.AddLogging(lb => lb.AddSerilog());
             })
             .Build();
 

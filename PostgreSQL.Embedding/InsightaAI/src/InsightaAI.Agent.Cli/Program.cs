@@ -9,6 +9,7 @@ using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Serilog;
 
 namespace InsightaAI.Agent.Cli;
 
@@ -23,6 +24,9 @@ public class Program
         var language = Environment.GetEnvironmentVariable("INSIGHTA_LANGUAGE")
             ?? CliConfig.Load().Language;
         CliCulture.Configure(language);
+
+        // 初始化文件日志（~/.insighta/logs/insighta-{date}.log）
+        InitLogger();
 
         // 初始化 OpenTelemetry（通过环境变量 INSIGHTA_TELEMETRY=1 启用）
         using var telemetry = InitTelemetry();
@@ -50,6 +54,22 @@ public class Program
         }
 
         return await rootCommand.InvokeAsync(args);
+    }
+
+    private static void InitLogger()
+    {
+        var logDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".insighta", "logs");
+
+        Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Information()
+            .WriteTo.File(
+                Path.Combine(logDir, ".log"),
+                rollingInterval: RollingInterval.Day,
+                retainedFileCountLimit: 14,
+                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}")
+            .CreateLogger();
     }
 
     private static IDisposable? InitTelemetry()

@@ -35,6 +35,7 @@ Key rules:
   sensitive data (API keys, passwords).
 
 # Skills & MCP Servers
+- Use `list_skills` to see available skills.
 - Use `activate_skill` to activate a skill before using its guidance.
 - You can activate multiple skills if the task requires.
 - Use `list_mcp_tools` to see available MCP tools, `activate_mcp_tool` to enable one.

@@ -13,6 +13,8 @@ using InsightaAI.Agent.Tools.BuiltIn;
 using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 
@@ -23,10 +25,6 @@ namespace InsightaAI.Agent;
 /// </summary>
 public class Agent : IDisposable
 {
-    /// <summary>
-    /// Hook 执行错误事件（用于日志记录）
-    /// </summary>
-    public static event Action<string, Exception>? OnHookError;
     private readonly AgentConfig _config;
     private readonly ILlmClient _llmClient;
     private readonly ToolRegistry _toolRegistry;
@@ -40,6 +38,7 @@ public class Agent : IDisposable
     private readonly HashSet<string> _alwaysAllowedTools = [];
     private readonly List<ISkill> _activatedSkills = [];
     private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<Agent> _logger;
     private string? _agentsMd;
     private bool _agentsMdLoaded;
     private bool _disposed;
@@ -91,6 +90,7 @@ public class Agent : IDisposable
         if (_contextManager != null) services.AddSingleton(_contextManager);
         if (_memoryManager != null) services.AddSingleton(_memoryManager);
         _serviceProvider = services.BuildServiceProvider();
+        _logger = NullLogger<Agent>.Instance;
 
         // 注册 activate_skill 工具
         if (_skillRegistry != null)
@@ -128,6 +128,7 @@ public class Agent : IDisposable
         _contextManager = serviceProvider.GetService<IContextManager>();
         _memoryManager = serviceProvider.GetService<IMemoryManager>();
         _messageStorage = serviceProvider.GetService<IMessageStorage>();
+        _logger = serviceProvider.GetService<ILogger<Agent>>() ?? NullLogger<Agent>.Instance;
 
         // 注册 activate_skill 工具
         if (_skillRegistry != null)
@@ -207,13 +208,50 @@ public class Agent : IDisposable
                     return ToolResult.FromError($"Skill '{skillName}' not found");
                 }
 
-                // 记录已激活的 Skill（去重）
                 if (!_activatedSkills.Any(s => s.Metadata.Name.Equals(skillName, StringComparison.OrdinalIgnoreCase)))
                 {
                     _activatedSkills.Add(skill);
                 }
 
                 return ToolResult.FromText($"Skill '{skillName}' activated successfully. Instructions have been loaded.");
+            });
+
+        RegisterListSkillsTool();
+    }
+
+    /// <summary>
+    /// 注册 list_skills 工具
+    /// </summary>
+    private void RegisterListSkillsTool()
+    {
+        var schema = JsonSerializer.Deserialize<JsonElement>(@"{
+            ""type"": ""object"",
+            ""properties"": {},
+            ""required"": []
+        }");
+
+        _toolRegistry.RegisterFunction(
+            "list_skills",
+            "列出所有可用的技能（名称和描述），用于了解当前有哪些技能可以被激活。",
+            schema,
+            async (args, ctx) =>
+            {
+                var skills = await _skillRegistry!.ListAllSkillsAsync(ctx.CancellationToken);
+                if (skills.Count == 0)
+                {
+                    return ToolResult.FromText("No skills available.");
+                }
+
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine($"Available skills ({skills.Count}):");
+                sb.AppendLine();
+                foreach (var skill in skills)
+                {
+                    var active = _skillRegistry.IsActive(skill.Name) ? " [active]" : "";
+                    sb.AppendLine($"- **{skill.Name}**{active}: {skill.Description}");
+                }
+
+                return ToolResult.FromText(sb.ToString());
             });
     }
 
@@ -274,9 +312,9 @@ public class Agent : IDisposable
     }
 
     /// <summary>
-    /// 触发 Agent Turn 启动钩子（在任何轮次开始前调用）
+    /// 触发 Agent Turn 启动钩子（fire-and-forget，不阻塞 Agent 主循环）
     /// </summary>
-    private async Task TriggerTurnStartedHooksAsync(
+    private void TriggerTurnStartedHooks(
         AgentEventHookContext context,
         string message,
         CancellationToken cancellationToken)
@@ -286,22 +324,16 @@ public class Agent : IDisposable
 
         foreach (var hook in _agentHooks)
         {
-            try
-            {
-                await hook.OnAgentTurnStartedAsync(context, message, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine(
-                    $"[AgentHook] Agent started hook '{hook.Id}' failed: {ex.Message}");
-            }
+            _ = SafeInvokeHookAsync(() => hook.OnAgentTurnStartedAsync(
+                context, message, cancellationToken),
+                $"Turn start hook '{hook.Id}'");
         }
     }
 
     /// <summary>
-    /// 触发 agent 级别的轮次开始钩子（同步等待，确保 Activity.Current 在 LLM 调用前就位）
+    /// 触发 agent 级别的轮次开始钩子（fire-and-forget，不阻塞 Agent 主循环）
     /// </summary>
-    private async Task TriggerRoundStartedHooksAsync(
+    private void TriggerRoundStartedHooks(
         string message,
         CancellationToken cancellationToken)
     {
@@ -310,21 +342,14 @@ public class Agent : IDisposable
 
         foreach (var hook in _agentHooks)
         {
-            try
-            {
-                await hook.OnAgentRoundStartedAsync(message, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine(
-                    $"[AgentHook] Round start hook '{hook.Id}' failed: {ex.Message}");
-            }
+            _ = SafeInvokeHookAsync(() => hook.OnAgentRoundStartedAsync(
+                message, cancellationToken),
+                $"Round start hook '{hook.Id}'");
         }
     }
 
     /// <summary>
-    /// 触发 agent 级别的轮次结束钩子（fire-and-forget）
-    /// 注意：此方法返回 void，明确表示不等待完成
+    /// 触发 agent 级别的轮次结束钩子（fire-and-forget，不阻塞 Agent 主循环）
     /// </summary>
     private void TriggerRoundEndedHooks(
         AgentEventHookContext hookContext,
@@ -336,32 +361,18 @@ public class Agent : IDisposable
         if (_agentHooks.Count == 0)
             return;
 
-        // Fire-and-forget: 并行触发所有 hooks，不阻塞主流程
-        var tasks = _agentHooks.Select(hook =>
-            hook.OnAgentRoundEndedAsync(hookContext, round, messages, assistantMessage, cancellationToken));
-
-        _ = Task.WhenAll(tasks).ContinueWith(t =>
+        foreach (var hook in _agentHooks)
         {
-            if (t.IsFaulted && t.Exception != null)
-            {
-                var innerEx = t.Exception.InnerException ?? t.Exception;
-                System.Diagnostics.Debug.WriteLine(
-                    $"[AgentHook] Round {round} hooks failed: {innerEx.Message}");
-
-                // 触发错误事件，允许外部日志系统记录
-                try
-                {
-                    OnHookError?.Invoke($"Round {round} hooks failed", innerEx);
-                }
-                catch { /* 错误事件处理器自身不能抛出异常 */ }
-            }
-        }, TaskContinuationOptions.ExecuteSynchronously);
+            _ = SafeInvokeHookAsync(() => hook.OnAgentRoundEndedAsync(
+                hookContext, round, messages, assistantMessage, cancellationToken),
+                $"Round {round} end hook '{hook.Id}'");
+        }
     }
 
     /// <summary>
-    /// 触发 Agent Turn 结束钩子
+    /// 触发 Agent Turn 结束钩子（fire-and-forget，不阻塞 Agent 主循环）
     /// </summary>
-    private async Task TriggerTurnEndedHooksAsync(
+    private void TriggerTurnEndedHooks(
         AgentEventHookContext context,
         List<Message> messages,
         CancellationToken cancellationToken)
@@ -371,14 +382,90 @@ public class Agent : IDisposable
 
         foreach (var hook in _agentHooks)
         {
-            try
+            _ = SafeInvokeHookAsync(() => hook.OnAgentTurnEndedAsync(
+                context, messages, cancellationToken),
+                $"Turn end hook '{hook.Id}'");
+        }
+    }
+
+    /// <summary>
+    /// 安全地 fire-and-forget 调用 Hook，异常仅记录日志
+    /// </summary>
+    private Task SafeInvokeHookAsync(Func<Task> hookAction, string hookLabel)
+    {
+        return hookAction().ContinueWith(t =>
+        {
+            if (t.IsFaulted && t.Exception != null)
             {
-                await hook.OnAgentTurnEndedAsync(context, messages, cancellationToken);
+                var ex = t.Exception.InnerException ?? t.Exception;
+                _logger.LogWarning("[AgentHook] {HookLabel} failed: {Message}", hookLabel, ex.Message);
             }
-            catch (Exception e)
-            {
-                // 忽略 hook 执行错误
-            }
+        }, TaskContinuationOptions.ExecuteSynchronously);
+    }
+
+    /// <summary>
+    /// 记录 Agent 事件日志（跳过 LLM 流式事件，避免日志爆炸）
+    /// </summary>
+    private void LogEvent(AgentEvent evt, string sessionId)
+    {
+        switch (evt)
+        {
+            case AgentTurnStartEvent turnStart:
+                _logger.LogInformation(
+                    "[{SessionId}] Turn started — agent={AgentId}, model={Model}",
+                    sessionId, turnStart.AgentId, turnStart.Model);
+                break;
+
+            case AgentRoundStartEvent roundStart:
+                _logger.LogInformation(
+                    "[{SessionId}] Round {Round} started",
+                    sessionId, roundStart.Round);
+                break;
+
+            case AgentToolStartEvent toolStart:
+                var args = toolStart.Arguments?.Length > 100
+                    ? toolStart.Arguments[..100] + "..."
+                    : toolStart.Arguments;
+                _logger.LogInformation(
+                    "[{SessionId}] Tool {ToolName}({Arguments}) started — callId={CallId}",
+                    sessionId, toolStart.ToolName, args, toolStart.ToolCallId);
+                break;
+
+            case AgentToolEndEvent toolEnd:
+                _logger.LogInformation(
+                    "[{SessionId}] Tool {ToolName} completed — isError={IsError}, callId={CallId}",
+                    sessionId, toolEnd.ToolName, toolEnd.IsError, toolEnd.ToolCallId);
+                break;
+
+            case AgentRoundEndEvent roundEnd:
+                _logger.LogInformation(
+                    "[{SessionId}] Round {Round} ended — hasToolCalls={HasToolCalls}",
+                    sessionId, roundEnd.Round, roundEnd.HasToolCalls);
+                break;
+
+            case AgentTurnEndEvent turnEnd:
+                _logger.LogInformation(
+                    "[{SessionId}] Turn ended — status={Status}, rounds={Rounds}, duration={Duration}ms, " +
+                    "inputTokens={InputTokens}, outputTokens={OutputTokens}, contextTokens={ContextTokens}/{MaxTokens}",
+                    sessionId, turnEnd.Result.Status, turnEnd.Result.Rounds, turnEnd.Result.DurationMs,
+                    turnEnd.Result.Usage?.InputTokens ?? 0, turnEnd.Result.Usage?.OutputTokens ?? 0,
+                    turnEnd.Result.EstimatedContextTokens, turnEnd.Result.MaxContextTokens);
+                break;
+
+            case AgentErrorEvent error:
+                _logger.LogError(
+                    "[{SessionId}] Agent error — message={Message}, recoverable={Recoverable}",
+                    sessionId, error.ErrorMessage, error.Recoverable);
+                break;
+
+            case AgentContextCompactedEvent compacted:
+                _logger.LogInformation(
+                    "[{SessionId}] Context compacted — strategy={Strategy}, " +
+                    "tokens: {PreTokens}→{PostTokens}, messages: {PreMessages}→{PostMessages}",
+                    sessionId, compacted.Strategy,
+                    compacted.PreCompactTokens, compacted.PostCompactTokens,
+                    compacted.PreCompactMessages, compacted.PostCompactMessages);
+                break;
         }
     }
 
@@ -485,20 +572,20 @@ public class Agent : IDisposable
 
         await foreach (var evt in agentLoop.RunAsync(loopContext, cancellationToken))
         {
-            // 转发事件给调用方
-            yield return evt;
+            // 事件日志
+            LogEvent(evt, sessionId);
 
-            // 事件后处理
+            // 事件预处理：Hook 与副作用在 yield 前完成，确保消费者提前退出时不会丢失关键工作
             switch (evt)
             {
                 case AgentTurnStartEvent turnStartEvt:
                     hookContext.AttachEvent(turnStartEvt);
-                    await TriggerTurnStartedHooksAsync(hookContext, input, cancellationToken);
+                    TriggerTurnStartedHooks(hookContext, input, cancellationToken);
                     break;
 
                 case AgentRoundStartEvent roundStartEvt:
                     hookContext.AttachEvent(roundStartEvt);
-                    await TriggerRoundStartedHooksAsync(input, cancellationToken);
+                    TriggerRoundStartedHooks(input, cancellationToken);
                     break;
 
                 case AgentContextCompactedEvent compactedEvt:
@@ -524,10 +611,13 @@ public class Agent : IDisposable
 
                 case AgentTurnEndEvent turnEndEvent:
                     hookContext.AttachEvent(turnEndEvent);
-                    await TriggerTurnEndedHooksAsync(hookContext,
+                    TriggerTurnEndedHooks(hookContext,
                         loopContext.Messages.ToList(), cancellationToken);
                     break;
             }
+
+            // 转发事件给调用方
+            yield return evt;
         }
     }
 
