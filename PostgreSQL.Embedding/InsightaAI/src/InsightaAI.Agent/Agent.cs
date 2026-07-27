@@ -5,7 +5,6 @@ using InsightaAI.Agent.Hooks;
 using InsightaAI.Agent.Mcp;
 using InsightaAI.Agent.Memory;
 using InsightaAI.Agent.Models;
-using InsightaAI.Agent.Prompts;
 using InsightaAI.Agent.Skills;
 using InsightaAI.Agent.Storage;
 using InsightaAI.Agent.Tools;
@@ -192,7 +191,7 @@ public class Agent : IDisposable
 
         _toolRegistry.RegisterFunction(
             "activate_skill",
-            "激活一个技能以获得相关指导。当用户任务需要特定技能时使用。",
+            "Activate a skill to get specialized guidance for the current task. If a skill matches the task, activate it before proceeding.",
             schema,
             async (args, ctx) =>
             {
@@ -213,7 +212,7 @@ public class Agent : IDisposable
                     _activatedSkills.Add(skill);
                 }
 
-                return ToolResult.FromText($"Skill '{skillName}' activated successfully. Instructions have been loaded.");
+                return ToolResult.FromText($"Skill '{skillName}' activated successfully. The full skill instructions will be available in the next reasoning round. Follow them before answering the user.");
             });
 
         RegisterListSkillsTool();
@@ -232,7 +231,7 @@ public class Agent : IDisposable
 
         _toolRegistry.RegisterFunction(
             "list_skills",
-            "列出所有可用的技能（名称和描述），用于了解当前有哪些技能可以被激活。",
+            "List all available skills (name and description). Use to check if any skill matches the current task.",
             schema,
             async (args, ctx) =>
             {

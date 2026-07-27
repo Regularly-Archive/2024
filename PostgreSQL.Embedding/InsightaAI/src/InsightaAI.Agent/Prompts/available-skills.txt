@@ -1,5 +1,5 @@
 ﻿
 ## Available Skills
-You can activate the following skills when needed:
+Review these skills before starting the task. If one clearly matches the user's request, activate it with `activate_skill` before proceeding. If you cannot identify a matching skill, use `list_skills` to search the complete catalog:
 
 {skills_list}

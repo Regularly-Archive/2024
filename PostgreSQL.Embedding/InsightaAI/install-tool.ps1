@@ -1,43 +1,64 @@
-# InsightaAI Agent CLI - 全局工具安装脚本
-# 用法: .\install-tool.ps1
+# InsightaAI Agent CLI - Global tool installer
+# Usage: .\install-tool.ps1
 
-$ErrorActionPreference = "SilentlyContinue"
+$ErrorActionPreference = "Stop"
 $projectPath = "src/InsightaAI.Agent.Cli"
-$outputPath = "./nupkg"
+$outputPath = Join-Path $PSScriptRoot "nupkg"
+$packageId = "InsightaAI.Agent.Cli"
+$toolCommand = "insighta"
+
+function Invoke-Dotnet {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]] $Arguments
+    )
+
+    & dotnet @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
+    }
+}
 
 Write-Host "=== InsightaAI Agent CLI Installer ===" -ForegroundColor Cyan
 Write-Host ""
 
-# 1. 卸载旧版本
-Write-Host "[1/3] Uninstalling old version..." -ForegroundColor Yellow
-dotnet tool uninstall --global InsightaAI.Agent.Cli 2>$null
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "  Old version uninstalled." -ForegroundColor Green
-} else {
-    Write-Host "  No previous version found." -ForegroundColor Gray
-}
-
-# 2. 打包新版本
-Write-Host "[2/3] Packing new version..." -ForegroundColor Yellow
-dotnet pack $projectPath -c Release -o $outputPath --force 2>$null
-if ($LASTEXITCODE -eq 0) {
-    $nupkg = Get-ChildItem "$outputPath/*.nupkg" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    Write-Host "  Packed: $($nupkg.Name)" -ForegroundColor Green
-} else {
-    Write-Host "  Pack failed!" -ForegroundColor Red
+# A running global tool keeps its executable and dependent files locked on Windows.
+$runningProcesses = Get-Process -Name $toolCommand -ErrorAction SilentlyContinue
+if ($runningProcesses) {
+    Write-Host "A running '$toolCommand' process was found." -ForegroundColor Red
+    Write-Host "Please exit the running Insighta session and run this script again." -ForegroundColor Yellow
     exit 1
 }
 
-# 3. 安装新版本
-Write-Host "[3/3] Installing new version..." -ForegroundColor Yellow
-dotnet tool install --global --add-source $outputPath InsightaAI.Agent.Cli --prerelease 2>$null
-if ($LASTEXITCODE -eq 0) {
+try {
+    Write-Host "[1/3] Packing new version..." -ForegroundColor Yellow
+    Invoke-Dotnet @("pack", $projectPath, "-c", "Release", "-o", $outputPath, "--force")
+
+    $nupkg = Get-ChildItem -LiteralPath $outputPath -Filter "*.nupkg" |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+    if (-not $nupkg) {
+        throw "No NuGet package was produced in '$outputPath'."
+    }
+    Write-Host "  Packed: $($nupkg.Name)" -ForegroundColor Green
+
+    Write-Host "[2/3] Uninstalling old version..." -ForegroundColor Yellow
+    & dotnet tool uninstall --global $packageId
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "  Old version uninstalled." -ForegroundColor Green
+    } else {
+        Write-Host "  No previous version found." -ForegroundColor Gray
+    }
+
+    Write-Host "[3/3] Installing new version..." -ForegroundColor Yellow
+    Invoke-Dotnet @("tool", "install", "--global", "--add-source", $outputPath, $packageId, "--prerelease")
     Write-Host "  Installed successfully!" -ForegroundColor Green
-} else {
-    Write-Host "  Install failed!" -ForegroundColor Red
+}
+catch {
+    Write-Host "  Installation failed: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
 }
 
 Write-Host ""
 Write-Host "=== Done! ===" -ForegroundColor Cyan
-Write-Host "Usage: insighta chat" -ForegroundColor Green
+Write-Host "Usage: $toolCommand chat" -ForegroundColor Green

@@ -1,15 +1,14 @@
-using System.CommandLine;
-using System.Text;
 using InsightaAI.Agent.Cli.Commands;
 using InsightaAI.Agent.Cli.Localization;
 using InsightaAI.Agent.Cli.Models;
-using InsightaAI.Agent.Diagnostics;
 using InsightaAI.Agent.Storage;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
+using System.CommandLine;
+using System.Text;
 
 namespace InsightaAI.Agent.Cli;
 
