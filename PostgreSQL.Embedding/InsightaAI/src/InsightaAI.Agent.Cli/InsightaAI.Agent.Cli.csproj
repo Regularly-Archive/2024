@@ -11,7 +11,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>insighta</ToolCommandName>
     <PackageId>InsightaAI.Agent.Cli</PackageId>
-    <Version>1.0.0-alpha.1</Version>
+    <Version>1.0.0-alpha.2</Version>
     <Description>InsightaAI Agent CLI - Your Another AI Assistant</Description>
     <Authors>InsightaAI</Authors>
   </PropertyGroup>

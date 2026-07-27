@@ -100,19 +100,13 @@ public class BashTool : ITool, IToolResultProjector
             var output = sb.ToString().TrimEnd();
 
             // 检查输出长度
-            if (output.Length > 10_000)
-            {
-                return ToolResult.FromText(
-                    $"Command output is too long ({output.Length} characters). " +
-                    "Please use 'head' or 'tail' to limit the output:\n" +
-                    $"  {command} | head -n 100\n" +
-                    $"  {command} | tail -n 100\n" +
-                    $"  {command} > output.txt");
-            }
-
             return result.Success
                 ? ToolResult.FromText(output)
                 : ToolResult.FromError(output);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -130,9 +124,11 @@ public class BashTool : ITool, IToolResultProjector
     {
         var text = result.Content.OfType<TextBlock>().FirstOrDefault()?.Text ?? string.Empty;
         var lines = text.Split('\n');
-        var preview = string.Join("\n", lines.Take(50));
-        if (lines.Length > 100)
-            preview += $"\n\n[... omitted {lines.Length - 100} lines ...]\n\n" + string.Join("\n", lines.TakeLast(50));
+        var preview = lines.Length <= 100
+            ? text
+            : string.Join("\n", lines.Take(50)) +
+              $"\n\n[... omitted {lines.Length - 100} lines ...]\n\n" +
+              string.Join("\n", lines.TakeLast(50));
         if (context.Artifact != null)
             preview += $"\n\n[Full output saved as artifact {context.Artifact.Id}: {context.Artifact.Path}]";
         return new ToolResultProjection
