@@ -77,9 +77,12 @@ TraditionalCompactThreshold: 80%
 - `Agent.LogEvent()` 记录 TurnStart/End、RoundStart/End、ToolStart/End、Error、ContextCompacted
 - 跳过 `AgentLlmStreamEvent`（避免日志爆炸）
 
-## 最近提交（2026-07-23）
+## 最近提交（2026-07-27）
 
 ```
+33ca577 fix: improve bash tool output handling
+0fec542 fix: improve skill discovery and tool installation
+f92247c docs: update AGENTS.md and TODO.md for hook dispatch, ILogger and list_skills
 6fe63c2 refactor(agent): unify hook dispatch, add ILogger and list_skills tool
 f1f4bff feat(cli): introduce localization for config command and split config into subcommands
 5bb3c69 refactor(agent): implement 4-layer system prompt architecture with AGENTS.md support
@@ -88,6 +91,13 @@ ce53a2b feat: add OpenTelemetry diagnostics; refactor orchestrator namespace
 0822f42 feat: show inline diff preview for edit_file in permission hook
 f806a75 refactor: extract AgentLoop and add auto message persistence
 ```
+
+### 最近变更（2026-07-27）
+
+- `BashTool` 不再因输出超过 10,000 字符直接报错，改由 Tool Result Lifecycle 统一保存完整结果并生成头尾预览；补充 Bash 输出测试。
+- CLI 工具版本升级为 `1.0.0-alpha.2`。
+- 改进 Skill 发现、激活提示和 `list_skills`/`activate_skill` 工具描述。
+- `install-tool.ps1` 增加严格错误处理、运行中进程检测、稳定的脚本目录解析和打包结果校验。
 
 ## 最新架构变更
 
@@ -118,11 +128,11 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 
 - `ToolResult` 新增 `Metadata` 属性（`IReadOnlyDictionary<string,object?>?`）
 - `McpToolCallResult` 封装 `Text` + `IsError` + `Metadata`，替代 `IMcpConnectionPool.CallToolAsync` 的 `string` 返回值
-- 两层填充：`SimpleMcpConnectionPool` 填 server 身份（`mcp.server.name`/`version`），`McpRegistry` 填本地配置（`mcp.server.description`/`transport`）
+- 两层填充：`SimpleMcpConnectionPool` 填 server 身份（`mcp.server.name`/`version`），`McpRegistry` 填本地配置元数据
 - `ToolCallHandlerTelemetryWrapper` 统一消费 Metadata → `activity.SetTag`
 - `AgentLoop.HandleMaxRoundsExceededAsync` 修复：传入 `snapshot` 而非 `context.Messages`
 
-**遗留：** MCP Telemetry Tag 命名优化（`mcp.server.description` → `mcp.config.description`，去重 `mcp.server.transport`），见 TODO.md #12
+**遗留：** MCP Telemetry Tag 命名优化仍未完成；当前代码仍需核对 `mcp.server.description` 与本地配置语义，见 TODO.md #12
 
 ### 统一摘要服务与会话标题（2026-07-21）
 
@@ -172,11 +182,13 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 
 3. **摘要服务统一（已完成）** — 全量摘要、增量摘要和会话标题已统一到 `SummaryService`；共享结构模板，并具备 MaxTokens 重试、完整性校验与标题 fallback。
 
-4. **AgentBuilder 生命周期** — 构造函数未默认注册 `ToolRegistry`，用户不调用 `WithToolRegistry()` 会抛异常。
+4. **AgentBuilder 生命周期** — 构造函数仍未默认注册 `ToolRegistry`，用户不调用 `WithToolRegistry()` 会抛异常。
 
-5. **Hook 生命周期整理（部分完成）** — 调度统一、日志注入已完成；剩余：`AgentEventHookContext.Event` 改不可变快照、`AgentErrorEvent` 接入。
+5. **Telemetry 防御性（部分完成）** — 指标命名和 Tool telemetry 标签已调整；`CurrentRoundContext` 仍有直接字典索引，需要改为安全读取。
 
-6. **日志 Token 用量为 0** — 部分模型（如 `glm-5.2`）在 streaming 模式下不返回 Usage，日志中 `inputTokens=0` 无法区分"未返回"和"真 0"。
+6. **Hook 生命周期整理（部分完成）** — 调度统一、日志注入已完成；剩余：`AgentEventHookContext.Event` 改不可变快照、`AgentErrorEvent` 接入。
+
+7. **日志 Token 用量为 0** — 部分模型（如 `glm-5.2`）在 streaming 模式下不返回 Usage，日志中 `inputTokens=0` 无法区分"未返回"和"真 0"。
 
 ### TODO.md 重点项
 
@@ -186,12 +198,18 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 - [x] Hook 调度统一（fire-and-forget 并行、yield 前触发、SafeInvokeHookAsync）
 - [x] Agent 注入 `ILogger<Agent>` + Serilog 文件日志 + `LogEvent` 事件日志
 - [x] `list_skills` 工具（运行时技能发现）
+- [x] Agent 旧构造函数创建的 ServiceProvider 可通过 `IDisposable` 释放
 - [ ] Memory 轻量化索引
 - [ ] AgentBuilder 默认注册 `ToolRegistry`
 - [ ] `AgentEventHookContext.Event` 改不可变事件快照
 - [ ] `AgentErrorEvent` 接入 AgentLoop
 - [ ] L3 Orchestrator 继续开发
 - [ ] MCP Telemetry Tag 命名清理（`mcp.server.description`→`mcp.config.description`，去重 transport）
+
+## 最近验证
+
+- 2026-07-28：Agent、Orchestrator、LLM 测试共 335 个通过。
+- 测试整体仍因 `InsightaAI.Tests.Shared` 缺少 `Azure.Core.dll` 导致测试宿主启动失败，需修复测试依赖或输出目录后重新验证。
 
 ## 愿景与里程碑
 

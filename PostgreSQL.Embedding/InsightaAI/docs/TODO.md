@@ -73,7 +73,7 @@
 - [x] SessionMemoryHook 改用 `context.Services?.GetService<ILlmClient>()`
 
 **待优化：**
-- [ ] Agent 实现 IDisposable，释放旧构造函数创建的 ServiceProvider
+- [x] Agent 实现 IDisposable，释放旧构造函数创建的 ServiceProvider
 - [ ] 未来如需 Scoped 服务（如 DbContext），需在 Agent Loop 时 CreateScope 创建子容器
 
 ---
@@ -162,6 +162,8 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 - **问题**: 直接使用字典索引 `CurrentRoundContext[_agentId]`，若 `AddTelemetry()` 未先调用会抛 `KeyNotFoundException`
 - **修复**: 改用 `TryGetValue`，未命中时记录非 parented 的 Activity
 
+**当前状态：** 尚未完成。`ToolCallHandlerTelemetryWrapper` 和 `LlmClientTelemetryProxy` 仍存在直接字典索引。
+
 6.2 `LlmRequestDuration` 标签维度不一致
 - **位置**: `TelemetryLlmClient.cs` `RecordMetricsAndTags`
 - **问题**: `LlmRequestDuration` 直方图 Record 时只传了 duration，未携带 `gen_ai.adapter`、`gen_ai.system`、`gen_ai.request.model` 标签，导致无法按模型维度做细粒度分析
@@ -171,6 +173,7 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 - [x] 第 5 点已修复：`TelemetryToolCallHandler` catch 块补充 `gen_ai.tool.is_allowed` 标签
 - [x] 第 5.1 点已修复：`LlmRequestDuration` metric 名从 `insighta.llm.request.duration` 改为 `gen_ai.client.operation.duration`
 - [x] Token counter 命名统一为 `gen_ai.client.tokens.input/output/cache_hit`（保持独立 counter 结构，仅改前缀与 OTel GenAI 对齐）
+- [x] `LlmRequestDuration` 使用带模型和供应商维度的标签记录
 
 ---
 
@@ -306,7 +309,9 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 **建议方案：**
 - `McpRegistry` 中 `mcp.server.description` → `mcp.config.description`
 - `McpRegistry` 中移除 `mcp.server.transport`（MCP SDK 已有）
-- `SimpleMcpConnectionPool` 保持 `mcp.server.name`/`mcp.server.version`（来自 server `initialize` 握手，语义正确）
+- `SimpleMcpConnectionPool` 保持来自 server `initialize` 握手的 `mcp.server.name`/`mcp.server.version`，并确认 description 是否应归入 server 身份
+
+**当前状态：** 尚未完成。当前连接池仍输出 `mcp.server.description`，需要完成 tag 分层并补充测试。
 
 **最终 tag 分层：**
 - `mcp.server.*` — 远端 server 身份（连接池层，来自握手）
@@ -355,3 +360,7 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 - 2026-07-22: 统一 Agent Turn/Round 生命周期术语，调整 RoundEnd 与工具调用顺序，记录 Hook 与 ErrorEvent 后续工作
 - 2026-07-23: 完成 CLI 全命令国际化（ChatCommand + ChatRenderer + EventRenderer，41 处硬编码字符串提取到 resx）
 - 2026-07-23: Hook 调度统一（fire-and-forget、yield 前触发、SafeInvokeHookAsync）、ILogger 注入、Serilog 文件日志、LogEvent 事件日志、list_skills 工具
+- 2026-07-27: 改进 Bash 大输出处理、补充 Bash 输出测试、CLI 升级到 `1.0.0-alpha.2`
+- 2026-07-27: 改进 Skill 发现/激活提示、`list_skills` 工具描述和全局工具安装脚本
+- 2026-07-28: 核对 TODO 与代码现状；Agent IDisposable 已完成，Telemetry 安全索引和 MCP tag 清理仍待处理
+- 2026-07-28: Agent、Orchestrator、LLM 测试共 335 个通过；测试整体另有 `Azure.Core.dll` 缺失导致的测试宿主启动问题
