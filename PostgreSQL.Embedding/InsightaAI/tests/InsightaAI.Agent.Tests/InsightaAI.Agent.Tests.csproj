@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\InsightaAI.Agent\InsightaAI.Agent.csproj" />
+    <ProjectReference Include="..\..\src\InsightaAI.Agent.Cli\InsightaAI.Agent.Cli.csproj" />
     <ProjectReference Include="..\InsightaAI.Tests.Shared\InsightaAI.Tests.Shared.csproj" />
   </ItemGroup>
 

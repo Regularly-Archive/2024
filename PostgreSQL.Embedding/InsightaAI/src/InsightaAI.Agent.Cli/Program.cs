@@ -1,11 +1,15 @@
 using InsightaAI.Agent.Cli.Commands;
 using InsightaAI.Agent.Cli.Localization;
 using InsightaAI.Agent.Cli.Models;
+using InsightaAI.Agent.Cli.Services;
 using InsightaAI.Agent.Storage;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Serilog;
 using System.CommandLine;
 using System.Text;
@@ -14,8 +18,6 @@ namespace InsightaAI.Agent.Cli;
 
 public class Program
 {
-    private static readonly IMessageStorage Storage = new JsonlMessageStorage();
-
     public static async Task<int> Main(string[] args)
     {
         // 设置控制台编码为 UTF-8（修复全局工具模式下特殊字符显示为问号的问题）
@@ -30,12 +32,25 @@ public class Program
         // 初始化 OpenTelemetry（通过环境变量 INSIGHTA_TELEMETRY=1 启用）
         using var telemetry = InitTelemetry();
 
+        // 创建 CLI 根 Host。命令行解析仍由 System.CommandLine 负责，
+        // 共享基础设施和命令对象由 Host DI 管理。
+        var hostBuilder = Host.CreateApplicationBuilder(args);
+        hostBuilder.Logging.ClearProviders();
+        hostBuilder.Logging.AddSerilog(Log.Logger, dispose: false);
+        hostBuilder.Services.AddSingleton<IMessageStorage, JsonlMessageStorage>();
+        hostBuilder.Services.AddScoped<IAgentFactory, AgentFactory>();
+        hostBuilder.Services.AddScoped<IChatApplication, ChatApplication>();
+        hostBuilder.Services.AddScoped<SessionsCommand>();
+
+        using var host = hostBuilder.Build();
+        var scopeFactory = host.Services.GetRequiredService<IServiceScopeFactory>();
+
         var rootCommand = new RootCommand("InsightaAI Agent CLI - Yet Another AI Agent");
 
         // 注册命令
         rootCommand.AddCommand(new ConfigCommand().Create());
-        rootCommand.AddCommand(new ChatCommand(Storage).Create());
-        rootCommand.AddCommand(new SessionsCommand(Storage).Create());
+        rootCommand.AddCommand(ChatCommand.Create(scopeFactory));
+        rootCommand.AddCommand(SessionsCommand.Create(scopeFactory));
         rootCommand.AddCommand(new SkillsCommand().Create());
         rootCommand.AddCommand(new McpCommand().Create());
 
@@ -49,7 +64,9 @@ public class Program
         // 如果没有子命令，默认运行 chat
         if (args.Length == 0)
         {
-            return await new ChatCommand(Storage).ExecuteAsync(null);
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var application = scope.ServiceProvider.GetRequiredService<IChatApplication>();
+            return await application.RunAsync(null);
         }
 
         return await rootCommand.InvokeAsync(args);

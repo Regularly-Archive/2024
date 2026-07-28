@@ -2,6 +2,7 @@ using System.CommandLine;
 using InsightaAI.Agent.Cli.Localization;
 using InsightaAI.Agent.Cli.UI;
 using InsightaAI.Agent.Storage;
+using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
 
 namespace InsightaAI.Agent.Cli.Commands;
@@ -25,9 +26,28 @@ public class SessionsCommand
     /// </summary>
     public Command Create()
     {
+        return CreateCommand(ListAsync, DeleteAsync);
+    }
+
+    /// <summary>
+    /// 创建由 DI Scope 执行的命令对象。
+    /// </summary>
+    public static Command Create(IServiceScopeFactory scopeFactory)
+    {
+        ArgumentNullException.ThrowIfNull(scopeFactory);
+
+        return CreateCommand(
+            () => ExecuteListInScopeAsync(scopeFactory),
+            sessionId => ExecuteDeleteInScopeAsync(scopeFactory, sessionId));
+    }
+
+    private static Command CreateCommand(
+        Func<Task<int>> list,
+        Func<string?, Task> delete)
+    {
         var command = new Command("sessions", CliStrings.SessionsDescription);
         var listCommand = new Command("list", CliStrings.SessionsListDescription);
-        listCommand.SetHandler(() => ListAsync());
+        listCommand.SetHandler(list);
 
         var deleteCommand = new Command("delete", CliStrings.SessionsDeleteDescription);
         var sessionIdOption = new Option<string?>("--sessionId", CliStrings.SessionsDeleteSessionIdOption)
@@ -35,11 +55,27 @@ public class SessionsCommand
             IsRequired = true
         };
         deleteCommand.AddOption(sessionIdOption);
-        deleteCommand.SetHandler((sessionId) => DeleteAsync(sessionId), sessionIdOption);
+        deleteCommand.SetHandler((sessionId) => delete(sessionId), sessionIdOption);
 
         command.AddCommand(listCommand);
         command.AddCommand(deleteCommand);
         return command;
+    }
+
+    private static async Task<int> ExecuteListInScopeAsync(IServiceScopeFactory scopeFactory)
+    {
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var command = scope.ServiceProvider.GetRequiredService<SessionsCommand>();
+        return await command.ListAsync();
+    }
+
+    private static async Task ExecuteDeleteInScopeAsync(
+        IServiceScopeFactory scopeFactory,
+        string? sessionId)
+    {
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var command = scope.ServiceProvider.GetRequiredService<SessionsCommand>();
+        await command.DeleteAsync(sessionId);
     }
 
     /// <summary>
