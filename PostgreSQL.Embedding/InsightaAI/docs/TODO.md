@@ -347,6 +347,16 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 
 ---
 
+## 明日计划
+
+- [ ] 清理 `ChatApplication` 中遗留的 `#if false` 旧代码
+- [ ] 为 `AgentBuilder` 补充独立单元测试，覆盖默认 `ToolRegistry`、`ConfigureServices()` 和 Provider 生命周期
+- [ ] 继续检查 Agent 服务生命周期，明确 Singleton/Scoped 支持策略
+- [ ] 视需要补充 CLI Bootstrap 启动顺序测试
+- [ ] 检查工作区状态，确认是否需要提交后续改动
+
+---
+
 ## 记录时间
 - 2026-07-03: 创建文档，记录当前待办事项
 - 2026-07-15: 新增 Agent 依赖注入待办、TiktokenTokenEstimator、测试失败清单
