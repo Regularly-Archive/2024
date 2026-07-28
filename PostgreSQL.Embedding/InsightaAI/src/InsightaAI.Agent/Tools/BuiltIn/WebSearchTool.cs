@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using InsightaAI.Agent.Abstractions;
 using InsightaAI.LLM.Models;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace InsightaAI.Agent.Tools.BuiltIn;
 
@@ -66,7 +67,9 @@ public class WebSearchTool : ITool, IToolResultProjector
 
         try
         {
-            var apiKey = Environment.GetEnvironmentVariable("TAVILY_API_KEY");
+            var environment = context.Services?.GetService<IEnvironmentVariableReader>()
+                ?? new ProcessEnvironmentVariableReader();
+            var apiKey = environment.Get("TAVILY_API_KEY");
             if (string.IsNullOrEmpty(apiKey))
                 return ToolResult.FromError("TAVILY_API_KEY environment variable is not set.");
 

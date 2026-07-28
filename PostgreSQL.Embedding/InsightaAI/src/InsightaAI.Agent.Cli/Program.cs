@@ -22,21 +22,26 @@ public class Program
     {
         // 设置控制台编码为 UTF-8（修复全局工具模式下特殊字符显示为问号的问题）
         Console.OutputEncoding = Encoding.UTF8;
-        var language = Environment.GetEnvironmentVariable("INSIGHTA_LANGUAGE")
-            ?? CliConfig.Load().Language;
+        var cliConfig = CliConfig.Load();
+        var cliEnvironment = new CliEnvironment(cliConfig.Envs);
+        cliEnvironment.ApplyBootstrapVariables();
+
+        var language = cliEnvironment.Get("INSIGHTA_LANGUAGE")
+            ?? cliConfig.Language;
         CliCulture.Configure(language);
 
         // 初始化文件日志（~/.insighta/logs/insighta-{date}.log）
         InitLogger();
 
         // 初始化 OpenTelemetry（通过环境变量 INSIGHTA_TELEMETRY=1 启用）
-        using var telemetry = InitTelemetry();
+        using var telemetry = InitTelemetry(cliEnvironment);
 
         // 创建 CLI 根 Host。命令行解析仍由 System.CommandLine 负责，
         // 共享基础设施和命令对象由 Host DI 管理。
         var hostBuilder = Host.CreateApplicationBuilder(args);
         hostBuilder.Logging.ClearProviders();
         hostBuilder.Logging.AddSerilog(Log.Logger, dispose: false);
+        hostBuilder.Services.AddSingleton(cliConfig);
         hostBuilder.Services.AddSingleton<IMessageStorage, JsonlMessageStorage>();
         hostBuilder.Services.AddScoped<IAgentFactory, AgentFactory>();
         hostBuilder.Services.AddScoped<IChatApplication, ChatApplication>();
@@ -88,10 +93,12 @@ public class Program
             .CreateLogger();
     }
 
-    private static IDisposable? InitTelemetry()
+    private static IDisposable? InitTelemetry(CliEnvironment environment)
     {
+        if (!string.Equals(environment.Get("INSIGHTA_TELEMETRY"), "1", StringComparison.OrdinalIgnoreCase))
+            return null;
 
-        var endpoint = Environment.GetEnvironmentVariable("INSIGHTA_OTEL_ENDPOINT") ?? "http://localhost:4317";
+        var endpoint = environment.Get("INSIGHTA_OTEL_ENDPOINT") ?? "http://localhost:4317";
 
         var resourceBuilder = ResourceBuilder.CreateDefault()
             .AddService("insighta-cli");

@@ -78,6 +78,20 @@
 
 ---
 
+### 2.1 CLI 配置启动阶段与运行阶段分离（优先级：高）
+
+**问题描述：**
+语言、Telemetry 和 OTLP endpoint 等配置需要在 `Program.cs` 初始化 CLI 文化、日志和 OpenTelemetry 之前生效，同时 Agent 运行时只能访问当前 Agent 的服务集合。
+
+**进展：**
+- [x] 增加 CLI 启动初始化阶段，在创建 Host 前加载并应用 Bootstrap 环境变量
+- [x] 区分 Bootstrap 配置与 Agent/Chat Runtime 配置
+- [x] 统一配置读取，`CliConfig` 通过 Host DI 复用
+- [x] 明确优先级：进程环境变量 > `CliConfig.Envs` > 默认值
+- [ ] 覆盖语言、Telemetry、日志和 OTLP endpoint 的启动时序测试
+
+---
+
 ### 3. SessionMemoryCompactStrategy 与 TraditionalCompactStrategy 统一
 
 **已完成：**
@@ -91,29 +105,14 @@
 
 ---
 
-### 4. AgentBuilder 生命周期一致性（优先级：中）
+### 4. AgentBuilder 与 AgentFactory 生命周期一致性（已完成）
 
-**问题描述：**
-`AgentBuilder` 的 `WithXxx()` 方法使用 `TryAddSingleton` 注册服务，但构造函数中未预先注册 `ToolRegistry`。如果用户不调用 `WithToolRegistry()`，`Agent` 构造时会抛出 `InvalidOperationException`。
+`AgentBuilder` 现在负责 Agent 级服务组合：构造时注册 `AgentConfig` 和默认 `ToolRegistry`，`WithXxx()` 覆盖显式依赖，`ConfigureServices()` 提供扩展注册点，`Build()` 创建当前 Agent 专属的 ServiceProvider。`Agent` 负责释放该 Provider。
 
-**当前代码：**
-```csharp
-// AgentBuilder 构造函数
-public AgentBuilder(AgentConfig config)
-{
-    _config = config;
-    _services = new ServiceCollection();
-    _services.TryAddSingleton(_config);
-    // ToolRegistry 未注册！
-}
-
-// Agent 构造函数
-_toolRegistry = serviceProvider.GetRequiredService<ToolRegistry>();  // 会抛异常
-```
-
-**待优化：**
-- [ ] 构造函数中默认注册 `ToolRegistry`
-- [ ] 或者在 `Build()` 中检查 `ToolRegistry` 是否已注册并给出清晰错误提示
+- [x] 构造函数中默认注册 `ToolRegistry`
+- [x] 增加 `ConfigureServices(Action<IServiceCollection>)`
+- [x] `AgentFactory` 通过 `AgentBuilder` 完成服务组合，不直接创建 Provider
+- [x] 保留旧的显式构造函数，兼容现有调用方
 
 ---
 
@@ -363,4 +362,6 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 - 2026-07-27: 改进 Bash 大输出处理、补充 Bash 输出测试、CLI 升级到 `1.0.0-alpha.2`
 - 2026-07-27: 改进 Skill 发现/激活提示、`list_skills` 工具描述和全局工具安装脚本
 - 2026-07-28: 核对 TODO 与代码现状；Agent IDisposable 已完成，Telemetry 安全索引和 MCP tag 清理仍待处理
-- 2026-07-28: Agent、Orchestrator、LLM 测试共 335 个通过；测试整体另有 `Azure.Core.dll` 缺失导致的测试宿主启动问题
+- 2026-07-28: Agent、Orchestrator、LLM 测试共 337 个通过；修复 `InsightaAI.Tests.Shared` 被误作为测试项目运行导致的 `Azure.Core.dll` 启动问题
+- 2026-07-28: 新增 CLI 配置 Bootstrap 与 Runtime 分离待办，记录 `CliConfig.Envs` 的启动时序问题
+- 2026-07-28: 完成 CLI Bootstrap 环境注入，并将 Agent 服务组合统一收回 `AgentBuilder`

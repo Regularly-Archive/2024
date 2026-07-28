@@ -84,6 +84,7 @@ public class Agent : IDisposable
         var services = new ServiceCollection();
         services.AddSingleton<ILlmClient>(_llmClient);
         services.AddSingleton(_toolRegistry);
+        services.AddSingleton<IEnvironmentVariableReader, ProcessEnvironmentVariableReader>();
         if (_skillRegistry != null) services.AddSingleton(_skillRegistry);
         if (_mcpRegistry != null) services.AddSingleton(_mcpRegistry);
         if (_contextManager != null) services.AddSingleton(_contextManager);

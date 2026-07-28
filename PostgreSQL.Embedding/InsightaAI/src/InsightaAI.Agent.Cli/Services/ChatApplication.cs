@@ -36,12 +36,17 @@ public sealed class ChatApplication : IChatApplication
 
     private readonly IMessageStorage _storage;
     private readonly IAgentFactory _agentFactory;
+    private readonly CliConfig _config;
     private readonly ChatRenderer _renderer = new();
 
-    public ChatApplication(IMessageStorage storage, IAgentFactory agentFactory)
+    public ChatApplication(
+        IMessageStorage storage,
+        IAgentFactory agentFactory,
+        CliConfig config)
     {
         _storage = storage;
         _agentFactory = agentFactory;
+        _config = config;
     }
 
     /// <summary>
@@ -49,14 +54,8 @@ public sealed class ChatApplication : IChatApplication
     /// </summary>
     public async Task<int> ExecuteAsync(string? sessionId, bool continueLast = false)
     {
-        var config = CliConfig.Load();
+        var config = _config;
         var auth = AuthConfig.Load();
-
-        // 注入环境变量
-        foreach (var (key, value) in config.Envs)
-        {
-            Environment.SetEnvironmentVariable(key, value);
-        }
 
         if (!ValidateConfig(config, auth))
         {

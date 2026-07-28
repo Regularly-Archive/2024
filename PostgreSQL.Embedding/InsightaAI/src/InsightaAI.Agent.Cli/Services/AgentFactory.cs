@@ -69,24 +69,20 @@ public sealed class AgentFactory : IAgentFactory
 
         var mcpRegistry = options.McpRegistry ?? new McpRegistry(new SimpleMcpConnectionPool());
         var memoryManager = CreateMemoryManager();
-        var agentServices = CreateAgentServiceProvider(
-            agentConfig,
-            options,
-            contextManager,
-            memoryManager,
-            mcpRegistry);
-
-        Agent agent;
-        try
-        {
-            // 使用 Agent 的 IServiceProvider 构造函数，让 Hook/Tool 访问当前 Agent 的服务集合。
-            agent = new Agent(agentConfig, agentServices);
-        }
-        catch
-        {
-            agentServices.Dispose();
-            throw;
-        }
+        var environment = new CliEnvironment(options.Config.Envs);
+        var agent = new AgentBuilder(agentConfig)
+            .WithLlm(options.LlmClient)
+            .WithToolRegistry(options.ToolRegistry)
+            .WithSkillRegistry(options.SkillRegistry)
+            .WithMcpRegistry(mcpRegistry)
+            .WithContextManager(contextManager)
+            .WithMemoryManager(memoryManager)
+            .WithMessageStore(_messageStorage)
+            .ConfigureServices(services =>
+            {
+                services.AddSingleton<IEnvironmentVariableReader>(environment);
+            })
+            .Build();
 
         agent.AddHook(new ToolPermissionHook("bash", "write_file", "read_file", "edit_file", "web_fetch"));
 
@@ -99,32 +95,12 @@ public sealed class AgentFactory : IAgentFactory
             agent.AddAgentHook(sessionMemoryHook);
         }
 
-        if (Environment.GetEnvironmentVariable("INSIGHTA_TELEMETRY") == "1")
+        if (environment.Get("INSIGHTA_TELEMETRY") == "1")
         {
             agent.AddTelemetry(options.SessionId);
         }
 
         return agent;
-    }
-
-    private ServiceProvider CreateAgentServiceProvider(
-        AgentConfig agentConfig,
-        AgentCreationOptions options,
-        IContextManager contextManager,
-        IMemoryManager memoryManager,
-        McpRegistry mcpRegistry)
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton(agentConfig);
-        services.AddSingleton(options.LlmClient);
-        services.AddSingleton(options.ToolRegistry);
-        services.AddSingleton<ISkillRegistry>(options.SkillRegistry);
-        services.AddSingleton(mcpRegistry);
-        services.AddSingleton(contextManager);
-        services.AddSingleton(memoryManager);
-        services.AddSingleton(_messageStorage);
-
-        return services.BuildServiceProvider();
     }
 
     private static IMemoryManager CreateMemoryManager()

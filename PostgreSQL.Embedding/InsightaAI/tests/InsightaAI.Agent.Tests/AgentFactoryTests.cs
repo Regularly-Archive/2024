@@ -15,6 +15,28 @@ namespace InsightaAI.Agent.Tests;
 public sealed class AgentFactoryTests
 {
     [Fact]
+    public void CliEnvironment_Should_Prefer_Process_Values_Over_Configured_Values()
+    {
+        const string variableName = "INSIGHTA_TEST_ENVIRONMENT_READER";
+        var originalValue = Environment.GetEnvironmentVariable(variableName);
+
+        try
+        {
+            Environment.SetEnvironmentVariable(variableName, "process");
+            var environment = new CliEnvironment(new Dictionary<string, string>
+            {
+                [variableName] = "configured"
+            });
+
+            Assert.Equal("process", environment.Get(variableName));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(variableName, originalValue);
+        }
+    }
+
+    [Fact]
     public async Task CreateAsync_Should_Expose_AgentServices_To_Tools()
     {
         var storage = new JsonlMessageStorage(Path.Combine(Path.GetTempPath(), "insighta-agent-factory-tests", Guid.NewGuid().ToString("N")));
@@ -28,7 +50,8 @@ public sealed class AgentFactoryTests
             {
                 servicesResolved =
                     context.Services?.GetService<AgentConfig>() is not null &&
-                    ReferenceEquals(context.Services.GetService<IMessageStorage>(), storage);
+                    ReferenceEquals(context.Services.GetService<IMessageStorage>(), storage) &&
+                    context.Services.GetService<IEnvironmentVariableReader>()?.Get("TEST_AGENT_ENV") == "configured";
                 return Task.FromResult(ToolResult.FromText("inspected"));
             });
 
@@ -45,7 +68,11 @@ public sealed class AgentFactoryTests
         var config = new CliConfig
         {
             PrimaryModel = "test/model",
-            MaxToolRounds = 2
+            MaxToolRounds = 2,
+            Envs = new Dictionary<string, string>
+            {
+                ["TEST_AGENT_ENV"] = "configured"
+            }
         };
         var summaryService = new SummaryService(new SummaryOptions
         {

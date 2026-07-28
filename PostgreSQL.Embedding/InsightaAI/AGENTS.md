@@ -172,6 +172,23 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 - `src/InsightaAI.Agent.Cli/Localization/CliStrings.cs` — 资源访问入口
 - `docs/i18n/` — 5 个命令的国际化资源清单文档
 
+### CLI 配置启动时序（已完成核心实现）
+
+`Program.cs` 在创建 Host 前加载 `CliConfig`，通过 `CliEnvironment` 应用 Bootstrap 环境变量，再初始化语言、日志和 Telemetry；`CliConfig` 实例通过 Host DI 传入运行时服务，不再由 `ChatApplication` 重复加载或修改进程环境。
+
+目标是将配置分为两阶段：
+
+```text
+Bootstrap 配置 → Program.cs 初始化文化、日志、Telemetry 和 Host
+Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服务
+```
+
+环境变量优先级统一为：进程环境变量 > `CliConfig.Envs` > 默认值。Agent 运行时通过 Agent 自己的 ServiceProvider 注入环境读取器，避免依赖 CLI 的外部 Provider。
+
+### AgentBuilder 与 AgentFactory
+
+`AgentBuilder` 是 Agent 级服务组合入口。它注册默认 `ToolRegistry` 和显式依赖，支持 `ConfigureServices()` 扩展当前 Agent 的服务集合，并在 `Build()` 时创建 Agent 专属 ServiceProvider。`AgentFactory` 只负责准备 CLI 业务依赖，再交给 Builder 组装；`Agent` 释放时负责释放该 Provider。旧的显式构造函数暂时保留，用于兼容现有调用方。
+
 ## 当前问题与改进方向
 
 ### 已知问题
@@ -182,13 +199,15 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 
 3. **摘要服务统一（已完成）** — 全量摘要、增量摘要和会话标题已统一到 `SummaryService`；共享结构模板，并具备 MaxTokens 重试、完整性校验与标题 fallback。
 
-4. **AgentBuilder 生命周期** — 构造函数仍未默认注册 `ToolRegistry`，用户不调用 `WithToolRegistry()` 会抛异常。
+4. **AgentBuilder 生命周期（已完成）** — `AgentBuilder` 默认注册 `ToolRegistry`，通过 `ConfigureServices()` 创建 Agent 专属 ServiceProvider；`AgentFactory` 已完成对接。
 
 5. **Telemetry 防御性（部分完成）** — 指标命名和 Tool telemetry 标签已调整；`CurrentRoundContext` 仍有直接字典索引，需要改为安全读取。
 
 6. **Hook 生命周期整理（部分完成）** — 调度统一、日志注入已完成；剩余：`AgentEventHookContext.Event` 改不可变快照、`AgentErrorEvent` 接入。
 
 7. **日志 Token 用量为 0** — 部分模型（如 `glm-5.2`）在 streaming 模式下不返回 Usage，日志中 `inputTokens=0` 无法区分"未返回"和"真 0"。
+
+8. **CLI 配置启动时序（核心实现已完成）** — Bootstrap 环境变量已在 `Program.cs` 初始化语言、日志和 Telemetry 前应用；启动时序测试仍待补充。
 
 ### TODO.md 重点项
 
@@ -200,16 +219,17 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 - [x] `list_skills` 工具（运行时技能发现）
 - [x] Agent 旧构造函数创建的 ServiceProvider 可通过 `IDisposable` 释放
 - [ ] Memory 轻量化索引
-- [ ] AgentBuilder 默认注册 `ToolRegistry`
+- [x] AgentBuilder 默认注册 `ToolRegistry`，并通过 `ConfigureServices()` 创建 Agent 专属 ServiceProvider
 - [ ] `AgentEventHookContext.Event` 改不可变事件快照
 - [ ] `AgentErrorEvent` 接入 AgentLoop
 - [ ] L3 Orchestrator 继续开发
 - [ ] MCP Telemetry Tag 命名清理（`mcp.server.description`→`mcp.config.description`，去重 transport）
+- [x] CLI 配置 Bootstrap/Runtime 分离与环境变量优先级统一（启动时序测试待补充）
 
 ## 最近验证
 
-- 2026-07-28：Agent、Orchestrator、LLM 测试共 335 个通过。
-- 测试整体仍因 `InsightaAI.Tests.Shared` 缺少 `Azure.Core.dll` 导致测试宿主启动失败，需修复测试依赖或输出目录后重新验证。
+- 2026-07-28：Agent、Orchestrator、LLM 测试共 337 个通过；`InsightaAI.Tests.Shared` 已明确标记为非测试项目，`Azure.Core.dll` 测试宿主启动问题已解决。
+- 2026-07-28：`AgentBuilder` 接管 Agent 服务组合和 Provider 生命周期；`AgentFactory` 完成迁移，Agent 测试 218 个通过。
 
 ## 愿景与里程碑
 
