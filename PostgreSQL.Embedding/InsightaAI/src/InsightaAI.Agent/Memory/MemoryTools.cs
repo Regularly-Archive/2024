@@ -85,21 +85,22 @@ internal class SaveMemoryTool : ITool
 
     public async Task<ToolResult> ExecuteAsync(IDictionary<string, object> args, ToolExecutionContext context)
     {
-        var content = args.TryGetValue("content", out var c) ? c?.ToString() : null;
+        var arguments = new ToolArgumentReader(Definition.Schema, args);
+        var content = arguments.GetString("content");
         if (string.IsNullOrWhiteSpace(content))
         {
             return ToolResult.FromError("Missing required parameter: content");
         }
 
         MemoryType? type = null;
-        if (args.TryGetValue("type", out var t) && t?.ToString() is string typeStr)
+        if (arguments.TryGetString("type", out var typeStr) && typeStr is not null)
         {
             if (Enum.TryParse<MemoryType>(typeStr, true, out var parsedType))
                 type = parsedType;
         }
 
         List<string>? tags = null;
-        if (args.TryGetValue("tags", out var tg) && tg?.ToString() is string tagsStr)
+        if (arguments.TryGetString("tags", out var tagsStr) && tagsStr is not null)
         {
             tags = tagsStr.Split(',', StringSplitOptions.RemoveEmptyEntries)
                 .Select(t => t.Trim())
@@ -107,7 +108,7 @@ internal class SaveMemoryTool : ITool
                 .ToList();
         }
 
-        var project = args.TryGetValue("project", out var p) ? p?.ToString() : null;
+        arguments.TryGetString("project", out var project);
 
         var entry = await _memoryManager.SaveMemoryAsync(
             _userId, content, type, tags, "user_input", project, context.CancellationToken);
@@ -178,23 +179,24 @@ You can update the memory's content, type, or tags. At least one update field is
 
     public async Task<ToolResult> ExecuteAsync(IDictionary<string, object> args, ToolExecutionContext context)
     {
-        var memoryId = args.TryGetValue("memory_id", out var id) ? id?.ToString() : null;
+        var arguments = new ToolArgumentReader(Definition.Schema, args);
+        var memoryId = arguments.GetString("memory_id");
         if (string.IsNullOrWhiteSpace(memoryId))
         {
             return ToolResult.FromError("Missing required parameter: memory_id");
         }
 
-        var content = args.TryGetValue("content", out var c) ? c?.ToString() : null;
+        arguments.TryGetString("content", out var content);
 
         MemoryType? type = null;
-        if (args.TryGetValue("type", out var t) && t?.ToString() is string typeStr)
+        if (arguments.TryGetString("type", out var typeStr) && typeStr is not null)
         {
             if (Enum.TryParse<MemoryType>(typeStr, true, out var parsedType))
                 type = parsedType;
         }
 
         List<string>? tags = null;
-        if (args.TryGetValue("tags", out var tg) && tg?.ToString() is string tagsStr)
+        if (arguments.TryGetString("tags", out var tagsStr) && tagsStr is not null)
         {
             tags = tagsStr.Split(',', StringSplitOptions.RemoveEmptyEntries)
                 .Select(t => t.Trim())
@@ -259,7 +261,8 @@ internal class DeleteMemoryTool : ITool
 
     public async Task<ToolResult> ExecuteAsync(IDictionary<string, object> args, ToolExecutionContext context)
     {
-        var memoryId = args.TryGetValue("memory_id", out var id) ? id?.ToString() : null;
+        var arguments = new ToolArgumentReader(Definition.Schema, args);
+        var memoryId = arguments.GetString("memory_id");
         if (string.IsNullOrWhiteSpace(memoryId))
         {
             return ToolResult.FromError("Missing required parameter: memory_id");
@@ -332,27 +335,22 @@ internal class SearchMemoryTool : ITool
 
     public async Task<ToolResult> ExecuteAsync(IDictionary<string, object> args, ToolExecutionContext context)
     {
-        var query = args.TryGetValue("query", out var q) ? q?.ToString() : null;
+        var arguments = new ToolArgumentReader(Definition.Schema, args);
+        var query = arguments.GetString("query");
         if (string.IsNullOrWhiteSpace(query))
         {
             return ToolResult.FromError("Missing required parameter: query");
         }
 
         MemoryType? type = null;
-        if (args.TryGetValue("type", out var t) && t?.ToString() is string typeStr)
+        if (arguments.TryGetString("type", out var typeStr) && typeStr is not null)
         {
             if (Enum.TryParse<MemoryType>(typeStr, true, out var parsedType))
                 type = parsedType;
         }
 
-        var maxResults = 5;
-        if (args.TryGetValue("max_results", out var m) && m?.ToString() is string maxStr)
-        {
-            if (int.TryParse(maxStr, out var parsedMax))
-                maxResults = parsedMax;
-        }
-
-        var project = args.TryGetValue("project", out var p) ? p?.ToString() : null;
+        var maxResults = arguments.GetInt32("max_results", 5);
+        arguments.TryGetString("project", out var project);
 
         var memories = await _memoryManager.SearchRelevantMemoriesAsync(
             _userId, query, maxResults, type, project, context.CancellationToken);
@@ -419,7 +417,8 @@ internal class GetUserProfileTool : ITool
 
     public async Task<ToolResult> ExecuteAsync(IDictionary<string, object> args, ToolExecutionContext context)
     {
-        var project = args.TryGetValue("project", out var p) ? p?.ToString() : null;
+        var arguments = new ToolArgumentReader(Definition.Schema, args);
+        arguments.TryGetString("project", out var project);
 
         var userContext = await _memoryManager.GetUserContextAsync(_userId, project, context.CancellationToken);
 

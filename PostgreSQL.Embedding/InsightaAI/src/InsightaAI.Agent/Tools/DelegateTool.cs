@@ -44,16 +44,12 @@ public class DelegateTool : ITool
 
     public async Task<ToolResult> ExecuteAsync(IDictionary<string, object> args, ToolExecutionContext context)
     {
-        var agentId = args.TryGetValue("agent_id", out var id) ? id?.ToString() ?? "" : "";
-        var task = args.TryGetValue("task", out var t) ? t?.ToString() ?? "" : "";
-
-        if (string.IsNullOrEmpty(agentId) || string.IsNullOrEmpty(task))
-        {
-            return ToolResult.FromError("Both agent_id and task are required.");
-        }
-
         try
         {
+            var arguments = new ToolArgumentReader(Definition.Schema, args);
+            var agentId = arguments.GetString("agent_id");
+            var task = arguments.GetString("task");
+
             var result = await _delegateHandler(agentId, task);
             return ToolResult.FromText($"[Delegated to {agentId}] {result}");
         }

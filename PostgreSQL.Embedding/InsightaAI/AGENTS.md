@@ -98,7 +98,9 @@ f806a75 refactor: extract AgentLoop and add auto message persistence
 - CLI 工具版本升级为 `1.0.0-alpha.2`。
 - 改进 Skill 发现、激活提示和 `list_skills`/`activate_skill` 工具描述。
 - `build-insighta.ps1` 负责本地打包并覆盖安装；`install-insighta.ps1` 从 NuGet 安装已发布版。两者均具备严格错误处理和运行中进程检测。
-- `glob` / `grep` 已统一使用 `excludes: string[]`；Glob 默认排除 `bin`/`obj`/`node_modules`，可通过 `include_ignored: true` 取消。两者均覆盖 ToolRegistry 数组参数转换测试。
+- 新增 schema 驱动的 `ToolArgumentReader`，统一固定 schema 本地工具的未知参数、必填项、类型、字符串数组和 enum 校验；动态 MCP 工具保留原样透传。
+- `glob` / `grep` 已统一使用 `excludes: string[]`；Glob 默认排除 `bin`/`obj`/`node_modules`，可通过 `include_ignored: true` 取消，且支持 `?` 单字符通配。
+- QA 回归发现并修复整数参数跨工具解析、Glob `?` 通配和无 `server_name` 的 MCP 工具列表阻塞；`list_mcp_tools` 对单个服务采用 5 秒超时并保留其余服务结果。Agent 测试 250 个通过，Insighta 工具回归完成。
 
 ## 最新架构变更
 

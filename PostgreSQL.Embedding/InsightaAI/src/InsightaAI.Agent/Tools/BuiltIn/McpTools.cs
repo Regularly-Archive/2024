@@ -10,6 +10,7 @@ namespace InsightaAI.Agent.Tools.BuiltIn;
 /// </summary>
 public static class McpTools
 {
+    private static readonly TimeSpan ListToolsTimeout = TimeSpan.FromSeconds(5);
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = false,
@@ -42,7 +43,8 @@ public static class McpTools
             schema,
             async (args, ctx) =>
             {
-                var serverName = args.TryGetValue("server_name", out var val) ? val?.ToString() : null;
+                var arguments = new ToolArgumentReader(schema, args);
+                arguments.TryGetString("server_name", out var serverName);
 
                 if (string.IsNullOrEmpty(serverName))
                 {
@@ -56,12 +58,33 @@ public static class McpTools
                     var result = new Dictionary<string, object>();
                     foreach (var server in servers)
                     {
-                        var tools = await mcpRegistry.ListToolsAsync(server.Name, ctx.CancellationToken);
-                        result[server.Name] = new
+                        try
                         {
-                            description = server.Description,
-                            tools = tools.Select(t => new { name = t.Name, description = t.Description }).ToArray()
-                        };
+                            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ctx.CancellationToken);
+                            timeout.CancelAfter(ListToolsTimeout);
+                            var tools = await mcpRegistry.ListToolsAsync(server.Name, timeout.Token);
+                            result[server.Name] = new
+                            {
+                                description = server.Description,
+                                tools = tools.Select(t => new { name = t.Name, description = t.Description }).ToArray()
+                            };
+                        }
+                        catch (OperationCanceledException) when (!ctx.CancellationToken.IsCancellationRequested)
+                        {
+                            result[server.Name] = new
+                            {
+                                description = server.Description,
+                                error = $"Timed out while listing tools after {ListToolsTimeout.TotalSeconds:0} seconds."
+                            };
+                        }
+                        catch (Exception ex)
+                        {
+                            result[server.Name] = new
+                            {
+                                description = server.Description,
+                                error = $"Unable to list tools: {ex.Message}"
+                            };
+                        }
                     }
 
                     return ToolResult.FromText(JsonSerializer.Serialize(result, JsonOptions));
@@ -111,13 +134,9 @@ public static class McpTools
             schema,
             async (args, ctx) =>
             {
-                var serverName = args["server_name"]?.ToString();
-                var toolName = args["tool_name"]?.ToString();
-
-                if (string.IsNullOrEmpty(serverName))
-                    return ToolResult.FromError("server_name is required");
-                if (string.IsNullOrEmpty(toolName))
-                    return ToolResult.FromError("tool_name is required");
+                var arguments = new ToolArgumentReader(schema, args);
+                var serverName = arguments.GetString("server_name");
+                var toolName = arguments.GetString("tool_name");
 
                 var metadata = await mcpRegistry.ActivateToolAsync(serverName, toolName, registry, ctx.CancellationToken);
                 if (metadata == null)
@@ -153,9 +172,8 @@ public static class McpTools
             schema,
             (args, ctx) =>
             {
-                var registeredName = args["registered_name"]?.ToString();
-                if (string.IsNullOrEmpty(registeredName))
-                    return Task.FromResult(ToolResult.FromError("registered_name is required"));
+                var arguments = new ToolArgumentReader(schema, args);
+                var registeredName = arguments.GetString("registered_name");
 
                 var removed = mcpRegistry.DeactivateTool(registeredName, registry);
                 if (!removed)

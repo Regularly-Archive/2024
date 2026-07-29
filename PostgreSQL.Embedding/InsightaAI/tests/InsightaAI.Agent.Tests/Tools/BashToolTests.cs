@@ -30,6 +30,30 @@ public sealed class BashToolTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ShouldRejectArgumentsNotDeclaredBySchema()
+    {
+        var tool = new BashTool(new StubShellExecutor(new ShellResult()));
+
+        var result = await tool.ExecuteAsync(
+            new Dictionary<string, object> { ["command"] = "test", ["unexpected"] = true }, CreateContext());
+
+        var text = result.Content.OfType<TextBlock>().Single().Text;
+        Assert.Contains("'unexpected' is not declared in the tool schema", text);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldRejectArgumentsWithTheWrongSchemaType()
+    {
+        var tool = new BashTool(new StubShellExecutor(new ShellResult()));
+
+        var result = await tool.ExecuteAsync(
+            new Dictionary<string, object> { ["command"] = "test", ["working_directory"] = 42 }, CreateContext());
+
+        var text = result.Content.OfType<TextBlock>().Single().Text;
+        Assert.Contains("'working_directory' must be a string", text);
+    }
+
+    [Fact]
     public void CreatePreview_ShouldShowHeadAndTailForLargeLineOutput()
     {
         var tool = new BashTool(new StubShellExecutor(new ShellResult()));

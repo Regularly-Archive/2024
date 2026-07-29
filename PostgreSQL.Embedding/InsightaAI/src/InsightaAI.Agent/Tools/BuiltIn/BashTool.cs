@@ -57,16 +57,9 @@ public class BashTool : ITool, IToolResultProjector
         try
         {
             // 获取参数
-            var command = GetStringValue(args, "command");
-            if (string.IsNullOrEmpty(command))
-            {
-                return ToolResult.FromError(
-                    "Missing required parameter: command\n" +
-                    "Required: {\"command\": \"string\"}\n" +
-                    "Optional: {\"working_directory\": \"string\"}");
-            }
-
-            var workingDirectory = GetStringValue(args, "working_directory");
+            var arguments = new ToolArgumentReader(Definition.Schema, args);
+            var command = arguments.GetString("command");
+            arguments.TryGetString("working_directory", out var workingDirectory);
 
             // 安全检查：禁止危险命令
             if (IsDangerousCommand(command))
@@ -165,12 +158,4 @@ public class BashTool : ITool, IToolResultProjector
             normalizedCommand.Contains(pattern, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static string? GetStringValue(IDictionary<string, object> args, string key)
-    {
-        if (args.TryGetValue(key, out var value))
-        {
-            return value?.ToString();
-        }
-        return null;
-    }
 }

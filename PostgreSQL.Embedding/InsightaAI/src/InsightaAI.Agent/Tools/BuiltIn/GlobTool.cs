@@ -62,19 +62,14 @@ public class GlobTool : ITool
     {
         try
         {
-            // 获取参数
-            var pattern = GetStringValue(args, "pattern");
-            if (string.IsNullOrEmpty(pattern))
-            {
-                return ToolResult.FromError(
-                    "Missing required parameter: pattern\n" +
-                    "Required: {\"pattern\": \"string\"}\n" +
-                    "Optional: {\"path\": \"string\"}");
-            }
+            if (args.ContainsKey("exclude"))
+                return ToolResult.FromError("Parameter 'exclude' is not supported. Use 'excludes' as an array of strings.");
 
-            var path = GetStringValue(args, "path") ?? ".";
-            var includeIgnored = GetBoolValue(args, "include_ignored") ?? false;
-            var additionalExcludes = GetStringArrayValue(args, "excludes");
+            var arguments = new ToolArgumentReader(Definition.Schema, args);
+            var pattern = arguments.GetString("pattern");
+            var path = arguments.GetString("path", ".");
+            var includeIgnored = arguments.GetBoolean("include_ignored");
+            var additionalExcludes = arguments.GetStringArray("excludes");
             var options = new GlobOptions
             {
                 UseDefaultExcludes = !includeIgnored,
@@ -136,61 +131,4 @@ public class GlobTool : ITool
         }
     }
 
-    private static string? GetStringValue(IDictionary<string, object> args, string key)
-    {
-        if (args.TryGetValue(key, out var value))
-        {
-            return value?.ToString();
-        }
-        return null;
-    }
-
-    private static bool? GetBoolValue(IDictionary<string, object> args, string key)
-    {
-        if (!args.TryGetValue(key, out var value) || value == null)
-            return null;
-
-        if (value is JsonElement jsonElement)
-        {
-            return jsonElement.ValueKind switch
-            {
-                JsonValueKind.True => true,
-                JsonValueKind.False => false,
-                _ => null
-            };
-        }
-
-        return bool.TryParse(value.ToString(), out var parsedValue) ? parsedValue : null;
-    }
-
-    private static string[] GetStringArrayValue(IDictionary<string, object> args, string key)
-    {
-        if (!args.TryGetValue(key, out var value) || value == null)
-            return Array.Empty<string>();
-
-        if (value is JsonElement { ValueKind: JsonValueKind.Array } jsonArray)
-        {
-            if (jsonArray.EnumerateArray().Any(item => item.ValueKind != JsonValueKind.String))
-                throw new ArgumentException("Parameter excludes must be an array of strings.");
-
-            return jsonArray.EnumerateArray()
-                .Select(item => item.GetString())
-                .Where(item => !string.IsNullOrWhiteSpace(item))
-                .Select(item => item!)
-                .ToArray();
-        }
-
-        if (value is System.Collections.IEnumerable enumerable && value is not string)
-        {
-            var values = enumerable.Cast<object?>().ToArray();
-            if (values.Any(item => item is not string))
-                throw new ArgumentException("Parameter excludes must be an array of strings.");
-
-            return values.Cast<string>()
-                .Where(item => !string.IsNullOrWhiteSpace(item))
-                .ToArray();
-        }
-
-        throw new ArgumentException("Parameter excludes must be an array of strings.");
-    }
 }

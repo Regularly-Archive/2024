@@ -42,13 +42,9 @@ public static class MetaLearningTools
             schema,
             async (args, ctx) =>
             {
-                var category = args["category"]?.ToString() ?? "tools";
-                var lesson = args["lesson"]?.ToString();
-
-                if (string.IsNullOrWhiteSpace(lesson))
-                {
-                    return ToolResult.FromError("lesson is required");
-                }
+                var arguments = new ToolArgumentReader(schema, args);
+                var category = arguments.GetString("category");
+                var lesson = arguments.GetString("lesson");
 
                 // 原子操作：检查 + 写入（避免竞态）
                 await store.AppendLessonIfNotExistsAsync(category, lesson, ctx.CancellationToken);
@@ -76,7 +72,8 @@ public static class MetaLearningTools
             schema,
             async (args, ctx) =>
             {
-                var file = args["file"]?.ToString() ?? "all";
+                var arguments = new ToolArgumentReader(schema, args);
+                var file = arguments.GetString("file");
 
                 if (file == "all")
                 {

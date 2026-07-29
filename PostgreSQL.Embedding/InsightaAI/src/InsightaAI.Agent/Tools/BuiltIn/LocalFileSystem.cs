@@ -130,12 +130,31 @@ public class LocalFileSystem : IFileSystem
         if (!Directory.Exists(searchPath))
             throw new DirectoryNotFoundException($"Directory not found: {searchPath}");
 
-        var matcher = new Matcher();
-        matcher.AddInclude(pattern);
         options ??= new GlobOptions();
         var excludePatterns = options.UseDefaultExcludes
             ? GlobOptions.DefaultExcludePatterns.Concat(options.ExcludePatterns)
             : options.ExcludePatterns;
+
+        // Microsoft.Extensions.FileSystemGlobbing does not implement the ? wildcard.
+        // Use the same wildcard matcher as excludes when it appears in an include pattern.
+        if (pattern.Contains('?'))
+        {
+            var filesWithQuestionWildcard = Directory.EnumerateFiles(searchPath, "*", SearchOption.AllDirectories)
+                .Where(file =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var relativePath = Path.GetRelativePath(searchPath, file).Replace('\\', '/');
+                    return MatchWildcardPattern(pattern, relativePath) &&
+                        !excludePatterns.Any(exclude => MatchWildcardPattern(exclude, relativePath));
+                })
+                .Select(Path.GetFullPath)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            return Task.FromResult(filesWithQuestionWildcard);
+        }
+
+        var matcher = new Matcher();
+        matcher.AddInclude(pattern);
         foreach (var excludePattern in excludePatterns.Distinct(StringComparer.OrdinalIgnoreCase))
             matcher.AddExclude(excludePattern);
 

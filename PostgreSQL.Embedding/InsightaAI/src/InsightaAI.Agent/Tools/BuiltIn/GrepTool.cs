@@ -83,34 +83,21 @@ public class GrepTool : ITool, IToolResultProjector
     {
         try
         {
-            // 获取参数
-            var pattern = GetStringValue(args, "pattern");
-            if (string.IsNullOrEmpty(pattern))
-            {
-                return ToolResult.FromError(
-                    "Missing required parameter: pattern\n" +
-                    "Required: {\"pattern\": \"string\", \"path\": \"string\"}\n" +
-                    "Optional: {\"recursive\": boolean, \"ignore_case\": boolean, \"use_regex\": boolean, \"files_only\": boolean, \"exclude\": \"string\", \"max_results\": number}");
-            }
-
-            var path = GetStringValue(args, "path");
-            if (string.IsNullOrEmpty(path))
-            {
-                path = Environment.CurrentDirectory;
-            }
-
-            var recursive = GetBoolValue(args, "recursive") ?? true;
-            var ignoreCase = GetBoolValue(args, "ignore_case") ?? false;
-            var useRegex = GetBoolValue(args, "use_regex") ?? true;
-            var filesOnly = GetBoolValue(args, "files_only") ?? false;
-            var maxResults = GetIntValue(args, "max_results") ?? 100;
-            if (maxResults <= 0)
-                return ToolResult.FromError("Parameter max_results must be greater than zero.");
-
             if (args.ContainsKey("exclude"))
                 return ToolResult.FromError("Parameter 'exclude' is not supported. Use 'excludes' as an array of strings.");
 
-            var excludePatterns = GetStringArrayValue(args, "excludes");
+            var arguments = new ToolArgumentReader(Definition.Schema, args);
+            var pattern = arguments.GetString("pattern");
+            var path = arguments.GetString("path", Environment.CurrentDirectory);
+            var recursive = arguments.GetBoolean("recursive", true);
+            var ignoreCase = arguments.GetBoolean("ignore_case");
+            var useRegex = arguments.GetBoolean("use_regex", true);
+            var filesOnly = arguments.GetBoolean("files_only");
+            var maxResults = arguments.GetInt32("max_results", 100);
+            if (maxResults <= 0)
+                return ToolResult.FromError("Parameter max_results must be greater than zero.");
+
+            var excludePatterns = arguments.GetStringArray("excludes");
 
             // 构建选项
             var options = new GrepOptions
@@ -238,79 +225,4 @@ public class GrepTool : ITool, IToolResultProjector
         return match.Success ? match.Groups["path"].Value : null;
     }
 
-    private static string? GetStringValue(IDictionary<string, object> args, string key)
-    {
-        if (args.TryGetValue(key, out var value))
-        {
-            return value?.ToString();
-        }
-        return null;
-    }
-
-    private static bool? GetBoolValue(IDictionary<string, object> args, string key)
-    {
-        if (args.TryGetValue(key, out var value) && value != null)
-        {
-            if (value is JsonElement jsonElement)
-            {
-                if (jsonElement.ValueKind == JsonValueKind.True) return true;
-                if (jsonElement.ValueKind == JsonValueKind.False) return false;
-            }
-            else if (bool.TryParse(value.ToString(), out var parsedValue))
-            {
-                return parsedValue;
-            }
-        }
-        return null;
-    }
-
-    private static int? GetIntValue(IDictionary<string, object> args, string key)
-    {
-        if (args.TryGetValue(key, out var value) && value != null)
-        {
-            if (value is JsonElement jsonElement)
-            {
-                if (jsonElement.ValueKind == JsonValueKind.Number && jsonElement.TryGetInt32(out var intValue))
-                {
-                    return intValue;
-                }
-            }
-            else if (int.TryParse(value.ToString(), out var parsedValue))
-            {
-                return parsedValue;
-            }
-        }
-        return null;
-    }
-
-    private static string[] GetStringArrayValue(IDictionary<string, object> args, string key)
-    {
-        if (!args.TryGetValue(key, out var value) || value == null)
-            return Array.Empty<string>();
-
-        if (value is JsonElement { ValueKind: JsonValueKind.Array } jsonArray)
-        {
-            if (jsonArray.EnumerateArray().Any(item => item.ValueKind != JsonValueKind.String))
-                throw new ArgumentException("Parameter excludes must be an array of strings.");
-
-            return jsonArray.EnumerateArray()
-                .Select(item => item.GetString())
-                .Where(item => !string.IsNullOrWhiteSpace(item))
-                .Select(item => item!)
-                .ToArray();
-        }
-
-        if (value is System.Collections.IEnumerable enumerable && value is not string)
-        {
-            var values = enumerable.Cast<object?>().ToArray();
-            if (values.Any(item => item is not string))
-                throw new ArgumentException("Parameter excludes must be an array of strings.");
-
-            return values.Cast<string>()
-                .Where(item => !string.IsNullOrWhiteSpace(item))
-                .ToArray();
-        }
-
-        throw new ArgumentException("Parameter excludes must be an array of strings.");
-    }
 }

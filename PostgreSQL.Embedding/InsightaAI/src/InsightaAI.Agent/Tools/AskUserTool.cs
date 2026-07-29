@@ -1,12 +1,11 @@
+using System.Text.Json;
 using InsightaAI.Agent.Abstractions;
 using InsightaAI.LLM.Models;
-using System.Text.Json;
 
 namespace InsightaAI.Agent.Tools;
 
 /// <summary>
-/// 向用户提问工具 - 用于 Agent 需要澄清或获取信息时
-/// 支持自由文本输入、单选和多选
+/// Asks the user for clarification or a decision.
 /// </summary>
 public class AskUserTool : ITool
 {
@@ -16,21 +15,13 @@ public class AskUserTool : ITool
 
     public ToolDefinition Definition { get; }
 
-    /// <summary>
-    /// 创建 AskUserTool
-    /// </summary>
-    /// <param name="askHandler">提问处理函数，接收 (问题, 选项列表, 是否多选)，返回用户回答</param>
     public AskUserTool(Func<string, string[]?, bool, Task<string>> askHandler)
     {
         _askHandler = askHandler;
-
         Definition = new ToolDefinition
         {
             Name = Name,
-            Description = "Ask the user a question to get clarification or make a decision. Supports three modes:\n" +
-                          "1. Yes/No question: don't pass choices, automatically shows Yes/No options\n" +
-                          "2. Single choice: pass a choices array, user selects one option\n" +
-                          "3. Multiple choice: pass a choices array with multiple_select=true, user can select multiple options",
+            Description = "Ask the user a question to get clarification or make a decision. Supports a free-text Yes/No question, single choice, and multiple choice.",
             Schema = JsonSerializer.SerializeToElement(new
             {
                 type = "object",
@@ -45,15 +36,15 @@ public class AskUserTool : ITool
                     {
                         type = "array",
                         items = new { type = "string" },
-                        description = "List of options. If not provided, defaults to [Yes, No]"
+                        description = "List of options. If omitted, the client may provide a free-text or Yes/No response."
                     },
                     multiple_select = new
                     {
                         type = "boolean",
-                        description = "Whether to allow multiple selection, default is false (single selection)"
+                        description = "Whether to allow multiple selection. Defaults to false."
                     }
                 },
-                required = new[] { "question", "choices" }
+                required = new[] { "question" }
             })
         };
     }
@@ -62,46 +53,13 @@ public class AskUserTool : ITool
         IDictionary<string, object> args,
         ToolExecutionContext context)
     {
-        if (!args.TryGetValue("question", out var questionObj) || questionObj is not string question)
-        {
-            return ToolResult.FromError("Missing required parameter: question");
-        }
-
-        // 解析 choices
-        string[]? choices = null;
-        if (args.TryGetValue("choices", out var choicesObj) && choicesObj != null)
-        {
-            choices = choicesObj switch
-            {
-                JsonElement jsonElement when jsonElement.ValueKind == JsonValueKind.Array =>
-                    jsonElement.EnumerateArray()
-                        .Select(x => x.GetString() ?? "")
-                        .Where(x => !string.IsNullOrEmpty(x))
-                        .ToArray(),
-                string jsonStr => ParseJsonStringArray(jsonStr),
-                string[] strArr => strArr,
-                object[] objArr => objArr.Select(x => x?.ToString() ?? "").Where(x => !string.IsNullOrEmpty(x)).ToArray(),
-                IEnumerable<object> objArr => objArr.Select(x => x?.ToString() ?? "").Where(x => !string.IsNullOrEmpty(x)).ToArray(),
-                _ => null
-            };
-        }
-
-        // 解析 multiple_select
-        bool multipleSelect = false;
-        if (args.TryGetValue("multiple_select", out var multiObj))
-        {
-            if (multiObj is JsonElement jsonElement)
-            {
-                multipleSelect = jsonElement.ValueKind == JsonValueKind.True;
-            }
-            else if (multiObj is bool boolVal)
-            {
-                multipleSelect = boolVal;
-            }
-        }
-
         try
         {
+            var arguments = new ToolArgumentReader(Definition.Schema, args);
+            var question = arguments.GetString("question");
+            arguments.TryGetStringArray("choices", out var choices);
+            var multipleSelect = arguments.GetBoolean("multiple_select");
+
             var answer = await _askHandler(question, choices, multipleSelect);
             return ToolResult.FromText(answer);
         }
@@ -109,25 +67,5 @@ public class AskUserTool : ITool
         {
             return ToolResult.FromError($"Failed to get user answer: {ex.Message}");
         }
-    }
-
-    private static string[]? ParseJsonStringArray(string json)
-    {
-        try
-        {
-            var element = JsonSerializer.Deserialize<JsonElement>(json);
-            if (element.ValueKind == JsonValueKind.Array)
-            {
-                return element.EnumerateArray()
-                    .Select(x => x.GetString() ?? "")
-                    .Where(x => !string.IsNullOrEmpty(x))
-                    .ToArray();
-            }
-        }
-        catch
-        {
-            // 不是有效的 JSON
-        }
-        return null;
     }
 }

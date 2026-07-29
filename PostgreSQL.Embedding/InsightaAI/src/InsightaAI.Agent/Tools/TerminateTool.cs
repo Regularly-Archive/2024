@@ -29,12 +29,19 @@ public class TerminateTool : ITool
 
     public Task<ToolResult> ExecuteAsync(IDictionary<string, object> args, ToolExecutionContext context)
     {
-        var answer = args.TryGetValue("answer", out var val) ? val?.ToString() ?? "" : "";
-
-        return Task.FromResult(new ToolResult
+        try
         {
-            Content = [new TextBlock { Text = $"[TERMINATE] {answer}" }]
-        });
+            var arguments = new ToolArgumentReader(Definition.Schema, args);
+            var answer = arguments.GetString("answer");
+            return Task.FromResult(new ToolResult
+            {
+                Content = [new TextBlock { Text = $"[TERMINATE] {answer}" }]
+            });
+        }
+        catch (Exception ex)
+        {
+            return Task.FromResult(ToolResult.FromError(ex.Message));
+        }
     }
 }
 
@@ -67,14 +74,21 @@ public class CompleteTaskTool : ITool
 
     public Task<ToolResult> ExecuteAsync(IDictionary<string, object> args, ToolExecutionContext context)
     {
-        var summary = args.TryGetValue("summary", out var s) ? s?.ToString() ?? "" : "";
-        var output = args.TryGetValue("output", out var o) ? o?.ToString() ?? "" : "";
-
-        var result = string.IsNullOrEmpty(output) ? summary : $"{summary}\n\nOutput:\n{output}";
-
-        return Task.FromResult(new ToolResult
+        try
         {
-            Content = [new TextBlock { Text = $"[TASK_COMPLETE] {result}" }]
-        });
+            var arguments = new ToolArgumentReader(Definition.Schema, args);
+            var summary = arguments.GetString("summary");
+            var output = arguments.GetString("output", "");
+            var result = string.IsNullOrEmpty(output) ? summary : $"{summary}\n\nOutput:\n{output}";
+
+            return Task.FromResult(new ToolResult
+            {
+                Content = [new TextBlock { Text = $"[TASK_COMPLETE] {result}" }]
+            });
+        }
+        catch (Exception ex)
+        {
+            return Task.FromResult(ToolResult.FromError(ex.Message));
+        }
     }
 }

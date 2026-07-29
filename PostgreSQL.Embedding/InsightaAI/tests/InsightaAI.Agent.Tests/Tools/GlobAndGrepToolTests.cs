@@ -25,6 +25,17 @@ public sealed class GlobAndGrepToolTests : IDisposable
     }
 
     [Fact]
+    public async Task GlobAsync_SupportsQuestionMarkSingleCharacterWildcard()
+    {
+        var projectFile = WriteFile("src/Test.csproj", "<Project />");
+        WriteFile("src/Test.csxxroj", "not a project");
+
+        var results = await _fileSystem.GlobAsync("**/*.cs?roj", _root);
+
+        Assert.Equal([Path.GetFullPath(projectFile)], results);
+    }
+
+    [Fact]
     public async Task GlobAsync_ExcludesCommonBuildDirectoriesByDefault()
     {
         var sourceFile = WriteFile("src/app.txt", "source");
@@ -131,7 +142,39 @@ public sealed class GlobAndGrepToolTests : IDisposable
         }, CreateContext());
 
         Assert.True(result.IsError);
-        Assert.Contains("excludes must be an array of strings", result.Content.OfType<TextBlock>().Single().Text);
+        Assert.Contains("'excludes' must be an array of strings", result.Content.OfType<TextBlock>().Single().Text);
+    }
+
+    [Fact]
+    public async Task GlobTool_RejectsLegacySingularExclude()
+    {
+        var tool = new GlobTool(_fileSystem);
+
+        var result = await tool.ExecuteAsync(new Dictionary<string, object>
+        {
+            ["pattern"] = "*.txt",
+            ["path"] = _root,
+            ["exclude"] = "generated.txt"
+        }, CreateContext());
+
+        Assert.True(result.IsError);
+        Assert.Contains("'exclude' is not supported", result.Content.OfType<TextBlock>().Single().Text);
+    }
+
+    [Fact]
+    public async Task GlobTool_RejectsParametersMissingFromSchema()
+    {
+        var tool = new GlobTool(_fileSystem);
+
+        var result = await tool.ExecuteAsync(new Dictionary<string, object>
+        {
+            ["pattern"] = "*.txt",
+            ["path"] = _root,
+            ["unexpected"] = true
+        }, CreateContext());
+
+        Assert.True(result.IsError);
+        Assert.Contains("'unexpected' is not declared in the tool schema", result.Content.OfType<TextBlock>().Single().Text);
     }
 
     [Fact]
@@ -282,6 +325,30 @@ public sealed class GlobAndGrepToolTests : IDisposable
 
         Assert.True(result.IsError);
         Assert.Contains("must be greater than zero", result.Content.OfType<TextBlock>().Single().Text);
+    }
+
+    [Theory]
+    [InlineData(typeof(long))]
+    [InlineData(typeof(decimal))]
+    [InlineData(typeof(double))]
+    public async Task GrepTool_AcceptsIntegralNumericArgumentRepresentations(Type numericType)
+    {
+        WriteFile("source.cs", "needle\nneedle");
+        var tool = new GrepTool(_fileSystem);
+        object maxResults = numericType == typeof(long) ? 1L
+            : numericType == typeof(decimal) ? 1m
+            : 1d;
+
+        var result = await tool.ExecuteAsync(new Dictionary<string, object>
+        {
+            ["pattern"] = "needle",
+            ["path"] = _root,
+            ["use_regex"] = false,
+            ["max_results"] = maxResults
+        }, CreateContext());
+
+        Assert.False(result.IsError);
+        Assert.Contains("Found at least 1 matches", result.Content.OfType<TextBlock>().Single().Text);
     }
 
     [Fact]

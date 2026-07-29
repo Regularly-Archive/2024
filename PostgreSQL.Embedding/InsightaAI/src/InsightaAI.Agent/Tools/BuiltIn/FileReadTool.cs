@@ -60,17 +60,10 @@ public class FileReadTool : ITool, IToolResultProjector
         try
         {
             // 获取参数
-            var filePath = GetStringValue(args, "file_path");
-            if (string.IsNullOrEmpty(filePath))
-            {
-                return ToolResult.FromError(
-                    "Missing required parameter: file_path\n" +
-                    "Required: {\"file_path\": \"string\"}\n" +
-                    "Optional: {\"offset\": number, \"limit\": number}");
-            }
-
-            var offset = GetIntValue(args, "offset", 0);
-            var limit = GetIntValue(args, "limit", 120);
+            var arguments = new ToolArgumentReader(Definition.Schema, args);
+            var filePath = arguments.GetString("file_path");
+            var offset = arguments.GetInt32("offset", 0);
+            var limit = arguments.GetInt32("limit", 120);
 
             // 检查文件是否存在
             if (!await _fileSystem.ExistsAsync(filePath, context.CancellationToken))
@@ -143,30 +136,4 @@ public class FileReadTool : ITool, IToolResultProjector
         Level = ToolResultRetentionLevel.Placeholder
     };
 
-    private static string? GetStringValue(IDictionary<string, object> args, string key, string? defaultValue = null)
-    {
-        if (args.TryGetValue(key, out var value))
-        {
-            return value?.ToString();
-        }
-        return defaultValue;
-    }
-    private static int? GetIntValue(IDictionary<string, object> args, string key, int? defaultValue = null)
-    {
-        if (args.TryGetValue(key, out var value) && value != null)
-        {
-            if (value is JsonElement jsonElement)
-            {
-                if (jsonElement.ValueKind == JsonValueKind.Number && jsonElement.TryGetInt32(out var intValue))
-                {
-                    return intValue;
-                }
-            }
-            else if (int.TryParse(value.ToString(), out var parsedValue))
-            {
-                return parsedValue;
-            }
-        }
-        return defaultValue;
-    }
 }

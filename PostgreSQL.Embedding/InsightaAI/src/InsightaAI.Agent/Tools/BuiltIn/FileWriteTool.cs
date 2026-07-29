@@ -58,25 +58,10 @@ public class FileWriteTool : ITool
         try
         {
             // 获取参数
-            var filePath = GetStringValue(args, "file_path");
-            if (string.IsNullOrEmpty(filePath))
-            {
-                return ToolResult.FromError(
-                    "Missing required parameter: file_path\n" +
-                    "Required parameters: {\"file_path\": \"string\", \"content\": \"string\"}\n" +
-                    "Optional: {\"append\": boolean}");
-            }
-
-            var content = GetStringValue(args, "content");
-            if (content == null)
-            {
-                return ToolResult.FromError(
-                    "Missing required parameter: content\n" +
-                    "Required parameters: {\"file_path\": \"string\", \"content\": \"string\"}\n" +
-                    "Optional: {\"append\": boolean}");
-            }
-
-            var append = GetBoolValue(args, "append") ?? false;
+            var arguments = new ToolArgumentReader(Definition.Schema, args);
+            var filePath = arguments.GetString("file_path");
+            var content = arguments.GetString("content");
+            var append = arguments.GetBoolean("append");
 
             // 路径安全验证
             var validation = PathValidator.Validate(filePath);
@@ -104,29 +89,4 @@ public class FileWriteTool : ITool
         }
     }
 
-    private static string? GetStringValue(IDictionary<string, object> args, string key)
-    {
-        if (args.TryGetValue(key, out var value))
-        {
-            return value?.ToString();
-        }
-        return null;
-    }
-
-    private static bool? GetBoolValue(IDictionary<string, object> args, string key)
-    {
-        if (args.TryGetValue(key, out var value) && value != null)
-        {
-            if (value is JsonElement jsonElement)
-            {
-                if (jsonElement.ValueKind == JsonValueKind.True) return true;
-                if (jsonElement.ValueKind == JsonValueKind.False) return false;
-            }
-            else if (bool.TryParse(value.ToString(), out var parsedValue))
-            {
-                return parsedValue;
-            }
-        }
-        return null;
-    }
 }

@@ -67,34 +67,11 @@ public class FileEditTool : ITool
         try
         {
             // 获取参数
-            var filePath = GetStringValue(args, "file_path");
-            if (string.IsNullOrEmpty(filePath))
-            {
-                return ToolResult.FromError(
-                    "Missing required parameter: file_path\n" +
-                    "Required: {\"file_path\": \"string\", \"old_string\": \"string\", \"new_string\": \"string\"}\n" +
-                    "Optional: {\"replace_all\": boolean}");
-            }
-
-            var oldString = GetStringValue(args, "old_string");
-            if (string.IsNullOrEmpty(oldString))
-            {
-                return ToolResult.FromError(
-                    "Missing required parameter: old_string\n" +
-                    "Required: {\"file_path\": \"string\", \"old_string\": \"string\", \"new_string\": \"string\"}\n" +
-                    "Optional: {\"replace_all\": boolean}");
-            }
-
-            var newString = GetStringValue(args, "new_string");
-            if (newString == null)
-            {
-                return ToolResult.FromError(
-                    "Missing required parameter: new_string\n" +
-                    "Required: {\"file_path\": \"string\", \"old_string\": \"string\", \"new_string\": \"string\"}\n" +
-                    "Optional: {\"replace_all\": boolean}");
-            }
-
-            var replaceAll = GetBoolValue(args, "replace_all");
+            var arguments = new ToolArgumentReader(Definition.Schema, args);
+            var filePath = arguments.GetString("file_path");
+            var oldString = arguments.GetString("old_string");
+            var newString = arguments.GetString("new_string");
+            var replaceAll = arguments.GetBoolean("replace_all");
 
             // 路径安全验证
             var validation = PathValidator.Validate(filePath);
@@ -140,7 +117,7 @@ public class FileEditTool : ITool
             var originalLineEnding = ResolveOutputLineEnding(originalLineEndingStyle);
 
             // 6. 执行替换
-            if (replaceAll == true)
+            if (replaceAll)
             {
                 // 替换所有匹配
                 var count = CountOccurrences(normalizedContent, normalizedOldString);
@@ -222,32 +199,6 @@ public class FileEditTool : ITool
             index += substring.Length;
         }
         return count;
-    }
-
-    private static string? GetStringValue(IDictionary<string, object> args, string key)
-    {
-        if (args.TryGetValue(key, out var value))
-        {
-            return value?.ToString();
-        }
-        return null;
-    }
-
-    private static bool? GetBoolValue(IDictionary<string, object> args, string key)
-    {
-        if (args.TryGetValue(key, out var value) && value != null)
-        {
-            if (value is JsonElement jsonElement)
-            {
-                if (jsonElement.ValueKind == JsonValueKind.True) return true;
-                if (jsonElement.ValueKind == JsonValueKind.False) return false;
-            }
-            else if (bool.TryParse(value.ToString(), out var parsedValue))
-            {
-                return parsedValue;
-            }
-        }
-        return null;
     }
 
     private static string NormalizeLineEndings(string text)

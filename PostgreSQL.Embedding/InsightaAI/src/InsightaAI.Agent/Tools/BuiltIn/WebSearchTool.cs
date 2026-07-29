@@ -46,6 +46,26 @@ public class WebSearchTool : ITool, IToolResultProjector
                 {
                     type = "string",
                     description = "Search topic: 'general' or 'news' (default 'general')"
+                },
+                include_answer = new
+                {
+                    type = "boolean",
+                    description = "Whether to include an answer synthesized by the search provider (default true)"
+                },
+                days = new
+                {
+                    type = "integer",
+                    description = "Maximum age of news results in days (default 3)"
+                },
+                include_domains = new
+                {
+                    type = "string",
+                    description = "Comma-separated domains to include"
+                },
+                exclude_domains = new
+                {
+                    type = "string",
+                    description = "Comma-separated domains to exclude"
                 }
             },
             required = new[] { "query" }
@@ -56,17 +76,18 @@ public class WebSearchTool : ITool, IToolResultProjector
         IDictionary<string, object> args,
         ToolExecutionContext context)
     {
-        var query = GetStringValue(args, "query") ?? "";
-        var maxResults = GetIntValue(args, "max_results", 5);
-        var searchDepth = GetStringValue(args, "search_depth") ?? "basic";
-        var topic = GetStringValue(args, "topic") ?? "general";
-        var includeAnswer = !args.ContainsKey("include_answer") || args["include_answer"] is not bool b || b;
-        var days = GetIntValue(args, "days", 3);
-        var includeDomains = GetStringValue(args, "include_domains");
-        var excludeDomains = GetStringValue(args, "exclude_domains");
-
         try
         {
+            var arguments = new ToolArgumentReader(Definition.Schema, args);
+            var query = arguments.GetString("query");
+            var maxResults = arguments.GetInt32("max_results", 5);
+            var searchDepth = arguments.GetString("search_depth", "basic");
+            var topic = arguments.GetString("topic", "general");
+            var includeAnswer = arguments.GetBoolean("include_answer", true);
+            var days = arguments.GetInt32("days", 3);
+            arguments.TryGetString("include_domains", out var includeDomains);
+            arguments.TryGetString("exclude_domains", out var excludeDomains);
+
             var environment = context.Services?.GetService<IEnvironmentVariableReader>()
                 ?? new ProcessEnvironmentVariableReader();
             var apiKey = environment.Get("TAVILY_API_KEY");
@@ -153,22 +174,6 @@ public class WebSearchTool : ITool, IToolResultProjector
         Content = [new TextBlock { Text = DefaultToolResultProjector.CreatePlaceholderText(context) }],
         Level = ToolResultRetentionLevel.Placeholder
     };
-
-    private static string? GetStringValue(IDictionary<string, object> args, string key)
-    {
-        if (args.TryGetValue(key, out var value))
-            return value?.ToString();
-        return null;
-    }
-
-    private static int GetIntValue(IDictionary<string, object> args, string key, int defaultValue)
-    {
-        if (args.TryGetValue(key, out var value) && value is int i)
-            return i;
-        if (value?.ToString() is string s && int.TryParse(s, out var parsed))
-            return parsed;
-        return defaultValue;
-    }
 
     private class TavilySearchRequest
     {

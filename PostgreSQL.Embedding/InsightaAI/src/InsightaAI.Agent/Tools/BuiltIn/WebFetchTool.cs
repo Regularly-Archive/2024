@@ -46,11 +46,12 @@ public class WebFetchTool : ITool, IToolResultProjector
         IDictionary<string, object> args,
         ToolExecutionContext context)
     {
-        var url = GetStringValue(args, "url") ?? "";
-        var extractText = args.TryGetValue("extract_text", out var v) && v is bool b && b;
-
         try
         {
+            var arguments = new ToolArgumentReader(Definition.Schema, args);
+            var url = arguments.GetString("url");
+            var extractText = arguments.GetBoolean("extract_text");
+
             // 验证 URL
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
                 return ToolResult.FromError($"Invalid URL: {url}");
@@ -122,13 +123,6 @@ public class WebFetchTool : ITool, IToolResultProjector
         Content = [new TextBlock { Text = DefaultToolResultProjector.CreatePlaceholderText(context) }],
         Level = ToolResultRetentionLevel.Placeholder
     };
-
-    private static string? GetStringValue(IDictionary<string, object> args, string key)
-    {
-        if (args.TryGetValue(key, out var value))
-            return value?.ToString();
-        return null;
-    }
 
     private static string ExtractTextFromHtml(string html)
     {
