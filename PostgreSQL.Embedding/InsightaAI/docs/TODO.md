@@ -349,7 +349,7 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 
 ## 明日计划
 
-- [ ] 清理 `ChatApplication` 中遗留的 `#if false` 旧代码
+- [x] 清理 `ChatApplication` 中遗留的 `#if false` 旧代码
 - [ ] 为 `AgentBuilder` 补充独立单元测试，覆盖默认 `ToolRegistry`、`ConfigureServices()` 和 Provider 生命周期
 - [ ] 继续检查 Agent 服务生命周期，明确 Singleton/Scoped 支持策略
 - [ ] 视需要补充 CLI Bootstrap 启动顺序测试
@@ -375,3 +375,4 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 - 2026-07-28: Agent、Orchestrator、LLM 测试共 337 个通过；修复 `InsightaAI.Tests.Shared` 被误作为测试项目运行导致的 `Azure.Core.dll` 启动问题
 - 2026-07-28: 新增 CLI 配置 Bootstrap 与 Runtime 分离待办，记录 `CliConfig.Envs` 的启动时序问题
 - 2026-07-28: 完成 CLI Bootstrap 环境注入，并将 Agent 服务组合统一收回 `AgentBuilder`
+- 2026-07-29: 清理 `ChatApplication` 中废弃的 `#if false` Agent 创建逻辑，CLI 构建与 Agent 测试通过
