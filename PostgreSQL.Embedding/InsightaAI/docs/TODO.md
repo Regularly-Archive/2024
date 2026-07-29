@@ -350,7 +350,7 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 ## 明日计划
 
 - [x] 清理 `ChatApplication` 中遗留的 `#if false` 旧代码
-- [ ] 为 `AgentBuilder` 补充独立单元测试，覆盖默认 `ToolRegistry`、`ConfigureServices()` 和 Provider 生命周期
+- [x] 为 `AgentBuilder` 补充独立单元测试，覆盖默认 `ToolRegistry`、`ConfigureServices()` 和 Provider 生命周期
 - [ ] 继续检查 Agent 服务生命周期，明确 Singleton/Scoped 支持策略
 - [ ] 视需要补充 CLI Bootstrap 启动顺序测试
 - [ ] 检查工作区状态，确认是否需要提交后续改动
@@ -376,4 +376,6 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 - 2026-07-28: 新增 CLI 配置 Bootstrap 与 Runtime 分离待办，记录 `CliConfig.Envs` 的启动时序问题
 - 2026-07-28: 完成 CLI Bootstrap 环境注入，并将 Agent 服务组合统一收回 `AgentBuilder`
 - 2026-07-29: 清理 `ChatApplication` 中废弃的 `#if false` Agent 创建逻辑，CLI 构建与 Agent 测试通过
-- 2026-07-29: Hardened Glob/Grep search: unified `excludes: string[]`, default Glob exclusions, streaming Grep scanning, regex timeout protection, and 17 focused tests.
+- 2026-07-29: 新增 `AgentBuilderTests`，覆盖默认注册、服务扩展、依赖覆盖和 Provider 释放；Agent 测试 222 个通过
+- 2026-07-29: 统一本地固定 schema 工具的 `ToolArgumentReader`，完成参数类型/必填/enum/数组校验；Glob/Grep 使用 `excludes: string[]`，Glob 默认排除构建目录并支持 `?` 通配。修复 QA 发现的整数参数解析和 `list_mcp_tools()` 全局阻塞，Agent 测试 250 个通过，Insighta 工具回归完成。
+- 2026-07-29: 修复 AgentBuilder 专属 DI 容器未传递 `ILoggerFactory` 导致 Agent 日志静默丢失；新增生命周期日志测试，CLI 退出时调用 `Log.CloseAndFlush()`，真实会话已验证日志落盘。

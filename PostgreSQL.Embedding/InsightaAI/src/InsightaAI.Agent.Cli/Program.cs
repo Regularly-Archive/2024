@@ -91,6 +91,8 @@ public class Program
                 retainedFileCountLimit: 14,
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}")
             .CreateLogger();
+
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => Log.CloseAndFlush();
     }
 
     private static IDisposable? InitTelemetry(CliEnvironment environment)

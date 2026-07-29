@@ -9,6 +9,7 @@ using InsightaAI.Agent.Storage;
 using InsightaAI.LLM.Models;
 using InsightaAI.Tests.Shared;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace InsightaAI.Agent.Tests;
 
@@ -79,7 +80,8 @@ public sealed class AgentFactoryTests
             Model = "test/model",
             ClientFactory = _ => new MockLlmClient()
         });
-        var factory = new AgentFactory(storage);
+        using var loggerFactory = LoggerFactory.Create(_ => { });
+        var factory = new AgentFactory(storage, loggerFactory);
 
         using var agent = await factory.CreateAsync(new AgentCreationOptions
         {

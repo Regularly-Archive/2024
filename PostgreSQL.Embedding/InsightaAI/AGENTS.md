@@ -101,6 +101,7 @@ f806a75 refactor: extract AgentLoop and add auto message persistence
 - 新增 schema 驱动的 `ToolArgumentReader`，统一固定 schema 本地工具的未知参数、必填项、类型、字符串数组和 enum 校验；动态 MCP 工具保留原样透传。
 - `glob` / `grep` 已统一使用 `excludes: string[]`；Glob 默认排除 `bin`/`obj`/`node_modules`，可通过 `include_ignored: true` 取消，且支持 `?` 单字符通配。
 - QA 回归发现并修复整数参数跨工具解析、Glob `?` 通配和无 `server_name` 的 MCP 工具列表阻塞；`list_mcp_tools` 对单个服务采用 5 秒超时并保留其余服务结果。Agent 测试 250 个通过，Insighta 工具回归完成。
+- `AgentBuilder` 的专属 ServiceProvider 现在显式接收 CLI Host 的 `ILoggerFactory`；修复其降级为 `NullLogger` 导致 Agent 事件不落盘的问题。CLI 退出时调用 `Log.CloseAndFlush()`，并通过真实 CLI 会话验证 `~/.insighta/logs/20260729.log` 的 Turn/Round/Tool 事件完整写入。
 
 ## 最新架构变更
 

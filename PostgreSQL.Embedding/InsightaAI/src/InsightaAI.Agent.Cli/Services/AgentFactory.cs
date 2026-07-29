@@ -15,6 +15,7 @@ using InsightaAI.Agent.Skills;
 using InsightaAI.Agent.Storage;
 using InsightaAI.LLM.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace InsightaAI.Agent.Cli.Services;
 
@@ -24,11 +25,14 @@ namespace InsightaAI.Agent.Cli.Services;
 public sealed class AgentFactory : IAgentFactory
 {
     private readonly IMessageStorage _messageStorage;
+    private readonly ILoggerFactory _loggerFactory;
 
-    public AgentFactory(IMessageStorage messageStorage)
+    public AgentFactory(IMessageStorage messageStorage, ILoggerFactory loggerFactory)
     {
         ArgumentNullException.ThrowIfNull(messageStorage);
+        ArgumentNullException.ThrowIfNull(loggerFactory);
         _messageStorage = messageStorage;
+        _loggerFactory = loggerFactory;
     }
 
     public async Task<Agent> CreateAsync(
@@ -78,6 +82,7 @@ public sealed class AgentFactory : IAgentFactory
             .WithContextManager(contextManager)
             .WithMemoryManager(memoryManager)
             .WithMessageStore(_messageStorage)
+            .WithLoggerFactory(_loggerFactory)
             .ConfigureServices(services =>
             {
                 services.AddSingleton<IEnvironmentVariableReader>(environment);

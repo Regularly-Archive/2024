@@ -8,6 +8,7 @@ using InsightaAI.Agent.Storage;
 using InsightaAI.LLM.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace InsightaAI.Agent;
 
@@ -92,6 +93,19 @@ public sealed class AgentBuilder
         ArgumentNullException.ThrowIfNull(messageStorage);
         _services.RemoveAll<IMessageStorage>();
         _services.AddSingleton(messageStorage);
+        return this;
+    }
+
+    /// <summary>
+    /// Supplies the logging factory used by this Agent's private service provider.
+    /// </summary>
+    public AgentBuilder WithLoggerFactory(ILoggerFactory loggerFactory)
+    {
+        ArgumentNullException.ThrowIfNull(loggerFactory);
+        _services.RemoveAll<ILoggerFactory>();
+        _services.RemoveAll(typeof(ILogger<>));
+        _services.AddSingleton(loggerFactory);
+        _services.AddSingleton(typeof(ILogger<>), typeof(Logger<>));
         return this;
     }
 
