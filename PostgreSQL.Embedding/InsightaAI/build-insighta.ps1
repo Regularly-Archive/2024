@@ -1,5 +1,5 @@
-# InsightaAI Agent CLI - Global tool installer
-# Usage: .\install-tool.ps1
+# InsightaAI Agent CLI - Build and install the local development version
+# Usage: .\build-insighta.ps1
 
 $ErrorActionPreference = "Stop"
 $projectPath = "src/InsightaAI.Agent.Cli"
@@ -19,19 +19,19 @@ function Invoke-Dotnet {
     }
 }
 
-Write-Host "=== InsightaAI Agent CLI Installer ===" -ForegroundColor Cyan
+Write-Host "=== InsightaAI Local Build Installer ===" -ForegroundColor Cyan
 Write-Host ""
 
 # A running global tool keeps its executable and dependent files locked on Windows.
-$runningProcesses = Get-Process -Name $toolCommand -ErrorAction SilentlyContinue
+$runningProcesses = Get-Process -Name @($toolCommand, "InsightaAI.Agent.Cli") -ErrorAction SilentlyContinue
 if ($runningProcesses) {
-    Write-Host "A running '$toolCommand' process was found." -ForegroundColor Red
+    Write-Host "A running Insighta CLI process was found." -ForegroundColor Red
     Write-Host "Please exit the running Insighta session and run this script again." -ForegroundColor Yellow
     exit 1
 }
 
 try {
-    Write-Host "[1/3] Packing new version..." -ForegroundColor Yellow
+    Write-Host "[1/3] Packing local development version..." -ForegroundColor Yellow
     Invoke-Dotnet @("pack", $projectPath, "-c", "Release", "-o", $outputPath, "--force")
 
     $nupkg = Get-ChildItem -LiteralPath $outputPath -Filter "*.nupkg" |
@@ -42,15 +42,15 @@ try {
     }
     Write-Host "  Packed: $($nupkg.Name)" -ForegroundColor Green
 
-    Write-Host "[2/3] Uninstalling old version..." -ForegroundColor Yellow
+    Write-Host "[2/3] Uninstalling previous version..." -ForegroundColor Yellow
     & dotnet tool uninstall --global $packageId
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "  Old version uninstalled." -ForegroundColor Green
+        Write-Host "  Previous version uninstalled." -ForegroundColor Green
     } else {
         Write-Host "  No previous version found." -ForegroundColor Gray
     }
 
-    Write-Host "[3/3] Installing new version..." -ForegroundColor Yellow
+    Write-Host "[3/3] Installing local package..." -ForegroundColor Yellow
     Invoke-Dotnet @("tool", "install", "--global", "--add-source", $outputPath, $packageId, "--prerelease")
     Write-Host "  Installed successfully!" -ForegroundColor Green
 }

@@ -116,12 +116,28 @@ public class LocalFileSystem : IFileSystem
     }
 
     public Task<string[]> GlobAsync(string pattern, string? basePath = null, CancellationToken cancellationToken = default)
+        => GlobAsync(pattern, basePath, options: null, cancellationToken: cancellationToken);
+
+    public Task<string[]> GlobAsync(
+        string pattern,
+        string? basePath,
+        GlobOptions? options,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var searchPath = basePath != null ? Path.GetFullPath(basePath) : Directory.GetCurrentDirectory();
+
+        if (!Directory.Exists(searchPath))
+            throw new DirectoryNotFoundException($"Directory not found: {searchPath}");
 
         var matcher = new Matcher();
         matcher.AddInclude(pattern);
-        matcher.AddIncludePatterns(new[] { "*.txt", "*.asciidoc", "*.md" });
+        options ??= new GlobOptions();
+        var excludePatterns = options.UseDefaultExcludes
+            ? GlobOptions.DefaultExcludePatterns.Concat(options.ExcludePatterns)
+            : options.ExcludePatterns;
+        foreach (var excludePattern in excludePatterns.Distinct(StringComparer.OrdinalIgnoreCase))
+            matcher.AddExclude(excludePattern);
 
         var result = matcher.Execute(
             new DirectoryInfoWrapper(new DirectoryInfo(searchPath))
@@ -129,78 +145,79 @@ public class LocalFileSystem : IFileSystem
 
         if (!result.HasMatches) return Task.FromResult(Array.Empty<string>());
 
-        var files = result.Files.Select(x => x.Path).ToArray();
+        var files = result.Files
+            .Select(x => Path.GetFullPath(Path.Combine(searchPath, x.Path)))
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
         return Task.FromResult(files);
     }
 
-    public Task<GrepResult> GrepAsync(string pattern, string path, GrepOptions? options = null, CancellationToken cancellationToken = default)
+    public async Task<GrepResult> GrepAsync(string pattern, string path, GrepOptions? options = null, CancellationToken cancellationToken = default)
     {
         options ??= new GrepOptions();
+        if (options.MaxResults is <= 0)
+            throw new ArgumentOutOfRangeException(nameof(options), "MaxResults must be greater than zero.");
+
         var fullPath = Path.GetFullPath(path);
         var matches = new List<GrepMatch>();
         var filesSearched = new HashSet<string>();
 
         try
         {
-            // 确定搜索路径
-            string[] filesToSearch;
+            IEnumerable<string> filesToSearch;
+            var searchRoot = fullPath;
             if (File.Exists(fullPath))
             {
                 filesToSearch = new[] { fullPath };
+                searchRoot = Path.GetDirectoryName(fullPath) ?? Directory.GetCurrentDirectory();
             }
             else if (Directory.Exists(fullPath))
             {
-                var searchOption = options.Recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
-                filesToSearch = Directory.GetFiles(fullPath, "*.*", searchOption);
+                filesToSearch = Directory.EnumerateFiles(fullPath, "*", new EnumerationOptions
+                {
+                    RecurseSubdirectories = options.Recursive,
+                    IgnoreInaccessible = true,
+                    ReturnSpecialDirectories = false
+                });
             }
             else
             {
-                return Task.FromResult(new GrepResult
+                return new GrepResult
                 {
                     Matches = Array.Empty<GrepMatch>(),
                     FileCount = 0,
                     TotalMatches = 0
-                });
+                };
             }
 
-            // 过滤排除的文件
-            filesToSearch = filesToSearch.Where(f =>
-            {
-                var relativePath = Path.GetRelativePath(fullPath, f);
-                return !options.ExcludePatterns.Any(pattern =>
-                    MatchWildcardPattern(pattern, relativePath));
-            }).ToArray();
-
-            // 编译正则表达式
-            var regexOptions = RegexOptions.Compiled;
+            var regexOptions = RegexOptions.CultureInvariant;
             if (options.IgnoreCase) regexOptions |= RegexOptions.IgnoreCase;
 
             Regex? regex = null;
             if (options.UseRegex)
-            {
-                try
-                {
-                    regex = new Regex(pattern, regexOptions);
-                }
-                catch
-                {
-                    // 如果正则表达式无效，使用普通字符串匹配
-                }
-            }
+                regex = new Regex(pattern, regexOptions, TimeSpan.FromSeconds(2));
 
-            // 搜索每个文件
             foreach (var file in filesToSearch)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                var relativePath = Path.GetRelativePath(searchRoot, file);
+                if (options.ExcludePatterns.Any(excludePattern =>
+                    MatchWildcardPattern(excludePattern, relativePath)))
+                {
+                    continue;
+                }
 
                 try
                 {
-                    var lines = File.ReadAllLines(file);
-                    filesSearched.Add(file);
+                    if (await IsProbablyBinaryAsync(file, cancellationToken))
+                        continue;
 
-                    for (int i = 0; i < lines.Length; i++)
+                    using var reader = new StreamReader(file, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+                    filesSearched.Add(file);
+                    var lineNumber = 0;
+                    while (await reader.ReadLineAsync(cancellationToken) is { } line)
                     {
-                        var line = lines[i];
+                        lineNumber++;
                         bool isMatch;
 
                         if (regex != null)
@@ -221,42 +238,63 @@ public class LocalFileSystem : IFileSystem
                             matches.Add(new GrepMatch
                             {
                                 FilePath = file,
-                                LineNumber = i + 1,
+                                LineNumber = lineNumber,
                                 LineContent = line
                             });
 
-                            // 检查是否达到最大结果数
                             if (options.MaxResults.HasValue && matches.Count >= options.MaxResults.Value)
                             {
-                                return Task.FromResult(new GrepResult
+                                return new GrepResult
                                 {
                                     Matches = matches,
                                     FileCount = filesSearched.Count,
                                     TotalMatches = matches.Count,
                                     Truncated = true
-                                });
+                                };
                             }
                         }
                     }
                 }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (RegexMatchTimeoutException ex)
+                {
+                    throw new InvalidOperationException($"Regex timed out while searching '{file}'.", ex);
+                }
                 catch
                 {
-                    // 跳过无法读取的文件
+                    // Skip files which cannot be read or decoded.
                 }
             }
 
-            return Task.FromResult(new GrepResult
+            return new GrepResult
             {
                 Matches = matches,
                 FileCount = filesSearched.Count,
                 TotalMatches = matches.Count,
                 Truncated = false
-            });
+            };
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
             throw new InvalidOperationException($"Grep failed: {ex.Message}", ex);
         }
+    }
+
+    private static async Task<bool> IsProbablyBinaryAsync(string path, CancellationToken cancellationToken)
+    {
+        const int sampleSize = 8 * 1024;
+        var buffer = new byte[sampleSize];
+        await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite,
+            bufferSize: sampleSize, FileOptions.Asynchronous | FileOptions.SequentialScan);
+        var count = await stream.ReadAsync(buffer.AsMemory(), cancellationToken);
+        return buffer.AsSpan(0, count).Contains((byte)0);
     }
 
     private static bool MatchWildcardPattern(string pattern, string text)
@@ -316,16 +354,9 @@ public class LocalFileSystem : IFileSystem
                 sb.Append("[^/]");
                 i++;
             }
-            else if (pattern[i] == '.')
-            {
-                // . 需要转义
-                sb.Append("\\.");
-                i++;
-            }
             else
             {
-                // 其他字符原样保留
-                sb.Append(pattern[i]);
+                sb.Append(Regex.Escape(pattern[i].ToString()));
                 i++;
             }
         }

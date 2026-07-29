@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using InsightaAI.Agent.Abstractions;
 using InsightaAI.LLM.Models;
 
@@ -59,10 +60,11 @@ public class GrepTool : ITool, IToolResultProjector
                         type = "boolean",
                         description = "Whether to show only matching file names. Default is false."
                     },
-                    exclude = new
+                    excludes = new
                     {
-                        type = "string",
-                        description = "File or directory patterns to exclude, separated by commas. e.g. '*.log,node_modules'"
+                        type = "array",
+                        items = new { type = "string" },
+                        description = "File or directory glob patterns to exclude, e.g. ['*.log', 'node_modules/**']"
                     },
                     max_results = new
                     {
@@ -101,15 +103,14 @@ public class GrepTool : ITool, IToolResultProjector
             var ignoreCase = GetBoolValue(args, "ignore_case") ?? false;
             var useRegex = GetBoolValue(args, "use_regex") ?? true;
             var filesOnly = GetBoolValue(args, "files_only") ?? false;
-            var exclude = GetStringValue(args, "exclude");
             var maxResults = GetIntValue(args, "max_results") ?? 100;
+            if (maxResults <= 0)
+                return ToolResult.FromError("Parameter max_results must be greater than zero.");
 
-            // 解析排除模式
-            var excludePatterns = string.IsNullOrEmpty(exclude)
-                ? Array.Empty<string>()
-                : exclude.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                    .Select(p => p.Trim())
-                    .ToArray();
+            if (args.ContainsKey("exclude"))
+                return ToolResult.FromError("Parameter 'exclude' is not supported. Use 'excludes' as an array of strings.");
+
+            var excludePatterns = GetStringArrayValue(args, "excludes");
 
             // 构建选项
             var options = new GrepOptions
@@ -147,7 +148,9 @@ public class GrepTool : ITool, IToolResultProjector
                     .ToArray();
 
                 var sb = new System.Text.StringBuilder();
-                sb.AppendLine($"Found {result.TotalMatches} matches in {fileGroups.Length} files:");
+                sb.AppendLine(result.Truncated
+                    ? $"Found at least {result.TotalMatches} matches in {fileGroups.Length} files (partial results):"
+                    : $"Found {result.TotalMatches} matches in {fileGroups.Length} files:");
                 sb.AppendLine();
                 foreach (var fg in fileGroups)
                 {
@@ -165,7 +168,9 @@ public class GrepTool : ITool, IToolResultProjector
             {
                 // 显示匹配的行
                 var sb = new System.Text.StringBuilder();
-                sb.AppendLine($"Found {result.TotalMatches} matches in {result.FileCount} files:");
+                sb.AppendLine(result.Truncated
+                    ? $"Found at least {result.TotalMatches} matches in {result.FileCount} files (partial results):"
+                    : $"Found {result.TotalMatches} matches in {result.FileCount} files:");
 
                 foreach (var match in result.Matches)
                 {
@@ -179,6 +184,10 @@ public class GrepTool : ITool, IToolResultProjector
 
                 return ToolResult.FromText(sb.ToString());
             }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -196,7 +205,7 @@ public class GrepTool : ITool, IToolResultProjector
     {
         var text = result.Content.OfType<TextBlock>().FirstOrDefault()?.Text ?? string.Empty;
         var fileMatches = text.Split('\n')
-            .Select(line => line.IndexOf(':') is var index && index > 0 ? line[..index] : null)
+            .Select(TryGetFilePathFromResultLine)
             .Where(path => !string.IsNullOrWhiteSpace(path))
             .GroupBy(path => path!, StringComparer.OrdinalIgnoreCase)
             .OrderByDescending(group => group.Count());
@@ -218,6 +227,16 @@ public class GrepTool : ITool, IToolResultProjector
         Content = [new TextBlock { Text = DefaultToolResultProjector.CreatePlaceholderText(context) }],
         Level = ToolResultRetentionLevel.Placeholder
     };
+
+    private static string? TryGetFilePathFromResultLine(string line)
+    {
+        var match = Regex.Match(line, @"^(?<path>.+):\d+:\s");
+        if (match.Success)
+            return match.Groups["path"].Value;
+
+        match = Regex.Match(line, @"^\s*\d+ matches in (?<path>.+)$");
+        return match.Success ? match.Groups["path"].Value : null;
+    }
 
     private static string? GetStringValue(IDictionary<string, object> args, string key)
     {
@@ -262,5 +281,36 @@ public class GrepTool : ITool, IToolResultProjector
             }
         }
         return null;
+    }
+
+    private static string[] GetStringArrayValue(IDictionary<string, object> args, string key)
+    {
+        if (!args.TryGetValue(key, out var value) || value == null)
+            return Array.Empty<string>();
+
+        if (value is JsonElement { ValueKind: JsonValueKind.Array } jsonArray)
+        {
+            if (jsonArray.EnumerateArray().Any(item => item.ValueKind != JsonValueKind.String))
+                throw new ArgumentException("Parameter excludes must be an array of strings.");
+
+            return jsonArray.EnumerateArray()
+                .Select(item => item.GetString())
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .Select(item => item!)
+                .ToArray();
+        }
+
+        if (value is System.Collections.IEnumerable enumerable && value is not string)
+        {
+            var values = enumerable.Cast<object?>().ToArray();
+            if (values.Any(item => item is not string))
+                throw new ArgumentException("Parameter excludes must be an array of strings.");
+
+            return values.Cast<string>()
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .ToArray();
+        }
+
+        throw new ArgumentException("Parameter excludes must be an array of strings.");
     }
 }

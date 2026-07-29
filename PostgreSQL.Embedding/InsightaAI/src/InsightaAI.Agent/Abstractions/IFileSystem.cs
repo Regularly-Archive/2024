@@ -51,6 +51,15 @@ public interface IFileSystem
     Task<string[]> GlobAsync(string pattern, string? basePath = null, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 按文件名模式搜索文件，并应用排除规则
+    /// </summary>
+    Task<string[]> GlobAsync(
+        string pattern,
+        string? basePath,
+        GlobOptions? options,
+        CancellationToken cancellationToken = default) => GlobAsync(pattern, basePath, cancellationToken);
+
+    /// <summary>
     /// 搜索文件内容
     /// </summary>
     Task<GrepResult> GrepAsync(string pattern, string path, GrepOptions? options = null, CancellationToken cancellationToken = default);
@@ -178,4 +187,26 @@ public record GrepOptions
     /// 最大返回结果数
     /// </summary>
     public int? MaxResults { get; init; }
+}
+
+/// <summary>
+/// Glob 搜索选项
+/// </summary>
+public record GlobOptions
+{
+    /// <summary>
+    /// 默认忽略的常见构建和依赖目录。
+    /// </summary>
+    public static IReadOnlyList<string> DefaultExcludePatterns { get; } =
+        ["**/bin/**", "**/obj/**", "**/node_modules/**"];
+
+    /// <summary>
+    /// 是否应用 <see cref="DefaultExcludePatterns"/>。
+    /// </summary>
+    public bool UseDefaultExcludes { get; init; } = true;
+
+    /// <summary>
+    /// 要额外排除的 glob 模式。
+    /// </summary>
+    public IReadOnlyList<string> ExcludePatterns { get; init; } = Array.Empty<string>();
 }

@@ -376,3 +376,4 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 - 2026-07-28: 新增 CLI 配置 Bootstrap 与 Runtime 分离待办，记录 `CliConfig.Envs` 的启动时序问题
 - 2026-07-28: 完成 CLI Bootstrap 环境注入，并将 Agent 服务组合统一收回 `AgentBuilder`
 - 2026-07-29: 清理 `ChatApplication` 中废弃的 `#if false` Agent 创建逻辑，CLI 构建与 Agent 测试通过
+- 2026-07-29: Hardened Glob/Grep search: unified `excludes: string[]`, default Glob exclusions, streaming Grep scanning, regex timeout protection, and 17 focused tests.

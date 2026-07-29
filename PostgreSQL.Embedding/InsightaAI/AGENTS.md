@@ -97,7 +97,8 @@ f806a75 refactor: extract AgentLoop and add auto message persistence
 - `BashTool` 不再因输出超过 10,000 字符直接报错，改由 Tool Result Lifecycle 统一保存完整结果并生成头尾预览；补充 Bash 输出测试。
 - CLI 工具版本升级为 `1.0.0-alpha.2`。
 - 改进 Skill 发现、激活提示和 `list_skills`/`activate_skill` 工具描述。
-- `install-tool.ps1` 增加严格错误处理、运行中进程检测、稳定的脚本目录解析和打包结果校验。
+- `build-insighta.ps1` 负责本地打包并覆盖安装；`install-insighta.ps1` 从 NuGet 安装已发布版。两者均具备严格错误处理和运行中进程检测。
+- `glob` / `grep` 已统一使用 `excludes: string[]`；Glob 默认排除 `bin`/`obj`/`node_modules`，可通过 `include_ignored: true` 取消。两者均覆盖 ToolRegistry 数组参数转换测试。
 
 ## 最新架构变更
 

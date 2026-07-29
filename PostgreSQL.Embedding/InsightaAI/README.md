@@ -6,10 +6,16 @@ InsightaAI 是一个基于 .NET 9 的 AI Agent 框架，提供 LLM 多模型适�
 
 要求：安装 .NET 9 SDK。
 
-在仓库根目录构建并安装全局工具：
+从 NuGet 安装最新发布版：
 
 ```powershell
-.\install-tool.ps1
+.\install-insighta.ps1
+```
+
+如果需要构建当前仓库并安装本地开发版：
+
+```powershell
+.\build-insighta.ps1
 ```
 
 首次使用先运行配置向导，然后开始对话：
@@ -20,6 +26,15 @@ insighta chat
 ```
 
 `insighta` 不带参数时同样会进入聊天。
+
+## 文件搜索行为
+
+`glob` 按传入的 glob pattern 匹配文件；`*.md` 仅匹配顶层，`**/*.md` 递归匹配子目录。为减少构建产物带来的噪声，它默认排除 `bin/`、`obj/` 和 `node_modules/`。
+
+- 传递 `excludes` 可追加排除模式数组，例如 `["generated/**", "*.min.js"]`。
+- 传递 `include_ignored: true` 可取消默认排除，以搜索这些目录中的文件。
+
+`grep` 同样使用 `excludes` 字符串数组排除文件或目录，例如 `["*.log", "node_modules/**"]`。
 
 ## 常用命令
 
@@ -84,7 +99,7 @@ dotnet test tests/InsightaAI.Agents.Orchestrator.Tests/InsightaAI.Agents.Orchest
 dotnet build src/InsightaAI.Agent.Cli/InsightaAI.Agent.Cli.csproj
 ```
 
-修改 CLI 后重新执行 `install-tool.ps1` 即可更新全局命令。
+修改 CLI 后重新执行 `build-insighta.ps1` 即可更新全局命令。
 
 ## 设计文档
 
