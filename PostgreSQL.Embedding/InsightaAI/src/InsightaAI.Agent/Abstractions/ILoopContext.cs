@@ -23,6 +23,9 @@ public interface ILoopContext
     /// <summary>追加多条消息</summary>
     void AddMessages(IEnumerable<Message> messages);
 
+    /// <summary>替换指定位置的消息，不触发消息持久化回调。</summary>
+    void ReplaceMessage(int index, Message message);
+
     /// <summary>检查并执行上下文压缩（如需要）</summary>
     Task<CompactionResult?> CompactIfNeededAsync(CancellationToken ct);
 

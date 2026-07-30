@@ -64,12 +64,15 @@ public sealed class AgentEventTelemetryHook : IAgentEventHook
         return Task.CompletedTask;
     }
 
-    public Task OnAgentRoundStartedAsync(string message, CancellationToken cancellationToken = default)
+    public Task OnAgentRoundStartedAsync(
+        AgentEventHookContext context,
+        IReadOnlyList<Message> messages,
+        CancellationToken cancellationToken = default)
     {
         // 结束上一轮的 span（多轮场景）
         EndRoundActivity();
 
-        _currentRound++;
+        _currentRound = context.GetEvent<AgentRoundStartEvent>().Round;
         _roundActivity = TelemetryConstants.ActivitySource.StartActivity(
             "insighta.agent.round", ActivityKind.Internal, parentContext: _turnActivityContext);
 

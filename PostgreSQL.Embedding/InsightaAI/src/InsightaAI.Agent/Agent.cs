@@ -34,6 +34,7 @@ public class Agent : IDisposable
     private readonly IMessageStorage? _messageStorage;
     private readonly List<IToolHook> _toolHooks = [];
     private readonly List<IAgentEventHook> _agentHooks = [];
+    private readonly List<IUserPromptEventHook> _userPromptHooks = [];
     private readonly HashSet<string> _alwaysAllowedTools = [];
     private readonly List<ISkill> _activatedSkills = [];
     private readonly IServiceProvider _serviceProvider;
@@ -171,6 +172,16 @@ public class Agent : IDisposable
     {
         ArgumentNullException.ThrowIfNull(hook);
         _agentHooks.Add(hook);
+        return this;
+    }
+
+    /// <summary>
+    /// 添加用户输入后置 Hook。Hook 以 fire-and-forget 方式执行，不能拦截当前输入。
+    /// </summary>
+    public Agent AddUserPromptHook(IUserPromptEventHook hook)
+    {
+        ArgumentNullException.ThrowIfNull(hook);
+        _userPromptHooks.Add(hook);
         return this;
     }
 
@@ -330,11 +341,28 @@ public class Agent : IDisposable
         }
     }
 
+    private void TriggerUserPromptHooks(
+        AgentEventHookContext context,
+        Message userMessage,
+        CancellationToken cancellationToken)
+    {
+        if (_userPromptHooks.Count == 0)
+            return;
+
+        foreach (var hook in _userPromptHooks)
+        {
+            _ = SafeInvokeHookAsync(() => hook.OnUserPromptReceivedAsync(
+                context, userMessage, cancellationToken),
+                $"User prompt hook '{hook.Id}'");
+        }
+    }
+
     /// <summary>
     /// 触发 agent 级别的轮次开始钩子（fire-and-forget，不阻塞 Agent 主循环）
     /// </summary>
     private void TriggerRoundStartedHooks(
-        string message,
+        AgentEventHookContext context,
+        IReadOnlyList<Message> messages,
         CancellationToken cancellationToken)
     {
         if (_agentHooks.Count == 0)
@@ -343,7 +371,7 @@ public class Agent : IDisposable
         foreach (var hook in _agentHooks)
         {
             _ = SafeInvokeHookAsync(() => hook.OnAgentRoundStartedAsync(
-                message, cancellationToken),
+                context, messages, cancellationToken),
                 $"Round start hook '{hook.Id}'");
         }
     }
@@ -353,8 +381,7 @@ public class Agent : IDisposable
     /// </summary>
     private void TriggerRoundEndedHooks(
         AgentEventHookContext hookContext,
-        int round,
-        List<Message> messages,
+        IReadOnlyList<Message> messages,
         Message? assistantMessage,
         CancellationToken cancellationToken)
     {
@@ -364,9 +391,14 @@ public class Agent : IDisposable
         foreach (var hook in _agentHooks)
         {
             _ = SafeInvokeHookAsync(() => hook.OnAgentRoundEndedAsync(
-                hookContext, round, messages, assistantMessage, cancellationToken),
-                $"Round {round} end hook '{hook.Id}'");
+                hookContext, messages, assistantMessage, cancellationToken),
+                $"Round {hookContext.GetEvent<AgentRoundEndEvent>().Round} end hook '{hook.Id}'");
         }
+    }
+
+    private AgentEventHookContext CreateHookContext(string sessionId, AgentEvent @event)
+    {
+        return AgentEventHookContext.Create(sessionId, @event, _serviceProvider);
     }
 
     /// <summary>
@@ -374,7 +406,7 @@ public class Agent : IDisposable
     /// </summary>
     private void TriggerTurnEndedHooks(
         AgentEventHookContext context,
-        List<Message> messages,
+        IReadOnlyList<Message> messages,
         CancellationToken cancellationToken)
     {
         if (_agentHooks.Count == 0)
@@ -410,6 +442,12 @@ public class Agent : IDisposable
     {
         switch (evt)
         {
+            case AgentUserPromptEvent userPrompt:
+                _logger.LogInformation(
+                    "[{SessionId}] User prompt received — input={Input}",
+                    sessionId, userPrompt.Input);
+                break;
+
             case AgentTurnStartEvent turnStart:
                 _logger.LogInformation(
                     "[{SessionId}] Turn started — agent={AgentId}, model={Model}",
@@ -522,12 +560,6 @@ public class Agent : IDisposable
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var sessionId = context?.SessionId ?? Guid.NewGuid().ToString("N");
-        var hookContext = new AgentEventHookContext
-        {
-            SessionId = sessionId,
-            Services = _serviceProvider
-        };
-
         // 每次调用创建 AgentLoop，确保 sessionId 正确
         ToolCallHandler handler = async (request, ct) =>
         {
@@ -568,7 +600,16 @@ public class Agent : IDisposable
             };
         }
 
-        loopContext.AddMessage(Message.FromUser(input));
+        var userMessage = Message.FromUser(input);
+        loopContext.AddMessage(userMessage);
+
+        var userPromptEvent = new AgentUserPromptEvent() { AgentId = sessionId, Input = input };
+        LogEvent(userPromptEvent, sessionId);
+
+        TriggerUserPromptHooks(
+            CreateHookContext(sessionId, userPromptEvent),
+            userMessage,
+            cancellationToken);
 
         await foreach (var evt in agentLoop.RunAsync(loopContext, cancellationToken))
         {
@@ -579,13 +620,15 @@ public class Agent : IDisposable
             switch (evt)
             {
                 case AgentTurnStartEvent turnStartEvt:
-                    hookContext.AttachEvent(turnStartEvt);
-                    TriggerTurnStartedHooks(hookContext, input, cancellationToken);
+                    TriggerTurnStartedHooks(
+                        CreateHookContext(sessionId, turnStartEvt), input, cancellationToken);
                     break;
 
                 case AgentRoundStartEvent roundStartEvt:
-                    hookContext.AttachEvent(roundStartEvt);
-                    TriggerRoundStartedHooks(input, cancellationToken);
+                    TriggerRoundStartedHooks(
+                        CreateHookContext(sessionId, roundStartEvt),
+                        loopContext.Messages.ToArray(),
+                        cancellationToken);
                     break;
 
                 case AgentContextCompactedEvent compactedEvt:
@@ -602,17 +645,15 @@ public class Agent : IDisposable
                     break;
 
                 case AgentRoundEndEvent roundEndEvt:
-                    hookContext.AttachEvent(roundEndEvt);
                     var lastAssistantMessage = loopContext.Messages
                         .LastOrDefault(m => m.Role == MessageRole.Assistant);
-                    TriggerRoundEndedHooks(hookContext, roundEndEvt.Round,
-                        loopContext.Messages.ToList(), lastAssistantMessage, cancellationToken);
+                    TriggerRoundEndedHooks(CreateHookContext(sessionId, roundEndEvt),
+                        loopContext.Messages.ToArray(), lastAssistantMessage, cancellationToken);
                     break;
 
                 case AgentTurnEndEvent turnEndEvent:
-                    hookContext.AttachEvent(turnEndEvent);
-                    TriggerTurnEndedHooks(hookContext,
-                        loopContext.Messages.ToList(), cancellationToken);
+                    TriggerTurnEndedHooks(CreateHookContext(sessionId, turnEndEvent),
+                        loopContext.Messages.ToArray(), cancellationToken);
                     break;
             }
 

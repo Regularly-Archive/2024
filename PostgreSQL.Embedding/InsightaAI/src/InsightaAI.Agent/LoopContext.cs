@@ -43,6 +43,11 @@ public sealed class LoopContext : ILoopContext
         }
     }
 
+    public void ReplaceMessage(int index, Message message)
+    {
+        _messages[index] = message;
+    }
+
     public async Task<CompactionResult?> CompactIfNeededAsync(CancellationToken ct)
     {
         if (_contextManager == null) return null;

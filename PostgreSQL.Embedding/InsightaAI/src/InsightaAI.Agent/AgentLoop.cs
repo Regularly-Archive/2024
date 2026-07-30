@@ -66,13 +66,6 @@ public sealed class AgentLoop
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            // 发送轮次开始事件
-            yield return new AgentRoundStartEvent
-            {
-                AgentId = _config.Id,
-                Round = round
-            };
-
             // 上下文压缩检查
             var compactionResult = await context.CompactIfNeededAsync(cancellationToken);
             if (compactionResult != null)
@@ -90,13 +83,19 @@ public sealed class AgentLoop
             }
 
             // 每轮重建 System Prompt（反映最新的 Skills 激活、Memory 等动态状态）
-            var messages = context.Messages.ToList();
-            if (messages.Count > 0 && messages[0].Role == MessageRole.System)
+            if (context.Messages.Count > 0 && context.Messages[0].Role == MessageRole.System)
             {
                 var rebuilt = await _systemPromptBuilder(cancellationToken);
-                messages[0] = Message.FromSystem(rebuilt);
+                context.ReplaceMessage(0, Message.FromSystem(rebuilt));
             }
-            var requestMessages = messages.ToArray();
+            var requestMessages = context.Messages.ToArray();
+
+            // 仅在最终 LLM 输入已确定后发送轮次开始事件。
+            yield return new AgentRoundStartEvent
+            {
+                AgentId = _config.Id,
+                Round = round
+            };
 
             var request = new LlmRequest
             {

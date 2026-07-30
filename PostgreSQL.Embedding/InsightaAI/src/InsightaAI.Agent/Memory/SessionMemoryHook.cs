@@ -1,6 +1,7 @@
 using System.Text.Json;
 using InsightaAI.Agent.Context.Summary;
 using InsightaAI.Agent.Hooks;
+using InsightaAI.Agent.Models;
 using InsightaAI.LLM.Models;
 
 namespace InsightaAI.Agent.Memory;
@@ -114,12 +115,11 @@ public sealed class SessionMemoryHook : IAgentEventHook
     /// </summary>
     public Task OnAgentRoundEndedAsync(
         AgentEventHookContext context,
-        int round,
         IReadOnlyList<Message> messages,
         Message? assistantMessage,
         CancellationToken cancellationToken = default)
     {
-        if (round < _options.MinRoundsBeforeLlm)
+        if (context.GetEvent<AgentRoundEndEvent>().Round < _options.MinRoundsBeforeLlm)
             return Task.CompletedTask;
 
         ExtractMemoryInBackground(context, messages);

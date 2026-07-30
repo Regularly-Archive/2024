@@ -19,7 +19,10 @@ public sealed record ToolExecutionContext
     /// <summary>取消令牌</summary>
     public CancellationToken CancellationToken { get; init; }
 
-    /// <summary>服务提供者（可选，Tool/ToolHook 可按需解析服务）</summary>
+    /// <summary>
+    /// 服务提供者（可选，Tool/ToolHook 可按需解析 Agent 级扩展服务）。
+    /// 该 Provider 不提供 Scoped 生命周期语义；仅应解析 Singleton 或 Transient 服务。
+    /// </summary>
     public IServiceProvider? Services { get; init; }
 }
 

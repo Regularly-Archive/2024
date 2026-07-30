@@ -7,6 +7,9 @@ namespace InsightaAI.Agent.Models;
 /// </summary>
 public enum AgentEventType
 {
+    /// <summary>Agent 已接收用户输入</summary>
+    UserPrompt,
+
     /// <summary>Agent 开始处理一次用户输入</summary>
     TurnStart,
 
@@ -43,6 +46,16 @@ public abstract record AgentEvent
     public abstract AgentEventType Type { get; }
     public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
     public required string AgentId { get; init; }
+}
+
+/// <summary>
+/// Agent 已接收用户输入。该事件用于 Hook 上下文，不会通过 Agent 的公开事件流转发。
+/// 用户消息内容作为 Hook 的瞬时参数传递，避免进入通用事件载荷。
+/// </summary>
+public sealed record AgentUserPromptEvent : AgentEvent
+{
+    public override AgentEventType Type => AgentEventType.UserPrompt;
+    public required string Input { get; init; }
 }
 
 /// <summary>

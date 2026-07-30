@@ -1,5 +1,6 @@
 ﻿using InsightaAI.Agent.Hooks;
 using InsightaAI.Agent.Memory;
+using InsightaAI.Agent.Models;
 using InsightaAI.LLM.Models;
 using InsightaAI.Tests.Shared;
 
@@ -49,17 +50,16 @@ public class SessionMemoryHookLlmTests : IDisposable
                 SummaryInterval = TimeSpan.Zero
             }, summaryService: CreateSummaryService(llmClient));
 
-        var hookContext = new AgentEventHookContext { SessionId = sessionId };
         var messages = new List<Message> { Message.FromUser("test message") };
 
         // Round 1, 2: 不应触发 LLM
-        await hook.OnAgentRoundEndedAsync(hookContext, 1, messages, null);
+        await hook.OnAgentRoundEndedAsync(CreateRoundEndContext(sessionId, 1), messages, null);
         await Task.Delay(300);
-        await hook.OnAgentRoundEndedAsync(hookContext, 2, messages, null);
+        await hook.OnAgentRoundEndedAsync(CreateRoundEndContext(sessionId, 2), messages, null);
         await Task.Delay(300);
 
         // Round 3: 应触发 LLM
-        await hook.OnAgentRoundEndedAsync(hookContext, 3, messages, null);
+        await hook.OnAgentRoundEndedAsync(CreateRoundEndContext(sessionId, 3), messages, null);
         await Task.Delay(500);
         var mem3 = await hook.GetSessionMemoryAsync();
 
@@ -90,10 +90,9 @@ public class SessionMemoryHookLlmTests : IDisposable
                 SummaryInterval = TimeSpan.Zero
             }, summaryService: CreateSummaryService(llmClient));
 
-        var hookContext = new AgentEventHookContext { SessionId = sessionId };
         var messages = new List<Message> { Message.FromUser("implement session memory") };
 
-        await hook.OnAgentRoundEndedAsync(hookContext, 1, messages, null);
+        await hook.OnAgentRoundEndedAsync(CreateRoundEndContext(sessionId, 1), messages, null);
         await Task.Delay(500);
 
         var memory = await hook.GetSessionMemoryAsync();
@@ -118,15 +117,14 @@ public class SessionMemoryHookLlmTests : IDisposable
                 SummaryInterval = TimeSpan.Zero
             }, summaryService: CreateSummaryService(llmClient));
 
-        var hookContext = new AgentEventHookContext { SessionId = sessionId };
         var messages = new List<Message> { Message.FromUser("first round") };
 
         // Round 1
-        await hook.OnAgentRoundEndedAsync(hookContext, 1, messages, null);
+        await hook.OnAgentRoundEndedAsync(CreateRoundEndContext(sessionId, 1), messages, null);
         await Task.Delay(500);
 
         // Round 2: MockLlmClient 返回 secondResponse
-        await hook.OnAgentRoundEndedAsync(hookContext, 2, messages, null);
+        await hook.OnAgentRoundEndedAsync(CreateRoundEndContext(sessionId, 2), messages, null);
         await Task.Delay(500);
         var mem2 = await hook.GetSessionMemoryAsync();
 
@@ -147,10 +145,9 @@ public class SessionMemoryHookLlmTests : IDisposable
                 SummaryInterval = TimeSpan.Zero
             }, summaryService: CreateSummaryService(llmClient));
 
-        var hookContext = new AgentEventHookContext { SessionId = sessionId };
         var messages = new List<Message> { Message.FromUser("test message") };
 
-        await hook.OnAgentRoundEndedAsync(hookContext, 1, messages, null);
+        await hook.OnAgentRoundEndedAsync(CreateRoundEndContext(sessionId, 1), messages, null);
         await Task.Delay(500);
 
         var memory = await hook.GetSessionMemoryAsync();
@@ -171,10 +168,9 @@ public class SessionMemoryHookLlmTests : IDisposable
                 SummaryInterval = TimeSpan.Zero
             });
 
-        var hookContext = new AgentEventHookContext { SessionId = sessionId };
         var messages = new List<Message> { Message.FromUser("test message") };
 
-        await hook.OnAgentRoundEndedAsync(hookContext, 1, messages, null);
+        await hook.OnAgentRoundEndedAsync(CreateRoundEndContext(sessionId, 1), messages, null);
         await Task.Delay(500);
 
         var memory = await hook.GetSessionMemoryAsync();
@@ -198,14 +194,12 @@ public class SessionMemoryHookLlmTests : IDisposable
                 SummaryInterval = TimeSpan.Zero
             }, summaryService: CreateSummaryService(llmClient));
 
-        var hookContext = new AgentEventHookContext { SessionId = sessionId };
-
         var msgs1 = new List<Message> { Message.FromUser("build an agent") };
-        await hook.OnAgentRoundEndedAsync(hookContext, 1, msgs1, null);
+        await hook.OnAgentRoundEndedAsync(CreateRoundEndContext(sessionId, 1), msgs1, null);
         await Task.Delay(500);
 
         var msgs2 = new List<Message> { Message.FromUser("I started working on it") };
-        await hook.OnAgentRoundEndedAsync(hookContext, 2, msgs2, null);
+        await hook.OnAgentRoundEndedAsync(CreateRoundEndContext(sessionId, 2), msgs2, null);
         await Task.Delay(500);
 
         var finalMemory = await hook.GetSessionMemoryAsync();
@@ -220,10 +214,8 @@ public class SessionMemoryHookLlmTests : IDisposable
         var sessionId = $"no-llm-{Guid.NewGuid():N}";
         var hook = new SessionMemoryHook(sessionId, TestUserId,
             options: new SessionMemoryOptions { EnableLlmSummary = false });
-        var hookContext = new AgentEventHookContext { SessionId = sessionId };
-
         var messages = new List<Message> { Message.FromUser("test message") };
-        await hook.OnAgentRoundEndedAsync(hookContext, 1, messages, null);
+        await hook.OnAgentRoundEndedAsync(CreateRoundEndContext(sessionId, 1), messages, null);
         await Task.Delay(300);
 
         var memory = await hook.GetSessionMemoryAsync();
@@ -238,4 +230,11 @@ public class SessionMemoryHookLlmTests : IDisposable
                 Model = "mock/test-model",
                 ClientFactory = _ => client
             });
+
+    private static AgentEventHookContext CreateRoundEndContext(string sessionId, int round) =>
+        AgentEventHookContext.Create(sessionId, new AgentRoundEndEvent
+        {
+            AgentId = "test-agent",
+            Round = round
+        });
 }

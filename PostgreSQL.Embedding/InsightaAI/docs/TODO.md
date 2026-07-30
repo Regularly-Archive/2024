@@ -341,7 +341,8 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 - [x] `list_skills` 工具供 Agent 运行时查询可用技能
 
 **待处理：**
-- [ ] `AgentEventHookContext.Event` 改为不可变事件快照，消除共享可变 Context 在 fire-and-forget Hook 中的竞态
+- [x] `AgentEventHookContext.Event` 改为不可变事件快照，消除共享可变 Context 在 fire-and-forget Hook 中的竞态
+- [x] 新增 `IUserPromptEventHook`：用户消息接收后的 fire-and-forget 观察点，记录用户输入日志；合规拦截留待独立的可等待接口
 - [ ] 设计并接入 `AgentErrorEvent` 异常生命周期，明确 Failed、Cancelled、Recoverable 和是否重新抛出
 - [ ] 真正的 Chat Session 创建、归档、删除事件由会话存储或应用层负责，不放入 `AgentLoop`
 
@@ -369,6 +370,7 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 - 2026-07-22: 统一 Agent Turn/Round 生命周期术语，调整 RoundEnd 与工具调用顺序，记录 Hook 与 ErrorEvent 后续工作
 - 2026-07-23: 完成 CLI 全命令国际化（ChatCommand + ChatRenderer + EventRenderer，41 处硬编码字符串提取到 resx）
 - 2026-07-23: Hook 调度统一（fire-and-forget、yield 前触发、SafeInvokeHookAsync）、ILogger 注入、Serilog 文件日志、LogEvent 事件日志、list_skills 工具
+- 2026-07-30: AgentEventHookContext 改为私有构造 + Create 的不可变事件快照；Round Hook 对齐为从事件读取轮次并接收消息快照；新增 IUserPromptEventHook 和用户输入事件日志
 - 2026-07-27: 改进 Bash 大输出处理、补充 Bash 输出测试、CLI 升级到 `1.0.0-alpha.2`
 - 2026-07-27: 改进 Skill 发现/激活提示、`list_skills` 工具描述和全局工具安装脚本
 - 2026-07-28: 核对 TODO 与代码现状；Agent IDisposable 已完成，Telemetry 安全索引和 MCP tag 清理仍待处理

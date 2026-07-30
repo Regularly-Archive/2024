@@ -17,6 +17,10 @@ namespace InsightaAI.Agent;
 ///
 /// 负责收集 Agent 配置和依赖，并在 Build 时创建只属于当前 Agent 的
 /// ServiceProvider。Agent 会在释放时一并释放该 ServiceProvider。
+///
+/// 生命周期约定：此容器是 Agent 级容器，而不是应用程序 Host 容器的子作用域。
+/// ConfigureServices 注册的 Singleton 在当前 Agent 内共享，Transient 在每次解析时创建。
+/// 当前不提供 Scoped 生命周期语义；不要注册或从 Tool/Hook 上下文解析 Scoped 服务。
 /// </summary>
 public sealed class AgentBuilder
 {
@@ -110,7 +114,10 @@ public sealed class AgentBuilder
     }
 
     /// <summary>
-    /// 注册当前 Agent 可访问的服务。
+    /// 注册当前 Agent 可访问的扩展服务。
+    ///
+    /// 仅支持 Singleton 和 Transient。此方法创建的容器没有 Turn 或 Tool 级作用域；
+    /// 注册 Scoped 服务会产生不符合预期的生命周期，尤其不适合 DbContext 等资源。
     /// </summary>
     public AgentBuilder ConfigureServices(Action<IServiceCollection> configure)
     {
