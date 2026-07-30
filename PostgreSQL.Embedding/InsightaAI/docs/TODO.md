@@ -343,7 +343,8 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 **待处理：**
 - [x] `AgentEventHookContext.Event` 改为不可变事件快照，消除共享可变 Context 在 fire-and-forget Hook 中的竞态
 - [x] 新增 `IUserPromptEventHook`：用户消息接收后的 fire-and-forget 观察点，记录用户输入日志；合规拦截留待独立的可等待接口
-- [ ] 设计并接入 `AgentErrorEvent` 异常生命周期，明确 Failed、Cancelled、Recoverable 和是否重新抛出
+- [x] 接入 `AgentErrorEvent` 异常生命周期：LLM `ErrorEvent` 唯一映射为 Agent 级错误事件，不再透传；触发错误 Hook 与日志后以 `Failed` TurnEnd 收束，且不写入空助手消息
+- [ ] 明确取消/中止场景（`DoneReason.Aborted`、`OperationCanceledException`）的 Agent 事件契约
 - [ ] 真正的 Chat Session 创建、归档、删除事件由会话存储或应用层负责，不放入 `AgentLoop`
 
 ---

@@ -75,8 +75,8 @@ public sealed record AgentResult
     /// <summary>执行状态</summary>
     public required AgentStatus Status { get; init; }
 
-    /// <summary>最终消息</summary>
-    public required Message Message { get; init; }
+    /// <summary>最终助手消息；失败或取消时为空。</summary>
+    public Message? Message { get; init; }
 
     /// <summary>Token 用量</summary>
     public TokenUsage? Usage { get; init; }

@@ -55,4 +55,8 @@ public interface IAgentEventHook
         AgentEventHookContext context,
         IReadOnlyList<Message> messages,
         CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    Task OnAgentErrorAsync(
+        AgentEventHookContext context,
+        CancellationToken cancellationToken = default) => Task.CompletedTask;
 }

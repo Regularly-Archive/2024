@@ -108,9 +108,17 @@ public sealed class AgentLoop
 
             // 调用 LLM 并转发流事件
             var llmStream = _llmClient.Streaming(request);
+            ErrorEvent? llmError = null;
 
             await foreach (var streamEvent in llmStream.WithCancellation(cancellationToken))
             {
+                if (streamEvent is ErrorEvent errorEvent)
+                {
+                    llmError = errorEvent;
+                    yield return CreateAgentErrorEvent(errorEvent);
+                    continue;
+                }
+
                 yield return new AgentLlmStreamEvent
                 {
                     AgentId = _config.Id,
@@ -120,6 +128,17 @@ public sealed class AgentLoop
 
             // 获取最终响应
             var response = await llmStream.GetResponseAsync(cancellationToken);
+
+            if (llmError != null || response.FinishReason == DoneReason.Error)
+            {
+                stopwatch.Stop();
+                var error = llmError ?? CreateFallbackError();
+                if (llmError == null)
+                    yield return CreateAgentErrorEvent(error);
+
+                yield return CreateFailedTurnEndEvent(context, totalUsage, stopwatch, round, error.Error.Message);
+                yield break;
+            }
 
             // 累计 token 用量
             if (response.Usage != null)
@@ -243,8 +262,16 @@ public sealed class AgentLoop
         };
 
         var finalStream = _llmClient.Streaming(finalRequest);
+        ErrorEvent? finalError = null;
         await foreach (var streamEvent in finalStream.WithCancellation(cancellationToken))
         {
+            if (streamEvent is ErrorEvent errorEvent)
+            {
+                finalError = errorEvent;
+                yield return CreateAgentErrorEvent(errorEvent);
+                continue;
+            }
+
             yield return new AgentLlmStreamEvent
             {
                 AgentId = _config.Id,
@@ -253,6 +280,18 @@ public sealed class AgentLoop
         }
 
         var finalResponse = await finalStream.GetResponseAsync(cancellationToken);
+
+        if (finalError != null || finalResponse.FinishReason == DoneReason.Error)
+        {
+            stopwatch.Stop();
+            var error = finalError ?? CreateFallbackError();
+            if (finalError == null)
+                yield return CreateAgentErrorEvent(error);
+
+            yield return CreateFailedTurnEndEvent(context, totalUsage, stopwatch,
+                _config.MaxToolRounds, error.Error.Message);
+            yield break;
+        }
 
         // 累计 token 用量
         if (finalResponse.Usage != null)
@@ -295,6 +334,36 @@ public sealed class AgentLoop
     /// <summary>
     /// 去重工具调用：LLM 可能生成多个名称和参数完全相同的工具调用
     /// </summary>
+    private AgentErrorEvent CreateAgentErrorEvent(ErrorEvent errorEvent) => new()
+    {
+        AgentId = _config.Id,
+        ErrorMessage = errorEvent.Error.Message,
+        Recoverable = errorEvent.Recoverable
+    };
+
+    private static ErrorEvent CreateFallbackError() => new()
+    {
+        Error = new InvalidOperationException("LLM stream completed with an error."),
+        Recoverable = false
+    };
+
+    private static AgentTurnEndEvent CreateFailedTurnEndEvent(
+        ILoopContext context, TokenUsage usage, Stopwatch stopwatch, int round, string error) => new()
+    {
+        AgentId = context.AgentId,
+        Result = new AgentResult
+        {
+            Status = AgentStatus.Failed,
+            Error = error,
+            Usage = usage,
+            Rounds = round,
+            DurationMs = stopwatch.ElapsedMilliseconds,
+            EstimatedContextTokens = context.EstimateTokens(),
+            MaxContextTokens = context.MaxContextTokens,
+            AvailableInputTokens = context.AvailableInputTokens
+        }
+    };
+
     internal static ToolCallBlock[] DeduplicateToolCalls(ToolCallBlock[] toolCalls)
     {
         if (toolCalls.Length <= 1) return toolCalls;

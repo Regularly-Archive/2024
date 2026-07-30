@@ -401,6 +401,15 @@ public class Agent : IDisposable
         return AgentEventHookContext.Create(sessionId, @event, _serviceProvider);
     }
 
+    private void TriggerErrorHooks(AgentEventHookContext context, CancellationToken cancellationToken)
+    {
+        foreach (var hook in _agentHooks)
+        {
+            _ = SafeInvokeHookAsync(() => hook.OnAgentErrorAsync(context, cancellationToken),
+                $"Error hook '{hook.Id}'");
+        }
+    }
+
     /// <summary>
     /// 触发 Agent Turn 结束钩子（fire-and-forget，不阻塞 Agent 主循环）
     /// </summary>
@@ -644,6 +653,10 @@ public class Agent : IDisposable
                     }
                     break;
 
+                case AgentErrorEvent errorEvent:
+                    TriggerErrorHooks(CreateHookContext(sessionId, errorEvent), cancellationToken);
+                    break;
+
                 case AgentRoundEndEvent roundEndEvt:
                     var lastAssistantMessage = loopContext.Messages
                         .LastOrDefault(m => m.Role == MessageRole.Assistant);
@@ -748,7 +761,6 @@ public class Agent : IDisposable
         return result ?? new AgentResult
         {
             Status = AgentStatus.Failed,
-            Message = Message.FromAssistant("Agent execution failed."),
             Error = "No completion event received."
         };
     }

@@ -38,6 +38,12 @@ public class EventRenderer : IDisposable
                 await HandleStreamEventAsync(llmEvent.StreamEvent);
                 break;
 
+            case AgentErrorEvent errorEvent:
+                await StopThinkingAsync();
+                AnsiConsole.MarkupLine($"[red]●[/] [dim][/]");
+                AnsiConsole.MarkupLine($"[red]⎿ {EscapeMarkup(errorEvent.ErrorMessage)}[/]");
+                break;
+
             case AgentToolStartEvent toolStart:
                 await HandleToolStartAsync(toolStart);
                 break;
@@ -96,11 +102,6 @@ public class EventRenderer : IDisposable
             case TextEndEvent textEnd:
                 await StopThinkingAsync();
                 break;
-            case ErrorEvent errorEvent:
-                AnsiConsole.MarkupLine($"[red]●[/] [dim][/]");
-                AnsiConsole.MarkupLine($"[red]⎿ {EscapeMarkup(errorEvent.Error.Message)}[/]");
-                break;
-
         }
     }
 

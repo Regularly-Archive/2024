@@ -67,6 +67,7 @@ TraditionalCompactThreshold: 80%
 - `IToolHook` — 工具执行前后拦截（权限控制、日志）
 - `IAgentEventHook` — Agent 生命周期观察（Turn/Round Start/End，记忆抽取、Telemetry）
 - `IUserPromptEventHook` — 用户消息已接收后的异步观察（审计、标题、指标）；不可修改、拒绝或阻塞输入
+- LLM `ErrorEvent` 只映射为 `AgentErrorEvent`，不再作为 `AgentLlmStreamEvent` 透传；CLI、Hook 与日志统一消费该 Agent 级事件，随后以无助手消息的 `Failed` `AgentTurnEndEvent` 收束本轮
 - 四个 Trigger 方法统一为 fire-and-forget 并行调度，通过 `SafeInvokeHookAsync` 处理异常（仅日志，不上报前台）
 - Hook 触发在 `yield return` 之前执行，确保消费者提前退出时不丢失关键工作
 - `AgentEventHookContext` 仅能由 `Create()` 创建，持有不可变事件快照；Round Hook 的轮次统一从 `context.GetEvent<TEvent>()` 读取
@@ -210,7 +211,7 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 
 5. **Telemetry 防御性（部分完成）** — 指标命名和 Tool telemetry 标签已调整；`CurrentRoundContext` 仍有直接字典索引，需要改为安全读取。
 
-6. **Hook 生命周期整理（部分完成）** — 调度统一、日志注入、不可变事件快照和用户输入后置 Hook 已完成；剩余：`AgentErrorEvent` 接入。
+6. **Hook 生命周期整理（部分完成）** — 调度统一、日志注入、不可变事件快照、用户输入后置 Hook 与 `AgentErrorEvent` 接入已完成；剩余：取消/中止场景的事件契约细化。
 
 7. **日志 Token 用量为 0** — 部分模型（如 `glm-5.2`）在 streaming 模式下不返回 Usage，日志中 `inputTokens=0` 无法区分"未返回"和"真 0"。
 
@@ -229,7 +230,7 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 - [x] AgentBuilder 默认注册 `ToolRegistry`，并通过 `ConfigureServices()` 创建 Agent 专属 ServiceProvider
 - [x] `AgentEventHookContext.Event` 改不可变事件快照
 - [x] `IUserPromptEventHook`（用户消息接收后的异步观察与日志）
-- [ ] `AgentErrorEvent` 接入 AgentLoop
+- [x] `AgentErrorEvent` 接入 AgentLoop（LLM `ErrorEvent` 唯一映射，失败 TurnEnd 不写入空助手消息）
 - [ ] L3 Orchestrator 继续开发
 - [ ] MCP Telemetry Tag 命名清理（`mcp.server.description`→`mcp.config.description`，去重 transport）
 - [x] CLI 配置 Bootstrap/Runtime 分离与环境变量优先级统一（启动时序测试待补充）
