@@ -110,7 +110,7 @@ public sealed class AgentFactory : IAgentFactory
 
     private static IMemoryManager CreateMemoryManager()
     {
-        return new MemoryManager(new FileMemoryProvider());
+        return new MemoryManager(new SqliteMemoryProvider());
     }
 
     private static IContextManager CreateContextManager(

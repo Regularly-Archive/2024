@@ -45,6 +45,11 @@ public interface IMemoryProvider
     Task DeleteMemoryAsync(string id, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 记录记忆被实际使用。搜索候选本身不应调用此方法。
+    /// </summary>
+    Task TouchMemoryAsync(string id, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 获取 MEMORY.md 索引内容（用于注入 System Prompt）
     /// </summary>
     Task<string> GetMemoryIndexAsync(

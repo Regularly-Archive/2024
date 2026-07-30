@@ -99,7 +99,7 @@ public sealed class FileMemoryProvider : IMemoryProvider
         if (File.Exists(privatePath))
         {
             var content = await File.ReadAllTextAsync(privatePath, cancellationToken);
-            return ParseMarkdownToMemory(content, memoryId, userId, MemoryScope.Private);
+            return MemoryMarkdownSerializer.Parse(content, memoryId, userId, MemoryScope.Private);
         }
 
         // 再查团队记忆
@@ -109,7 +109,7 @@ public sealed class FileMemoryProvider : IMemoryProvider
             if (File.Exists(teamPath))
             {
                 var content = await File.ReadAllTextAsync(teamPath, cancellationToken);
-                return ParseMarkdownToMemory(content, memoryId, projectId, MemoryScope.Team);
+                return MemoryMarkdownSerializer.Parse(content, memoryId, projectId, MemoryScope.Team);
             }
         }
 
@@ -123,7 +123,7 @@ public sealed class FileMemoryProvider : IMemoryProvider
 
         // 保存记忆文件
         var filePath = Path.Combine(memoriesDir, $"{entry.Id}.md");
-        var content = FormatMemoryAsMarkdown(entry);
+        var content = MemoryMarkdownSerializer.Format(entry);
         await File.WriteAllTextAsync(filePath, content, cancellationToken);
 
         // 更新 MEMORY.md 索引
@@ -145,7 +145,7 @@ public sealed class FileMemoryProvider : IMemoryProvider
                 {
                     var content = await File.ReadAllTextAsync(filePath, cancellationToken);
                     var scope = Path.GetFileName(scopeDir) == "team" ? MemoryScope.Team : MemoryScope.Private;
-                    return ParseMarkdownToMemory(content, id, Path.GetFileName(userDir), scope);
+                    return MemoryMarkdownSerializer.Parse(content, id, Path.GetFileName(userDir), scope);
                 }
             }
         }
@@ -417,7 +417,7 @@ public sealed class FileMemoryProvider : IMemoryProvider
             {
                 var content = await File.ReadAllTextAsync(file, cancellationToken);
                 var id = Path.GetFileNameWithoutExtension(file);
-                var memory = ParseMarkdownToMemory(content, id, ownerOrProject, scope);
+                var memory = MemoryMarkdownSerializer.Parse(content, id, ownerOrProject, scope);
                 if (memory != null)
                 {
                     memories.Add(memory);
@@ -444,119 +444,6 @@ public sealed class FileMemoryProvider : IMemoryProvider
         }
 
         return true;
-    }
-
-    private static string FormatMemoryAsMarkdown(MemoryEntry entry)
-    {
-        var tags = string.Join(", ", entry.Tags);
-        var scope = entry.Scope.ToString().ToLowerInvariant();
-        var project = entry.Project ?? "";
-        var lastAccessed = entry.LastAccessedAt.HasValue ? entry.LastAccessedAt.Value.ToString("O") : "";
-
-        return $@"---
-name: {entry.Name}
-description: {entry.Description}
-type: {entry.Type.ToString().ToLowerInvariant()}
-scope: {scope}
-project: {project}
-tags: [{tags}]
-source: {entry.Source}
-created: {entry.CreatedAt:O}
-updated: {entry.UpdatedAt:O}
-last_accessed: {lastAccessed}
-access_count: {entry.AccessCount}
----
-
-{entry.Content}";
-    }
-
-    private static MemoryEntry? ParseMarkdownToMemory(string content, string id, string ownerOrProject, MemoryScope scope)
-    {
-        // 解析 YAML frontmatter
-        var match = Regex.Match(content, @"^---\s*\n(.*?)\n---\s*\n(.*)$",
-            RegexOptions.Singleline);
-
-        if (!match.Success)
-            return null;
-
-        var frontmatter = match.Groups[1].Value;
-        var body = match.Groups[2].Value.Trim();
-
-        var entry = new MemoryEntry
-        {
-            Id = id,
-            Content = body,
-            Scope = scope
-        };
-
-        // 设置 userId 或 project
-        if (scope == MemoryScope.Team)
-        {
-            entry.Project = ownerOrProject;
-        }
-        else
-        {
-            entry.UserId = ownerOrProject;
-        }
-
-        // 解析 frontmatter 字段
-        foreach (var line in frontmatter.Split('\n'))
-        {
-            var colonIndex = line.IndexOf(':');
-            if (colonIndex <= 0) continue;
-
-            var key = line[..colonIndex].Trim();
-            var value = line[(colonIndex + 1)..].Trim();
-
-            switch (key)
-            {
-                case "name":
-                    entry.Name = value;
-                    break;
-                case "description":
-                    entry.Description = value;
-                    break;
-                case "type":
-                    if (Enum.TryParse<MemoryType>(value, true, out var type))
-                        entry.Type = type;
-                    break;
-                case "scope":
-                    if (Enum.TryParse<MemoryScope>(value, true, out var scopeVal))
-                        entry.Scope = scopeVal;
-                    break;
-                case "project":
-                    if (!string.IsNullOrEmpty(value))
-                        entry.Project = value;
-                    break;
-                case "tags":
-                    entry.Tags = value.Trim('[', ']')
-                        .Split(',', StringSplitOptions.RemoveEmptyEntries)
-                        .Select(t => t.Trim())
-                        .ToList();
-                    break;
-                case "source":
-                    entry.Source = value;
-                    break;
-                case "created":
-                    if (DateTime.TryParse(value, out var created))
-                        entry.CreatedAt = created;
-                    break;
-                case "updated":
-                    if (DateTime.TryParse(value, out var updated))
-                        entry.UpdatedAt = updated;
-                    break;
-                case "last_accessed":
-                    if (DateTime.TryParse(value, out var lastAccessed))
-                        entry.LastAccessedAt = lastAccessed;
-                    break;
-                case "access_count":
-                    if (int.TryParse(value, out var count))
-                        entry.AccessCount = count;
-                    break;
-            }
-        }
-
-        return entry;
     }
 
     private static float CalculateRelevanceScore(MemoryEntry memory, string query)
