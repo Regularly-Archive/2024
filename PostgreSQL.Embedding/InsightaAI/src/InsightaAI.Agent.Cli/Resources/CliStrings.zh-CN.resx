@@ -545,7 +545,7 @@
     <value>[dim]● 任务已被用户取消 [/]</value>
   </data>
   <data name="ChatInterruptedHint" xml:space="preserve">
-    <value>[red]⎿ 已中断 [dim]· Insighta 应该改做什么？[/] [/]</value>
+    <value>[red]⎿ 已中断 [dim]· 请告诉 Insighta 你想怎么做？[/] [/]</value>
   </data>
   <data name="ChatThinkingInitial" xml:space="preserve">
     <value>思考中.</value>
