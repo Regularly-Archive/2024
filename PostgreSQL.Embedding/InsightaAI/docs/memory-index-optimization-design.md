@@ -90,7 +90,7 @@ FTS5 的默认 `unicode61` tokenizer 将连续的 Unicode 字符视为一个 tok
   ├─ FTS5 MATCH + BM25 召回 Top 20 候选
   ├─ 合入 pinned 记忆与短精确词匹配候选
   ├─ 基于相关性、固定性和访问历史重排
-  ├─ 在 MemoryTokenBudget 内构造 ActiveMemorySnapshot
+  ├─ 合并稳定 Core 记忆与任务相关候选，构造 ActiveMemorySnapshot
   ├─ 将快照注入本 Turn 的动态 System Prompt
   └─ 对进入快照的条目记录一次强访问
        │
@@ -132,7 +132,7 @@ finalScore =
 
 ### 6.3 预算与降级
 
-按排序依次加入快照，直到 `MemoryTokenBudget` 用尽。每条记忆在 Prompt 中使用长度受限的摘要（`Name`、`Description`、必要标签/来源），而非默认注入完整正文。无法放入快照的条目仍可通过 `search_memory` 找回。
+第一阶段不以 token 预算裁剪快照。每条记忆在 Prompt 中使用 `Name`、`Description` 和必要标签，而非默认注入完整正文；后续若需处理上下文压力，应由 Agent 的 Prompt 层根据实际模型预算决定，而不是由检索层决定。
 
 FTS 查询失败或无命中时，降级为：固定记忆 + 记忆数量统计 + `search_memory` 使用提示。不得回退到全文 `MEMORY.md` 注入。
 
@@ -164,9 +164,12 @@ FTS 查询失败或无命中时，降级为：固定记忆 + 记忆数量统计 
 ```csharp
 public sealed record ActiveMemorySnapshot(
     string TurnId,
-    IReadOnlyList<MemoryEntry> Entries,
-    int EstimatedTokens);
+    IReadOnlyList<MemoryEntry> CoreEntries,
+    IReadOnlyList<MemoryEntry> ActiveEntries,
+    string Index);
 ```
+
+当前实现已完成 Phase 2 的核心链路：`RunStreamAsync` 在收到用户输入后创建一次快照，后续 LLM Round 只复用该快照。快照中的条目以名称、描述和标签注入 Prompt，并在选入快照时记录一次访问。Pinned、访问历史重排和用户确认时间仍留待后续校准阶段。
 
 `MEMORY.md` 可以在迁移期继续作为面向用户的可读导出，但不再是运行时注入的数据源，也不能成为第二份可编辑事实源。
 
@@ -182,7 +185,7 @@ public sealed record ActiveMemorySnapshot(
 
 ### Phase 2：活跃快照
 
-1. 引入 `ActiveMemorySnapshot` 和 `MemoryTokenBudget`。
+1. 引入 `ActiveMemorySnapshot` 与显式 `Core` / `OnDemand` 激活策略。
 2. 在用户 Turn 起点召回、重排并冻结快照。
 3. 多轮工具调用复用快照；同 Turn 的强访问去重。
 4. 补充 `pinned` 和用户确认时间。

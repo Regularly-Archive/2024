@@ -304,6 +304,32 @@ public class MemoryManagerTests : IDisposable
         Assert.True(results.Count <= 3);
     }
 
+    [Fact]
+    public async Task CreateActiveMemorySnapshotAsync_SelectsAndTouchesEntriesOnce()
+    {
+        var memory = new MemoryEntry
+        {
+            Id = "active-snapshot",
+            UserId = TestUserId,
+            Name = "Snapshot retrieval",
+            Description = "Relevant to the active memory snapshot.",
+            Content = "active memory snapshot retrieval",
+            Type = MemoryType.Project,
+            Scope = MemoryScope.Private
+        };
+        await _provider.SaveMemoryAsync(memory);
+
+        var snapshot = await _manager.CreateActiveMemorySnapshotAsync(
+            TestUserId, "active memory snapshot", "turn-001");
+        var stored = await _provider.GetMemoryAsync(memory.Id);
+
+        Assert.Equal("turn-001", snapshot.TurnId);
+        Assert.Collection(snapshot.Entries, item => Assert.Equal(memory.Id, item.Id));
+        Assert.Empty(snapshot.CoreEntries);
+        Assert.NotNull(stored);
+        Assert.Equal(1, stored.AccessCount);
+    }
+
     #endregion
 
     #region User Context

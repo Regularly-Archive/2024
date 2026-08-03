@@ -22,6 +22,7 @@ public sealed class MemoryManager : IMemoryManager
         List<string>? tags = null,
         string? source = null,
         string? project = null,
+        MemoryActivation activation = MemoryActivation.OnDemand,
         CancellationToken cancellationToken = default)
     {
         // 检查是否应该保存（What NOT to Save）
@@ -74,7 +75,8 @@ public sealed class MemoryManager : IMemoryManager
             Scope = scope,
             Tags = resolvedTags,
             Source = source ?? "user_input",
-            Project = project
+            Project = project,
+            Activation = activation
         };
 
         await _provider.SaveMemoryAsync(entry, cancellationToken);
@@ -87,6 +89,7 @@ public sealed class MemoryManager : IMemoryManager
         string? content = null,
         MemoryType? type = null,
         List<string>? tags = null,
+        MemoryActivation? activation = null,
         CancellationToken cancellationToken = default)
     {
         // 获取现有记忆
@@ -119,6 +122,9 @@ public sealed class MemoryManager : IMemoryManager
         {
             existing.Tags = tags;
         }
+
+        if (activation.HasValue)
+            existing.Activation = activation.Value;
 
         existing.UpdatedAt = DateTime.UtcNow;
 
@@ -235,6 +241,46 @@ public sealed class MemoryManager : IMemoryManager
         CancellationToken cancellationToken = default)
     {
         await _provider.SaveUserProfileAsync(profile, cancellationToken);
+    }
+
+    public async Task<ActiveMemorySnapshot> CreateActiveMemorySnapshotAsync(
+        string userId,
+        string input,
+        string turnId,
+        string? projectId = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(userId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(input);
+        ArgumentException.ThrowIfNullOrWhiteSpace(turnId);
+        MemoryType? requestedType = IsUserIdentityQuery(input) ? MemoryType.User : null;
+        var coreEntries = await _provider.ListCoreMemoriesAsync(userId, cancellationToken);
+        var activeCandidates = await SearchRelevantMemoriesAsync(
+            userId, input, maxResults: 20, requestedType, projectId, cancellationToken);
+
+        var coreIds = coreEntries.Select(memory => memory.Id).ToHashSet(StringComparer.Ordinal);
+        var activeEntries = activeCandidates
+            .Where(memory => !coreIds.Contains(memory.Id))
+            .ToList();
+
+        // Core context is always present and therefore is not an access signal.
+        // Only a task-related retrieval is counted as automatic use.
+        foreach (var memory in activeEntries)
+            await _provider.TouchMemoryAsync(memory.Id, cancellationToken);
+
+        var index = await GetMemoryIndexAsync(userId, projectId, cancellationToken);
+        return new ActiveMemorySnapshot(turnId, coreEntries, activeEntries, index);
+    }
+
+    private static bool IsUserIdentityQuery(string input)
+    {
+        var normalized = input.Trim().ToLowerInvariant();
+        return normalized.Contains("我是谁", StringComparison.Ordinal) ||
+               normalized.Contains("我的信息", StringComparison.Ordinal) ||
+               normalized.Contains("我的身份", StringComparison.Ordinal) ||
+               normalized.Contains("用户身份", StringComparison.Ordinal) ||
+               normalized.Contains("who am i", StringComparison.Ordinal) ||
+               normalized.Contains("my profile", StringComparison.Ordinal);
     }
 
     #region Private Methods

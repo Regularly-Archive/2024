@@ -269,7 +269,9 @@ public class Agent : IDisposable
     /// <summary>
     /// 构建完整的 System Prompt（每轮发送前调用，保证反映最新的 Skills/MCP/Memory 状态）
     /// </summary>
-    private async Task<string> BuildSystemPromptAsync(CancellationToken cancellationToken = default)
+    private async Task<string> BuildSystemPromptAsync(
+        ActiveMemorySnapshot? memorySnapshot = null,
+        CancellationToken cancellationToken = default)
     {
         var allSkills = _skillRegistry != null
             ? await _skillRegistry.ListAllSkillsAsync(cancellationToken)
@@ -279,19 +281,7 @@ public class Agent : IDisposable
             ? await _mcpRegistry.ListAllServersAsync(cancellationToken)
             : null;
 
-        string? memoryIndex = null;
-        if (_memoryManager != null && !string.IsNullOrEmpty(_config.UserId))
-        {
-            try
-            {
-                memoryIndex = await _memoryManager.GetMemoryIndexAsync(
-                    _config.UserId, null, cancellationToken);
-            }
-            catch
-            {
-                // 记忆系统出错不应阻止对话
-            }
-        }
+        var memoryIndex = memorySnapshot is null ? null : FormatMemorySnapshot(memorySnapshot);
 
         return await Context.SystemPrompt.SystemPromptBuilder.BuildAsync(new Context.SystemPrompt.SystemPromptParams
         {
@@ -302,6 +292,36 @@ public class Agent : IDisposable
             McpServers = mcps,
             MemoryIndex = memoryIndex,
         });
+    }
+
+    /// <summary>Formats the frozen memory snapshot for the dynamic system prompt.</summary>
+    private static string? FormatMemorySnapshot(ActiveMemorySnapshot snapshot)
+    {
+        if (snapshot.Entries.Count == 0)
+            return snapshot.Index;
+
+        var sb = new System.Text.StringBuilder();
+        if (!string.IsNullOrWhiteSpace(snapshot.Index))
+            sb.AppendLine(snapshot.Index);
+
+        AppendMemories("Core memories:", snapshot.CoreEntries);
+        AppendMemories("Task-related memories for this turn:", snapshot.ActiveEntries);
+        return sb.ToString().TrimEnd();
+
+        void AppendMemories(string title, IReadOnlyList<MemoryEntry> memories)
+        {
+            if (memories.Count == 0)
+                return;
+
+            sb.AppendLine(title);
+            foreach (var memory in memories)
+            {
+                sb.Append($"- [{memory.Type}] {memory.Name}: {memory.Description}");
+                if (memory.Tags.Count > 0)
+                    sb.Append($" (tags: {string.Join(", ", memory.Tags)})");
+                sb.AppendLine();
+            }
+        }
     }
 
     /// <summary>
@@ -569,6 +589,19 @@ public class Agent : IDisposable
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var sessionId = context?.SessionId ?? Guid.NewGuid().ToString("N");
+        ActiveMemorySnapshot? memorySnapshot = null;
+        if (_memoryManager != null && !string.IsNullOrEmpty(_config.UserId))
+        {
+            try
+            {
+                memorySnapshot = await _memoryManager.CreateActiveMemorySnapshotAsync(
+                    _config.UserId, input, sessionId, cancellationToken: cancellationToken);
+            }
+            catch
+            {
+                // Memory retrieval must not prevent a conversation from starting.
+            }
+        }
         // 每次调用创建 AgentLoop，确保 sessionId 正确
         ToolCallHandler handler = async (request, ct) =>
         {
@@ -579,13 +612,14 @@ public class Agent : IDisposable
             handler = ToolCallHandlerProxyFactory(handler);
         var toolCallExecutor = new ToolCallExecutor(_config.Id, sessionId, handler, _serviceProvider);
         var llmClient = LlmClientProxyFactory != null ? LlmClientProxyFactory(_llmClient) : _llmClient;
-        var agentLoop = new AgentLoop(_config, llmClient, _toolRegistry, toolCallExecutor, cancellationToken => BuildSystemPromptAsync(cancellationToken));
+        var agentLoop = new AgentLoop(_config, llmClient, _toolRegistry, toolCallExecutor,
+            cancellationToken => BuildSystemPromptAsync(memorySnapshot, cancellationToken));
 
         // 构建 LoopContext（System Prompt + History + User Input）
         var loopContext = new LoopContext(sessionId, _config.Id, _contextManager);
 
         // 构建系统提示词（每轮 AgentLoop 内部会重建以反映 Skills 激活等动态状态）
-        var systemPrompt = await BuildSystemPromptAsync(cancellationToken);
+        var systemPrompt = await BuildSystemPromptAsync(memorySnapshot, cancellationToken);
         if (!string.IsNullOrEmpty(systemPrompt))
         {
             loopContext.AddMessage(Message.FromSystem(systemPrompt));

@@ -3,6 +3,7 @@ using InsightaAI.Agent.Models;
 using InsightaAI.Agent.Tools;
 using InsightaAI.LLM;
 using InsightaAI.Agent.Abstractions;
+using InsightaAI.Agent.Memory;
 using InsightaAI.LLM.Models;
 using InsightaAI.Tests.Shared;
 
@@ -189,6 +190,52 @@ public class AgentTests
         Assert.NotNull(result);
         Assert.Equal(AgentStatus.Completed, result.Status);
         Assert.Equal(2, result.Rounds);
+    }
+
+    [Fact]
+    public async Task Agent_Should_Reuse_ActiveMemorySnapshot_AcrossToolRounds()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"insighta-agent-memory-{Guid.NewGuid():N}");
+        try
+        {
+            var provider = new FileMemoryProvider(directory);
+            var manager = new MemoryManager(provider);
+            var memory = new MemoryEntry
+            {
+                Id = "active-memory",
+                UserId = "memory-user",
+                Name = "Time preference",
+                Description = "A remembered preference about time.",
+                Content = "time preference",
+                Type = MemoryType.User,
+                Scope = MemoryScope.Private
+            };
+            await provider.SaveMemoryAsync(memory);
+
+            var toolCall = new ToolCallBlock
+            {
+                Id = "call-1",
+                Name = "get_current_time",
+                Arguments = JsonSerializer.Deserialize<JsonElement>("{}")
+            };
+            var llmClient = new MockLlmClient(
+                firstResponseToolCalls: [toolCall], secondResponse: "Done.");
+            var registry = new ToolRegistry();
+            registry.Register(new GetCurrentTimeTool());
+            using var agent = new Agent(CreateConfig() with { UserId = "memory-user" }, llmClient, registry,
+                memoryManager: manager);
+
+            await agent.RunAsync("time preference");
+            var stored = await provider.GetMemoryAsync(memory.Id);
+
+            Assert.NotNull(stored);
+            Assert.Equal(1, stored.AccessCount);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
     }
 
     [Fact]

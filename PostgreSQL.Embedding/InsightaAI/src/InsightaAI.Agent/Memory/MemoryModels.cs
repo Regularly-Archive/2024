@@ -35,6 +35,17 @@ public enum MemoryScope
 }
 
 /// <summary>
+/// Controls whether a memory is always supplied as stable user context or is
+/// only available through task-related retrieval.
+/// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum MemoryActivation
+{
+    OnDemand,
+    Core
+}
+
+/// <summary>
 /// 记忆条目
 /// </summary>
 public class MemoryEntry
@@ -59,6 +70,9 @@ public class MemoryEntry
 
     [JsonPropertyName("scope")]
     public MemoryScope Scope { get; set; } = MemoryScope.Private;
+
+    [JsonPropertyName("activation")]
+    public MemoryActivation Activation { get; set; } = MemoryActivation.OnDemand;
 
     [JsonPropertyName("tags")]
     public List<string> Tags { get; set; } = [];
@@ -91,6 +105,18 @@ public class MemoryEntry
     /// <summary>MEMORY.md 中的索引行（不持久化）</summary>
     [JsonIgnore]
     public string? IndexLine { get; set; }
+}
+
+/// <summary>
+/// A stable projection of memories selected for one Agent turn.
+/// </summary>
+public sealed record ActiveMemorySnapshot(
+    string TurnId,
+    IReadOnlyList<MemoryEntry> CoreEntries,
+    IReadOnlyList<MemoryEntry> ActiveEntries,
+    string Index)
+{
+    public IReadOnlyList<MemoryEntry> Entries => CoreEntries.Concat(ActiveEntries).ToArray();
 }
 
 /// <summary>

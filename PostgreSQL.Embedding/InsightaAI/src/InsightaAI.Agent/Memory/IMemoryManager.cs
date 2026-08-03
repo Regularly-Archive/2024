@@ -15,6 +15,7 @@ public interface IMemoryManager
         List<string>? tags = null,
         string? source = null,
         string? project = null,
+        MemoryActivation activation = MemoryActivation.OnDemand,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -26,6 +27,7 @@ public interface IMemoryManager
         string? content = null,
         MemoryType? type = null,
         List<string>? tags = null,
+        MemoryActivation? activation = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -44,6 +46,14 @@ public interface IMemoryManager
         string context,
         int maxResults = 5,
         MemoryType? type = null,
+        string? projectId = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Creates the active-memory snapshot for one user turn.</summary>
+    Task<ActiveMemorySnapshot> CreateActiveMemorySnapshotAsync(
+        string userId,
+        string input,
+        string turnId,
         string? projectId = null,
         CancellationToken cancellationToken = default);
 

@@ -246,6 +246,20 @@ public sealed class FileMemoryProvider : IMemoryProvider
             .ToList();
     }
 
+    public async Task<List<MemoryEntry>> ListCoreMemoriesAsync(
+        string userId,
+        CancellationToken cancellationToken = default)
+    {
+        var memories = await LoadMemoriesFromDirectoryAsync(
+            Path.Combine(GetPrivateDirectory(userId), "memories"),
+            userId, MemoryScope.Private, cancellationToken);
+
+        return memories
+            .Where(memory => memory.Activation == MemoryActivation.Core)
+            .OrderByDescending(memory => memory.UpdatedAt)
+            .ToList();
+    }
+
     public async Task UpdateMemoryAsync(MemoryEntry entry, CancellationToken cancellationToken = default)
     {
         entry.UpdatedAt = DateTime.UtcNow;

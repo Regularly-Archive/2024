@@ -76,6 +76,12 @@ internal class SaveMemoryTool : ITool
                     {
                         type = "string",
                         description = "Associated project name (for team memories)."
+                    },
+                    activation = new
+                    {
+                        type = "string",
+                        @enum = new[] { "on_demand", "core" },
+                        description = "Use core only for explicit, stable preferences that should apply across tasks."
                     }
                 },
                 required = new[] { "content" }
@@ -110,8 +116,12 @@ internal class SaveMemoryTool : ITool
 
         arguments.TryGetString("project", out var project);
 
+        var activation = MemoryActivation.OnDemand;
+        if (arguments.TryGetString("activation", out var activationValue) && activationValue is not null)
+            Enum.TryParse<MemoryActivation>(activationValue.Replace("_", string.Empty), true, out activation);
+
         var entry = await _memoryManager.SaveMemoryAsync(
-            _userId, content, type, tags, "user_input", project, context.CancellationToken);
+            _userId, content, type, tags, "user_input", project, activation, context.CancellationToken);
 
         // 检查是否被过滤
         if (entry.Source == "filtered")
@@ -170,6 +180,12 @@ You can update the memory's content, type, or tags. At least one update field is
                     {
                         type = "string",
                         description = "New comma-separated tag list (optional)"
+                    },
+                    activation = new
+                    {
+                        type = "string",
+                        @enum = new[] { "on_demand", "core" },
+                        description = "Whether this memory is always included as core context."
                     }
                 },
                 required = new[] { "memory_id" }
@@ -205,13 +221,20 @@ You can update the memory's content, type, or tags. At least one update field is
         }
 
         // 至少需要一个更新字段
-        if (string.IsNullOrWhiteSpace(content) && !type.HasValue && tags == null)
+        MemoryActivation? activation = null;
+        if (arguments.TryGetString("activation", out var activationValue) && activationValue is not null &&
+            Enum.TryParse<MemoryActivation>(activationValue.Replace("_", string.Empty), true, out var parsedActivation))
+        {
+            activation = parsedActivation;
+        }
+
+        if (string.IsNullOrWhiteSpace(content) && !type.HasValue && tags == null && !activation.HasValue)
         {
             return ToolResult.FromError("At least one update field (content, type, or tags) is required.");
         }
 
         var success = await _memoryManager.UpdateMemoryAsync(
-            _userId, memoryId, content, type, tags, context.CancellationToken);
+            _userId, memoryId, content, type, tags, activation, context.CancellationToken);
 
         if (!success)
         {

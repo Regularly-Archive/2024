@@ -120,6 +120,43 @@ public sealed class SqliteMemoryProviderTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task CreateActiveMemorySnapshotAsync_UsesUserTypeForIdentityQuestions()
+    {
+        var memory = CreateMemory("user-profile", "User profile", "The user is Yuanpei.");
+        memory.Type = MemoryType.User;
+        await _provider.SaveMemoryAsync(memory);
+        var manager = new MemoryManager(_provider);
+
+        var snapshot = await manager.CreateActiveMemorySnapshotAsync(
+            "yuanpei", "Who am I?", "turn-identity");
+
+        Assert.Collection(snapshot.Entries, item => Assert.Equal(memory.Id, item.Id));
+        var stored = await _provider.GetMemoryAsync(memory.Id);
+        Assert.NotNull(stored);
+        Assert.Equal(1, stored.AccessCount);
+    }
+
+    [Fact]
+    public async Task CreateActiveMemorySnapshotAsync_IncludesCoreWithoutTouchingIt()
+    {
+        var core = CreateMemory("core-style", "Response style", "Use concise Chinese responses.");
+        core.Type = MemoryType.Feedback;
+        core.Activation = MemoryActivation.Core;
+        await _provider.SaveMemoryAsync(core);
+        var manager = new MemoryManager(_provider);
+
+        var snapshot = await manager.CreateActiveMemorySnapshotAsync(
+            "yuanpei", "unrelated task", "turn-core");
+
+        Assert.Collection(snapshot.CoreEntries, item => Assert.Equal(core.Id, item.Id));
+        Assert.Empty(snapshot.ActiveEntries);
+        var stored = await _provider.GetMemoryAsync(core.Id);
+        Assert.NotNull(stored);
+        Assert.Equal(MemoryActivation.Core, stored.Activation);
+        Assert.Equal(0, stored.AccessCount);
+    }
+
+    [Fact]
     public async Task TouchMemoryAsync_UpdatesAccessDataWithoutChangingContent()
     {
         var memory = CreateMemory("sqlite", "SQLite memory", "Remember the local SQLite database.");

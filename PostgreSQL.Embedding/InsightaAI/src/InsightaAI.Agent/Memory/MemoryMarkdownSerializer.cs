@@ -21,6 +21,7 @@ public static class MemoryMarkdownSerializer
             description: {entry.Description}
             type: {entry.Type.ToString().ToLowerInvariant()}
             scope: {scope}
+            activation: {entry.Activation.ToString().ToLowerInvariant()}
             project: {project}
             tags: [{tags}]
             source: {entry.Source}
@@ -66,6 +67,7 @@ public static class MemoryMarkdownSerializer
                 case "description": entry.Description = value; break;
                 case "type" when Enum.TryParse<MemoryType>(value, true, out var type): entry.Type = type; break;
                 case "scope" when Enum.TryParse<MemoryScope>(value, true, out var parsedScope): entry.Scope = parsedScope; break;
+                case "activation" when Enum.TryParse<MemoryActivation>(value, true, out var activation): entry.Activation = activation; break;
                 case "project" when !string.IsNullOrEmpty(value): entry.Project = value; break;
                 case "tags":
                     entry.Tags = value.Trim('[', ']')

@@ -34,6 +34,11 @@ public interface IMemoryProvider
         int take = 50,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Returns private memories explicitly promoted to stable core context.</summary>
+    Task<List<MemoryEntry>> ListCoreMemoriesAsync(
+        string userId,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// 更新记忆
     /// </summary>

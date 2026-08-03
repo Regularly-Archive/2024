@@ -54,10 +54,10 @@ public sealed class SqliteMemoryProvider : IMemoryProvider, IAsyncDisposable
         command.Transaction = transaction;
         command.CommandText = """
             INSERT INTO memory_entries (
-                id, user_id, name, description, content, type, scope, tags_json, source, project,
+                id, user_id, name, description, content, type, scope, activation, tags_json, source, project,
                 created_at, updated_at, last_accessed_at, access_count)
             VALUES (
-                $id, $userId, $name, $description, $content, $type, $scope, $tagsJson, $source, $project,
+                $id, $userId, $name, $description, $content, $type, $scope, $activation, $tagsJson, $source, $project,
                 $createdAt, $updatedAt, $lastAccessedAt, $accessCount)
             ON CONFLICT(id) DO UPDATE SET
                 user_id = excluded.user_id,
@@ -66,6 +66,7 @@ public sealed class SqliteMemoryProvider : IMemoryProvider, IAsyncDisposable
                 content = excluded.content,
                 type = excluded.type,
                 scope = excluded.scope,
+                activation = excluded.activation,
                 tags_json = excluded.tags_json,
                 source = excluded.source,
                 project = excluded.project,
@@ -220,6 +221,33 @@ public sealed class SqliteMemoryProvider : IMemoryProvider, IAsyncDisposable
         return results;
     }
 
+    public async Task<List<MemoryEntry>> ListCoreMemoriesAsync(
+        string userId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(userId);
+
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = $"""
+            SELECT {MemoryColumns}
+            FROM memory_entries m
+            WHERE m.user_id = $userId
+              AND m.scope = $scope
+              AND m.activation = $activation
+            ORDER BY m.updated_at DESC;
+            """;
+        command.Parameters.AddWithValue("$userId", userId);
+        command.Parameters.AddWithValue("$scope", MemoryScope.Private.ToString());
+        command.Parameters.AddWithValue("$activation", MemoryActivation.Core.ToString());
+
+        var results = new List<MemoryEntry>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            results.Add(ReadMemory(reader));
+        return results;
+    }
+
     public async Task UpdateMemoryAsync(MemoryEntry entry, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entry);
@@ -352,6 +380,7 @@ public sealed class SqliteMemoryProvider : IMemoryProvider, IAsyncDisposable
                     content TEXT NOT NULL,
                     type TEXT NOT NULL,
                     scope TEXT NOT NULL,
+                    activation TEXT NOT NULL DEFAULT 'OnDemand',
                     tags_json TEXT NOT NULL,
                     source TEXT NOT NULL,
                     project TEXT NULL,
@@ -382,6 +411,8 @@ public sealed class SqliteMemoryProvider : IMemoryProvider, IAsyncDisposable
                 );
                 """;
             await command.ExecuteNonQueryAsync(cancellationToken);
+            await EnsureColumnAsync(connection, "memory_entries", "activation",
+                "TEXT NOT NULL DEFAULT 'OnDemand'", cancellationToken);
             _initialized = true;
         }
         finally
@@ -407,6 +438,26 @@ public sealed class SqliteMemoryProvider : IMemoryProvider, IAsyncDisposable
             ("$description", entry.Description),
             ("$content", entry.Content),
             ("$tags", string.Join(' ', entry.Tags)));
+    }
+
+    private static async Task EnsureColumnAsync(
+        SqliteConnection connection,
+        string table,
+        string column,
+        string definition,
+        CancellationToken cancellationToken)
+    {
+        var check = connection.CreateCommand();
+        await using var disposableCheck = check;
+        check.CommandText = $"SELECT 1 FROM pragma_table_info('{table}') WHERE name = $column LIMIT 1;";
+        check.Parameters.AddWithValue("$column", column);
+        if (await check.ExecuteScalarAsync(cancellationToken) is not null)
+            return;
+
+        var alter = connection.CreateCommand();
+        await using var disposableAlter = alter;
+        alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definition};";
+        await alter.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task ExecuteAsync(
@@ -448,6 +499,7 @@ public sealed class SqliteMemoryProvider : IMemoryProvider, IAsyncDisposable
         command.Parameters.AddWithValue("$content", entry.Content);
         command.Parameters.AddWithValue("$type", entry.Type.ToString());
         command.Parameters.AddWithValue("$scope", entry.Scope.ToString());
+        command.Parameters.AddWithValue("$activation", entry.Activation.ToString());
         command.Parameters.AddWithValue("$tagsJson", JsonSerializer.Serialize(entry.Tags));
         command.Parameters.AddWithValue("$source", entry.Source);
         command.Parameters.AddWithValue("$project", entry.Project ?? (object)DBNull.Value);
@@ -468,6 +520,7 @@ public sealed class SqliteMemoryProvider : IMemoryProvider, IAsyncDisposable
             Content = reader.GetString(reader.GetOrdinal("content")),
             Type = Enum.Parse<MemoryType>(reader.GetString(reader.GetOrdinal("type"))),
             Scope = Enum.Parse<MemoryScope>(reader.GetString(reader.GetOrdinal("scope"))),
+            Activation = Enum.Parse<MemoryActivation>(reader.GetString(reader.GetOrdinal("activation"))),
             Tags = JsonSerializer.Deserialize<List<string>>(reader.GetString(reader.GetOrdinal("tags_json"))) ?? [],
             Source = reader.GetString(reader.GetOrdinal("source")),
             Project = reader.IsDBNull(reader.GetOrdinal("project")) ? null : reader.GetString(reader.GetOrdinal("project")),
@@ -518,7 +571,7 @@ public sealed class SqliteMemoryProvider : IMemoryProvider, IAsyncDisposable
     }
 
     private const string MemoryColumns = """
-        m.id, m.user_id, m.name, m.description, m.content, m.type, m.scope, m.tags_json,
+        m.id, m.user_id, m.name, m.description, m.content, m.type, m.scope, m.activation, m.tags_json,
         m.source, m.project, m.created_at, m.updated_at, m.last_accessed_at, m.access_count
         """;
 
