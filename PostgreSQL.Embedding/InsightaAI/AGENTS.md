@@ -132,6 +132,14 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 - `_activatedSkills` List<ISkill> 替代 `_skillInstructions` 字符串累加
 - `LoadAgentsMd()` 懒加载，仅读一次
 
+### Memory 索引与活跃快照（2026-08-04）
+
+- `SqliteMemoryProvider` 是运行时主存储，使用 SQLite FTS5 `trigram` 召回候选；`FileMemoryProvider` 保留作迁移和兼容实现。
+- `RunStreamAsync()` 在用户 Turn 开始时创建一次 `ActiveMemorySnapshot`，其中 `CoreEntries` 每轮常驻、`ActiveEntries` 按当前输入召回；同一 Turn 的所有 LLM Round 复用该不可变快照。
+- 访问统计是粗粒度信号：进入 `ActiveEntries` 和 `search_memory` 返回结果各记一次；Core 常驻注入不计数。排序以 FTS 词法相关性为主，并最多施加 10% 的访问频率和 5% 的近期访问修正。
+- 快照通过 `ActiveMemorySnapshot.FormatAsString()` 生成 Prompt 文本，避免 Agent 承担记忆展示逻辑；当名称只是描述的截断前缀时，仅保留完整描述以消除重复。
+- 后续重点是收紧自动注入的相关性门槛和候选证据覆盖，避免宽泛 trigram 命中把通用项目记忆带入当前任务。
+
 ### MCP 工具调用元数据管道（2026-07-21）
 
 - `ToolResult` 新增 `Metadata` 属性（`IReadOnlyDictionary<string,object?>?`）
@@ -203,7 +211,7 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 
 1. **MicroCompact 生命周期重构（已完成核心链路）** — 阈值调整为 45-65-80，工具结果按 Full → Preview → Placeholder → Removed 渐进降级；Artifact 与上下文表示分离。策略先在消息副本上试算，有实际收益才提交；自动压缩可按阈值级联，手动 `/compact auto` 按优先级提交第一个有效策略。
 
-2. **Memory 全量注入** — `GetMemoryIndexAsync` 返回全量 MEMORY.md 文本（80+ 条），改轻量为统计信息 + `search_memory` 工具按需检索。
+2. **Memory 轻量化索引（已完成核心链路）** — SQLite FTS5 已替代全量 `MEMORY.md` 注入；Core/OnDemand 活跃快照、访问统计和轻量重排已接入。剩余：收紧自动注入的相关性门槛与候选证据覆盖。
 
 3. **摘要服务统一（已完成）** — 全量摘要、增量摘要和会话标题已统一到 `SummaryService`；共享结构模板，并具备 MaxTokens 重试、完整性校验与标题 fallback。
 
@@ -226,7 +234,8 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 - [x] Agent 注入 `ILogger<Agent>` + Serilog 文件日志 + `LogEvent` 事件日志
 - [x] `list_skills` 工具（运行时技能发现）
 - [x] Agent 旧构造函数创建的 ServiceProvider 可通过 `IDisposable` 释放
-- [ ] Memory 轻量化索引
+- [x] Memory 轻量化索引（SQLite FTS5、Core/OnDemand 快照、访问统计与轻量重排）
+- [ ] Memory 自动注入相关性校准（阈值、候选证据覆盖与宽泛查询抑制）
 - [x] AgentBuilder 默认注册 `ToolRegistry`，并通过 `ConfigureServices()` 创建 Agent 专属 ServiceProvider
 - [x] `AgentEventHookContext.Event` 改不可变事件快照
 - [x] `IUserPromptEventHook`（用户消息接收后的异步观察与日志）

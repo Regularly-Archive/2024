@@ -189,6 +189,23 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 
 ## 功能特性
 
+### 6.4 Memory 轻量化索引（核心链路已完成）
+
+**已完成：**
+- [x] `SqliteMemoryProvider` 使用 SQLite FTS5 `trigram` 作为运行时记忆主存储，并提供 Markdown 历史迁移工具
+- [x] `ActiveMemorySnapshot` 将 `CoreEntries` 与按任务召回的 `ActiveEntries` 分离，并在一个用户 Turn 内复用
+- [x] `search_memory` 与自动活跃召回记录粗粒度 `AccessCount` / `LastAccessedAt`；Core 常驻注入不计数
+- [x] 排序以 FTS 词法相关性为主，频率和近期访问分别最多提供 10% 与 5% 的乘法修正
+- [x] 快照由 `FormatAsString()` 负责 Prompt 文本化，消除名称与摘要的截断重复
+
+**待处理：**
+- [ ] 校准自动注入门槛：区分宽泛 trigram 候选与真正任务相关的记忆，避免通用项目历史挤入快照
+- [ ] 记录召回候选、入选原因和被淘汰原因，作为后续阈值校准依据
+
+**设计文档：** [memory-index-optimization-design.md](memory-index-optimization-design.md)
+
+---
+
 ### 7. Tool Result Lifecycle v2（优先级：高）
 
 **问题描述：**
