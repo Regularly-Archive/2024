@@ -108,9 +108,11 @@ public sealed class AgentFactory : IAgentFactory
         return agent;
     }
 
-    private static IMemoryManager CreateMemoryManager()
+    private IMemoryManager CreateMemoryManager()
     {
-        return new MemoryManager(new SqliteMemoryProvider());
+        return new MemoryManager(
+            new SqliteMemoryProvider(),
+            _loggerFactory.CreateLogger<MemoryManager>());
     }
 
     private static IContextManager CreateContextManager(

@@ -1,5 +1,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace InsightaAI.Agent.Memory;
 
@@ -15,10 +17,12 @@ public sealed class MemoryManager : IMemoryManager
     private const double MinimumAutomaticQueryCoverage = 0.50d;
 
     private readonly IMemoryProvider _provider;
+    private readonly ILogger<MemoryManager> _logger;
 
-    public MemoryManager(IMemoryProvider provider)
+    public MemoryManager(IMemoryProvider provider, ILogger<MemoryManager>? logger = null)
     {
         _provider = provider ?? throw new ArgumentNullException(nameof(provider));
+        _logger = logger ?? NullLogger<MemoryManager>.Instance;
     }
 
     public async Task<MemoryEntry> SaveMemoryAsync(
@@ -278,10 +282,27 @@ public sealed class MemoryManager : IMemoryManager
             userId, input, maxResults: 20, requestedType, projectId, cancellationToken);
 
         var coreIds = coreEntries.Select(memory => memory.Id).ToHashSet(StringComparer.Ordinal);
-        var activeEntries = activeCandidates
-            .Where(memory => !coreIds.Contains(memory.Id))
-            .Where(memory => requestedType.HasValue || HasSufficientAutomaticEvidence(memory, input))
+        var queryTerms = ExtractQueryTerms(input);
+        var decisions = activeCandidates
+            .Select(memory => EvaluateAutomaticSelection(memory, coreIds, requestedType, queryTerms))
             .ToList();
+        var activeEntries = decisions
+            .Where(decision => decision.Selected)
+            .Select(decision => decision.Memory)
+            .ToList();
+
+        foreach (var decision in decisions)
+        {
+            _logger.LogDebug(
+                "Memory snapshot candidate {MemoryId} ({MemoryType}) {SelectionOutcome}: {SelectionReason}; " +
+                "matchedTerms={MatchedTerms}, queryTerms={QueryTerms}, coverage={Coverage:F2}",
+                decision.Memory.Id, decision.Memory.Type,
+                decision.Selected ? "selected" : "rejected", decision.Reason,
+                decision.MatchedTerms, decision.QueryTerms, decision.Coverage);
+        }
+        _logger.LogInformation(
+            "Memory snapshot created: core={CoreCount}, candidates={CandidateCount}, selected={SelectedCount}, queryTerms={QueryTerms}",
+            coreEntries.Count, activeCandidates.Count, activeEntries.Count, queryTerms.Count);
 
         // Core context is always present and therefore is not an access signal.
         // Only a task-related retrieval is counted as automatic use.
@@ -303,11 +324,20 @@ public sealed class MemoryManager : IMemoryManager
                normalized.Contains("my profile", StringComparison.Ordinal);
     }
 
-    private static bool HasSufficientAutomaticEvidence(MemoryEntry memory, string input)
+    private static MemorySelectionDecision EvaluateAutomaticSelection(
+        MemoryEntry memory,
+        ISet<string> coreIds,
+        MemoryType? requestedType,
+        IReadOnlyList<string> queryTerms)
     {
-        var queryTerms = ExtractQueryTerms(input);
+        if (coreIds.Contains(memory.Id))
+            return new(memory, false, "core_duplicate", 0, queryTerms.Count, 0);
+
+        if (requestedType.HasValue)
+            return new(memory, true, "explicit_type", 0, queryTerms.Count, 0);
+
         if (queryTerms.Count < MinimumAutomaticQueryTerms)
-            return false;
+            return new(memory, false, "short_query", 0, queryTerms.Count, 0);
 
         var searchableText = string.Concat(
             memory.Name,
@@ -318,8 +348,13 @@ public sealed class MemoryManager : IMemoryManager
             searchableText.Contains(term, StringComparison.OrdinalIgnoreCase));
         var coverage = (double)matchedTerms / queryTerms.Count;
 
-        return matchedTerms >= MinimumAutomaticMatchedTerms &&
-               coverage >= MinimumAutomaticQueryCoverage;
+        if (matchedTerms < MinimumAutomaticMatchedTerms)
+            return new(memory, false, "insufficient_matches", matchedTerms, queryTerms.Count, coverage);
+
+        if (coverage < MinimumAutomaticQueryCoverage)
+            return new(memory, false, "insufficient_coverage", matchedTerms, queryTerms.Count, coverage);
+
+        return new(memory, true, "sufficient_evidence", matchedTerms, queryTerms.Count, coverage);
     }
 
     private static List<string> ExtractQueryTerms(string input)
@@ -335,6 +370,14 @@ public sealed class MemoryManager : IMemoryManager
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
+
+    private sealed record MemorySelectionDecision(
+        MemoryEntry Memory,
+        bool Selected,
+        string Reason,
+        int MatchedTerms,
+        int QueryTerms,
+        double Coverage);
 
     private static float GetMemoryRank(MemoryEntry memory)
     {

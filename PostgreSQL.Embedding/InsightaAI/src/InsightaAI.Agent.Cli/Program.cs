@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
+using Serilog.Events;
 using System.CommandLine;
 using System.Text;
 
@@ -85,6 +86,7 @@ public class Program
 
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Information()
+            .MinimumLevel.Override("InsightaAI.Agent.Memory.MemoryManager", LogEventLevel.Debug)
             .WriteTo.File(
                 Path.Combine(logDir, ".log"),
                 rollingInterval: RollingInterval.Day,

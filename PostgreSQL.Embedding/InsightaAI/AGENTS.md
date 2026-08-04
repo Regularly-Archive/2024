@@ -112,7 +112,7 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 - `RunStreamAsync()` 在用户 Turn 开始时创建一次 `ActiveMemorySnapshot`，其中 `CoreEntries` 每轮常驻、`ActiveEntries` 按当前输入召回；同一 Turn 的所有 LLM Round 复用该不可变快照。
 - 访问统计是粗粒度信号：进入 `ActiveEntries` 和 `search_memory` 返回结果各记一次；Core 常驻注入不计数。排序以 FTS 词法相关性为主，并最多施加 10% 的访问频率和 5% 的近期访问修正。
 - 快照通过 `ActiveMemorySnapshot.FormatAsString()` 生成 Prompt 文本，避免 Agent 承担记忆展示逻辑；当名称只是描述的截断前缀时，仅保留完整描述以消除重复。
-- 自动注入的初始门槛已启用：输入至少 3 个 trigram，候选至少命中 2 个且覆盖 50% 查询片段；短而宽泛的输入只带 Core。后续重点是记录检索决策并基于真实会话校准这些初始值。
+- 自动注入的初始门槛已启用：输入至少 3 个 trigram，候选至少命中 2 个且覆盖 50% 查询片段；短而宽泛的输入只带 Core。`MemoryManager` 会将候选筛选原因（不含输入和正文）写入本地 Debug 日志，后续据此校准初始值。
 
 ### MCP 工具调用元数据管道（2026-07-21）
 
@@ -145,7 +145,7 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 
 ### 当前待办
 
-1. **Memory 自动注入校准** — 记录检索决策，并用真实会话调整初始覆盖门槛。
+1. **Memory 自动注入校准** — 用本地候选筛选日志和真实会话调整初始覆盖门槛。
 2. **Agent 生命周期** — 明确 Scoped 服务支持策略，并补充 CLI Bootstrap 启动时序测试。
 3. **Hook 事件契约** — 细化取消/中止场景（`DoneReason.Aborted`、`OperationCanceledException`）。
 4. **Telemetry** — 完成 MCP tag 命名清理，并消除 `CurrentRoundContext` 的不安全字典索引。

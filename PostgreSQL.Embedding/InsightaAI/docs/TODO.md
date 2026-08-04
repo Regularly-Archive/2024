@@ -198,10 +198,11 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 - [x] 排序以 FTS 词法相关性为主，频率和近期访问分别最多提供 10% 与 5% 的乘法修正
 - [x] 快照由 `FormatAsString()` 负责 Prompt 文本化，消除名称与摘要的截断重复
 - [x] 自动快照要求至少 3 个查询片段、2 个命中且 50% 覆盖；短而宽泛的输入允许只注入 Core
+- [x] `MemoryManager` 将候选的入选/淘汰原因、命中数与覆盖率写入本地 Debug 日志，不记录输入或记忆正文
 
 **待处理：**
 - [ ] 基于真实会话校准自动注入门槛，避免通用项目历史挤入快照
-- [ ] 记录召回候选、入选原因和被淘汰原因，作为后续阈值校准依据
+- [ ] 收紧身份查询的兜底策略：当前 `explicit_type` 会放行全部 `User` 候选；应改为依赖少量 Core 用户画像，普通 User 记忆仍按相关性筛选
 
 **设计文档：** [memory-index-optimization-design.md](memory-index-optimization-design.md)
 
@@ -369,7 +370,7 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 
 ## 当前优先级
 
-1. Memory 自动注入校准：补充候选、命中片段及入选/淘汰原因的诊断记录，并根据真实会话调整门槛。
+1. Memory 自动注入校准：基于已记录的候选与入选/淘汰原因，根据真实会话调整门槛与身份查询兜底策略。
 2. Agent 服务生命周期：明确 Singleton/Scoped 支持策略。
 3. CLI Bootstrap：补充语言、Telemetry、日志和 OTLP endpoint 的启动时序测试。
 4. Hook：明确取消/中止场景的 Agent 事件契约。
