@@ -81,32 +81,6 @@ TraditionalCompactThreshold: 80%
 - `Agent.LogEvent()` 记录 TurnStart/End、RoundStart/End、ToolStart/End、Error、ContextCompacted
 - 跳过 `AgentLlmStreamEvent`（避免日志爆炸）
 
-## 最近提交（2026-07-27）
-
-```
-33ca577 fix: improve bash tool output handling
-0fec542 fix: improve skill discovery and tool installation
-f92247c docs: update AGENTS.md and TODO.md for hook dispatch, ILogger and list_skills
-6fe63c2 refactor(agent): unify hook dispatch, add ILogger and list_skills tool
-f1f4bff feat(cli): introduce localization for config command and split config into subcommands
-5bb3c69 refactor(agent): implement 4-layer system prompt architecture with AGENTS.md support
-c321d78 fix: resolve naming inconsistencies in telemetry constants
-ce53a2b feat: add OpenTelemetry diagnostics; refactor orchestrator namespace
-0822f42 feat: show inline diff preview for edit_file in permission hook
-f806a75 refactor: extract AgentLoop and add auto message persistence
-```
-
-### 最近变更（2026-07-27）
-
-- `BashTool` 不再因输出超过 10,000 字符直接报错，改由 Tool Result Lifecycle 统一保存完整结果并生成头尾预览；补充 Bash 输出测试。
-- CLI 工具版本升级为 `1.0.0-alpha.2`。
-- 改进 Skill 发现、激活提示和 `list_skills`/`activate_skill` 工具描述。
-- `build-insighta.ps1` 负责本地打包并覆盖安装；`install-insighta.ps1` 从 NuGet 安装已发布版。两者均具备严格错误处理和运行中进程检测。
-- 新增 schema 驱动的 `ToolArgumentReader`，统一固定 schema 本地工具的未知参数、必填项、类型、字符串数组和 enum 校验；动态 MCP 工具保留原样透传。
-- `glob` / `grep` 已统一使用 `excludes: string[]`；Glob 默认排除 `bin`/`obj`/`node_modules`，可通过 `include_ignored: true` 取消，且支持 `?` 单字符通配。
-- QA 回归发现并修复整数参数跨工具解析、Glob `?` 通配和无 `server_name` 的 MCP 工具列表阻塞；`list_mcp_tools` 对单个服务采用 5 秒超时并保留其余服务结果。Agent 测试 250 个通过，Insighta 工具回归完成。
-- `AgentBuilder` 的专属 ServiceProvider 现在显式接收 CLI Host 的 `ILoggerFactory`；修复其降级为 `NullLogger` 导致 Agent 事件不落盘的问题。CLI 退出时调用 `Log.CloseAndFlush()`，并通过真实 CLI 会话验证 `~/.insighta/logs/20260729.log` 的 Turn/Round/Tool 事件完整写入。
-
 ## 最新架构变更
 
 ### 系统提示词四层架构（5bb3c69）
@@ -150,44 +124,6 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 
 **遗留：** MCP Telemetry Tag 命名优化仍未完成；当前代码仍需核对 `mcp.server.description` 与本地配置语义，见 TODO.md #12
 
-### 统一摘要服务与会话标题（2026-07-21）
-
-- 新增 `Context/Summary/ISummaryService` 与 `SummaryService`，统一承载三种轻量 LLM 场景：
-  - `SummarizeAsync` — 全量摘要，供 `TraditionalCompactStrategy` 使用
-  - `UpdateAsync` — 增量摘要，供 `SessionMemoryHook` 使用
-  - `GenerateTitleAsync` — 根据新会话首条用户消息生成短标题
-- `SummaryResult` 显式返回成功状态、`FinishReason`、尝试次数和错误，摘要失败时不再保存残缺内容
-- 全量/增量摘要统一使用 `summary-output-template.txt`，固定 Goal、Constraints、Progress、Key Decisions、Next Steps、Critical Context、Relevant Files 等章节
-- 摘要遇到 `DoneReason.MaxTokens` 时执行一次更激进的完整重生成；连续失败则保留旧 Session Memory 或放弃本次 TraditionalCompact
-- 标题生成默认 256 tokens；无正文且命中 `MaxTokens` 时以 512 tokens 重试，并接受已生成的可用短标题
-- 标题 LLM 连续失败时，从首条用户输入确定性降级：取第一行、清理 Markdown/空白、按 Unicode 字符安全截断到 30 字符并添加省略号
-- `SessionMemoryHook` 移除模型/客户端工厂等重复配置，改为依赖 `ISummaryService`；`MinRoundsBeforeLlm` 现在实际生效
-- `IMessageStorage.UpdateSessionTitleAsync` 只原子更新标题和时间，避免与消息计数并发更新相互覆盖；JSONL 与 PostgreSQL 均已实现
-- CLI 在首条普通用户消息时并行生成标题，`insighta sessions` 增加 Title 列
-
-**关键文件：**
-- `src/InsightaAI.Agent/Context/Summary/` — 摘要服务接口、实现、配置和结果模型
-- `src/InsightaAI.Agent/Prompts/full-summary.txt` — 全量摘要 Prompt
-- `src/InsightaAI.Agent/Prompts/incremental-summary.txt` — 增量摘要 Prompt
-- `src/InsightaAI.Agent/Prompts/summary-output-template.txt` — 共享输出结构
-- `src/InsightaAI.Agent/Prompts/session-title.txt` — 会话标题 Prompt
-- `tests/InsightaAI.Agent.Tests/Context/SummaryServiceTests.cs` — 摘要、MaxTokens、标题和 fallback 测试
-
-### CLI 全命令国际化（2026-07-23）
-
-- `ChatCommand`、`ChatRenderer`、`EventRenderer` 中 41 处硬编码字符串提取到 resx
-- `CliStrings.resx` / `CliStrings.zh-CN.resx` 新增 41 个 `Chat*` 资源条目（21 个静态属性 + 20 个 Format 格式化）
-- Spectre.Console markup 标签整体存入 resx 值中，翻译时保留 `[yellow]`、`[dim]` 等标签
-- `ask_user` 工具的 `question` 参数增加 `Markup.Escape` 防护
-- 5 个命令的国际化资源清单文档存放在 `docs/i18n/`
-- 全部 5 个 CLI 命令（config、sessions、mcp、skills、chat）已完成国际化
-
-**关键文件：**
-- `src/InsightaAI.Agent.Cli/Resources/CliStrings.resx` — 默认英文资源
-- `src/InsightaAI.Agent.Cli/Resources/CliStrings.zh-CN.resx` — 中文资源
-- `src/InsightaAI.Agent.Cli/Localization/CliStrings.cs` — 资源访问入口
-- `docs/i18n/` — 5 个命令的国际化资源清单文档
-
 ### CLI 配置启动时序（已完成核心实现）
 
 `Program.cs` 在创建 Host 前加载 `CliConfig`，通过 `CliEnvironment` 应用 Bootstrap 环境变量，再初始化语言、日志和 Telemetry；`CliConfig` 实例通过 Host DI 传入运行时服务，不再由 `ChatApplication` 重复加载或修改进程环境。
@@ -207,47 +143,18 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 
 ## 当前问题与改进方向
 
-### 已知问题
+### 当前待办
 
-1. **MicroCompact 生命周期重构（已完成核心链路）** — 阈值调整为 45-65-80，工具结果按 Full → Preview → Placeholder → Removed 渐进降级；Artifact 与上下文表示分离。策略先在消息副本上试算，有实际收益才提交；自动压缩可按阈值级联，手动 `/compact auto` 按优先级提交第一个有效策略。
-
-2. **Memory 轻量化索引（已完成核心链路）** — SQLite FTS5 已替代全量 `MEMORY.md` 注入；Core/OnDemand 活跃快照、访问统计、轻量重排和初始自动注入覆盖门槛已接入。剩余：记录检索决策并基于真实会话校准门槛。
-
-3. **摘要服务统一（已完成）** — 全量摘要、增量摘要和会话标题已统一到 `SummaryService`；共享结构模板，并具备 MaxTokens 重试、完整性校验与标题 fallback。
-
-4. **AgentBuilder 生命周期（已完成）** — `AgentBuilder` 默认注册 `ToolRegistry`，通过 `ConfigureServices()` 创建 Agent 专属 ServiceProvider；`AgentFactory` 已完成对接。
-
-5. **Telemetry 防御性（部分完成）** — 指标命名和 Tool telemetry 标签已调整；`CurrentRoundContext` 仍有直接字典索引，需要改为安全读取。
-
-6. **Hook 生命周期整理（部分完成）** — 调度统一、日志注入、不可变事件快照、用户输入后置 Hook 与 `AgentErrorEvent` 接入已完成；剩余：取消/中止场景的事件契约细化。
-
-7. **日志 Token 用量为 0** — 部分模型（如 `glm-5.2`）在 streaming 模式下不返回 Usage，日志中 `inputTokens=0` 无法区分"未返回"和"真 0"。
-
-8. **CLI 配置启动时序（核心实现已完成）** — Bootstrap 环境变量已在 `Program.cs` 初始化语言、日志和 Telemetry 前应用；启动时序测试仍待补充。
-
-### TODO.md 重点项
-
-- [x] 摘要服务统一（全量/增量摘要、会话标题、MaxTokens 恢复与 fallback）
-- [x] MicroCompact 阈值优化与工具结果生命周期重构（45-65-80）
-- [x] CLI 全命令国际化（ChatCommand + ChatRenderer + EventRenderer，41 处字符串提取到 resx）
-- [x] Hook 调度统一（fire-and-forget 并行、yield 前触发、SafeInvokeHookAsync）
-- [x] Agent 注入 `ILogger<Agent>` + Serilog 文件日志 + `LogEvent` 事件日志
-- [x] `list_skills` 工具（运行时技能发现）
-- [x] Agent 旧构造函数创建的 ServiceProvider 可通过 `IDisposable` 释放
-- [x] Memory 轻量化索引（SQLite FTS5、Core/OnDemand 快照、访问统计与轻量重排）
-- [ ] Memory 自动注入相关性校准（记录检索决策，并基于真实会话调整初始覆盖门槛）
-- [x] AgentBuilder 默认注册 `ToolRegistry`，并通过 `ConfigureServices()` 创建 Agent 专属 ServiceProvider
-- [x] `AgentEventHookContext.Event` 改不可变事件快照
-- [x] `IUserPromptEventHook`（用户消息接收后的异步观察与日志）
-- [x] `AgentErrorEvent` 接入 AgentLoop（LLM `ErrorEvent` 唯一映射，失败 TurnEnd 不写入空助手消息）
-- [ ] L3 Orchestrator 继续开发
-- [ ] MCP Telemetry Tag 命名清理（`mcp.server.description`→`mcp.config.description`，去重 transport）
-- [x] CLI 配置 Bootstrap/Runtime 分离与环境变量优先级统一（启动时序测试待补充）
+1. **Memory 自动注入校准** — 记录检索决策，并用真实会话调整初始覆盖门槛。
+2. **Agent 生命周期** — 明确 Scoped 服务支持策略，并补充 CLI Bootstrap 启动时序测试。
+3. **Hook 事件契约** — 细化取消/中止场景（`DoneReason.Aborted`、`OperationCanceledException`）。
+4. **Telemetry** — 完成 MCP tag 命名清理，并消除 `CurrentRoundContext` 的不安全字典索引。
+5. **运行时用量** — 区分流式模型未返回 token usage 与真实的 0。
+6. **L3 Orchestrator** — 继续开发编排能力。
 
 ## 最近验证
 
-- 2026-07-28：Agent、Orchestrator、LLM 测试共 337 个通过；`InsightaAI.Tests.Shared` 已明确标记为非测试项目，`Azure.Core.dll` 测试宿主启动问题已解决。
-- 2026-07-28：`AgentBuilder` 接管 Agent 服务组合和 Provider 生命周期；`AgentFactory` 完成迁移，Agent 测试 218 个通过。
+- 2026-08-04：MemoryManager 与 SqliteMemoryProvider 定向测试 42 项通过，覆盖自动快照筛选、访问计数和 SQLite FTS 行为。
 
 ## 愿景与里程碑
 

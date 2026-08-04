@@ -367,36 +367,10 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 
 ---
 
-## 明日计划
+## 当前优先级
 
-- [x] 清理 `ChatApplication` 中遗留的 `#if false` 旧代码
-- [x] 为 `AgentBuilder` 补充独立单元测试，覆盖默认 `ToolRegistry`、`ConfigureServices()` 和 Provider 生命周期
-- [ ] 继续检查 Agent 服务生命周期，明确 Singleton/Scoped 支持策略
-- [ ] 视需要补充 CLI Bootstrap 启动顺序测试
-- [ ] 检查工作区状态，确认是否需要提交后续改动
-
----
-
-## 记录时间
-- 2026-07-03: 创建文档，记录当前待办事项
-- 2026-07-15: 新增 Agent 依赖注入待办、TiktokenTokenEstimator、测试失败清单
-- 2026-07-16: 新增 AgentBuilder 生命周期一致性待办（ToolRegistry 注册问题）
-- 2026-07-21: 新增 Tool Result Interception 功能待办（Phase 1-3 已完成）
-- 2026-07-13: 新增 ESC 打断 LLM 生成功能（已完成，待优化 Spectre.Console 兼容性和单元测试）
-- 2026-07-13: 新增 -c/--continue 恢复最近会话、reasoning 事件支持、工具调用 ID 一致性修复、Spectre.Console Status spinner 兼容性修复
-- 2026-07-21: 新增 MCP Telemetry Tag 命名清理待办
-- 2026-07-21: 完成统一 SummaryService、全量/增量共享模板、MaxTokens 恢复、会话标题生成及输入截取 fallback
-- 2026-07-22: 统一 Agent Turn/Round 生命周期术语，调整 RoundEnd 与工具调用顺序，记录 Hook 与 ErrorEvent 后续工作
-- 2026-07-23: 完成 CLI 全命令国际化（ChatCommand + ChatRenderer + EventRenderer，41 处硬编码字符串提取到 resx）
-- 2026-07-23: Hook 调度统一（fire-and-forget、yield 前触发、SafeInvokeHookAsync）、ILogger 注入、Serilog 文件日志、LogEvent 事件日志、list_skills 工具
-- 2026-07-30: AgentEventHookContext 改为私有构造 + Create 的不可变事件快照；Round Hook 对齐为从事件读取轮次并接收消息快照；新增 IUserPromptEventHook 和用户输入事件日志
-- 2026-07-27: 改进 Bash 大输出处理、补充 Bash 输出测试、CLI 升级到 `1.0.0-alpha.2`
-- 2026-07-27: 改进 Skill 发现/激活提示、`list_skills` 工具描述和全局工具安装脚本
-- 2026-07-28: 核对 TODO 与代码现状；Agent IDisposable 已完成，Telemetry 安全索引和 MCP tag 清理仍待处理
-- 2026-07-28: Agent、Orchestrator、LLM 测试共 337 个通过；修复 `InsightaAI.Tests.Shared` 被误作为测试项目运行导致的 `Azure.Core.dll` 启动问题
-- 2026-07-28: 新增 CLI 配置 Bootstrap 与 Runtime 分离待办，记录 `CliConfig.Envs` 的启动时序问题
-- 2026-07-28: 完成 CLI Bootstrap 环境注入，并将 Agent 服务组合统一收回 `AgentBuilder`
-- 2026-07-29: 清理 `ChatApplication` 中废弃的 `#if false` Agent 创建逻辑，CLI 构建与 Agent 测试通过
-- 2026-07-29: 新增 `AgentBuilderTests`，覆盖默认注册、服务扩展、依赖覆盖和 Provider 释放；Agent 测试 222 个通过
-- 2026-07-29: 统一本地固定 schema 工具的 `ToolArgumentReader`，完成参数类型/必填/enum/数组校验；Glob/Grep 使用 `excludes: string[]`，Glob 默认排除构建目录并支持 `?` 通配。修复 QA 发现的整数参数解析和 `list_mcp_tools()` 全局阻塞，Agent 测试 250 个通过，Insighta 工具回归完成。
-- 2026-07-29: 修复 AgentBuilder 专属 DI 容器未传递 `ILoggerFactory` 导致 Agent 日志静默丢失；新增生命周期日志测试，CLI 退出时调用 `Log.CloseAndFlush()`，真实会话已验证日志落盘。
+1. Memory 自动注入校准：补充候选、命中片段及入选/淘汰原因的诊断记录，并根据真实会话调整门槛。
+2. Agent 服务生命周期：明确 Singleton/Scoped 支持策略。
+3. CLI Bootstrap：补充语言、Telemetry、日志和 OTLP endpoint 的启动时序测试。
+4. Hook：明确取消/中止场景的 Agent 事件契约。
+5. MCP Telemetry：完成 tag 命名分层与去重。
