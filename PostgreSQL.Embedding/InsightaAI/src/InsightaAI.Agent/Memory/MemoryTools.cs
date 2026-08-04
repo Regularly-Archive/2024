@@ -383,6 +383,9 @@ internal class SearchMemoryTool : ITool
             return ToolResult.FromText("No matching memories found.");
         }
 
+        foreach (var memory in memories)
+            await _memoryManager.RecordMemoryAccessAsync(memory.Id, context.CancellationToken);
+
         var sb = new StringBuilder();
         sb.AppendLine($"Found {memories.Count} relevant memories:");
         sb.AppendLine();

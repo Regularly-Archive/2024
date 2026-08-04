@@ -30,6 +30,43 @@ public class MemoryManagerTests : IDisposable
         }
     }
 
+    [Fact]
+    public void ActiveMemorySnapshot_FormatAsString_ShouldAvoidRepeatingTruncatedName()
+    {
+        var memory = new MemoryEntry
+        {
+            Name = "User: The user works in the high-tech zone and lives...",
+            Description = "The user works in the high-tech zone and lives in Weiyang district.",
+            Type = MemoryType.User,
+            Tags = ["work", "home"]
+        };
+        var snapshot = new ActiveMemorySnapshot("turn-001", [memory], [], "Memory index");
+
+        var result = snapshot.FormatAsString();
+
+        Assert.Equal(
+            "Memory index\nCore memories:\n- [User] The user works in the high-tech zone and lives in Weiyang district. (tags: work, home)",
+            result.Replace("\r\n", "\n"));
+    }
+
+    [Fact]
+    public void ActiveMemorySnapshot_FormatAsString_ShouldKeepDistinctNameAndDescription()
+    {
+        var memory = new MemoryEntry
+        {
+            Name = "Build command",
+            Description = "Run the focused Agent test suite before committing.",
+            Type = MemoryType.Feedback
+        };
+        var snapshot = new ActiveMemorySnapshot("turn-001", [], [memory], "");
+
+        var result = snapshot.FormatAsString();
+
+        Assert.Equal(
+            "Task-related memories for this turn:\n- [Feedback] Build command — Run the focused Agent test suite before committing.",
+            result.Replace("\r\n", "\n"));
+    }
+
     #region Auto-Classification
 
     [Fact]
@@ -302,6 +339,64 @@ public class MemoryManagerTests : IDisposable
 
         // Assert
         Assert.True(results.Count <= 3);
+    }
+
+    [Fact]
+    public async Task SearchRelevantMemoriesAsync_Should_BoostFrequentlyAndRecentlyUsedCandidates()
+    {
+        var cold = new MemoryEntry
+        {
+            Id = "cold-memory",
+            UserId = TestUserId,
+            Name = "Shared retrieval topic",
+            Description = "A matching memory.",
+            Content = "shared retrieval topic",
+            Type = MemoryType.Project,
+            Scope = MemoryScope.Private
+        };
+        var hot = new MemoryEntry
+        {
+            Id = "hot-memory",
+            UserId = TestUserId,
+            Name = "Shared retrieval topic",
+            Description = "A matching memory.",
+            Content = "shared retrieval topic",
+            Type = MemoryType.Project,
+            Scope = MemoryScope.Private,
+            AccessCount = 20,
+            LastAccessedAt = DateTime.UtcNow
+        };
+        await _provider.SaveMemoryAsync(cold);
+        await _provider.SaveMemoryAsync(hot);
+
+        var results = await _manager.SearchRelevantMemoriesAsync(
+            TestUserId, "shared retrieval topic", maxResults: 2);
+
+        Assert.Equal(hot.Id, results[0].Id);
+        Assert.InRange(results[0].RelevanceScore!.Value, 0, 1);
+    }
+
+    [Fact]
+    public async Task RecordMemoryAccessAsync_Should_TouchMemory()
+    {
+        var memory = new MemoryEntry
+        {
+            Id = "record-access",
+            UserId = TestUserId,
+            Name = "Access tracking",
+            Description = "A memory to record.",
+            Content = "access tracking",
+            Type = MemoryType.Project,
+            Scope = MemoryScope.Private
+        };
+        await _provider.SaveMemoryAsync(memory);
+
+        await _manager.RecordMemoryAccessAsync(memory.Id);
+        var stored = await _provider.GetMemoryAsync(memory.Id);
+
+        Assert.NotNull(stored);
+        Assert.Equal(1, stored.AccessCount);
+        Assert.NotNull(stored.LastAccessedAt);
     }
 
     [Fact]

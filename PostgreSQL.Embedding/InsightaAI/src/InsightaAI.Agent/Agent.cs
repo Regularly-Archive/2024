@@ -281,7 +281,7 @@ public class Agent : IDisposable
             ? await _mcpRegistry.ListAllServersAsync(cancellationToken)
             : null;
 
-        var memoryIndex = memorySnapshot is null ? null : FormatMemorySnapshot(memorySnapshot);
+        var memoryIndex = memorySnapshot?.FormatAsString();
 
         return await Context.SystemPrompt.SystemPromptBuilder.BuildAsync(new Context.SystemPrompt.SystemPromptParams
         {
@@ -292,36 +292,6 @@ public class Agent : IDisposable
             McpServers = mcps,
             MemoryIndex = memoryIndex,
         });
-    }
-
-    /// <summary>Formats the frozen memory snapshot for the dynamic system prompt.</summary>
-    private static string? FormatMemorySnapshot(ActiveMemorySnapshot snapshot)
-    {
-        if (snapshot.Entries.Count == 0)
-            return snapshot.Index;
-
-        var sb = new System.Text.StringBuilder();
-        if (!string.IsNullOrWhiteSpace(snapshot.Index))
-            sb.AppendLine(snapshot.Index);
-
-        AppendMemories("Core memories:", snapshot.CoreEntries);
-        AppendMemories("Task-related memories for this turn:", snapshot.ActiveEntries);
-        return sb.ToString().TrimEnd();
-
-        void AppendMemories(string title, IReadOnlyList<MemoryEntry> memories)
-        {
-            if (memories.Count == 0)
-                return;
-
-            sb.AppendLine(title);
-            foreach (var memory in memories)
-            {
-                sb.Append($"- [{memory.Type}] {memory.Name}: {memory.Description}");
-                if (memory.Tags.Count > 0)
-                    sb.Append($" (tags: {string.Join(", ", memory.Tags)})");
-                sb.AppendLine();
-            }
-        }
     }
 
     /// <summary>

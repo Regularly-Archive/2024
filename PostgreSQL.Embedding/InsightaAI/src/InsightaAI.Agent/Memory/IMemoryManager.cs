@@ -49,6 +49,11 @@ public interface IMemoryManager
         string? projectId = null,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Records one coarse-grained use of a memory entry.</summary>
+    Task RecordMemoryAccessAsync(
+        string memoryId,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Creates the active-memory snapshot for one user turn.</summary>
     Task<ActiveMemorySnapshot> CreateActiveMemorySnapshotAsync(
         string userId,

@@ -117,6 +117,72 @@ public sealed record ActiveMemorySnapshot(
     string Index)
 {
     public IReadOnlyList<MemoryEntry> Entries => CoreEntries.Concat(ActiveEntries).ToArray();
+
+    /// <summary>
+    /// Formats this frozen snapshot for injection into the dynamic system prompt.
+    /// </summary>
+    public string FormatAsString()
+    {
+        if (Entries.Count == 0)
+            return Index;
+
+        var sb = new System.Text.StringBuilder();
+        if (!string.IsNullOrWhiteSpace(Index))
+            sb.AppendLine(Index);
+
+        AppendMemories("Core memories:", CoreEntries);
+        AppendMemories("Task-related memories for this turn:", ActiveEntries);
+        return sb.ToString().TrimEnd();
+
+        void AppendMemories(string title, IReadOnlyList<MemoryEntry> memories)
+        {
+            if (memories.Count == 0)
+                return;
+
+            sb.AppendLine(title);
+            foreach (var memory in memories)
+            {
+                sb.Append($"- [{memory.Type}] {FormatMemoryText(memory)}");
+                if (memory.Tags.Count > 0)
+                    sb.Append($" (tags: {string.Join(", ", memory.Tags)})");
+                sb.AppendLine();
+            }
+        }
+    }
+
+    private static string FormatMemoryText(MemoryEntry memory)
+    {
+        var name = StripTypePrefix(memory.Name, memory.Type);
+        var description = StripTypePrefix(memory.Description, memory.Type);
+
+        if (string.IsNullOrWhiteSpace(description))
+            return name;
+
+        // Imported names are commonly the first, truncated portion of the description.
+        // Render the complete description once instead of repeating that portion.
+        if (DescriptionContainsName(description, name))
+            return description;
+
+        return string.IsNullOrWhiteSpace(name) ? description : $"{name} — {description}";
+    }
+
+    private static string StripTypePrefix(string value, MemoryType type)
+    {
+        var prefix = $"{type}:";
+        return value.Trim().StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+            ? value.Trim()[prefix.Length..].TrimStart()
+            : value.Trim();
+    }
+
+    private static bool DescriptionContainsName(string description, string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return false;
+
+        var comparableName = name.TrimEnd('.', '。', ':', '：', '…').TrimEnd();
+        return comparableName.Length > 0 &&
+               description.StartsWith(comparableName, StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 /// <summary>

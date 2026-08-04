@@ -158,10 +158,23 @@ public sealed class MemoryManager : IMemoryManager
         {
             Type = type,
             ProjectId = projectId,
-            MaxResults = maxResults
+            MaxResults = Math.Max(maxResults * 4, 20)
         };
 
-        return await _provider.SearchMemoriesAsync(userId, context, options, cancellationToken);
+        var candidates = await _provider.SearchMemoriesAsync(userId, context, options, cancellationToken);
+        return candidates
+            .OrderByDescending(GetMemoryRank)
+            .ThenByDescending(memory => memory.UpdatedAt)
+            .Take(maxResults)
+            .ToList();
+    }
+
+    public async Task RecordMemoryAccessAsync(
+        string memoryId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(memoryId);
+        await _provider.TouchMemoryAsync(memoryId, cancellationToken);
     }
 
     public async Task<string> GetMemoryIndexAsync(
@@ -266,7 +279,7 @@ public sealed class MemoryManager : IMemoryManager
         // Core context is always present and therefore is not an access signal.
         // Only a task-related retrieval is counted as automatic use.
         foreach (var memory in activeEntries)
-            await _provider.TouchMemoryAsync(memory.Id, cancellationToken);
+            await RecordMemoryAccessAsync(memory.Id, cancellationToken);
 
         var index = await GetMemoryIndexAsync(userId, projectId, cancellationToken);
         return new ActiveMemorySnapshot(turnId, coreEntries, activeEntries, index);
@@ -281,6 +294,19 @@ public sealed class MemoryManager : IMemoryManager
                normalized.Contains("用户身份", StringComparison.Ordinal) ||
                normalized.Contains("who am i", StringComparison.Ordinal) ||
                normalized.Contains("my profile", StringComparison.Ordinal);
+    }
+
+    private static float GetMemoryRank(MemoryEntry memory)
+    {
+        var lexicalRelevance = memory.RelevanceScore ?? 0f;
+        var frequencyBoost = Math.Min(1d, Math.Log(1d + memory.AccessCount) / Math.Log(21d));
+        var recencyBoost = memory.LastAccessedAt is { } lastAccessed
+            ? Math.Exp(-Math.Max(0d, (DateTime.UtcNow - lastAccessed.ToUniversalTime()).TotalDays) / 30d)
+            : 0d;
+
+        // Usage history may only break ties between already relevant candidates.
+        // It cannot revive a weak lexical match into an automatic prompt entry.
+        return (float)(lexicalRelevance * (1d + (0.10d * frequencyBoost) + (0.05d * recencyBoost)));
     }
 
     #region Private Methods

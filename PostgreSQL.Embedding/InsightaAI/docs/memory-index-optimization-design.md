@@ -118,15 +118,14 @@ FTS5 的默认 `unicode61` tokenizer 将连续的 Unicode 字符视为一个 tok
 ```text
 finalScore =
   lexicalRelevance
-+ pinnedBoost
-+ frequencyBoost
-+ recencyBoost
+  * (1 + 0.10 * frequencyBoost + 0.05 * recencyBoost)
 ```
 
 - `lexicalRelevance`：由 FTS5 BM25 归一化而来，始终是主导项。
-- `pinnedBoost`：少量硬约束/关键偏好优先，但仍受独立预算限制。
-- `frequencyBoost`：对 `AccessCount` 使用对数缩放，避免高频旧记忆长期垄断。
-- `recencyBoost`：由 `LastAccessedAt` 计算指数衰减，例如 `exp(-elapsedDays / stabilityDays)`。
+- `frequencyBoost`：对 `AccessCount` 使用对数缩放，并在 20 次访问时饱和；最多提高 10%。
+- `recencyBoost`：由 `LastAccessedAt` 按 30 天时间常数的指数衰减计算；最多提高 5%。
+
+热度只作为乘法修正，不能让低词法相关性的候选反超高相关候选；自动注入的相关性门槛应独立处理。
 
 高频但与当前输入无文本相关性的记忆不能仅凭 LRU 进入快照。
 
@@ -142,22 +141,22 @@ FTS 查询失败或无命中时，降级为：固定记忆 + 记忆数量统计 
 
 | 行为 | 信号强度 | `AccessCount` / `LastAccessedAt` |
 | --- | --- | --- |
-| 条目被选入 `ActiveMemorySnapshot` 并注入 Prompt | 强 | 每个 Turn 最多更新一次 |
-| `search_memory` 返回后，Agent 按 ID 读取完整条目 | 强 | 更新一次 |
-| 用户明确确认、纠正或要求沿用该记忆 | 强 | 更新一次，并更新 `last_confirmed_at` |
+| 条目被选入 `ActiveMemorySnapshot.ActiveEntries` 并注入 Prompt | 强 | 更新一次 |
+| `search_memory` 返回条目 | 强 | 每条结果更新一次 |
+| `CoreEntries` 常驻注入 | 无 | 不更新，避免常驻导致热度虚高 |
 | 仅进入初步候选、但未进入快照 | 弱 | 不更新 |
 | Agent 保存、修改某条记忆 | 不是访问 | 只更新 `updated_at` |
 
-应提供原子的 `TouchMemoryAsync(memoryId, turnId, reason)`；同一 `memoryId` 在同一 `turnId` 中只能产生一次强访问。这样一个多轮工具链不会人为放大 LRU 信号。
+当前实现采用粗粒度 `TouchMemoryAsync(memoryId)`：自动召回进入 `ActiveEntries` 时更新一次，`search_memory` 每返回一条结果更新一次；不维护独立的 `turnId` 去重表。Core 常驻注入不计入访问，避免其热度被系统行为虚高。
 
 ## 8. 接口边界
 
 建议引入 `SqliteMemoryProvider`，保持 `IMemoryProvider` 的抽象不被 SQLite 细节污染：
 
 - Provider：事务性保存、FTS 查询、精确查询和原子 `TouchMemoryAsync`。
-- Manager：候选合并、重排、token 预算裁剪与快照构造。
+- Manager：候选合并、基于访问历史的轻量重排与快照构造。
 - System Prompt Builder：只消费 `ActiveMemorySnapshot`，不知道 BM25、FTS 或持久化细节。
-- `search_memory`：走 Manager；若 Agent 读取具体条目，再由 Manager 触发 `TouchMemoryAsync`。
+- `search_memory`：走 Manager；成功返回的每条结果由 Manager 触发 `TouchMemoryAsync`。
 
 运行时模型：
 
@@ -166,10 +165,13 @@ public sealed record ActiveMemorySnapshot(
     string TurnId,
     IReadOnlyList<MemoryEntry> CoreEntries,
     IReadOnlyList<MemoryEntry> ActiveEntries,
-    string Index);
+    string Index)
+{
+    string FormatAsString();
+}
 ```
 
-当前实现已完成 Phase 2 的核心链路：`RunStreamAsync` 在收到用户输入后创建一次快照，后续 LLM Round 只复用该快照。快照中的条目以名称、描述和标签注入 Prompt，并在选入快照时记录一次访问。Pinned、访问历史重排和用户确认时间仍留待后续校准阶段。
+当前实现已完成 Phase 2 的核心链路：`RunStreamAsync` 在收到用户输入后创建一次快照，后续 LLM Round 只复用该快照。快照由 `FormatAsString()` 负责 Prompt 表示，避免 Agent 知道 Core/OnDemand 的展示细节；名称只是描述的截断前缀时只渲染完整描述，减少重复文本。`ActiveEntries` 在选入快照时记录一次访问，访问历史参与轻量重排。Pinned 和用户确认时间仍留待后续校准阶段。
 
 `MEMORY.md` 可以在迁移期继续作为面向用户的可读导出，但不再是运行时注入的数据源，也不能成为第二份可编辑事实源。
 
@@ -187,7 +189,7 @@ public sealed record ActiveMemorySnapshot(
 
 1. 引入 `ActiveMemorySnapshot` 与显式 `Core` / `OnDemand` 激活策略。
 2. 在用户 Turn 起点召回、重排并冻结快照。
-3. 多轮工具调用复用快照；同 Turn 的强访问去重。
+3. 多轮工具调用复用快照；访问统计保持粗粒度，不为同 Turn 建立去重状态。
 4. 补充 `pinned` 和用户确认时间。
 
 ### Phase 3：校准与维护
@@ -221,11 +223,11 @@ dotnet run --project src/InsightaAI.Memory.Migrator -- `
 ## 11. 验收标准
 
 - 多轮工具执行中，同一用户 Turn 只发生一次初始活跃记忆召回。
-- 同一条记忆在同一 Turn 最多产生一次强访问计数。
+- 访问计数是粗粒度使用强度，不要求同一 Turn 去重。
 - 中文相关短语可经 trigram FTS5 召回；短于 3 个字符的项目名/标签可经精确匹配召回。
 - 无访问历史但与当前输入文本相关的记忆可被召回。
 - 高频但与当前输入无关的记忆不能仅凭 LRU 进入快照。
-- Prompt 中记忆占用不超过配置预算，`search_memory` 可找回未注入内容。
+- `search_memory` 可找回未注入内容；检索层不承担模型 token 预算裁剪。
 - FTS 失败或无命中时不会恢复全量 `MEMORY.md` 注入。
 
 ## 12. 参考资料

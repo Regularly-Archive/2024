@@ -1,4 +1,5 @@
 using InsightaAI.Agent.Memory;
+using InsightaAI.Agent.Abstractions;
 using Microsoft.Data.Sqlite;
 
 namespace InsightaAI.Agent.Tests.Memory;
@@ -154,6 +155,27 @@ public sealed class SqliteMemoryProviderTests : IAsyncLifetime
         Assert.NotNull(stored);
         Assert.Equal(MemoryActivation.Core, stored.Activation);
         Assert.Equal(0, stored.AccessCount);
+    }
+
+    [Fact]
+    public async Task SearchMemoryTool_Should_TouchReturnedMemories()
+    {
+        var memory = CreateMemory("tool-access", "Search tool memory", "A memory returned by the search tool.");
+        await _provider.SaveMemoryAsync(memory);
+        var manager = new MemoryManager(_provider);
+        var registry = new ToolRegistry();
+        MemoryTools.RegisterAll(registry, manager, "yuanpei");
+        var tool = registry.GetExecutor("search_memory");
+
+        Assert.NotNull(tool);
+        var result = await tool.ExecuteAsync(
+            new Dictionary<string, object> { ["query"] = "search tool memory" },
+            new ToolExecutionContext { AgentId = "test", ToolCallId = "call-1" });
+
+        Assert.False(result.IsError);
+        var stored = await _provider.GetMemoryAsync(memory.Id);
+        Assert.NotNull(stored);
+        Assert.Equal(1, stored.AccessCount);
     }
 
     [Fact]
