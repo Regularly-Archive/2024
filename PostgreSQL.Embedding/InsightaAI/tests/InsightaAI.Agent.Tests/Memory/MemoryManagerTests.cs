@@ -425,6 +425,65 @@ public class MemoryManagerTests : IDisposable
         Assert.Equal(1, stored.AccessCount);
     }
 
+    [Fact]
+    public async Task CreateActiveMemorySnapshotAsync_ShouldExcludeBroadMatchesWithoutEnoughQueryCoverage()
+    {
+        var relevant = new MemoryEntry
+        {
+            Id = "memory-index",
+            UserId = TestUserId,
+            Name = "Memory index retrieval",
+            Description = "SQLite FTS retrieval for the memory index.",
+            Content = "Insighta memory index retrieval policy and SQLite FTS selection.",
+            Type = MemoryType.Project,
+            Scope = MemoryScope.Private
+        };
+        var broad = new MemoryEntry
+        {
+            Id = "insighta-architecture",
+            UserId = TestUserId,
+            Name = "Insighta architecture",
+            Description = "Architecture history.",
+            Content = "Insighta project architecture and L3 orchestrator.",
+            Type = MemoryType.Project,
+            Scope = MemoryScope.Private
+        };
+        await _provider.SaveMemoryAsync(relevant);
+        await _provider.SaveMemoryAsync(broad);
+
+        var snapshot = await _manager.CreateActiveMemorySnapshotAsync(
+            TestUserId, "Insighta memory index retrieval", "turn-evidence");
+        var storedRelevant = await _provider.GetMemoryAsync(relevant.Id);
+        var storedBroad = await _provider.GetMemoryAsync(broad.Id);
+
+        Assert.Collection(snapshot.ActiveEntries, item => Assert.Equal(relevant.Id, item.Id));
+        Assert.Equal(1, storedRelevant!.AccessCount);
+        Assert.Equal(0, storedBroad!.AccessCount);
+    }
+
+    [Fact]
+    public async Task CreateActiveMemorySnapshotAsync_ShouldNotAutoInjectForShortBroadInput()
+    {
+        var memory = new MemoryEntry
+        {
+            Id = "insighta-history",
+            UserId = TestUserId,
+            Name = "Insighta history",
+            Description = "Project history.",
+            Content = "Insighta project history and architecture.",
+            Type = MemoryType.Project,
+            Scope = MemoryScope.Private
+        };
+        await _provider.SaveMemoryAsync(memory);
+
+        var snapshot = await _manager.CreateActiveMemorySnapshotAsync(
+            TestUserId, "Insighta", "turn-short");
+        var stored = await _provider.GetMemoryAsync(memory.Id);
+
+        Assert.Empty(snapshot.ActiveEntries);
+        Assert.Equal(0, stored!.AccessCount);
+    }
+
     #endregion
 
     #region User Context

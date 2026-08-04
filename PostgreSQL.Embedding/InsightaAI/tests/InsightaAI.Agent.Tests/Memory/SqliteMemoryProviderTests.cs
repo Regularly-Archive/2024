@@ -158,6 +158,31 @@ public sealed class SqliteMemoryProviderTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task CreateActiveMemorySnapshotAsync_ShouldFilterBroadFtsMatches()
+    {
+        var relevant = CreateMemory(
+            "memory-index",
+            "Memory index retrieval",
+            "Insighta memory index retrieval policy and SQLite FTS selection.");
+        var broad = CreateMemory(
+            "insighta-architecture",
+            "Insighta architecture",
+            "Insighta project architecture and L3 orchestrator.");
+        await _provider.SaveMemoryAsync(relevant);
+        await _provider.SaveMemoryAsync(broad);
+        var manager = new MemoryManager(_provider);
+
+        var snapshot = await manager.CreateActiveMemorySnapshotAsync(
+            "yuanpei", "Insighta memory index retrieval", "turn-fts-evidence");
+        var storedRelevant = await _provider.GetMemoryAsync(relevant.Id);
+        var storedBroad = await _provider.GetMemoryAsync(broad.Id);
+
+        Assert.Collection(snapshot.ActiveEntries, item => Assert.Equal(relevant.Id, item.Id));
+        Assert.Equal(1, storedRelevant!.AccessCount);
+        Assert.Equal(0, storedBroad!.AccessCount);
+    }
+
+    [Fact]
     public async Task SearchMemoryTool_Should_TouchReturnedMemories()
     {
         var memory = CreateMemory("tool-access", "Search tool memory", "A memory returned by the search tool.");

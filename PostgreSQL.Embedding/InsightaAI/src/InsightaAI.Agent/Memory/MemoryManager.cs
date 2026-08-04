@@ -8,6 +8,12 @@ namespace InsightaAI.Agent.Memory;
 /// </summary>
 public sealed class MemoryManager : IMemoryManager
 {
+    // Automatic prompt injection needs stronger evidence than an explicit search tool call.
+    // These are conservative initial policy values and should be calibrated from retrieval diagnostics.
+    private const int MinimumAutomaticQueryTerms = 3;
+    private const int MinimumAutomaticMatchedTerms = 2;
+    private const double MinimumAutomaticQueryCoverage = 0.50d;
+
     private readonly IMemoryProvider _provider;
 
     public MemoryManager(IMemoryProvider provider)
@@ -274,6 +280,7 @@ public sealed class MemoryManager : IMemoryManager
         var coreIds = coreEntries.Select(memory => memory.Id).ToHashSet(StringComparer.Ordinal);
         var activeEntries = activeCandidates
             .Where(memory => !coreIds.Contains(memory.Id))
+            .Where(memory => requestedType.HasValue || HasSufficientAutomaticEvidence(memory, input))
             .ToList();
 
         // Core context is always present and therefore is not an access signal.
@@ -294,6 +301,39 @@ public sealed class MemoryManager : IMemoryManager
                normalized.Contains("用户身份", StringComparison.Ordinal) ||
                normalized.Contains("who am i", StringComparison.Ordinal) ||
                normalized.Contains("my profile", StringComparison.Ordinal);
+    }
+
+    private static bool HasSufficientAutomaticEvidence(MemoryEntry memory, string input)
+    {
+        var queryTerms = ExtractQueryTerms(input);
+        if (queryTerms.Count < MinimumAutomaticQueryTerms)
+            return false;
+
+        var searchableText = string.Concat(
+            memory.Name,
+            memory.Description,
+            memory.Content,
+            string.Concat(memory.Tags));
+        var matchedTerms = queryTerms.Count(term =>
+            searchableText.Contains(term, StringComparison.OrdinalIgnoreCase));
+        var coverage = (double)matchedTerms / queryTerms.Count;
+
+        return matchedTerms >= MinimumAutomaticMatchedTerms &&
+               coverage >= MinimumAutomaticQueryCoverage;
+    }
+
+    private static List<string> ExtractQueryTerms(string input)
+    {
+        var compactInput = string.Concat(input.EnumerateRunes()
+            .Where(rune => !Rune.IsWhiteSpace(rune))
+            .Select(rune => rune.ToString()));
+
+        return compactInput.EnumerateRunes()
+            .Chunk(3)
+            .Where(chunk => chunk.Length == 3)
+            .Select(chunk => string.Concat(chunk))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private static float GetMemoryRank(MemoryEntry memory)
