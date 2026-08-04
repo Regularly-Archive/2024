@@ -159,7 +159,7 @@ public sealed class AgentLoop
             };
             context.AddMessage(assistantMessage);
 
-            // 检查是否有工具调用（去重：LLM 可能生成相同名称+参数的重复调用）
+            // 检查是否有工具调用（去重：LLM 流可能重复发出同一工具名和原始参数的调用）
             var toolCalls = DeduplicateToolCalls(response.GetToolCalls());
             if (toolCalls.Length == 0)
             {
@@ -331,9 +331,7 @@ public sealed class AgentLoop
         };
     }
 
-    /// <summary>
-    /// 去重工具调用：LLM 可能生成多个名称和参数完全相同的工具调用
-    /// </summary>
+    /// <summary>将 LLM 流错误映射为 Agent 级错误事件。</summary>
     private AgentErrorEvent CreateAgentErrorEvent(ErrorEvent errorEvent) => new()
     {
         AgentId = _config.Id,
@@ -349,21 +347,24 @@ public sealed class AgentLoop
 
     private static AgentTurnEndEvent CreateFailedTurnEndEvent(
         ILoopContext context, TokenUsage usage, Stopwatch stopwatch, int round, string error) => new()
-    {
-        AgentId = context.AgentId,
-        Result = new AgentResult
         {
-            Status = AgentStatus.Failed,
-            Error = error,
-            Usage = usage,
-            Rounds = round,
-            DurationMs = stopwatch.ElapsedMilliseconds,
-            EstimatedContextTokens = context.EstimateTokens(),
-            MaxContextTokens = context.MaxContextTokens,
-            AvailableInputTokens = context.AvailableInputTokens
-        }
-    };
+            AgentId = context.AgentId,
+            Result = new AgentResult
+            {
+                Status = AgentStatus.Failed,
+                Error = error,
+                Usage = usage,
+                Rounds = round,
+                DurationMs = stopwatch.ElapsedMilliseconds,
+                EstimatedContextTokens = context.EstimateTokens(),
+                MaxContextTokens = context.MaxContextTokens,
+                AvailableInputTokens = context.AvailableInputTokens
+            }
+        };
 
+    /// <summary>
+    /// 按工具名及原始 JSON 参数文本移除重复的工具调用。
+    /// </summary>
     internal static ToolCallBlock[] DeduplicateToolCalls(ToolCallBlock[] toolCalls)
     {
         if (toolCalls.Length <= 1) return toolCalls;
