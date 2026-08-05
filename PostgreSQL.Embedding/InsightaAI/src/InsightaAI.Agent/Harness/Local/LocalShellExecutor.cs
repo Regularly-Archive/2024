@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using InsightaAI.Agent.Abstractions;
 
-namespace InsightaAI.Agent.Tools.BuiltIn;
+namespace InsightaAI.Agent.Harness.Local;
 
 /// <summary>
 /// Shell 命令执行记录

@@ -122,10 +122,11 @@ public sealed class LlmClientTelemetryProxy : ILlmClient
     private Activity? StartChildActivity(string name)
     {
         // 强制从字典恢复 round Activity，确保正确挂在 round 下
+        // 字典仅在 round hook 激活时填充；缺失时降级为无父 context，避免 KeyNotFoundException
         ActivityContext roundActivityContext = default;
-        if (_agentId != null)
+        if (_agentId != null && TelemetryConstants.CurrentRoundContext.TryGetValue(_agentId, out var roundCtx))
         {
-            roundActivityContext = TelemetryConstants.CurrentRoundContext[_agentId];
+            roundActivityContext = roundCtx;
         }
 
         return TelemetryConstants.ActivitySource.StartActivity(name, ActivityKind.Client, parentContext: roundActivityContext);

@@ -1,6 +1,7 @@
 using InsightaAI.Agent.Models;
 using InsightaAI.Agent.Tools.BuiltIn;
 using InsightaAI.Agent.Abstractions;
+using InsightaAI.Agent.Harness.Local;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace InsightaAI.Agent.Extensions;
@@ -18,6 +19,7 @@ public static class BuiltInToolsExtensions
         // 注册默认实现（如果尚未注册）
         services.TryAddSingleton<IShellExecutor, LocalShellExecutor>();
         services.TryAddSingleton<IFileSystem, LocalFileSystem>();
+        services.TryAddSingleton<IPathValidator, LocalPathValidator>();
 
         return services;
     }
@@ -32,19 +34,21 @@ public static class BuiltInToolsExtensions
     public static ToolRegistry AddBuiltInTools(
         this ToolRegistry registry,
         IShellExecutor? shellExecutor = null,
-        IFileSystem? fileSystem = null)
+        IFileSystem? fileSystem = null,
+        IPathValidator? pathValidator = null)
     {
         // 使用提供的实现或创建默认实现
         shellExecutor ??= new LocalShellExecutor();
         fileSystem ??= new LocalFileSystem();
+        pathValidator ??= new LocalPathValidator();
 
         // 创建共享的文件读取状态
         var readState = new FileReadState();
 
         // 注册接口模式的工具
         registry.Register(new FileReadTool(fileSystem, readState));
-        registry.Register(new FileWriteTool(fileSystem));
-        registry.Register(new FileEditTool(fileSystem, readState));
+        registry.Register(new FileWriteTool(fileSystem, pathValidator));
+        registry.Register(new FileEditTool(fileSystem, pathValidator, readState));
         registry.Register(new GrepTool(fileSystem));
         registry.Register(new GlobTool(fileSystem));
         registry.Register(new BashTool(shellExecutor));
@@ -68,8 +72,9 @@ public static class BuiltInToolsExtensions
     {
         var shellExecutor = serviceProvider.GetService<IShellExecutor>() ?? new LocalShellExecutor();
         var fileSystem = serviceProvider.GetService<IFileSystem>() ?? new LocalFileSystem();
+        var pathValidator = serviceProvider.GetService<IPathValidator>() ?? new LocalPathValidator();
 
-        return registry.AddBuiltInTools(shellExecutor, fileSystem);
+        return registry.AddBuiltInTools(shellExecutor, fileSystem, pathValidator);
     }
 }
 

@@ -1,4 +1,5 @@
 using InsightaAI.Agent.Abstractions;
+using InsightaAI.Agent.Harness.Local;
 using InsightaAI.Agent.Tools.BuiltIn;
 using InsightaAI.LLM.Models;
 using System.Text.Json;

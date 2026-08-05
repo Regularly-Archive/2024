@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using InsightaAI.Agent.Abstractions;
 using InsightaAI.Agent.Cli.Models;
@@ -40,7 +41,19 @@ public sealed class AgentFactoryTests
     [Fact]
     public async Task CreateAsync_Should_Expose_AgentServices_To_Tools()
     {
+        // 进程环境可能启用 INSIGHTA_TELEMETRY（AgentFactory 据此装配 telemetry），
+        // 而测试进程未初始化 TracerProvider，导致 ActivitySource.StartActivity 返回 null。
+        // 注册全局 ActivityListener 提供最小可用的 telemetry 环境，让装配的组件正常工作。
+        using var activityListener = new ActivityListener
+        {
+            ShouldListenTo = _ => true,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData
+        };
+        ActivitySource.AddActivityListener(activityListener);
+
         var storage = new JsonlMessageStorage(Path.Combine(Path.GetTempPath(), "insighta-agent-factory-tests", Guid.NewGuid().ToString("N")));
+        // 模拟真实 CLI 流程：先创建会话（生成会话目录），再创建 Agent，确保 Agent 写消息时目录已存在
+        var session = await storage.CreateSessionAsync("test-model", "test-provider");
         var servicesResolved = false;
         var toolRegistry = new ToolRegistry();
         toolRegistry.RegisterFunction(
@@ -97,10 +110,11 @@ public sealed class AgentFactoryTests
             ToolRegistry = toolRegistry,
             SkillRegistry = new SkillRegistry(),
             SummaryService = summaryService,
-            SessionId = "factory-test-session"
+            SessionId = session.Id
         });
 
-        var result = await agent.RunAsync("Inspect the agent services.");
+        // 与真实 CLI 流程一致：context 携带 SessionId，Agent 写消息时使用该目录
+        var result = await agent.RunAsync("Inspect the agent services.", new InsightaAI.Agent.Models.AgentContext { SessionId = session.Id });
 
         Assert.Equal(AgentStatus.Completed, result.Status);
         Assert.True(servicesResolved);

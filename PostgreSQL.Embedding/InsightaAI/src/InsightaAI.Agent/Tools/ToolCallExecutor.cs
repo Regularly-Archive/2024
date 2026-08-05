@@ -1,7 +1,7 @@
 ﻿using InsightaAI.Agent.Abstractions;
 using InsightaAI.Agent.Context;
 using InsightaAI.Agent.Models;
-using InsightaAI.Agent.Tools.BuiltIn;
+using InsightaAI.Agent.Harness.Local;
 using InsightaAI.LLM.Models;
 using Microsoft.Extensions.DependencyInjection;
 using System.Runtime.CompilerServices;

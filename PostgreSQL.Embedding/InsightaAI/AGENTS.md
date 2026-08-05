@@ -159,7 +159,7 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 1. **Memory 自动注入校准** — 用本地候选筛选日志和真实会话调整初始覆盖门槛。
 2. **Agent 生命周期** — 明确 Scoped 服务支持策略。
 3. **Hook 事件契约** — 细化取消/中止场景（`DoneReason.Aborted`、`OperationCanceledException`）。
-4. **Telemetry** — 完成 MCP tag 命名清理，并消除 `CurrentRoundContext` 的不安全字典索引。
+4. **Telemetry** — 完成 MCP tag 命名清理（`CurrentRoundContext` 不安全字典索引已消除，2026-08-05 随 AgentFactoryTests 修复完成，见 TODO.md 6.1）。
 5. **运行时用量** — 区分流式模型未返回 token usage 与真实的 0。
 6. **L3 Orchestrator** — 继续开发编排能力。
 

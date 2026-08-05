@@ -161,7 +161,7 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 - **问题**: 直接使用字典索引 `CurrentRoundContext[_agentId]`，若 `AddTelemetry()` 未先调用会抛 `KeyNotFoundException`
 - **修复**: 改用 `TryGetValue`，未命中时记录非 parented 的 Activity
 
-**当前状态：** 尚未完成。`ToolCallHandlerTelemetryWrapper` 和 `LlmClientTelemetryProxy` 仍存在直接字典索引。
+**当前状态：** 已完成（2026-08-05）。`ToolCallHandlerTelemetryWrapper` 和 `LlmClientTelemetryProxy` 均已改用 `TryGetValue` 兜底，字典缺失（如测试环境未挂 round hook）时降级为无父 span，不再抛 `KeyNotFoundException`。该问题在修复 `AgentFactoryTests.CreateAsync_Should_Expose_AgentServices_To_Tools` 时暴露并一并修复。
 
 6.2 `LlmRequestDuration` 标签维度不一致
 - **位置**: `TelemetryLlmClient.cs` `RecordMetricsAndTags`

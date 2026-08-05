@@ -17,10 +17,11 @@ public static class ToolCallHandlerTelemetryWrapper
         {
             // 强制从字典恢复 round Activity，确保 tool_call 正确挂在 round 下
             // IAsyncEnumerable yield 边界会导致 Activity.Current 丢失或指向错误的 Activity
+            // 字典缺失时降级为无父 context（如测试环境未挂 round hook）
             ActivityContext activityContext = default;
-            if (agentId != null)
+            if (agentId != null && TelemetryConstants.CurrentRoundContext.TryGetValue(agentId, out var roundCtx))
             {
-                activityContext = TelemetryConstants.CurrentRoundContext[agentId];
+                activityContext = roundCtx;
             }
 
             using var activity = TelemetryConstants.ActivitySource.StartActivity(

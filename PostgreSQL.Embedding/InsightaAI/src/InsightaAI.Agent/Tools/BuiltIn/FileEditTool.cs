@@ -12,15 +12,17 @@ namespace InsightaAI.Agent.Tools.BuiltIn;
 public class FileEditTool : ITool
 {
     private readonly IFileSystem _fileSystem;
+    private readonly IPathValidator _pathValidator;
     private readonly FileReadState _readState;
 
     public string Name => "edit_file";
 
     public ToolDefinition Definition { get; }
 
-    public FileEditTool(IFileSystem fileSystem, FileReadState readState)
+    public FileEditTool(IFileSystem fileSystem, IPathValidator pathValidator, FileReadState readState)
     {
         _fileSystem = fileSystem;
+        _pathValidator = pathValidator;
         _readState = readState;
 
         Definition = new ToolDefinition
@@ -74,7 +76,7 @@ public class FileEditTool : ITool
             var replaceAll = arguments.GetBoolean("replace_all");
 
             // 路径安全验证
-            var validation = PathValidator.Validate(filePath);
+            var validation = _pathValidator.Validate(filePath);
             if (!validation.IsSafe)
             {
                 return ToolResult.FromError(validation.ErrorMessage!);

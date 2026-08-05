@@ -12,14 +12,16 @@ namespace InsightaAI.Agent.Tools.BuiltIn;
 public class FileWriteTool : ITool
 {
     private readonly IFileSystem _fileSystem;
+    private readonly IPathValidator _pathValidator;
 
     public string Name => "write_file";
 
     public ToolDefinition Definition { get; }
 
-    public FileWriteTool(IFileSystem fileSystem)
+    public FileWriteTool(IFileSystem fileSystem, IPathValidator pathValidator)
     {
         _fileSystem = fileSystem;
+        _pathValidator = pathValidator;
 
         Definition = new ToolDefinition
         {
@@ -64,7 +66,7 @@ public class FileWriteTool : ITool
             var append = arguments.GetBoolean("append");
 
             // 路径安全验证
-            var validation = PathValidator.Validate(filePath);
+            var validation = _pathValidator.Validate(filePath);
             if (!validation.IsSafe)
             {
                 return ToolResult.FromError(validation.ErrorMessage!);

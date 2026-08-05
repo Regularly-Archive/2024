@@ -4,7 +4,7 @@ using Microsoft.Extensions.FileSystemGlobbing.Abstractions;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace InsightaAI.Agent.Tools.BuiltIn;
+namespace InsightaAI.Agent.Harness.Local;
 
 /// <summary>
 /// 本地文件系统实现
