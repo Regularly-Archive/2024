@@ -17,11 +17,11 @@ public interface ILoopContext
     /// <summary>当前消息列表（只读）</summary>
     IReadOnlyList<Message> Messages { get; }
 
-    /// <summary>追加一条消息</summary>
-    void AddMessage(Message message);
+    /// <summary>追加一条消息，并等待消息添加后的异步处理完成。</summary>
+    Task AddMessageAsync(Message message);
 
-    /// <summary>追加多条消息</summary>
-    void AddMessages(IEnumerable<Message> messages);
+    /// <summary>追加多条消息，并按添加顺序等待异步处理完成。</summary>
+    Task AddMessagesAsync(IEnumerable<Message> messages);
 
     /// <summary>替换指定位置的消息，不触发消息持久化回调。</summary>
     void ReplaceMessage(int index, Message message);
@@ -39,8 +39,8 @@ public interface ILoopContext
     int AvailableInputTokens { get; }
 
     /// <summary>
-    /// 消息添加回调（可选，用于自动持久化）
-    /// 当 LoopContext.AddMessage 被调用时触发
+    /// 消息添加后的异步回调（可选，用于自动持久化）。
+    /// 当 <see cref="AddMessageAsync"/> 被调用时触发，调用方会等待其完成。
     /// </summary>
-    Action<Message>? OnMessageAdded { get; set; }
+    Func<Message, Task>? OnMessageAddedAsync { get; set; }
 }

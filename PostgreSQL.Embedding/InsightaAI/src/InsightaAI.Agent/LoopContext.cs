@@ -26,21 +26,19 @@ public sealed class LoopContext : ILoopContext
 
     public IReadOnlyList<Message> Messages => _messages;
 
-    public Action<Message>? OnMessageAdded { get; set; }
+    public Func<Message, Task>? OnMessageAddedAsync { get; set; }
 
-    public void AddMessage(Message message)
+    public async Task AddMessageAsync(Message message)
     {
         _messages.Add(message);
-        OnMessageAdded?.Invoke(message);
+        if (OnMessageAddedAsync is not null)
+            await OnMessageAddedAsync(message);
     }
 
-    public void AddMessages(IEnumerable<Message> messages)
+    public async Task AddMessagesAsync(IEnumerable<Message> messages)
     {
         foreach (var message in messages)
-        {
-            _messages.Add(message);
-            OnMessageAdded?.Invoke(message);
-        }
+            await AddMessageAsync(message);
     }
 
     public void ReplaceMessage(int index, Message message)

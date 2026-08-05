@@ -157,7 +157,7 @@ public sealed class AgentLoop
                 Role = MessageRole.Assistant,
                 Content = response.Content
             };
-            context.AddMessage(assistantMessage);
+            await context.AddMessageAsync(assistantMessage);
 
             // 检查是否有工具调用（去重：LLM 流可能重复发出同一工具名和原始参数的调用）
             var toolCalls = DeduplicateToolCalls(response.GetToolCalls());
@@ -218,7 +218,7 @@ public sealed class AgentLoop
             // 将工具执行结果加入对话历史
             foreach (var result in _toolCallExecutor.Results)
             {
-                context.AddMessage(new Message
+                await context.AddMessageAsync(new Message
                 {
                     Role = MessageRole.ToolResult,
                     ToolCallId = result.ToolCall.Id,
@@ -311,7 +311,7 @@ public sealed class AgentLoop
         };
 
         // 添加最后一条助手消息
-        context.AddMessage(finalMessage);
+        await context.AddMessageAsync(finalMessage);
         stopwatch.Stop();
 
         yield return new AgentTurnEndEvent

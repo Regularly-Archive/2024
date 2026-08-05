@@ -114,6 +114,17 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 - 快照通过 `ActiveMemorySnapshot.FormatAsString()` 生成 Prompt 文本，避免 Agent 承担记忆展示逻辑；当名称只是描述的截断前缀时，仅保留完整描述以消除重复。
 - 自动注入的初始门槛已启用：输入至少 3 个 trigram，候选至少命中 2 个且覆盖 50% 查询片段；短而宽泛的输入只带 Core。`MemoryManager` 会将候选筛选原因（不含输入和正文）写入本地 Debug 日志，后续据此校准初始值。
 
+### WebFetch 内容提取（2026-08-05）
+
+- `WebFetchTool` 使用 AngleSharp 解析 HTML，优先提取 `article`、`main` 或 `[role=main]`，并输出标题、描述、作者、发布日期和 canonical URL 等精选元数据。
+- HTML→Markdown 由 `ReverseMarkdown` 完成；相对链接与图片 URL 在转换前解析为绝对地址。`format` 支持 `html`、`text` 和默认 `markdown`，未知值宽容回退 Markdown。
+- `text` 格式以块级元素保留段落与列表换行；抓取阶段会剔除导航、页脚、脚本和常见交互控件，避免其占用 Agent 上下文。
+- 后续优化：针对自定义 Web Components 的 Markdown 降级，以及文章尾部反馈、推荐资源等非正文区域的启发式过滤。
+
+### 消息持久化顺序（2026-08-05）
+
+- `ILoopContext` 的消息追加与持久化回调均为异步；Agent Loop 在继续生成前等待新增消息成功写入存储，避免 fire-and-forget 写入造成会话 JSONL 或历史记录缺失。
+
 ### MCP 工具调用元数据管道（2026-07-21）
 
 - `ToolResult` 新增 `Metadata` 属性（`IReadOnlyDictionary<string,object?>?`）

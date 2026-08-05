@@ -592,29 +592,29 @@ public class Agent : IDisposable
         var systemPrompt = await BuildSystemPromptAsync(memorySnapshot, cancellationToken);
         if (!string.IsNullOrEmpty(systemPrompt))
         {
-            loopContext.AddMessage(Message.FromSystem(systemPrompt));
+            await loopContext.AddMessageAsync(Message.FromSystem(systemPrompt));
         }
 
         if (context?.History != null)
         {
-            loopContext.AddMessages(context.History);
+            await loopContext.AddMessagesAsync(context.History);
         }
 
         // 设置消息持久化回调（在 history 之后、user message 之前）
         // 这样只有新增的消息会被持久化，历史消息不会重复存储
         if (_messageStorage != null)
         {
-            loopContext.OnMessageAdded = msg =>
+            loopContext.OnMessageAddedAsync = async msg =>
             {
                 // 系统消息不持久化（运行时构建的 prompt）
                 if (msg.Role == MessageRole.System) return;
                 var record = msg.ToMessageRecord(sessionId);
-                _ = _messageStorage.AddMessageAsync(sessionId, record);
+                await _messageStorage.AddMessageAsync(sessionId, record);
             };
         }
 
         var userMessage = Message.FromUser(input);
-        loopContext.AddMessage(userMessage);
+        await loopContext.AddMessageAsync(userMessage);
 
         var userPromptEvent = new AgentUserPromptEvent() { AgentId = sessionId, Input = input };
         LogEvent(userPromptEvent, sessionId);

@@ -369,6 +369,20 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 
 ---
 
+### WebFetchTool 内容提取优化
+
+**已完成：**
+- [x] 使用 AngleSharp 选择主内容区域（`article` / `main` / `[role=main]`），并提取精选页面元数据。
+- [x] 使用 ReverseMarkdown 转换 HTML 为 Markdown，转换前将相对链接和图片地址规范化为绝对 URL。
+- [x] `format=text` 按块级元素保留段落、标题和列表换行。
+- [x] 过滤导航、页脚、脚本及常见交互控件，减少网页 UI 噪音。
+
+**待处理：**
+- [ ] 为自定义 Web Components（例如 `<bread-crumbs>`）提供 Markdown 降级或移除策略。
+- [ ] 对文章尾部反馈、相关推荐和其他资源区增加启发式过滤，且避免误删正文。
+
+---
+
 ## 当前优先级
 
 1. Memory 自动注入校准：基于已记录的候选与入选/淘汰原因，根据真实会话调整门槛与身份查询兜底策略。
