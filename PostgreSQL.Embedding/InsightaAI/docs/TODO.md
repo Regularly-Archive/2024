@@ -88,7 +88,7 @@
 - [x] 区分 Bootstrap 配置与 Agent/Chat Runtime 配置
 - [x] 统一配置读取，`CliConfig` 通过 Host DI 复用
 - [x] 明确优先级：进程环境变量 > `CliConfig.Envs` > 默认值
-- [ ] 覆盖语言、Telemetry、日志和 OTLP endpoint 的启动时序测试
+- [x] 提取 `CliBootstrap`，覆盖配置应用、进程环境优先级及语言、Telemetry、OTLP endpoint 默认值的启动前解析测试
 
 ---
 
@@ -203,6 +203,7 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 **待处理：**
 - [ ] 基于真实会话校准自动注入门槛，避免通用项目历史挤入快照
 - [ ] 收紧身份查询的兜底策略：当前 `explicit_type` 会放行全部 `User` 候选；应改为依赖少量 Core 用户画像，普通 User 记忆仍按相关性筛选
+- [ ] Memory Update/Delete 授权：`UpdateMemoryAsync` / `DeleteMemoryAsync` 当前只按 `memoryId` 操作，尚未验证调用方 `userId`。暂不修复；后续先定义 Team memory 的项目成员授权模型，再为 Private 校验 `existing.UserId == userId`，并为 Team 校验项目成员权限。不得以调用方可传入的 project 字符串代替授权。
 
 **设计文档：** [memory-index-optimization-design.md](memory-index-optimization-design.md)
 
@@ -372,6 +373,5 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 
 1. Memory 自动注入校准：基于已记录的候选与入选/淘汰原因，根据真实会话调整门槛与身份查询兜底策略。
 2. Agent 服务生命周期：明确 Singleton/Scoped 支持策略。
-3. CLI Bootstrap：补充语言、Telemetry、日志和 OTLP endpoint 的启动时序测试。
-4. Hook：明确取消/中止场景的 Agent 事件契约。
-5. MCP Telemetry：完成 tag 命名分层与去重。
+3. Hook：明确取消/中止场景的 Agent 事件契约。
+4. MCP Telemetry：完成 tag 命名分层与去重。

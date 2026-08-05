@@ -18,59 +18,109 @@ Currently, the agent lacks persistent memory capabilities:
 ## 2. Design Goals
 
 1. **Persistent Memory**: Store and retrieve information across sessions
-2. **Semantic Search**: Find relevant memories using natural language queries
-3. **Memory Types**: Distinguish between facts, procedures, and user preferences
+2. **Full-text Retrieval**: Find relevant memories with SQLite FTS5 lexical retrieval; vector semantic search remains a future capability
+3. **Memory Types**: Distinguish between user profile, feedback, project, and reference memories
 4. **Storage Flexibility**: Support file-based and database storage
 5. **Integration**: Seamlessly integrate with existing context compression and skill systems
 6. **Performance**: Fast retrieval with minimal latency
 
 ## 3. Architecture Overview
 
+> **当前实现状态（2026-08）**：主存储已从文件迁移到 SQLite + FTS5。`FileMemoryProvider`
+> 保留作迁移与兼容实现；`PostgresMemoryProvider` 与向量搜索为早期设计目标，尚未实现。
+
 ```
 Memory System
 ├── IMemoryProvider                    # Storage abstraction
-│   ├── FileMemoryProvider             # Markdown file storage
-│   └── PostgresMemoryProvider         # Database storage with vector search
+│   ├── SqliteMemoryProvider           # SQLite + FTS5 (trigram) — 运行时主存储
+│   └── FileMemoryProvider             # Markdown 文件存储（迁移/兼容保留）
 ├── MemoryManager                      # Core memory operations
 │   ├── SaveMemoryAsync()              # Store new memory
-│   ├── SearchMemoriesAsync()          # Semantic search
+│   ├── SearchRelevantMemoriesAsync()  # FTS 召回 + 排序（词法为主，访问频率 ≤10%、近期 ≤5% 修正）
+│   ├── CreateActiveMemorySnapshotAsync() # 每 Turn 创建不可变快照（Core + Active）
+│   ├── RecordMemoryAccessAsync()      # 粗粒度访问计数
 │   └── GetUserProfileAsync()          # Get user preferences
 ├── Memory Tools
-│   ├── SaveMemoryTool                 # Tool: save memory
-│   ├── SearchMemoryTool               # Tool: search memories
-│   └── GetUserProfileTool             # Tool: get user context
+│   ├── save_memory                    # Tool: save memory
+│   ├── search_memory                  # Tool: search memories
+│   ├── update_memory                  # Tool: update memory
+│   ├── delete_memory                  # Tool: delete memory
+│   └── get_user_profile               # Tool: get user context
 └── Memory Injection                   # Inject into system prompt
-    └── SystemPromptBuilder            # Build enhanced system prompt
+    └── ActiveMemorySnapshot.FormatAsString()  # 快照格式化（Agent 不承担展示逻辑）
 ```
 
 ## 4. Data Models
 
 ### 4.1 Memory Entry
 
-```csharp
-public class MemoryEntry
-{
-    public string Id { get; set; } = Guid.NewGuid().ToString();
-    public string UserId { get; set; }
-    public string Content { get; set; }
-    public MemoryType Type { get; set; }
-    public List<string> Tags { get; set; } = new();
-    public string Source { get; set; }  // "user_input", "agent_inference", "file_import"
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime? LastAccessedAt { get; set; }
-    public int AccessCount { get; set; }
-    public float? RelevanceScore { get; set; }  // For search results
-    public Dictionary<string, string> Metadata { get; set; } = new();
-}
+> **当前实现状态（2026-08）**：`MemoryType` 已从 Fact/Procedure/Context/Reference 演变为
+> User/Feedback/Project/Reference（参考 Claude Code 设计）；`MemoryEntry` 新增
+> Name/Description/Scope/Activation/Project 字段，并引入 `ActiveMemorySnapshot` 不可变快照。
 
+```csharp
 public enum MemoryType
 {
-    Fact,        // 事实：用户偏好、项目信息、环境配置
-    Procedure,   // 流程：可复用的操作步骤、工作流
-    Context,     // 上下文：当前项目状态、决策历史
-    Reference    // 参考：代码片段、配置示例
+    User,        // 用户画像：角色、目标、职责、知识背景（始终私有）
+    Feedback,    // 反馈：用户对工作方式的指导，包括纠正和确认（默认私有）
+    Project,     // 项目：进行中的工作、目标、缺陷、决策（倾向团队）
+    Reference    // 参考：外部系统资源指针、文档位置（通常团队）
+}
+
+public enum MemoryScope
+{
+    Private,     // 私有：仅当前用户可见
+    Team         // 团队：项目内所有用户共享
+}
+
+public enum MemoryActivation
+{
+    OnDemand,    // 仅通过任务相关检索获得
+    Core         // 始终作为稳定上下文注入（Core Entries）
+}
+
+public class MemoryEntry
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N")[..12];
+    public string UserId { get; set; }
+    public string Name { get; set; }
+    public string Description { get; set; }
+    public string Content { get; set; }
+    public MemoryType Type { get; set; } = MemoryType.User;
+    public MemoryScope Scope { get; set; } = MemoryScope.Private;
+    public MemoryActivation Activation { get; set; } = MemoryActivation.OnDemand;
+    public List<string> Tags { get; set; } = [];
+    public string Source { get; set; }  // "user_input", "agent_inference", "file_import"
+    public string? Project { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? LastAccessedAt { get; set; }
+    public int AccessCount { get; set; }
+    public Dictionary<string, string> Metadata { get; set; } = [];
+    [JsonIgnore] public float? RelevanceScore { get; set; }  // 搜索分数（不持久化）
+    [JsonIgnore] public string? IndexLine { get; set; }       // MEMORY.md 索引行（不持久化）
+}
+
+/// <summary>
+/// 一个 Turn 内冻结的记忆投影：CoreEntries 每轮常驻，ActiveEntries 按当前输入召回。
+/// 同一 Turn 的所有 LLM Round 复用同一不可变快照。
+/// </summary>
+public sealed record ActiveMemorySnapshot(
+    string TurnId,
+    IReadOnlyList<MemoryEntry> CoreEntries,
+    IReadOnlyList<MemoryEntry> ActiveEntries,
+    string Index)
+{
+    public IReadOnlyList<MemoryEntry> Entries => CoreEntries.Concat(ActiveEntries).ToArray();
+    public string FormatAsString();
 }
 ```
+
+**`ActiveMemorySnapshot.FormatAsString()` 输出规则**：
+- 先输出 `Index`（由 Provider 生成的记忆可用性索引；File Provider 为 `MEMORY.md` 文本，SQLite Provider 为记忆数量和 `search_memory` 提示）
+- 再按 `Core memories:` / `Task-related memories for this turn:` 分组标题输出，条目格式 `- [Type] text (tags: ...)`
+- 名称去重：当 `Name` 只是 `Description` 的截断前缀时，只输出完整 `Description`，避免重复
+- `Entries` 为空时仅返回 `Index`
 
 ### 4.2 User Profile
 
@@ -117,32 +167,23 @@ public class CommunicationStyle
 
 ### 5.1 Memory Provider
 
+> **当前实现状态（2026-08）**：`SearchMemoriesAsync` 签名已从 `(userId, query, type, maxResults)`
+> 改为 `(userId, query, MemorySearchOptions? options)`；新增 `ListCoreMemoriesAsync`、
+> `TouchMemoryAsync`、`GetMemoryIndexAsync`。
+
 ```csharp
 public interface IMemoryProvider
 {
-    /// <summary>
-    /// 保存记忆
-    /// </summary>
     Task SaveMemoryAsync(MemoryEntry entry, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// 获取记忆
-    /// </summary>
     Task<MemoryEntry?> GetMemoryAsync(string id, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// 语义搜索记忆
-    /// </summary>
     Task<List<MemoryEntry>> SearchMemoriesAsync(
-        string userId, 
-        string query, 
-        MemoryType? type = null,
-        int maxResults = 10,
+        string userId,
+        string query,
+        MemorySearchOptions? options = null,
         CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// 获取用户的所有记忆（分页）
-    /// </summary>
     Task<List<MemoryEntry>> ListMemoriesAsync(
         string userId,
         MemoryType? type = null,
@@ -150,67 +191,119 @@ public interface IMemoryProvider
         int take = 50,
         CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// 更新记忆
-    /// </summary>
+    /// <summary>返回显式提升为稳定核心上下文的私有记忆。</summary>
+    Task<List<MemoryEntry>> ListCoreMemoriesAsync(
+        string userId,
+        CancellationToken cancellationToken = default);
+
     Task UpdateMemoryAsync(MemoryEntry entry, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// 删除记忆
-    /// </summary>
     Task DeleteMemoryAsync(string id, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// 获取用户画像
-    /// </summary>
+    /// <summary>记录记忆被实际使用。搜索候选本身不应调用此方法。</summary>
+    Task TouchMemoryAsync(string id, CancellationToken cancellationToken = default);
+
+    /// <summary>获取 Provider 生成的记忆可用性索引（用于注入 System Prompt）。</summary>
+    Task<string> GetMemoryIndexAsync(
+        string userId,
+        string? projectId = null,
+        CancellationToken cancellationToken = default);
+
     Task<UserProfile?> GetUserProfileAsync(string userId, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// 保存用户画像
-    /// </summary>
     Task SaveUserProfileAsync(UserProfile profile, CancellationToken cancellationToken = default);
+}
+
+public class MemorySearchOptions
+{
+    public MemoryType? Type { get; init; }
+    public List<string>? Tags { get; init; }
+    public string? ProjectId { get; init; }
+    public int MaxResults { get; init; } = 10;
+    public float MinScore { get; init; } = 0.5f;  // 预留向量搜索最小相似度
 }
 ```
 
 ### 5.2 Memory Manager
 
+> **当前实现状态（2026-08）**：新增 `update_memory` / `delete_memory` 能力（
+> `UpdateMemoryAsync` / `DeleteMemoryAsync`）；新增 `RecordMemoryAccessAsync` 与
+> `CreateActiveMemorySnapshotAsync`；`SearchRelevantMemoriesAsync` 内部先召回 4 倍候选，
+> 再按 `GetMemoryRank`（词法相关 × (1 + 10% 频率 + 5% 近期)）排序后截取。
+
 ```csharp
 public interface IMemoryManager
 {
-    /// <summary>
-    /// 保存记忆（自动分类和打标签）
-    /// </summary>
+    /// <summary>保存记忆（自动分类和打标签）</summary>
     Task<MemoryEntry> SaveMemoryAsync(
         string userId,
         string content,
         MemoryType? type = null,
         List<string>? tags = null,
         string? source = null,
+        string? project = null,
+        MemoryActivation activation = MemoryActivation.OnDemand,
         CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// 智能搜索（结合语义搜索和关键词匹配）
-    /// </summary>
+    /// <summary>更新记忆内容（按 memoryId）</summary>
+    Task<bool> UpdateMemoryAsync(
+        string userId,
+        string memoryId,
+        string? content = null,
+        MemoryType? type = null,
+        List<string>? tags = null,
+        MemoryActivation? activation = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>删除记忆</summary>
+    Task<bool> DeleteMemoryAsync(
+        string userId,
+        string memoryId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>智能搜索（FTS 召回 + 排序）</summary>
     Task<List<MemoryEntry>> SearchRelevantMemoriesAsync(
         string userId,
         string context,
         int maxResults = 5,
+        MemoryType? type = null,
+        string? projectId = null,
         CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// 获取用户上下文（合并画像和相关记忆）
-    /// </summary>
+    /// <summary>记录一次粗粒度的记忆使用</summary>
+    Task RecordMemoryAccessAsync(
+        string memoryId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>为一个用户 Turn 创建活跃记忆快照（Core + Active）</summary>
+    Task<ActiveMemorySnapshot> CreateActiveMemorySnapshotAsync(
+        string userId,
+        string input,
+        string turnId,
+        string? projectId = null,
+        CancellationToken cancellationToken = default);
+
+    Task<string> GetMemoryIndexAsync(
+        string userId,
+        string? projectId = null,
+        CancellationToken cancellationToken = default);
+
     Task<string> GetUserContextAsync(
         string userId,
         string? currentProject = null,
         CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// 更新用户画像（基于对话历史）
-    /// </summary>
     Task UpdateUserProfileAsync(
         string userId,
         Dictionary<string, string> updates,
+        CancellationToken cancellationToken = default);
+
+    Task<UserProfile?> GetUserProfileAsync(
+        string userId,
+        CancellationToken cancellationToken = default);
+
+    Task SaveUserProfileAsync(
+        UserProfile profile,
         CancellationToken cancellationToken = default);
 }
 ```
@@ -219,42 +312,101 @@ public interface IMemoryManager
 
 ### 6.1 File Memory Provider
 
-存储位置：`~/.insightai/memory/{userId}/`
+> **当前实现状态（2026-08）**：保留作迁移与兼容实现，不再是运行时主存储。
+> 存储路径为 `~/.insighta/memories/private/{userId}/`（注意是 `.insighta` 而非 `.insightai`）。
+
+存储位置：`~/.insighta/memories/private/{userId}/`（兼容实现，参考 Claude Code 设计）
 
 ```
-~/.insightai/memory/{userId}/
-├── profile.md           # 用户画像
-├── memories/
-│   ├── {id}.md          # 单条记忆
-│   └── index.json       # 索引文件
-└── projects/
-    └── {project}.md     # 项目特定记忆
+~/.insighta/memories/
+├── private/{userId}/    # 私有记忆
+│   ├── MEMORY.md        # 索引文件（注入 System Prompt）
+│   ├── user-profile.md  # 用户画像
+│   └── memories/
+│       ├── {id}.md      # 单条记忆（YAML front-matter + 正文）
+│       └── ...
+└── team/{projectId}/    # 团队记忆（项目级）
+    ├── MEMORY.md
+    └── memories/
 ```
 
 **记忆文件格式**：
 ```markdown
 ---
-id: mem_abc123
-type: fact
+id: 1a2b3c4d5e6f
+name: 记忆名称
+description: 简短描述
+type: user            # user | feedback | project | reference
 tags: [preference, coding-style]
 source: user_input
-created: 2024-01-15T10:30:00Z
+activation: on_demand # on_demand | core
+created: 2026-08-01T10:30:00Z
 ---
-
-用户偏好使用 4 空格缩进，不使用 Tab。
-喜欢使用 var 关键字进行类型推断。
+记忆正文内容
 ```
 
-**优点**：
-- 人类可读，易于手动编辑
-- 版本控制友好
-- 无外部依赖
+**优点**：人类可读、易于手动编辑、版本控制友好、无外部依赖。
+**缺点**：全量扫描、无全文索引，记忆量大时性能差、上下文膨胀。
 
-**缺点**：
-- 搜索性能较差（需全量扫描）
-- 不支持向量搜索
+### 6.2 SQLite Memory Provider（运行时主存储）
 
-### 6.2 PostgreSQL Memory Provider
+> **当前实现状态（2026-08-04）**：SQLite + FTS5（trigram tokenizer）召回候选，替代文件
+> 全量加载。定向测试 42 项通过，覆盖自动快照筛选、访问计数和 FTS 行为。
+
+**表结构**（与 `SqliteMemoryProvider` 一致）：
+```sql
+-- 记忆表
+CREATE TABLE IF NOT EXISTS memory_entries (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    content TEXT NOT NULL,
+    type TEXT NOT NULL,          -- 'user' | 'feedback' | 'project' | 'reference'
+    scope TEXT NOT NULL,         -- 'private' | 'team'
+    activation TEXT NOT NULL DEFAULT 'OnDemand',  -- 'OnDemand' | 'Core'
+    tags_json TEXT NOT NULL,     -- JSON 数组
+    source TEXT NOT NULL,
+    project TEXT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    last_accessed_at TEXT NULL,
+    access_count INTEGER NOT NULL DEFAULT 0
+);
+
+-- 用户画像表（单 JSON 列，而非扁平列）
+CREATE TABLE IF NOT EXISTS user_profiles (
+    user_id TEXT PRIMARY KEY,
+    profile_json TEXT NOT NULL,  -- JSON: { display_name, preferences, projects, stack, style, last_updated }
+    updated_at TEXT NOT NULL
+);
+
+-- 索引
+CREATE INDEX IF NOT EXISTS idx_memory_private ON memory_entries (user_id, scope, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_memory_team ON memory_entries (project, scope, updated_at DESC);
+
+-- FTS5 虚拟表（trigram tokenizer，支持中文子串匹配）
+CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(
+    memory_id UNINDEXED,
+    name,
+    description,
+    content,
+    tags,
+    tokenize = 'trigram'
+);
+```
+
+**召回与排序**：
+- **召回**：FTS5 trigram 匹配，`SearchRelevantMemoriesAsync` 内部先取 4 倍于 `maxResults` 的候选（`MaxResults * 4`）再排序。
+- **排序**：以 FTS 词法相关性为主，访问频率最多 10% 修正、近期访问最多 5% 修正（`GetMemoryRank`）。
+- **访问计数**：`TouchMemoryAsync` 在记忆进入 `ActiveEntries` 或 `search_memory` 返回结果时各记一次；Core 常驻注入不计数。
+
+**优点**：无外部服务依赖、本地快速全文检索、中文支持好。
+**缺点**：不支持向量语义检索（当前由词法 FTS 承担）。
+
+### 6.3 PostgreSQL Memory Provider（设计目标，尚未实现）
+
+> **当前实现状态（2026-08）**：仍为早期设计目标，`PostgresMemoryProvider` 未实现。
 
 **数据库 Schema**：
 ```sql
@@ -263,7 +415,7 @@ CREATE TABLE memories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id VARCHAR(100) NOT NULL,
     content TEXT NOT NULL,
-    type VARCHAR(20) NOT NULL,  -- 'fact', 'procedure', 'context', 'reference'
+    type VARCHAR(20) NOT NULL,  -- 'user', 'feedback', 'project', 'reference'
     tags TEXT[] DEFAULT '{}',
     source VARCHAR(50),
     metadata JSONB DEFAULT '{}',
@@ -291,16 +443,13 @@ CREATE INDEX idx_memories_tags ON memories USING GIN(tags);
 CREATE INDEX idx_memories_embedding ON memories USING ivfflat (embedding vector_cosine_ops);
 ```
 
-**优点**：
-- 高性能语义搜索
-- 支持复杂查询
-- 可扩展性强
-
-**缺点**：
-- 需要外部依赖
-- 需要嵌入 API 调用（有成本）
+**优点**：高性能语义搜索、支持复杂查询、可扩展性强。
+**缺点**：需要外部依赖、需要嵌入 API 调用（有成本）。
 
 ## 7. Tool Definitions
+
+> **当前实现状态（2026-08）**：工具已从 3 个扩展到 5 个（新增 `update_memory` / `delete_memory`）。
+> 记忆类型从 `fact/procedure/context/reference` 更新为 `user/feedback/project/reference`。
 
 ### 7.1 Save Memory Tool
 
@@ -310,12 +459,18 @@ public class SaveMemoryTool : IToolExecutor
 {
     [ToolParameter("content", "要保存的内容", required: true)]
     public string Content { get; set; }
-    
-    [ToolParameter("type", "记忆类型：fact（事实）、procedure（流程）、context（上下文）、reference（参考）", required: false)]
+
+    [ToolParameter("type", "记忆类型：user（用户）、feedback（反馈）、project（项目）、reference（参考）", required: false)]
     public string? Type { get; set; }
-    
+
     [ToolParameter("tags", "标签列表，用逗号分隔", required: false)]
     public string? Tags { get; set; }
+
+    [ToolParameter("project", "关联的项目名称", required: false)]
+    public string? Project { get; set; }
+
+    [ToolParameter("activation", "注入策略：on_demand（按任务检索）或 core（每轮常驻）", required: false)]
+    public string? Activation { get; set; }
 }
 ```
 
@@ -327,16 +482,53 @@ public class SearchMemoryTool : IToolExecutor
 {
     [ToolParameter("query", "搜索查询", required: true)]
     public string Query { get; set; }
-    
+
     [ToolParameter("type", "限定搜索的记忆类型", required: false)]
     public string? Type { get; set; }
-    
+
+    [ToolParameter("project", "限定搜索的项目", required: false)]
+    public string? Project { get; set; }
+
     [ToolParameter("max_results", "最大返回结果数", required: false)]
     public int? MaxResults { get; set; }
 }
 ```
 
-### 7.3 Get User Profile Tool
+### 7.3 Update Memory Tool
+
+```csharp
+[Tool("update_memory", "更新现有的长期记忆")]
+public class UpdateMemoryTool : IToolExecutor
+{
+    [ToolParameter("memory_id", "要更新的记忆 ID", required: true)]
+    public string MemoryId { get; set; }
+
+    [ToolParameter("content", "新的记忆内容", required: false)]
+    public string? Content { get; set; }
+
+    [ToolParameter("type", "新的记忆类型", required: false)]
+    public string? Type { get; set; }
+
+    [ToolParameter("tags", "新的标签列表", required: false)]
+    public string? Tags { get; set; }
+
+    [ToolParameter("activation", "新的注入策略：on_demand 或 core", required: false)]
+    public string? Activation { get; set; }
+}
+```
+
+### 7.4 Delete Memory Tool
+
+```csharp
+[Tool("delete_memory", "删除一条长期记忆")]
+public class DeleteMemoryTool : IToolExecutor
+{
+    [ToolParameter("memory_id", "要删除的记忆 ID", required: true)]
+    public string MemoryId { get; set; }
+}
+```
+
+### 7.5 Get User Profile Tool
 
 ```csharp
 [Tool("get_user_profile", "获取用户偏好和项目上下文")]
@@ -351,51 +543,32 @@ public class GetUserProfileTool : IToolExecutor
 
 ### 8.1 System Prompt Injection
 
-在构建系统提示词时，自动注入相关记忆：
+> **当前实现状态（2026-08-04）**：`RunStreamAsync()` 在用户 Turn 开始时创建一次
+> `ActiveMemorySnapshot`（Core 常驻 + Active 按当前输入召回），同一 Turn 的所有 LLM Round
+> 复用该不可变快照；由 `ActiveMemorySnapshot.FormatAsString()` 生成 Prompt 文本，Agent 不承担
+> 展示逻辑。动态 System Prompt 每轮由 `SystemPromptBuilder` 重建，记忆作为 Layer 4 注入。
+
+`RunStreamAsync()` 负责在 Turn 开始时创建快照；系统提示词构建器只消费已格式化的快照文本，不能自行检索或创建快照：
 
 ```csharp
-public class SystemPromptBuilder
+// Agent.RunStreamAsync：每个用户 Turn 仅创建一次。
+var snapshot = await _memoryManager.CreateActiveMemorySnapshotAsync(
+    _config.UserId,
+    input,
+    sessionId,
+    cancellationToken: cancellationToken);
+
+// Agent.BuildSystemPromptAsync：每个 LLM Round 重建 Prompt，复用同一快照。
+var systemPrompt = await SystemPromptBuilder.BuildAsync(new SystemPromptParams
 {
-    public async Task<string> BuildAsync(AgentContext context)
-    {
-        var sb = new StringBuilder();
-        
-        // 1. 基础系统提示
-        sb.AppendLine(context.BaseSystemPrompt);
-        
-        // 2. 用户画像
-        var userProfile = await _memoryManager.GetUserProfileAsync(context.UserId);
-        if (userProfile != null)
-        {
-            sb.AppendLine("\n## User Preferences");
-            sb.AppendLine($"- Language: {userProfile.Style.Language}");
-            sb.AppendLine($"- Verbosity: {userProfile.Style.Verbosity}");
-            // ... 其他偏好
-        }
-        
-        // 3. 相关记忆（基于当前对话上下文）
-        var relevantMemories = await _memoryManager.SearchRelevantMemoriesAsync(
-            context.UserId, 
-            context.CurrentMessage,
-            maxResults: 3);
-        
-        if (relevantMemories.Any())
-        {
-            sb.AppendLine("\n## Relevant Memories");
-            foreach (var memory in relevantMemories)
-            {
-                sb.AppendLine($"- [{memory.Type}] {memory.Content}");
-            }
-        }
-        
-        return sb.ToString();
-    }
-}
+    // Layer 1–3 和其他 Layer 4 动态信息省略
+    MemoryIndex = snapshot.FormatAsString()
+});
 ```
 
-### 8.2 Context Compression Integration
+### 8.2 Future Context Compression Integration
 
-在上下文压缩时，保留重要记忆：
+当前实现的上下文压缩消费 `SessionMemoryHook` 生成的 `MEMORY.md`；下列 `MemoryAwareCompactStrategy` 是未来将长期记忆写入压缩链路的设计草案，尚未实现。
 
 ```csharp
 public class MemoryAwareCompactStrategy : ICompactStrategy
@@ -422,9 +595,9 @@ public class MemoryAwareCompactStrategy : ICompactStrategy
 }
 ```
 
-### 8.3 Skill System Integration
+### 8.3 Future Skill System Integration
 
-记忆可以触发技能激活：
+当前没有基于记忆自动建议或激活 Skill 的实现；下列代码为设计草案。
 
 ```csharp
 public class MemorySkillIntegration
@@ -433,7 +606,7 @@ public class MemorySkillIntegration
     {
         // 1. 搜索相关程序记忆
         var procedures = await _memoryManager.SearchRelevantMemoriesAsync(
-            userId, context, type: MemoryType.Procedure);
+            userId, context, type: MemoryType.Reference);
         
         // 2. 匹配已注册的技能
         var suggestedSkills = new List<ISkill>();
@@ -451,7 +624,9 @@ public class MemorySkillIntegration
 }
 ```
 
-## 9. Implementation Plan
+## 9. Historical / Future Implementation Plan
+
+> 本节保留早期实施路线作为背景，不描述当前完成状态；实际状态以第 16 节为准。
 
 ### Phase 1: Core Memory System (2-3 days)
 
@@ -505,13 +680,18 @@ public class MemorySkillIntegration
    - Suggest skills based on memories
    - Convert procedures to skills
 
-## 10. Configuration
+## 10. Future Configuration Design
+
+> **当前实现状态（2026-08-04）**：以下 JSON 尚未接入运行时配置绑定。当前 CLI
+> 由 `AgentFactory` 直接创建 `SqliteMemoryProvider`，默认数据库路径为
+> `~/.insighta/memory/memory.db`。本节保留为将来的可配置化设计，不应视为当前可用配置。
 
 ```json
 {
   "Memory": {
-    "Provider": "postgres",  // "file" or "postgres"
-    "FileStoragePath": "~/.insightai/memory",
+    "Provider": "sqlite",  // "sqlite"（当前主存储）| "file"（迁移/兼容）
+    "SqlitePath": "~/.insighta/memory/memory.db",
+    "FileStoragePath": "~/.insighta/memories",
     "ConnectionString": "${CONNECTION_STRING}",
     "EmbeddingModel": "text-embedding-ada-002",
     "MaxMemoriesPerUser": 10000,
@@ -543,69 +723,65 @@ public class MemorySkillIntegration
 
 ## 12. Security Considerations
 
-1. **Data Isolation**: User memories are isolated by `user_id`
-2. **Encryption**: Sensitive memories can be encrypted at rest
-3. **Access Control**: Memories are only accessible by the owning user
-4. **Data Retention**: Configurable retention policies
-5. **GDPR Compliance**: Support for data deletion requests
+1. **Retrieval isolation (implemented)**: SQLite search/list operations filter private memories by `user_id`; team memories are included only when the caller supplies a matching `projectId`.
+2. **Mutation authorization (known limitation; deferred)**: `UpdateMemoryAsync` and `DeleteMemoryAsync` load by memory ID only and do not verify the caller's `userId`. This is intentionally recorded but not fixed yet: the follow-up must first define Team memory project-membership authorization, then verify `existing.UserId == userId` for Private memories and membership for Team memories. A caller-supplied project string is not authorization evidence.
+3. **Encryption (future)**: Sensitive memories may be encrypted at rest; no encryption layer is implemented today.
+4. **Retention and GDPR (future)**: Retention policies and dedicated deletion/export workflows are not implemented.
 
 ## 13. Session Memory (Short-Term Memory)
 
 ### 13.1 概述
 
-会话记忆是**短期记忆**，仅在单次会话期间有效。它的价值在于：
+会话记忆是**会话级短期记忆**，用于本地持久化会话摘要并辅助上下文压缩。它的价值在于：
 
-- **上下文压缩**：作为 L2 压缩策略的摘要来源（零成本）
-- **工具协同**：记录工具调用的错误和成功模式，实现"协同进化"
-- **会话连续性**：在长对话中保持关键信息
+- **上下文压缩**：作为 L2 压缩策略的摘要来源；压缩阶段不再调用 LLM，但摘要可由 `ISummaryService` 在后台预先更新。
+- **会话连续性**：在长对话中保持关键信息。
+
+Tool Error Memory 属于第 14 节的后续能力，当前尚未实现。
 
 ### 13.2 存储结构
 
 ```
-~/.insightai/memory/sessions/{sessionId}/
-├── session-memory.md        # 会话级记忆摘要
-├── metadata.json            # 会话元数据
-└── tool-errors/             # 工具调用记录
-    ├── {errorId}.md         # 单条错误记录
-    └── ...
+~/.insighta/memories/sessions/{sessionId}/
+├── MEMORY.md                # 会话级记忆摘要
+└── metadata.json            # 会话元数据
 ```
 
 ### 13.3 SessionMemoryHook
 
-实现 `IAgentHook` 接口，在每轮结束后异步提取记忆：
+实现 `IAgentEventHook` 接口。Round 结束（达到配置的最小轮次）或 Turn 结束时，它会保存消息快照并在后台提取记忆：
 
 ```csharp
-public sealed class SessionMemoryHook : IAgentHook
+public sealed class SessionMemoryHook : IAgentEventHook
 {
-    // 每轮结束后触发
-    public async Task OnRoundEndAsync(int round, IReadOnlyList<Message> messages,
-        Message? assistantMessage, CancellationToken cancellationToken)
+    public Task OnAgentRoundEndedAsync(
+        AgentEventHookContext context,
+        IReadOnlyList<Message> messages,
+        Message? assistantMessage,
+        CancellationToken cancellationToken = default)
     {
-        // 异步执行，不阻塞主流程
-        _ = Task.Run(async () =>
-        {
-            await ExtractAndSaveMemoryAsync(round, messages, assistantMessage, cancellationToken);
-        }, cancellationToken);
+        ExtractMemoryInBackground(context, messages);
+        return Task.CompletedTask;
     }
 }
 ```
 
 **提取策略**：
-- 用户偏好关键词：喜欢、偏好、不要、don't
-- 项目信息关键词：项目、project、目标、goal、截止、deadline
-- 决策关键词：决定、decide、选择、choose、方案、approach
-- 问题关键词：错误、error、问题、issue、bug
+
+- `SessionMemoryHook` 将已有摘要与最近最多 10 条消息交给 `ISummaryService.UpdateAsync()`；成功后原子地替换 `MEMORY.md`。
+- LLM 摘要可通过 `SessionMemoryOptions.EnableLlmSummary` 关闭；默认开启，并受最小轮次和摘要间隔控制。
+- 摘要失败时不覆盖已有 `MEMORY.md`。
 
 ### 13.4 与 L2 压缩的集成
 
 会话记忆是 L2 Session Memory Compact 的数据来源：
 
 ```
-对话轮次 1-10 → SessionMemoryHook 异步提取 → session-memory.md
+对话轮次 → SessionMemoryHook 异步提取 → MEMORY.md
 占用率分母：AvailableInputTokens = MaxContextTokens - ReservedForOutput
 当上下文达到 45% → MicroCompact (L1)
 当上下文达到 65% → SessionMemoryCompact (L2)
-  └── 读取 session-memory.md 作为摘要
+  └── 读取 MEMORY.md 作为摘要
   └── 替换旧消息，保留最近 N 轮
 当上下文达到 80% → TraditionalCompact (L3)
   └── 调用 LLM 生成摘要
@@ -795,7 +971,7 @@ private static bool IsContentSimilar(string content1, string content2)
     if (entities1.Count > 0 && entities2.Count > 0)
     {
         var overlap = entities1.Intersect(entities2, StringComparer.OrdinalIgnoreCase).Count();
-        var similarity = (float)overlap / Math.Min(entities1.Count, entities2.Count);
+        var similarity = (float)overlap / Math.Max(entities1.Count, entities2.Count);
         if (similarity >= 0.7f) return true;
     }
 
@@ -803,7 +979,7 @@ private static bool IsContentSimilar(string content1, string content2)
     var keywords1 = ExtractKeywords(content1);
     var keywords2 = ExtractKeywords(content2);
     var keywordOverlap = keywords1.Intersect(keywords2, StringComparer.OrdinalIgnoreCase).Count();
-    var keywordSimilarity = (float)keywordOverlap / Math.Max(keywords1.Count, keywords2.Count);
+    var keywordSimilarity = (float)keywordOverlap / Math.Min(keywords1.Count, keywords2.Count);
     return keywordSimilarity >= 0.8f;
 }
 ```
@@ -812,26 +988,32 @@ private static bool IsContentSimilar(string content1, string content2)
 
 ### 已完成
 
-- [x] `IMemoryProvider` + `FileMemoryProvider`
+- [x] `IMemoryProvider` + `SqliteMemoryProvider`（SQLite + FTS5 trigram，运行时主存储）
+- [x] `IMemoryProvider` + `FileMemoryProvider`（迁移与兼容保留）
 - [x] `MemoryManager` + `IMemoryManager`
-- [x] `MemoryEntry`, `UserProfile` 模型
-- [x] `save_memory`, `search_memory`, `get_user_profile` 工具
-- [x] System Prompt 注入记忆索引 (MEMORY.md)
+- [x] `MemoryEntry`, `UserProfile` 模型（含 Type/Scope/Activation）
+- [x] `ActiveMemorySnapshot` 每 Turn 不可变快照（Core 常驻 + Active 召回）
+- [x] `save_memory`, `search_memory`, `update_memory`, `delete_memory`, `get_user_profile` 工具
+- [x] System Prompt 注入 Provider 记忆索引 + 活跃记忆快照格式化
 - [x] 记忆去重逻辑
-- [x] `IAgentHook` 接口
+- [x] `IAgentEventHook` 接口
 - [x] `SessionMemoryHook` 会话记忆
 - [x] Agent 钩子触发机制
+- [x] L2 `SessionMemoryCompactStrategy`
+- [x] 访问计数（粗粒度）与排序修正（频率 ≤10%、近期 ≤5%）
+- [x] 自动注入门槛（≥3 trigram、候选 ≥2 命中且覆盖 50% 查询片段）
+- [x] 定向测试 42 项通过（2026-08-04）
 
 ### 待实现
 
 - [ ] Tool Error Memory 记录和使用
-- [ ] L2 Session Memory Compact 策略
-- [ ] PostgreSQL Memory Provider
-- [ ] 向量搜索支持
+- [ ] PostgreSQL Memory Provider（早期设计目标）
+- [ ] 向量语义搜索支持
 - [ ] 用户画像自动更新
+- [ ] Memory 自动注入门槛校准（基于本地筛选日志调参）
 
 ---
 
-**Document Version**: 2.0
-**Last Updated**: 2025-01-15
+**Document Version**: 2.1
+**Last Updated**: 2026-08-04
 **Author**: InsightaAI Team

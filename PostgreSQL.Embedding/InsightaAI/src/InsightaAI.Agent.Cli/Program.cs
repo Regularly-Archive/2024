@@ -24,18 +24,14 @@ public class Program
         // 设置控制台编码为 UTF-8（修复全局工具模式下特殊字符显示为问号的问题）
         Console.OutputEncoding = Encoding.UTF8;
         var cliConfig = CliConfig.Load();
-        var cliEnvironment = new CliEnvironment(cliConfig.Envs);
-        cliEnvironment.ApplyBootstrapVariables();
-
-        var language = cliEnvironment.Get("INSIGHTA_LANGUAGE")
-            ?? cliConfig.Language;
-        CliCulture.Configure(language);
+        var bootstrap = CliBootstrap.Initialize(cliConfig);
+        CliCulture.Configure(bootstrap.Language);
 
         // 初始化文件日志（~/.insighta/logs/insighta-{date}.log）
         InitLogger();
 
         // 初始化 OpenTelemetry（通过环境变量 INSIGHTA_TELEMETRY=1 启用）
-        using var telemetry = InitTelemetry(cliEnvironment);
+        using var telemetry = InitTelemetry(bootstrap);
 
         // 创建 CLI 根 Host。命令行解析仍由 System.CommandLine 负责，
         // 共享基础设施和命令对象由 Host DI 管理。
@@ -97,12 +93,10 @@ public class Program
         AppDomain.CurrentDomain.ProcessExit += (_, _) => Log.CloseAndFlush();
     }
 
-    private static IDisposable? InitTelemetry(CliEnvironment environment)
+    private static IDisposable? InitTelemetry(CliBootstrap bootstrap)
     {
-        if (!string.Equals(environment.Get("INSIGHTA_TELEMETRY"), "1", StringComparison.OrdinalIgnoreCase))
+        if (!bootstrap.TelemetryEnabled)
             return null;
-
-        var endpoint = environment.Get("INSIGHTA_OTEL_ENDPOINT") ?? "http://localhost:4317";
 
         var resourceBuilder = ResourceBuilder.CreateDefault()
             .AddService("insighta-cli");
@@ -111,13 +105,13 @@ public class Program
             .SetResourceBuilder(resourceBuilder)
             .AddSource("InsightaAI.Agent")
             .AddHttpClientInstrumentation()
-            .AddOtlpExporter(o => o.Endpoint = new Uri(endpoint))
+            .AddOtlpExporter(o => o.Endpoint = new Uri(bootstrap.OtlpEndpoint))
             .Build();
 
         var meterProvider = Sdk.CreateMeterProviderBuilder()
             .SetResourceBuilder(resourceBuilder)
             .AddMeter("InsightaAI.Agent")
-            .AddOtlpExporter(o => o.Endpoint = new Uri(endpoint))
+            .AddOtlpExporter(o => o.Endpoint = new Uri(bootstrap.OtlpEndpoint))
             .Build();
 
         return new CompositeDisposable(tracerProvider, meterProvider);

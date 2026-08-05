@@ -124,7 +124,7 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 
 **遗留：** MCP Telemetry Tag 命名优化仍未完成；当前代码仍需核对 `mcp.server.description` 与本地配置语义，见 TODO.md #12
 
-### CLI 配置启动时序（已完成核心实现）
+### CLI 配置启动时序（已完成）
 
 `Program.cs` 在创建 Host 前加载 `CliConfig`，通过 `CliEnvironment` 应用 Bootstrap 环境变量，再初始化语言、日志和 Telemetry；`CliConfig` 实例通过 Host DI 传入运行时服务，不再由 `ChatApplication` 重复加载或修改进程环境。
 
@@ -135,7 +135,7 @@ Bootstrap 配置 → Program.cs 初始化文化、日志、Telemetry 和 Host
 Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服务
 ```
 
-环境变量优先级统一为：进程环境变量 > `CliConfig.Envs` > 默认值。Agent 运行时通过 Agent 自己的 ServiceProvider 注入环境读取器，避免依赖 CLI 的外部 Provider。
+环境变量优先级统一为：进程环境变量 > `CliConfig.Envs` > 默认值。`CliBootstrap` 将启动前解析结果冻结为语言、Telemetry 开关和 OTLP endpoint，并由测试覆盖；Agent 运行时通过 Agent 自己的 ServiceProvider 注入环境读取器，避免依赖 CLI 的外部 Provider。
 
 ### AgentBuilder 与 AgentFactory
 
@@ -146,7 +146,7 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 ### 当前待办
 
 1. **Memory 自动注入校准** — 用本地候选筛选日志和真实会话调整初始覆盖门槛。
-2. **Agent 生命周期** — 明确 Scoped 服务支持策略，并补充 CLI Bootstrap 启动时序测试。
+2. **Agent 生命周期** — 明确 Scoped 服务支持策略。
 3. **Hook 事件契约** — 细化取消/中止场景（`DoneReason.Aborted`、`OperationCanceledException`）。
 4. **Telemetry** — 完成 MCP tag 命名清理，并消除 `CurrentRoundContext` 的不安全字典索引。
 5. **运行时用量** — 区分流式模型未返回 token usage 与真实的 0。
