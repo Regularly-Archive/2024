@@ -125,6 +125,11 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 
 - `ILoopContext` 的消息追加与持久化回调均为异步；Agent Loop 在继续生成前等待新增消息成功写入存储，避免 fire-and-forget 写入造成会话 JSONL 或历史记录缺失。
 
+### CLI 用量展示：上下文占用图标调整（2026-08-06）
+
+- `EventRenderer.ShowTokenUsage()` 的上下文占用展示由 🧠 改为 🪟（window emoji），避免被误认为记忆相关；标签随占用百分比着色（≥90 红 / ≥70 黄 / 其余绿）的逻辑保持不变。
+- 曾评估过 BarChart 进度条与文本进度条方案，均因低百分比下视觉失衡被否决；最终保留「图标 + 百分比」的简洁形式。
+
 ### MCP 工具调用元数据管道（2026-07-21）
 
 - `ToolResult` 新增 `Metadata` 属性（`IReadOnlyDictionary<string,object?>?`）

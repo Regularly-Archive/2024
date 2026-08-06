@@ -189,7 +189,7 @@ public class EventRenderer : IDisposable
             : "[dim]0⚡[/]";
 
         // 上下文百分比
-        var contextText = "[dim]🧠 -[/]";
+        var contextText = "[dim]🪟 -[/]";
         if (availableInputTokens > 0 && estimatedContextTokens > 0)
         {
             var contextPercent = (double)estimatedContextTokens / availableInputTokens * 100;
@@ -199,7 +199,7 @@ public class EventRenderer : IDisposable
                 >= 70 => "yellow",
                 _ => "green"
             };
-            contextText = $"[{contextColor}]🧠 {contextPercent:F0}%[/]";
+            contextText = $"[{contextColor}]🪟 {contextPercent:F0}%[/]";
         }
 
         grid.AddRow(
