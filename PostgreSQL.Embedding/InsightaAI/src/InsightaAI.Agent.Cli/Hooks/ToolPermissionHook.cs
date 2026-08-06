@@ -43,6 +43,11 @@ public class ToolPermissionHook : IToolHook
         {
             ShowEditDiff(arguments);
         }
+        // 对 write_file 工具显示内容预览
+        else if (toolName == "write_file")
+        {
+            ShowWritePreview(arguments);
+        }
 
         AnsiConsole.WriteLine();
 
@@ -92,46 +97,79 @@ public class ToolPermissionHook : IToolHook
             var newText = newElement.GetString() ?? "";
             var filePath = filePathElement.GetString() ?? "";
 
-            var diffBuilder = new InlineDiffBuilder(new Differ());
-            var diffModel = diffBuilder.BuildDiffModel(oldText, newText);
-
-            // 统计变更行数
-            var added = diffModel.Lines.Count(l => l.Type == ChangeType.Inserted);
-            var removed = diffModel.Lines.Count(l => l.Type == ChangeType.Deleted);
-
-            if (added == 0 && removed == 0)
-                return;
-
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine($"[dim]File: {EscapeMarkup(filePath)}[/]");
-            AnsiConsole.MarkupLine($"[dim]Changes Preview: [green]+{added}[/] lines, [red]-{removed}[/] lines[/]");
-
-            var panelLines = new List<Markup>();
-            foreach (var line in diffModel.Lines)
-            {
-                var escaped = EscapeMarkup(line.Text ?? "");
-                var prefix = line.Type switch
-                {
-                    ChangeType.Inserted => "[green]+",
-                    ChangeType.Deleted => "[red]-",
-                    _ => "[dim] "
-                };
-                panelLines.Add(new Markup($"{prefix}{escaped}[/]"));
-            }
-
-            var panelContent = new Rows(panelLines);
-            var panel = new Panel(panelContent)
-            {
-                Border = BoxBorder.Square,
-                BorderStyle = new Style(Color.Grey),
-                Padding = new Padding(0, 0, 0, 0)
-            };
-            AnsiConsole.Write(panel);
+            ShowDiffPreview(filePath, oldText, newText);
         }
         catch
         {
-            // JSON 解析失败或 diff 生成异常时静默跳过
+            // JSON 解析失败时静默跳过
         }
+    }
+
+    /// <summary>
+    /// 为 write_file 工具显示 inline diff 预览
+    /// </summary>
+    private static void ShowWritePreview(string arguments)
+    {
+        try
+        {
+            var doc = JsonDocument.Parse(arguments);
+            var root = doc.RootElement;
+
+            if (!root.TryGetProperty("file_path", out var filePathElement) ||
+                !root.TryGetProperty("content", out var contentElement))
+                return;
+
+            var filePath = filePathElement.GetString() ?? "";
+            var content = contentElement.GetString() ?? "";
+
+            ShowDiffPreview(filePath, "", content);
+        }
+        catch
+        {
+            // JSON 解析失败时静默跳过
+        }
+    }
+
+    /// <summary>
+    /// 显示 inline diff 预览
+    /// </summary>
+    private static void ShowDiffPreview(string filePath, string oldText, string newText)
+    {
+        var diffBuilder = new InlineDiffBuilder(new Differ());
+        var diffModel = diffBuilder.BuildDiffModel(oldText, newText);
+
+        // 统计变更行数
+        var added = diffModel.Lines.Count(l => l.Type == ChangeType.Inserted);
+        var removed = diffModel.Lines.Count(l => l.Type == ChangeType.Deleted);
+
+        if (added == 0 && removed == 0)
+            return;
+
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine($"[dim]File: {EscapeMarkup(filePath)}[/]");
+        AnsiConsole.MarkupLine($"[dim]Changes Preview: [green]+{added}[/] lines, [red]-{removed}[/] lines[/]");
+
+        var panelLines = new List<Markup>();
+        foreach (var line in diffModel.Lines)
+        {
+            var escaped = EscapeMarkup(line.Text ?? "");
+            var prefix = line.Type switch
+            {
+                ChangeType.Inserted => "[green]+",
+                ChangeType.Deleted => "[red]-",
+                _ => "[dim] "
+            };
+            panelLines.Add(new Markup($"{prefix}{escaped}[/]"));
+        }
+
+        var panelContent = new Rows(panelLines);
+        var panel = new Panel(panelContent)
+        {
+            Border = BoxBorder.Square,
+            BorderStyle = new Style(Color.Grey),
+            Padding = new Padding(0, 0, 0, 0)
+        };
+        AnsiConsole.Write(panel);
     }
 
     private static string EscapeMarkup(string text)

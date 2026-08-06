@@ -130,6 +130,12 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 - `EventRenderer.ShowTokenUsage()` 的上下文占用展示由 🧠 改为 🪟（window emoji），避免被误认为记忆相关；标签随占用百分比着色（≥90 红 / ≥70 黄 / 其余绿）的逻辑保持不变。
 - 曾评估过 BarChart 进度条与文本进度条方案，均因低百分比下视觉失衡被否决；最终保留「图标 + 百分比」的简洁形式。
 
+### 工具权限预览：write_file 加入 diff 预览（2026-08-06）
+
+- `ToolPermissionHook` 在 edit_file 之外，为 write_file 也提供执行前预览。
+- 预览统一走 `ShowDiffPreview()`：write_file 以空串作为旧内容，diff 结果全为新增行（绿色 +），视觉与 edit_file 完全一致。
+- 抽象的变更行统计（`+N` / `-N`）与 Panel 渲染逻辑由 edit_file 与 write_file 共用，避免重复实现。
+
 ### MCP 工具调用元数据管道（2026-07-21）
 
 - `ToolResult` 新增 `Metadata` 属性（`IReadOnlyDictionary<string,object?>?`）
