@@ -20,6 +20,10 @@ using InsightaAI.Agent.Storage;
 using InsightaAI.Agent.Tools;
 using InsightaAI.Agent.Tools.BuiltIn;
 using InsightaAI.LLM.Abstractions;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Spectre.Console;
 
 namespace InsightaAI.Agent.Cli.Services;
@@ -37,16 +41,19 @@ public sealed class ChatApplication : IChatApplication
     private readonly IMessageStorage _storage;
     private readonly IAgentFactory _agentFactory;
     private readonly CliConfig _config;
+    private readonly CliBootstrap _bootstrap;
     private readonly ChatRenderer _renderer = new();
 
     public ChatApplication(
         IMessageStorage storage,
         IAgentFactory agentFactory,
-        CliConfig config)
+        CliConfig config,
+        CliBootstrap bootstrap)
     {
         _storage = storage;
         _agentFactory = agentFactory;
         _config = config;
+        _bootstrap = bootstrap;
     }
 
     /// <summary>
@@ -62,6 +69,10 @@ public sealed class ChatApplication : IChatApplication
             _renderer.ShowWarning(CliStrings.ChatConfigRequiredHint);
             return 1;
         }
+
+        // 会话级遥测懒加载：仅真正进入 chat 会话才初始化 OTLP exporter，
+        // 随会话结束自动 dispose（见 AGENTS.md「Telemetry 会话级懒加载」）
+        using var telemetry = InitTelemetry(_bootstrap);
 
         // 解析当前模型配置
         var (providerName, _) = config.ParsePrimaryModel();
@@ -126,6 +137,52 @@ public sealed class ChatApplication : IChatApplication
     public Task<int> RunAsync(string? sessionId, bool continueLast = false)
     {
         return ExecuteAsync(sessionId, continueLast);
+    }
+
+    /// <summary>
+    /// 会话级遥测初始化。仅 chat 会话调用；OTLP exporter 设短超时，
+    /// 避免无 collector 时 dispose/flush 连接挂起。
+    /// </summary>
+    private static IDisposable? InitTelemetry(CliBootstrap bootstrap)
+    {
+        if (!bootstrap.TelemetryEnabled)
+            return null;
+
+        var resourceBuilder = ResourceBuilder.CreateDefault()
+            .AddService("insighta-cli");
+
+        var tracerProvider = Sdk.CreateTracerProviderBuilder()
+            .SetResourceBuilder(resourceBuilder)
+            .AddSource("InsightaAI.Agent")
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter(o =>
+            {
+                o.Endpoint = new Uri(bootstrap.OtlpEndpoint);
+                o.TimeoutMilliseconds = 1000;
+            })
+            .Build();
+
+        var meterProvider = Sdk.CreateMeterProviderBuilder()
+            .SetResourceBuilder(resourceBuilder)
+            .AddMeter("InsightaAI.Agent")
+            .AddOtlpExporter(o =>
+            {
+                o.Endpoint = new Uri(bootstrap.OtlpEndpoint);
+                o.TimeoutMilliseconds = 1000;
+            })
+            .Build();
+
+        return new CompositeDisposable(tracerProvider, meterProvider);
+    }
+
+    private sealed class CompositeDisposable : IDisposable
+    {
+        private readonly IDisposable[] _disposables;
+        public CompositeDisposable(params IDisposable[] disposables) => _disposables = disposables;
+        public void Dispose()
+        {
+            foreach (var d in _disposables) d.Dispose();
+        }
     }
 
     private async Task RunChatLoopAsync(ChatSession session, Agent agent, ISummaryService summaryService, CliConfig config, AuthConfig auth, ToolRegistry toolRegistry, SkillRegistry skillRegistry, McpRegistry? mcpRegistry)

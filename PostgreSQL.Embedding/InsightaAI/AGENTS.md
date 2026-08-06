@@ -167,6 +167,16 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 
 环境变量优先级统一为：进程环境变量 > `CliConfig.Envs` > 默认值。`CliBootstrap` 将启动前解析结果冻结为语言、Telemetry 开关和 OTLP endpoint，并由测试覆盖；Agent 运行时通过 Agent 自己的 ServiceProvider 注入环境读取器，避免依赖 CLI 的外部 Provider。
 
+### Telemetry 会话级懒加载（2026-08-06）
+
+**决策**：OpenTelemetry 初始化从启动流程移入 `ChatApplication.ExecuteAsync`，仅当真正进入 chat 会话时才创建 TracerProvider / MeterProvider（`using` 随会话结束自动 dispose）；`--help`、`config`、`sessions`、`skills`、`mcp` 等管理命令完全不初始化遥测。
+
+**原因**：`INSIGHTA_TELEMETRY=1` 时 OTLP exporter 默认指向 `http://localhost:4317`，本机无 collector（端口未开放）时进程退出 dispose/flush 连接超时 ~4 秒，拖慢所有命令（`--help` 实测从 ~4.4s 降到 ~250ms）。遥测的真实消费方是 Agent 会话（ActivitySource `InsightaAI.Agent`），与命令解析无耦合，故将生命周期绑定到会话而非启动流程，避免"按命令名判断是否需要遥测"的字符串开关。
+
+**实施**：`Program.cs` 删除 `InitTelemetry` 及其 OpenTelemetry using；`CliBootstrap` 通过 Host DI 注入 `ChatApplication`；`ExecuteAsync` 在 `ValidateConfig` 通过后创建 telemetry。兜底：OTLP exporter 设 `TimeoutMilliseconds = 1000`，collector 未启动时快速失败而非挂起 4 秒。
+
+**效果**：关闭遥测时启动 ~250ms 与干净 baseline 一致；开启遥测时仅 chat 会话承担 exporter 连接开销，管理命令零遥测开销。
+
 ### AgentBuilder 与 AgentFactory
 
 `AgentBuilder` 是 Agent 级服务组合入口。它注册默认 `ToolRegistry` 和显式依赖，支持 `ConfigureServices()` 扩展当前 Agent 的服务集合，并在 `Build()` 时创建 Agent 专属 ServiceProvider。`AgentFactory` 只负责准备 CLI 业务依赖，再交给 Builder 组装；`Agent` 释放时负责释放该 Provider。旧的显式构造函数暂时保留，用于兼容现有调用方。

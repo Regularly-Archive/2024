@@ -3,10 +3,6 @@ using InsightaAI.Agent.Cli.Localization;
 using InsightaAI.Agent.Cli.Models;
 using InsightaAI.Agent.Cli.Services;
 using InsightaAI.Agent.Storage;
-using OpenTelemetry;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -30,15 +26,15 @@ public class Program
         // 初始化文件日志（~/.insighta/logs/insighta-{date}.log）
         InitLogger();
 
-        // 初始化 OpenTelemetry（通过环境变量 INSIGHTA_TELEMETRY=1 启用）
-        using var telemetry = InitTelemetry(bootstrap);
-
         // 创建 CLI 根 Host。命令行解析仍由 System.CommandLine 负责，
         // 共享基础设施和命令对象由 Host DI 管理。
+        // 注：Telemetry 已改为会话级懒加载（见 ChatApplication.ExecuteAsync），
+        // 仅进入 chat 会话时初始化 OTLP，管理命令（--help/config 等）零遥测开销。
         var hostBuilder = Host.CreateApplicationBuilder(args);
         hostBuilder.Logging.ClearProviders();
         hostBuilder.Logging.AddSerilog(Log.Logger, dispose: false);
         hostBuilder.Services.AddSingleton(cliConfig);
+        hostBuilder.Services.AddSingleton(bootstrap);
         hostBuilder.Services.AddSingleton<IMessageStorage, JsonlMessageStorage>();
         hostBuilder.Services.AddScoped<IAgentFactory, AgentFactory>();
         hostBuilder.Services.AddScoped<IChatApplication, ChatApplication>();
@@ -91,39 +87,5 @@ public class Program
             .CreateLogger();
 
         AppDomain.CurrentDomain.ProcessExit += (_, _) => Log.CloseAndFlush();
-    }
-
-    private static IDisposable? InitTelemetry(CliBootstrap bootstrap)
-    {
-        if (!bootstrap.TelemetryEnabled)
-            return null;
-
-        var resourceBuilder = ResourceBuilder.CreateDefault()
-            .AddService("insighta-cli");
-
-        var tracerProvider = Sdk.CreateTracerProviderBuilder()
-            .SetResourceBuilder(resourceBuilder)
-            .AddSource("InsightaAI.Agent")
-            .AddHttpClientInstrumentation()
-            .AddOtlpExporter(o => o.Endpoint = new Uri(bootstrap.OtlpEndpoint))
-            .Build();
-
-        var meterProvider = Sdk.CreateMeterProviderBuilder()
-            .SetResourceBuilder(resourceBuilder)
-            .AddMeter("InsightaAI.Agent")
-            .AddOtlpExporter(o => o.Endpoint = new Uri(bootstrap.OtlpEndpoint))
-            .Build();
-
-        return new CompositeDisposable(tracerProvider, meterProvider);
-    }
-
-    private sealed class CompositeDisposable : IDisposable
-    {
-        private readonly IDisposable[] _disposables;
-        public CompositeDisposable(params IDisposable[] disposables) => _disposables = disposables;
-        public void Dispose()
-        {
-            foreach (var d in _disposables) d.Dispose();
-        }
     }
 }
