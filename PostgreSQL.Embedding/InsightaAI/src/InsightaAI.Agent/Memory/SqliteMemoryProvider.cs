@@ -20,8 +20,8 @@ public sealed class SqliteMemoryProvider : IMemoryProvider, IAsyncDisposable
         databasePath ??= Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             ".insighta",
-            "memory",
-            "memory.db");
+            "memories",
+            "memories.db");
 
         var fullPath = Path.GetFullPath(databasePath);
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);

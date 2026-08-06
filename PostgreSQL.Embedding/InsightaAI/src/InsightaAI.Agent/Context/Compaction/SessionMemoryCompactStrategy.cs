@@ -33,8 +33,8 @@ public sealed class SessionMemoryCompactStrategy : ICompactStrategy
     public SessionMemoryCompactStrategy(SessionMemoryHook sessionMemoryHook)
     {
         _sessionMemoryHook = sessionMemoryHook ?? throw new ArgumentNullException(nameof(sessionMemoryHook));
-        _memoryFilePath = Path.Combine(sessionMemoryHook.SessionDirectory, "MEMORY.md");
-        _memoryMetadataFilePath = Path.Combine(sessionMemoryHook.SessionDirectory, "metadata.json");
+        _memoryFilePath = Path.Combine(sessionMemoryHook.SessionDirectory, "memories", "MEMORY.md");
+        _memoryMetadataFilePath = Path.Combine(sessionMemoryHook.SessionDirectory, "memories", "metadata.json");
     }
 
     public bool ShouldCompact(IReadOnlyList<Message> messages, int estimatedTokens, ContextBudget budget)

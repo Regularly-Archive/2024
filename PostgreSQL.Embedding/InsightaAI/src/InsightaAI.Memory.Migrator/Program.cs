@@ -256,8 +256,8 @@ internal static class MemoryMigrationProgram
             var database = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 ".insighta",
-                "memory",
-                "memory.db");
+                "memories",
+                "memories.db");
             var apply = false;
             var inspect = false;
             var showHelp = false;

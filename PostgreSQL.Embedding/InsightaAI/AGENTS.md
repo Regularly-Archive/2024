@@ -114,6 +114,16 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 - 快照通过 `ActiveMemorySnapshot.FormatAsString()` 生成 Prompt 文本，避免 Agent 承担记忆展示逻辑；当名称只是描述的截断前缀时，仅保留完整描述以消除重复。
 - 自动注入的初始门槛已启用：输入至少 3 个 trigram，候选至少命中 2 个且覆盖 50% 查询片段；短而宽泛的输入只带 Core。`MemoryManager` 会将候选筛选原因（不含输入和正文）写入本地 Debug 日志，后续据此校准初始值。
 
+### 记忆存储路径变更（2026-08-06）
+
+**决策**：SQLite 记忆库路径从 `~/.insighta/memory/memory.db` 改为 `~/.insighta/memories/memories.db`；会话级 MEMORY.md 从 `~/.insighta/memories/sessions/{sessionId}/MEMORY.md` 改为 `~/.insighta/sessions/{sessionId}/memories/MEMORY.md`。
+
+**原因**：
+- SQLite 库与 Markdown 记忆同归 `memories/` 目录，语义统一（`memory/` 单数过时）。
+- 会话记忆目录归位到会话根目录 `~/.insighta/sessions/{sessionId}/` 下，与 ToolResultArtifactStore（`tool_results/`）等会话级资源并列；`SessionDirectory` 保留会话根目录语义供其他组件共享，Memory 通过自有 `memories/` 子目录存储，不占用根目录语义。
+
+**实施**：`SqliteMemoryProvider` 默认库路径；`SessionMemoryHook` 拆分 `_sessionDir`（会话根目录）与 `_memoryDir`（`{_sessionDir}/memories`），MEMORY.md/metadata.json 走 `_memoryDir`；`SessionMemoryCompactStrategy` 跟随新结构读取；`InsightaAI.Memory.Migrator` 默认 database 同步更新。数据库迁移由用户自行处理（旧库数据需手动迁移，运行时首次打开新路径自动建空库）。
+
 ### WebFetch 内容提取（2026-08-05）
 
 - `WebFetchTool` 使用 AngleSharp 解析 HTML，优先提取 `article`、`main` 或 `[role=main]`，并输出标题、描述、作者、发布日期和 canonical URL 等精选元数据。

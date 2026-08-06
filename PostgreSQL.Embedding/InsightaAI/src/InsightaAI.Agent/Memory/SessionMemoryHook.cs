@@ -47,9 +47,10 @@ public sealed record SessionMemoryOptions
 /// 会话记忆钩子 - 在每轮结束后提取短期记忆，支持 LLM 增强摘要
 ///
 /// 存储结构：
-/// ~/.insightai/memory/sessions/{sessionId}/
-/// ├── MEMORY.md    # 会话级记忆（短期）
-/// └── metadata.json        # 会话元数据
+/// ~/.insighta/sessions/{sessionId}/
+/// └── memories/
+///     ├── MEMORY.md    # 会话级记忆（短期）
+///     └── metadata.json        # 会话元数据
 /// </summary>
 public sealed class SessionMemoryHook : IAgentEventHook
 {
@@ -57,6 +58,7 @@ public sealed class SessionMemoryHook : IAgentEventHook
     private readonly string _userId;
     private readonly string? _projectId;
     private readonly string _sessionDir;
+    private readonly string _memoryDir;
     private readonly SemaphoreSlim _lock = new(1, 1);
 
     // LLM 增强配置
@@ -102,12 +104,15 @@ public sealed class SessionMemoryHook : IAgentEventHook
         _userId = userId;
         _projectId = projectId;
 
-        // 会话记忆目录
-        var memoryBase = Path.Combine(
+        // 会话根目录（可能被其他组件共享，如 ToolResultArtifactStore）
+        _sessionDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".insighta", "memories", "sessions", sessionId);
-        _sessionDir = memoryBase;
+            ".insighta", "sessions", sessionId);
         Directory.CreateDirectory(_sessionDir);
+
+        // 会话记忆目录：Memory 自有的子目录，不占用会话根目录语义
+        _memoryDir = Path.Combine(_sessionDir, "memories");
+        Directory.CreateDirectory(_memoryDir);
     }
 
     /// <summary>
@@ -163,7 +168,7 @@ public sealed class SessionMemoryHook : IAgentEventHook
     /// </summary>
     public async Task<string> GetSessionMemoryAsync(CancellationToken cancellationToken = default)
     {
-        var memoryPath = Path.Combine(_sessionDir, "MEMORY.md");
+        var memoryPath = Path.Combine(_memoryDir, "MEMORY.md");
         if (!File.Exists(memoryPath))
             return "";
 
@@ -207,7 +212,7 @@ public sealed class SessionMemoryHook : IAgentEventHook
                 await _lock.WaitAsync(cancellationToken);
                 try
                 {
-                    var memoryPath = Path.Combine(_sessionDir, "MEMORY.md");
+                    var memoryPath = Path.Combine(_memoryDir, "MEMORY.md");
                     await File.WriteAllTextAsync(memoryPath, mergedSummary, cancellationToken);
                 }
                 finally
@@ -229,7 +234,7 @@ public sealed class SessionMemoryHook : IAgentEventHook
     {
         try
         {
-            var metadataPath = Path.Combine(_sessionDir, "metadata.json");
+            var metadataPath = Path.Combine(_memoryDir, "metadata.json");
             if (!File.Exists(metadataPath))
                 return null;
 
@@ -247,7 +252,7 @@ public sealed class SessionMemoryHook : IAgentEventHook
     /// </summary>
     private async Task CreateOrUpdateMetadata(CancellationToken cancellationToken)
     {
-        var metadataPath = Path.Combine(_sessionDir, "metadata.json");
+        var metadataPath = Path.Combine(_memoryDir, "metadata.json");
         var now = DateTime.UtcNow;
 
         SessionMemoryMetadata metadata;
