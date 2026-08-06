@@ -136,6 +136,14 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 - 预览统一走 `ShowDiffPreview()`：write_file 以空串作为旧内容，diff 结果全为新增行（绿色 +），视觉与 edit_file 完全一致。
 - 抽象的变更行统计（`+N` / `-N`）与 Panel 渲染逻辑由 edit_file 与 write_file 共用，避免重复实现。
 
+### 工具权限确认国际化（2026-08-06）
+
+- `ToolPermissionHook` 的权限确认 SelectionPrompt 完成国际化：标题、选项 Label 与工具调用提示语均走 `CliStrings` 资源（`ToolPermissionProceedTitle` / `ToolPermissionAllow` / `ToolPermissionAllowAlways` / `ToolPermissionReject` / `ToolPermissionWantsToUseFormat`）。
+- 匹配逻辑从字符串 switch 改为枚举 `ToolPermissionChoice`，规避"本地化文本做 switch 匹配"失效的陷阱；沿用 ConfigCommand 的 `MenuChoice<T>` 模式——Value 稳定用于匹配，Label 本地化仅作展示。
+- `MenuChoice<T>` 从 ConfigCommand 的 private record 提取为公共类型（`Models/MenuChoice.cs`），供各命令/ Hook 复用。
+- Spectre markup 颜色标签（如 `[yellow]●[/]`、`[cyan]...[/]`）留在代码侧拼接，资源值只含可翻译纯文本。
+- 资源清单见 `docs/i18n/tool-permission-hook.md`。
+
 ### MCP 工具调用元数据管道（2026-07-21）
 
 - `ToolResult` 新增 `Metadata` 属性（`IReadOnlyDictionary<string,object?>?`）
