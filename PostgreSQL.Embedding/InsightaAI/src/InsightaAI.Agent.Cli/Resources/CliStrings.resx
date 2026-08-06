@@ -532,6 +532,21 @@
   <data name="ChatAskUserSelectTitle" xml:space="preserve">
     <value>Select an option:</value>
   </data>
+  <data name="ToolPermissionProceedTitle" xml:space="preserve">
+    <value>Do you want to proceed?</value>
+  </data>
+  <data name="ToolPermissionWantsToUseFormat" xml:space="preserve">
+    <value>Insighta wants to use tool {0} with arguments:</value>
+  </data>
+  <data name="ToolPermissionAllow" xml:space="preserve">
+    <value>Yes</value>
+  </data>
+  <data name="ToolPermissionAllowAlways" xml:space="preserve">
+    <value>Yes, and don't ask again in current session</value>
+  </data>
+  <data name="ToolPermissionReject" xml:space="preserve">
+    <value>Reject</value>
+  </data>
   <data name="ChatWelcomeExitHint" xml:space="preserve">
     <value>Type a message to start, type '/exit' or '/quit' to leave</value>
   </data>

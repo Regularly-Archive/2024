@@ -466,7 +466,8 @@ public class ConfigCommand
         return selected == cancelResult ? null : selected;
     }
 
-    private sealed record MenuChoice<TAction>(TAction Value, string Label)
+    private sealed record 
+        MenuChoice<TAction>(TAction Value, string Label)
         where TAction : struct, Enum;
 
     private enum ProviderAction

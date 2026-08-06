@@ -129,6 +129,10 @@ public static class CliStrings
     public static string ChatAskUserMultiSelectTitle => Get(nameof(ChatAskUserMultiSelectTitle));
     public static string ChatAskUserNoSelection => Get(nameof(ChatAskUserNoSelection));
     public static string ChatAskUserSelectTitle => Get(nameof(ChatAskUserSelectTitle));
+    public static string ToolPermissionProceedTitle => Get(nameof(ToolPermissionProceedTitle));
+    public static string ToolPermissionAllow => Get(nameof(ToolPermissionAllow));
+    public static string ToolPermissionAllowAlways => Get(nameof(ToolPermissionAllowAlways));
+    public static string ToolPermissionReject => Get(nameof(ToolPermissionReject));
     public static string ChatWelcomeExitHint => Get(nameof(ChatWelcomeExitHint));
     public static string ChatWelcomeClearHint => Get(nameof(ChatWelcomeClearHint));
     public static string ChatTokenUsageLabel => Get(nameof(ChatTokenUsageLabel));

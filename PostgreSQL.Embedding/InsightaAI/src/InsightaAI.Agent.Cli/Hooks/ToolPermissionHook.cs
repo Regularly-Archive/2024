@@ -4,6 +4,8 @@ using DiffPlex.DiffBuilder;
 using DiffPlex.DiffBuilder.Model;
 using InsightaAI.Agent.Abstractions;
 using InsightaAI.Agent.Cli.Extensions;
+using InsightaAI.Agent.Cli.Localization;
+using InsightaAI.Agent.Cli.Models;
 using InsightaAI.Agent.Hooks;
 using Spectre.Console;
 
@@ -33,7 +35,7 @@ public class ToolPermissionHook : IToolHook
         ToolExecutionContext context)
     {
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine($"[yellow]●[/] Insighta wants to use tool [cyan]{EscapeMarkup(toolName)}[/] with arguments:");
+        AnsiConsole.MarkupLine($"[yellow]●[/] {CliStrings.Format("ToolPermissionWantsToUseFormat", $"[cyan]{EscapeMarkup(toolName)}[/]")}");
 
         var displayArgs = arguments.TruncateToConsoleWidth(offset: 4);
         AnsiConsole.MarkupLine($"[dim]⎿ {EscapeMarkup(displayArgs)}[/]");
@@ -52,21 +54,28 @@ public class ToolPermissionHook : IToolHook
         AnsiConsole.WriteLine();
 
         var choice = AnsiConsole.Prompt(
-            new SelectionPrompt<string>()
-                .Title("Do you want to proceed?")
+            new SelectionPrompt<MenuChoice<ToolPermissionChoice>>()
+                .Title(CliStrings.ToolPermissionProceedTitle)
+                .UseConverter(c => c.Label)
                 .AddChoices([
-                    "Yes",
-                    "Yes, and don't ask again in current session",
-                    "Reject"
+                    new(ToolPermissionChoice.Allow, CliStrings.ToolPermissionAllow),
+                    new(ToolPermissionChoice.AllowAlways, CliStrings.ToolPermissionAllowAlways),
+                    new(ToolPermissionChoice.Reject, CliStrings.ToolPermissionReject)
                 ]));
 
-        return Task.FromResult(choice switch
+        return Task.FromResult(choice.Value switch
         {
-            "Yes" => ToolHookResult.Allow,
-            "Yes, and don't ask again in current session" => ToolHookResult.AllowAlways,
-            "Reject" => ToolHookResult.Deny,
+            ToolPermissionChoice.Allow => ToolHookResult.Allow,
+            ToolPermissionChoice.AllowAlways => ToolHookResult.AllowAlways,
             _ => ToolHookResult.Deny
         });
+    }
+
+    private enum ToolPermissionChoice
+    {
+        Allow,
+        AllowAlways,
+        Reject
     }
 
     public Task OnAfterExecutionAsync(

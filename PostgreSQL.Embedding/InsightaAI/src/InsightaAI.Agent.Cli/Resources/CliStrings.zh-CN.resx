@@ -532,6 +532,21 @@
   <data name="ChatAskUserSelectTitle" xml:space="preserve">
     <value>选择一个选项：</value>
   </data>
+  <data name="ToolPermissionProceedTitle" xml:space="preserve">
+    <value>是否继续？</value>
+  </data>
+  <data name="ToolPermissionWantsToUseFormat" xml:space="preserve">
+    <value>Insighta 想使用工具 {0}，参数如下：</value>
+  </data>
+  <data name="ToolPermissionAllow" xml:space="preserve">
+    <value>是</value>
+  </data>
+  <data name="ToolPermissionAllowAlways" xml:space="preserve">
+    <value>是，本次会话不再询问</value>
+  </data>
+  <data name="ToolPermissionReject" xml:space="preserve">
+    <value>拒绝</value>
+  </data>
   <data name="ChatWelcomeExitHint" xml:space="preserve">
     <value>输入消息开始对话，输入 '/exit' 或 '/quit' 退出</value>
   </data>
