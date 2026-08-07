@@ -102,9 +102,7 @@ public class SessionMemoryCompactStrategyTests : IDisposable
     public void ShouldCompact_Should_ReturnTrue_WhenAboveThresholdAndHasMemory()
     {
         // Arrange - 先写入会话记忆
-        var sessionDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".insighta", "memories", "sessions", "test-session");
+        var sessionDir = Path.Combine(_sessionMemoryHook.SessionDirectory, "memories");
         Directory.CreateDirectory(sessionDir);
         File.WriteAllText(Path.Combine(sessionDir, "MEMORY.md"), "## Round 1\n- User asked about API");
 
@@ -127,8 +125,8 @@ public class SessionMemoryCompactStrategyTests : IDisposable
         finally
         {
             // Cleanup
-            if (Directory.Exists(sessionDir))
-                Directory.Delete(sessionDir, true);
+            if (Directory.Exists(_sessionMemoryHook.SessionDirectory))
+                Directory.Delete(_sessionMemoryHook.SessionDirectory, true);
         }
     }
 
@@ -140,9 +138,7 @@ public class SessionMemoryCompactStrategyTests : IDisposable
     public async Task CompactAsync_Should_UseSessionMemoryAsSummary()
     {
         // Arrange - 先写入会话记忆
-        var sessionDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".insighta", "memories", "sessions", "test-session");
+        var sessionDir = Path.Combine(_sessionMemoryHook.SessionDirectory, "memories");
         Directory.CreateDirectory(sessionDir);
         File.WriteAllText(Path.Combine(sessionDir, "MEMORY.md"),
             "## Round 1\n- User asked about REST API\n- Decided to use FastAPI");
@@ -168,8 +164,8 @@ public class SessionMemoryCompactStrategyTests : IDisposable
         finally
         {
             // Cleanup
-            if (Directory.Exists(sessionDir))
-                Directory.Delete(sessionDir, true);
+            if (Directory.Exists(_sessionMemoryHook.SessionDirectory))
+                Directory.Delete(_sessionMemoryHook.SessionDirectory, true);
         }
     }
 
@@ -177,9 +173,7 @@ public class SessionMemoryCompactStrategyTests : IDisposable
     public async Task CompactAsync_Should_KeepRecentMessages()
     {
         // Arrange - 先写入会话记忆
-        var sessionDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".insighta", "memories", "sessions", "test-session");
+        var sessionDir = Path.Combine(_sessionMemoryHook.SessionDirectory, "memories");
         Directory.CreateDirectory(sessionDir);
         File.WriteAllText(Path.Combine(sessionDir, "MEMORY.md"), "## Summary\nPrevious context");
 
@@ -197,8 +191,8 @@ public class SessionMemoryCompactStrategyTests : IDisposable
         finally
         {
             // Cleanup
-            if (Directory.Exists(sessionDir))
-                Directory.Delete(sessionDir, true);
+            if (Directory.Exists(_sessionMemoryHook.SessionDirectory))
+                Directory.Delete(_sessionMemoryHook.SessionDirectory, true);
         }
     }
 
@@ -206,9 +200,7 @@ public class SessionMemoryCompactStrategyTests : IDisposable
     public async Task CompactAsync_Should_ContainCompactedMarker()
     {
         // Arrange - 先写入会话记忆
-        var sessionDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".insighta", "memories", "sessions", "test-session");
+        var sessionDir = Path.Combine(_sessionMemoryHook.SessionDirectory, "memories");
         Directory.CreateDirectory(sessionDir);
         File.WriteAllText(Path.Combine(sessionDir, "MEMORY.md"), "## Summary\nTest memory");
 
@@ -229,8 +221,8 @@ public class SessionMemoryCompactStrategyTests : IDisposable
         finally
         {
             // Cleanup
-            if (Directory.Exists(sessionDir))
-                Directory.Delete(sessionDir, true);
+            if (Directory.Exists(_sessionMemoryHook.SessionDirectory))
+                Directory.Delete(_sessionMemoryHook.SessionDirectory, true);
         }
     }
 
@@ -242,9 +234,7 @@ public class SessionMemoryCompactStrategyTests : IDisposable
     public async Task CompactAsync_Should_ReturnNoCompaction_WhenMemoryIsEmpty()
     {
         // Arrange - 创建空的会话记忆文件
-        var sessionDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".insighta", "memories", "sessions", "test-session");
+        var sessionDir = Path.Combine(_sessionMemoryHook.SessionDirectory, "memories");
         Directory.CreateDirectory(sessionDir);
         File.WriteAllText(Path.Combine(sessionDir, "MEMORY.md"), "");
 
@@ -265,8 +255,8 @@ public class SessionMemoryCompactStrategyTests : IDisposable
         finally
         {
             // Cleanup
-            if (Directory.Exists(sessionDir))
-                Directory.Delete(sessionDir, true);
+            if (Directory.Exists(_sessionMemoryHook.SessionDirectory))
+                Directory.Delete(_sessionMemoryHook.SessionDirectory, true);
         }
     }
 
@@ -274,9 +264,7 @@ public class SessionMemoryCompactStrategyTests : IDisposable
     public async Task CompactAsync_Should_ReturnNoCompaction_WhenFileReadFails()
     {
         // Arrange - 创建会话记忆文件后删除目录（模拟文件读取失败）
-        var sessionDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".insighta", "memories", "sessions", "test-session");
+        var sessionDir = Path.Combine(_sessionMemoryHook.SessionDirectory, "memories");
         Directory.CreateDirectory(sessionDir);
         File.WriteAllText(Path.Combine(sessionDir, "MEMORY.md"), "Some memory");
 

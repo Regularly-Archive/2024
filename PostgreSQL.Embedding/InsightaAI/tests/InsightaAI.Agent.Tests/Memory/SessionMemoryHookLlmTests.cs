@@ -1,4 +1,5 @@
-﻿using InsightaAI.Agent.Hooks;
+﻿using InsightaAI.Agent.Context.Summary;
+using InsightaAI.Agent.Hooks;
 using InsightaAI.Agent.Memory;
 using InsightaAI.Agent.Models;
 using InsightaAI.LLM.Models;
@@ -11,21 +12,29 @@ namespace InsightaAI.Agent.Tests.Memory;
 /// </summary>
 public class SessionMemoryHookLlmTests : IDisposable
 {
-    private readonly string _tempHome;
     private const string TestUserId = "test-user-llm";
+    private readonly List<string> _sessionDirs = new();
 
-    public SessionMemoryHookLlmTests()
+    /// <summary>
+    /// 创建 SessionMemoryHook 并登记其会话目录，便于 Dispose 统一清理，
+    /// 避免测试在真实 ~/.insighta/sessions/ 下留下残留目录。
+    /// </summary>
+    private SessionMemoryHook CreateHook(string sessionId, SessionMemoryOptions? options = null, ISummaryService? summaryService = null)
     {
-        _tempHome = Path.Combine(Path.GetTempPath(), $"insightai_llm_test_{Guid.NewGuid():N}");
-        Directory.CreateDirectory(_tempHome);
+        var hook = new SessionMemoryHook(sessionId, TestUserId, options: options, summaryService: summaryService);
+        _sessionDirs.Add(hook.SessionDirectory);
+        return hook;
     }
 
     public void Dispose()
     {
-        if (Directory.Exists(_tempHome))
+        foreach (var dir in _sessionDirs)
         {
-            try { Directory.Delete(_tempHome, recursive: true); }
-            catch { }
+            if (Directory.Exists(dir))
+            {
+                try { Directory.Delete(dir, recursive: true); }
+                catch { }
+            }
         }
     }
 
@@ -42,7 +51,7 @@ public class SessionMemoryHookLlmTests : IDisposable
     {
         var sessionId = $"trigger-test-{Guid.NewGuid():N}";
         var llmClient = new MockLlmClient(response: "<summary>Test summary</summary>");
-        var hook = new SessionMemoryHook(sessionId, TestUserId,
+        var hook = CreateHook(sessionId,
             options: new SessionMemoryOptions
             {
                 EnableLlmSummary = true,
@@ -82,7 +91,7 @@ public class SessionMemoryHookLlmTests : IDisposable
 </summary>";
 
         var llmClient = new MockLlmClient(response: llmResponse);
-        var hook = new SessionMemoryHook(sessionId, TestUserId,
+        var hook = CreateHook(sessionId,
             options: new SessionMemoryOptions
             {
                 EnableLlmSummary = true,
@@ -109,7 +118,7 @@ public class SessionMemoryHookLlmTests : IDisposable
         var llmClient = new MockLlmClient(
             response: "<summary>Round 1 summary</summary>",
             secondResponse: "<summary>Updated summary</summary>");
-        var hook = new SessionMemoryHook(sessionId, TestUserId,
+        var hook = CreateHook(sessionId,
             options: new SessionMemoryOptions
             {
                 EnableLlmSummary = true,
@@ -137,7 +146,7 @@ public class SessionMemoryHookLlmTests : IDisposable
     {
         var sessionId = $"empty-llm-{Guid.NewGuid():N}";
         var llmClient = new MockLlmClient(response: "");
-        var hook = new SessionMemoryHook(sessionId, TestUserId,
+        var hook = CreateHook(sessionId,
             options: new SessionMemoryOptions
             {
                 EnableLlmSummary = true,
@@ -160,7 +169,7 @@ public class SessionMemoryHookLlmTests : IDisposable
     public async Task LlmSummary_Should_NotWriteMemory_WhenFactoryIsNull()
     {
         var sessionId = $"no-factory-{Guid.NewGuid():N}";
-        var hook = new SessionMemoryHook(sessionId, TestUserId,
+        var hook = CreateHook(sessionId,
             options: new SessionMemoryOptions
             {
                 EnableLlmSummary = true,
@@ -186,7 +195,7 @@ public class SessionMemoryHookLlmTests : IDisposable
         var llmClient = new MockLlmClient(
             response: "<summary>## Goal\n- Build agent</summary>",
             secondResponse: "<summary>## Goal\n- Build agent\n\n## Progress\n### Done\n- [x] Started</summary>");
-        var hook = new SessionMemoryHook(sessionId, TestUserId,
+        var hook = CreateHook(sessionId,
             options: new SessionMemoryOptions
             {
                 EnableLlmSummary = true,
@@ -212,7 +221,7 @@ public class SessionMemoryHookLlmTests : IDisposable
     public async Task NoMemoryWritten_WhenLlmDisabled()
     {
         var sessionId = $"no-llm-{Guid.NewGuid():N}";
-        var hook = new SessionMemoryHook(sessionId, TestUserId,
+        var hook = CreateHook(sessionId,
             options: new SessionMemoryOptions { EnableLlmSummary = false });
         var messages = new List<Message> { Message.FromUser("test message") };
         await hook.OnAgentRoundEndedAsync(CreateRoundEndContext(sessionId, 1), messages, null);

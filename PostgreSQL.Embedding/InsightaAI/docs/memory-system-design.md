@@ -742,7 +742,7 @@ Tool Error Memory 属于第 14 节的后续能力，当前尚未实现。
 ### 13.2 存储结构
 
 ```
-~/.insighta/memories/sessions/{sessionId}/
+~/.insighta/sessions/{sessionId}/memories/
 ├── MEMORY.md                # 会话级记忆摘要
 └── metadata.json            # 会话元数据
 ```

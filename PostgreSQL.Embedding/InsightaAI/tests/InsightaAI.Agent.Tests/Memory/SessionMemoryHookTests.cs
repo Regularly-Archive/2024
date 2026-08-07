@@ -11,31 +11,39 @@ namespace InsightaAI.Agent.Tests.Memory;
 /// </summary>
 public class SessionMemoryHookTests : IDisposable
 {
-    private readonly string _originalHome;
-    private readonly string _tempHome;
     private const string TestSessionId = "test-session-001";
     private const string TestUserId = "test-user-001";
     private readonly AgentEventHookContext _hookContext;
+    private readonly List<string> _sessionDirs = new();
 
     public SessionMemoryHookTests()
     {
-        // 使用临时目录模拟 ~/.insightai
-        _originalHome = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        _tempHome = Path.Combine(Path.GetTempPath(), $"insightai_hook_test_{Guid.NewGuid():N}");
-        Directory.CreateDirectory(_tempHome);
-
         // 创建测试用的 HookContext（不含 LLM 客户端）
         _hookContext = AgentEventHookContext.Create(
             TestSessionId,
             new AgentRoundEndEvent { AgentId = "test-agent", Round = 1 });
     }
 
+    /// <summary>
+    /// 创建 SessionMemoryHook 并登记其会话目录，便于 Dispose 统一清理，
+    /// 避免测试在真实 ~/.insighta/sessions/ 下留下残留目录。
+    /// </summary>
+    private SessionMemoryHook CreateHook(string sessionId, SessionMemoryOptions? options = null)
+    {
+        var hook = new SessionMemoryHook(sessionId, TestUserId, options: options);
+        _sessionDirs.Add(hook.SessionDirectory);
+        return hook;
+    }
+
     public void Dispose()
     {
-        if (Directory.Exists(_tempHome))
+        foreach (var dir in _sessionDirs)
         {
-            try { Directory.Delete(_tempHome, recursive: true); }
-            catch { }
+            if (Directory.Exists(dir))
+            {
+                try { Directory.Delete(dir, recursive: true); }
+                catch { }
+            }
         }
     }
 
@@ -43,7 +51,7 @@ public class SessionMemoryHookTests : IDisposable
     public void Constructor_Should_CreateSessionDirectory()
     {
         // Act
-        var hook = new SessionMemoryHook(TestSessionId, TestUserId);
+        var hook = CreateHook(TestSessionId);
 
         // Assert - 构造函数应创建目录（在真实路径下）
         // 这里主要测试不抛异常
@@ -54,7 +62,7 @@ public class SessionMemoryHookTests : IDisposable
     public async Task OnRoundEndAsync_Should_ReturnTaskCompletedTask()
     {
         // Arrange
-        var hook = new SessionMemoryHook(TestSessionId, TestUserId, options: new SessionMemoryOptions { EnableLlmSummary = false });
+        var hook = CreateHook(TestSessionId, options: new SessionMemoryOptions { EnableLlmSummary = false });
         var messages = new List<Message>
         {
             Message.FromUser("我喜欢使用 C# 编程")
@@ -71,7 +79,7 @@ public class SessionMemoryHookTests : IDisposable
     public async Task OnRoundEndAsync_Should_NotBlock()
     {
         // Arrange
-        var hook = new SessionMemoryHook(TestSessionId, TestUserId, options: new SessionMemoryOptions { EnableLlmSummary = false });
+        var hook = CreateHook(TestSessionId, options: new SessionMemoryOptions { EnableLlmSummary = false });
         var messages = new List<Message>
         {
             Message.FromUser("测试消息")
@@ -92,7 +100,7 @@ public class SessionMemoryHookTests : IDisposable
     {
         // Arrange
         var sessionId = $"empty-session-{Guid.NewGuid():N}";
-        var hook = new SessionMemoryHook(sessionId, TestUserId, options: new SessionMemoryOptions { EnableLlmSummary = false });
+        var hook = CreateHook(sessionId, options: new SessionMemoryOptions { EnableLlmSummary = false });
 
         // Act
         var memory = await hook.GetSessionMemoryAsync();
@@ -106,7 +114,7 @@ public class SessionMemoryHookTests : IDisposable
     {
         // Arrange
         var sessionId = $"pref-session-{Guid.NewGuid():N}";
-        var hook = new SessionMemoryHook(sessionId, TestUserId, options: new SessionMemoryOptions { EnableLlmSummary = false });
+        var hook = CreateHook(sessionId, options: new SessionMemoryOptions { EnableLlmSummary = false });
         var messages = new List<Message>
         {
             Message.FromUser("我喜欢使用 C# 和 .NET 开发")
@@ -131,7 +139,7 @@ public class SessionMemoryHookTests : IDisposable
     {
         // Arrange
         var sessionId = $"proj-session-{Guid.NewGuid():N}";
-        var hook = new SessionMemoryHook(sessionId, TestUserId, options: new SessionMemoryOptions { EnableLlmSummary = false });
+        var hook = CreateHook(sessionId, options: new SessionMemoryOptions { EnableLlmSummary = false });
         var messages = new List<Message>
         {
             Message.FromUser("项目的目标是在 Q2 完成发布")
@@ -151,7 +159,7 @@ public class SessionMemoryHookTests : IDisposable
     {
         // Arrange
         var sessionId = $"error-session-{Guid.NewGuid():N}";
-        var hook = new SessionMemoryHook(sessionId, TestUserId, options: new SessionMemoryOptions { EnableLlmSummary = false });
+        var hook = CreateHook(sessionId, options: new SessionMemoryOptions { EnableLlmSummary = false });
         var messages = new List<Message>
         {
             Message.FromUser("编译出现了错误 CS1001")
@@ -170,7 +178,7 @@ public class SessionMemoryHookTests : IDisposable
     public async Task OnRoundEndAsync_Should_HandleEmptyMessages()
     {
         // Arrange
-        var hook = new SessionMemoryHook(TestSessionId, TestUserId, options: new SessionMemoryOptions { EnableLlmSummary = false });
+        var hook = CreateHook(TestSessionId, options: new SessionMemoryOptions { EnableLlmSummary = false });
         var messages = new List<Message>();
 
         // Act & Assert - 不应抛异常
@@ -182,7 +190,7 @@ public class SessionMemoryHookTests : IDisposable
     {
         // Arrange
         var sessionId = $"assist-session-{Guid.NewGuid():N}";
-        var hook = new SessionMemoryHook(sessionId, TestUserId, options: new SessionMemoryOptions { EnableLlmSummary = false });
+        var hook = CreateHook(sessionId, options: new SessionMemoryOptions { EnableLlmSummary = false });
         var messages = new List<Message>
         {
             Message.FromUser("帮我写一个函数")
@@ -202,7 +210,7 @@ public class SessionMemoryHookTests : IDisposable
     public async Task OnTurnEndAsync_Should_NotThrow()
     {
         // Arrange
-        var hook = new SessionMemoryHook(TestSessionId, TestUserId, options: new SessionMemoryOptions { EnableLlmSummary = false });
+        var hook = CreateHook(TestSessionId, options: new SessionMemoryOptions { EnableLlmSummary = false });
         var messages = new List<Message>
         {
             Message.FromUser("测试消息")
