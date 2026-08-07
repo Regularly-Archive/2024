@@ -213,7 +213,7 @@ public sealed class ChatApplication : IChatApplication
             if (userInput.Equals(CommandClear, StringComparison.OrdinalIgnoreCase))
             {
                 await session.ClearAsync();
-                AnsiConsole.Clear();
+                Terminal.Clear();
                 _renderer.ShowWarning(CliStrings.ChatContextCleared);
                 continue;
             }

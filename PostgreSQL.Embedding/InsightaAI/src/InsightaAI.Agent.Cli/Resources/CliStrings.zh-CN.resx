@@ -553,6 +553,9 @@
   <data name="ChatWelcomeClearHint" xml:space="preserve">
     <value>输入 '/clear' 清空上下文</value>
   </data>
+  <data name="ChatWelcomeInputHint" xml:space="preserve">
+    <value>Shift+Enter 或 Ctrl+Enter 换行，Enter 发送</value>
+  </data>
   <data name="ChatTokenUsageLabel" xml:space="preserve">
     <value>[grey]用量:[/]</value>
   </data>

@@ -17,13 +17,14 @@ public class ChatRenderer
     /// </summary>
     public void ShowWelcome(string provider, string model, string sessionId, int toolCount, int skillCount = 0)
     {
-        AnsiConsole.Clear();
+        Terminal.Clear();
         AnsiConsole.Write(new FigletText("InsightaAI").Color(Color.Blue));
         AnsiConsole.MarkupLine($"[white]{CliStrings.Format("ChatWelcomeProviderModelFormat", provider, model)}[/]");
         AnsiConsole.MarkupLine($"[white]{CliStrings.Format("ChatWelcomeSessionIdFormat", sessionId)}[/]");
         AnsiConsole.MarkupLine($"[white]{CliStrings.Format("ChatWelcomeToolsSkillsFormat", toolCount, skillCount)}[/]");
         AnsiConsole.MarkupLine($"[white]{CliStrings.ChatWelcomeExitHint}[/]");
         AnsiConsole.MarkupLine($"[white]{CliStrings.ChatWelcomeClearHint}[/]");
+        AnsiConsole.MarkupLine($"[white]{CliStrings.ChatWelcomeInputHint}[/]");
         AnsiConsole.WriteLine();
     }
 
@@ -63,14 +64,12 @@ public class ChatRenderer
     }
 
     /// <summary>
-    /// 提示用户输入
+    /// 提示用户输入（支持多行：粘贴换行不会触发提交，Shift+Enter 手动换行，Enter 发送）
     /// </summary>
     public string? PromptUser()
     {
         AnsiConsole.WriteLine();
-        return AnsiConsole.Prompt(
-            new TextPrompt<string>("[bold green]>[/]")
-                .AllowEmpty());
+        return new MultiLineTextPrompt().Show(AnsiConsole.Console);
     }
 
     /// <summary>
@@ -116,7 +115,7 @@ public class ChatRenderer
     {
         if (interactive)
         {
-            AnsiConsole.Clear();
+            Terminal.Clear();
         }
 
         if (sessions.Count == 0)

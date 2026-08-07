@@ -135,6 +135,7 @@ public static class CliStrings
     public static string ToolPermissionReject => Get(nameof(ToolPermissionReject));
     public static string ChatWelcomeExitHint => Get(nameof(ChatWelcomeExitHint));
     public static string ChatWelcomeClearHint => Get(nameof(ChatWelcomeClearHint));
+    public static string ChatWelcomeInputHint => Get(nameof(ChatWelcomeInputHint));
     public static string ChatTokenUsageLabel => Get(nameof(ChatTokenUsageLabel));
     public static string ChatInterruptedTitle => Get(nameof(ChatInterruptedTitle));
     public static string ChatInterruptedHint => Get(nameof(ChatInterruptedHint));

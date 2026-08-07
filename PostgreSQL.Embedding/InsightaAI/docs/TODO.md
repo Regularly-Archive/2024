@@ -383,9 +383,55 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 
 ---
 
+### 14. Agent 安全增强：DenyList 与敏感文件保护（优先级：中）
+
+**问题描述：**
+Agent 可执行 Shell 命令、读写文件、搜索内容，当前缺少用户可配置的安全防线。两个目标：
+1. `AgentConfig` 添加 `DenyList`，拒绝 `rm -rf`、`Remove-Item` 等危险操作，规则可自定义。
+2. 敏感文件保护：`.env`、配置文件、`.ssh` 私钥等含机密内容不应被 Agent 直接读取。
+
+**威胁模型：**
+`read_file` / `grep` 有显式路径参数（可精确拦截），但 `bash` 是"任意代码执行"逃逸通道，命令内容检测无法完全约束（可无限变形）。目标界定为"防止敏感内容进入 LLM 上下文 + 防止结构化工具直接触碰敏感路径"，而非阻止 bash 执行本身。
+
+**配置链路（职责分离）：**
+```
+CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentConfig ←数据传播链路─ SecurityPolicyHook (IToolHook)
+```
+
+**拦截语义：强制拒绝，不提供交互放行。** 交互确认是 `ToolPermissionHook` 的职责；DenyList 是预先声明，命中即拒绝并返回明确错误。放行 = 用户改 `CliConfig` 删规则。
+
+**纵深防御分层（推荐第一版范围 L1+L3）：**
+- L1 结构化工具层：`read_file`/`grep`/`write_file` 按路径精确拦截（可靠）
+- L2 bash 命令内容启发式：只拦直白写法（拦不住变形）
+- L3 bash 输出打码：`OnAfterExecutionAsync` 扫 stdout，命中敏感模式替换为 `[REDACTED]` 再交给 LLM（兜底防泄漏进上下文）
+- L4 最小权限执行：`IShellExecutor` 换 Docker/沙箱（根治，独立大工程，单独立项）
+
+**Phase 1：DenyList（约 0.5 天）**
+- [ ] `AgentConfig` 加 `DenyRules`（`DenyRule(Pattern, DenyMatchMode)`，模式 exact/glob/regex）
+- [ ] `CliConfig.SecurityConfig.DenyList` + JSON 映射（`security.deny_list`）
+- [ ] `SecurityPolicyHook`（`IToolHook`，AgentBuilder 默认注册）实现三种模式匹配
+- [ ] 内置默认高危规则（用户 DenyList 追加而非覆盖）
+- [ ] 单元测试 + 集成测试
+
+**Phase 2：敏感文件保护（约 0.5~1 天）**
+- [ ] `SecurityConfig.SensitivePaths`（glob 模式：`**/.env`、`**/.ssh/**`、`~/.insighta/config.json`）
+- [ ] L1：按路径拦截 `read_file`/`grep`/`write_file`（解析 arguments 中 file_path/path 参数）
+- [ ] L3：`OnAfterExecutionAsync` 输出打码
+
+**待决策：**
+- [ ] DenyRule 匹配对象：整条命令规范化匹配（Phase 1）还是拆解命令 token（Phase 2）
+- [ ] 内置默认规则清单范围
+- [ ] L2 启发式检测阈值
+- [ ] L4 沙箱执行器是否立项（Docker 还是受限用户）
+
+**设计文档：** [agent-security-design.md](agent-security-design.md)
+
+---
+
 ## 当前优先级
 
 1. Memory 自动注入校准：基于已记录的候选与入选/淘汰原因，根据真实会话调整门槛与身份查询兜底策略。
 2. Agent 服务生命周期：明确 Singleton/Scoped 支持策略。
 3. Hook：明确取消/中止场景的 Agent 事件契约。
 4. MCP Telemetry：完成 tag 命名分层与去重。
+5. Agent 安全增强（#14）：Phase 1 DenyList → Phase 2 敏感文件保护（L1+L3）。

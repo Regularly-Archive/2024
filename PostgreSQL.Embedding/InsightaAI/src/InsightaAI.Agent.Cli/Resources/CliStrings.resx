@@ -553,6 +553,9 @@
   <data name="ChatWelcomeClearHint" xml:space="preserve">
     <value>Type '/clear' to clear context</value>
   </data>
+  <data name="ChatWelcomeInputHint" xml:space="preserve">
+    <value>Shift+Enter or Ctrl+Enter for new line, Enter to send</value>
+  </data>
   <data name="ChatTokenUsageLabel" xml:space="preserve">
     <value>[grey]Usage:[/]</value>
   </data>
