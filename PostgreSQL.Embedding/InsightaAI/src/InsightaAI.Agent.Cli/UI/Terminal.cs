@@ -14,6 +14,14 @@ namespace InsightaAI.Agent.Cli.UI;
 public static class Terminal
 {
     /// <summary>
+    /// 是否处于 git bash（MSYS2/mintty 经 winpty）环境。
+    /// git bash 与 MSYS2 家族启动时都会设置 <c>MSYSTEM</c> 环境变量，
+    /// 是区分该环境与 Windows Terminal / ConHost / Linux 的可靠信号。
+    /// </summary>
+    public static bool IsGitBash =>
+        Environment.GetEnvironmentVariable("MSYSTEM") is { Length: > 0 };
+
+    /// <summary>
     /// 清空屏幕。兼容 git bash（winpty/mintty）与常规 Windows 控制台。
     /// </summary>
     public static void Clear()

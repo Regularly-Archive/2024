@@ -69,6 +69,17 @@ public class ChatRenderer
     public string? PromptUser()
     {
         AnsiConsole.WriteLine();
+
+        // git bash（mintty 经 winpty）下 Console.ReadKey 逐键读取会把 UTF-8
+        // 中文拆成单字节按键事件导致乱码，因此回退到整行读取；其余终端
+        // （Windows Terminal / ConHost / Linux）使用多行输入组件。
+        if (Terminal.IsGitBash)
+        {
+            return AnsiConsole.Prompt(
+                new TextPrompt<string>("[bold green]>[/]")
+                    .AllowEmpty());
+        }
+
         return new MultiLineTextPrompt().Show(AnsiConsole.Console);
     }
 
