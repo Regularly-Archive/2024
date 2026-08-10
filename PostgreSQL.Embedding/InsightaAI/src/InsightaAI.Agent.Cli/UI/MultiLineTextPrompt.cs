@@ -17,8 +17,8 @@ namespace InsightaAI.Agent.Cli.UI;
 ///
 /// 光标定位不依赖 Win32 Console API（CursorLeft/CursorTop/SetCursorPosition）：
 /// git bash（mintty/winpty）下这些调用会抛 IOException（handle is invalid）或返回
-/// 错误坐标。改用 ANSI 光标保存/恢复序列（\u001B[s / \u001B[u）+ 相对移动（\u001B[{n}B /
-/// \u001B[{n}C），兼容 mintty、Windows Terminal 及启用 VT 的 ConHost。
+/// 错误坐标。改用相对光标移动序列（\u001B[{n}A / \u001B[{n}B / \u001B[{n}C），
+/// 通过维护编辑区内的相对行号回到锚点，兼容 mintty、Windows Terminal 及启用 VT 的 ConHost。
 /// </summary>
 public sealed class MultiLineTextPrompt : IPrompt<string>
 {
@@ -50,13 +50,9 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
             Console.Out.Flush();
         }
 
-        // 保存光标位置作为编辑区锚点（提示符之后）。此后 Redraw / PositionCaret 都以
-        // 它为原点做相对定位，不再查询终端绝对坐标（winpty 下 Console.CursorLeft 抛错）。
-        Console.Write("\u001B[s");
-        Console.Out.Flush();
-
         var buffer = new PromptInputBuffer();
         var rowCount = 1; // 编辑区当前占用的物理终端行数（含折行）
+        var cursorRow = 0; // 当前光标相对编辑区锚点的物理行号
         // 首行的提示符与后续行的缩进均占两列，内容折行需要排除这部分宽度。
         var termWidth = Math.Max(1, GetTerminalWidth() - PromptIndent.Length);
 
@@ -342,7 +338,7 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
             if (!buffer.ContainsPaste)
                 return;
 
-            Console.Write("\u001B[u");
+            MoveToAnchor();
             for (var i = 0; i < rowCount; i++)
             {
                 Console.Write("\u001B[K");
@@ -350,7 +346,7 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
                     Console.Write("\r\n");
             }
 
-            Console.Write("\u001B[u");
+            MoveFromLastRenderedRowToAnchor(rowCount);
             Console.Write(buffer.Text);
             Console.Out.Flush();
         }
@@ -359,7 +355,7 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
         // 折行），再把光标定位到 caret。相比增量维护行宽，所有边界统一处理。
         void Redraw()
         {
-            Console.Write("\u001B[u"); // 恢复光标到锚点
+            MoveToAnchor();
 
             var physicalLines = new List<string>();
             foreach (var line in buffer.DisplayText.Split('\n'))
@@ -382,6 +378,8 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
             }
 
             rowCount = newRowCount;
+            MoveFromLastRenderedRowToAnchor(total);
+            cursorRow = 0;
             PositionCaret();
         }
 
@@ -463,7 +461,7 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
                 }
             }
 
-            Console.Write("\u001B[u"); // 恢复光标到锚点
+            MoveToAnchor();
             if (row > 0)
             {
                 // 首行从提示符后的锚点开始；显式换行和自动折行后的物理行从第 0 列
@@ -474,13 +472,14 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
             }
             if (col > 0)
                 Console.Write($"\u001B[{col}C"); // 右移 col 列
+            cursorRow = row;
             Console.Out.Flush();
         }
 
         // 清理编辑区：还原锚点并清空当前占用的所有物理行（取消/异常时调用）。
         void ClearEditor(int lines)
         {
-            Console.Write("\u001B[u");
+            MoveToAnchor();
             for (var i = 0; i < lines; i++)
             {
                 Console.Write("\u001B[K");
@@ -488,6 +487,26 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
                     Console.Write("\r\n");
             }
             Console.Out.Flush();
+        }
+
+        // 当前光标始终由 PositionCaret 维护在编辑区内。回车保证第 0 列，随后按已知
+        // 行号上移，再跳过首行提示符的宽度，即可回到提示符后的编辑区锚点。
+        void MoveToAnchor()
+        {
+            Console.Write("\r");
+            if (cursorRow > 0)
+                Console.Write($"\u001B[{cursorRow}A");
+            Console.Write($"\u001B[{PromptIndent.Length}C");
+        }
+
+        // 重绘完成时光标位于最后一个已处理物理行。回到首行并跳过提示符，供下一次
+        // 定位或提交前揭示原文使用。
+        void MoveFromLastRenderedRowToAnchor(int renderedRows)
+        {
+            Console.Write("\r");
+            if (renderedRows > 1)
+                Console.Write($"\u001B[{renderedRows - 1}A");
+            Console.Write($"\u001B[{PromptIndent.Length}C");
         }
 
     }
