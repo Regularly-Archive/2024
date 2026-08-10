@@ -23,6 +23,7 @@ namespace InsightaAI.Agent.Cli.UI;
 public sealed class MultiLineTextPrompt : IPrompt<string>
 {
     private const string PromptMarkup = "[bold green]>[/] ";
+    private const string PromptIndent = "  ";
     private const string EnableBracketedPaste = "\u001B[?2004h";
     private const string DisableBracketedPaste = "\u001B[?2004l";
     private const string BracketedPasteStart = "[200~";
@@ -56,7 +57,8 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
 
         var buffer = new PromptInputBuffer();
         var rowCount = 1; // 编辑区当前占用的物理终端行数（含折行）
-        var termWidth = GetTerminalWidth();
+        // 首行的提示符与后续行的缩进均占两列，内容折行需要排除这部分宽度。
+        var termWidth = Math.Max(1, GetTerminalWidth() - PromptIndent.Length);
 
         // ReadKey 无法"放回"已读的键，peek 消费的多余键暂存于此，主循环优先取出。
         var pendingKeys = new Queue<ConsoleKeyInfo?>();
@@ -370,7 +372,11 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
             {
                 Console.Write("\u001B[K"); // 清行
                 if (i < newRowCount)
+                {
+                    if (i > 0)
+                        Console.Write(PromptIndent);
                     Console.Write(physicalLines[i]);
+                }
                 if (i < total - 1)
                     Console.Write("\r\n");
             }
@@ -459,7 +465,13 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
 
             Console.Write("\u001B[u"); // 恢复光标到锚点
             if (row > 0)
+            {
+                // 首行从提示符后的锚点开始；显式换行和自动折行后的物理行从第 0 列
+                // 开始。先回车再下移，避免把提示符宽度错误叠加到后续行。
+                Console.Write("\r");
                 Console.Write($"\u001B[{row}B"); // 下移 row 行
+                Console.Write($"\u001B[{PromptIndent.Length}C"); // 对齐后续行的提示符缩进
+            }
             if (col > 0)
                 Console.Write($"\u001B[{col}C"); // 右移 col 列
             Console.Out.Flush();
