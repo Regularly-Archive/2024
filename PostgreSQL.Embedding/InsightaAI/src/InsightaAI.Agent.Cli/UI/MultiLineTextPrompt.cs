@@ -17,8 +17,8 @@ namespace InsightaAI.Agent.Cli.UI;
 ///
 /// 光标定位不依赖 Win32 Console API（CursorLeft/CursorTop/SetCursorPosition）：
 /// git bash（mintty/winpty）下这些调用会抛 IOException（handle is invalid）或返回
-/// 错误坐标。改用 DEC 光标保存/恢复序列（\x1b7 / \x1b8）+ 相对移动（\x1b[{n}B /
-/// \x1b[{n}C），兼容 mintty、Windows Terminal 及启用 VT 的 ConHost。
+/// 错误坐标。改用 ANSI 光标保存/恢复序列（\u001B[s / \u001B[u）+ 相对移动（\u001B[{n}B /
+/// \u001B[{n}C），兼容 mintty、Windows Terminal 及启用 VT 的 ConHost。
 /// </summary>
 public sealed class MultiLineTextPrompt : IPrompt<string>
 {
@@ -40,7 +40,7 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
 
         // 保存光标位置作为编辑区锚点（提示符之后）。此后 Redraw / PositionCaret 都以
         // 它为原点做相对定位，不再查询终端绝对坐标（winpty 下 Console.CursorLeft 抛错）。
-        Console.Write("\x1b7");
+        Console.Write("\u001B[s");
         Console.Out.Flush();
 
         var buffer = new StringBuilder();
@@ -225,7 +225,7 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
         // 折行），再把光标定位到 caret。相比增量维护行宽，所有边界统一处理。
         void Redraw()
         {
-            Console.Write("\x1b8"); // 恢复光标到锚点
+            Console.Write("\u001B[u"); // 恢复光标到锚点
 
             var physicalLines = new List<string>();
             foreach (var line in buffer.ToString().Split('\n'))
@@ -236,7 +236,7 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
 
             for (var i = 0; i < total; i++)
             {
-                Console.Write("\x1b[K"); // 清行
+                Console.Write("\u001B[K"); // 清行
                 if (i < newRowCount)
                     Console.Write(physicalLines[i]);
                 if (i < total - 1)
@@ -324,21 +324,21 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
                 }
             }
 
-            Console.Write("\x1b8"); // 恢复光标到锚点
+            Console.Write("\u001B[u"); // 恢复光标到锚点
             if (row > 0)
-                Console.Write($"\x1b[{row}B"); // 下移 row 行
+                Console.Write($"\u001B[{row}B"); // 下移 row 行
             if (col > 0)
-                Console.Write($"\x1b[{col}C"); // 右移 col 列
+                Console.Write($"\u001B[{col}C"); // 右移 col 列
             Console.Out.Flush();
         }
 
         // 清理编辑区：还原锚点并清空当前占用的所有物理行（取消/异常时调用）。
         void ClearEditor(int lines)
         {
-            Console.Write("\x1b8");
+            Console.Write("\u001B[u");
             for (var i = 0; i < lines; i++)
             {
-                Console.Write("\x1b[K");
+                Console.Write("\u001B[K");
                 if (i < lines - 1)
                     Console.Write("\r\n");
             }

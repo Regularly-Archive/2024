@@ -34,7 +34,7 @@ public static class Terminal
         {
             // LegacyConsoleBackend.Clear 内部调用 Console.CursorLeft 触发
             // GetBufferInfo → IOException。直接写 ANSI 清屏序列绕过该路径。
-            Console.Write("\x1b[2J\x1b[H");
+            Console.Write("\u001B[2J\u001B[H");
             Console.Out.Flush();
         }
     }
