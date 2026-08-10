@@ -22,6 +22,14 @@ public static class Terminal
         Environment.GetEnvironmentVariable("MSYSTEM") is { Length: > 0 };
 
     /// <summary>
+    /// 是否可以尝试使用 VT 输入协议。无法交互或显式声明为 dumb 的终端必须降级。
+    /// </summary>
+    public static bool SupportsBracketedPaste =>
+        !Console.IsInputRedirected &&
+        !Console.IsOutputRedirected &&
+        !string.Equals(Environment.GetEnvironmentVariable("TERM"), "dumb", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
     /// 清空屏幕。兼容 git bash（winpty/mintty）与常规 Windows 控制台。
     /// </summary>
     public static void Clear()

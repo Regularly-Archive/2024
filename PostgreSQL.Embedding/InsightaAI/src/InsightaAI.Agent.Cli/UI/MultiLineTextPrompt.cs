@@ -23,6 +23,10 @@ namespace InsightaAI.Agent.Cli.UI;
 public sealed class MultiLineTextPrompt : IPrompt<string>
 {
     private const string PromptMarkup = "[bold green]>[/] ";
+    private const string EnableBracketedPaste = "\u001B[?2004h";
+    private const string DisableBracketedPaste = "\u001B[?2004l";
+    private const string BracketedPasteStart = "[200~";
+    private const string BracketedPasteEnd = "\u001B[201~";
 
     /// <inheritdoc />
     public string Show(IAnsiConsole console)
@@ -38,13 +42,19 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
         console.Markup(PromptMarkup);
         Console.Out.Flush();
 
+        var bracketedPasteEnabled = Terminal.SupportsBracketedPaste;
+        if (bracketedPasteEnabled)
+        {
+            Console.Write(EnableBracketedPaste);
+            Console.Out.Flush();
+        }
+
         // 保存光标位置作为编辑区锚点（提示符之后）。此后 Redraw / PositionCaret 都以
         // 它为原点做相对定位，不再查询终端绝对坐标（winpty 下 Console.CursorLeft 抛错）。
         Console.Write("\u001B[s");
         Console.Out.Flush();
 
-        var buffer = new StringBuilder();
-        var caret = 0;    // 光标在 buffer 中的字符索引
+        var buffer = new PromptInputBuffer();
         var rowCount = 1; // 编辑区当前占用的物理终端行数（含折行）
         var termWidth = GetTerminalWidth();
 
@@ -58,13 +68,42 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var rawKey = pendingKeys.Count > 0
+                var fromPendingQueue = pendingKeys.Count > 0;
+                var rawKey = fromPendingQueue
                     ? pendingKeys.Dequeue()
                     : await console.Input.ReadKeyAsync(true, cancellationToken).ConfigureAwait(false);
                 if (rawKey == null)
                     return string.Empty;
 
                 var key = rawKey.Value;
+
+                if (bracketedPasteEnabled && key.KeyChar == '\u001B')
+                {
+                    var pastedText = await TryReadBracketedPasteAsync(cancellationToken).ConfigureAwait(false);
+                    if (pastedText is not null)
+                    {
+                        buffer.InsertPaste(NormalizeLineEndings(pastedText));
+                        Redraw();
+                        continue;
+                    }
+                }
+
+                // Windows 的 Console.ReadKey 会吞掉 bracketed paste 包装符，导致无法走上方
+                // 的协议路径。此处将一次已到达的输入突发作为回退：多字符或含换行的突发
+                // 折叠为粘贴块；普通输入和方向键仍逐个处理。
+                if (!fromPendingQueue && key.Key != ConsoleKey.Enter && key.KeyChar != '\u001B')
+                {
+                    var burst = await ReadAvailableInputBurstAsync(key, cancellationToken).ConfigureAwait(false);
+                    if (IsPasteBurst(burst))
+                    {
+                        buffer.InsertPaste(NormalizeLineEndings(string.Concat(burst.Select(static item => item.KeyChar))));
+                        Redraw();
+                        continue;
+                    }
+
+                    foreach (var pending in burst.Skip(1))
+                        pendingKeys.Enqueue(pending);
+                }
 
                 // Ctrl+C 取消输入（与 rawKey == null 一样返回空串约定）
                 if (key.Key == ConsoleKey.C && key.Modifiers.HasFlag(ConsoleModifiers.Control))
@@ -92,24 +131,37 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
                     // KeyAvailable 在快速输入/IME 上屏时误判为"换行"导致 Enter 不发送。
                     if (await IsInputIdleAsync(cancellationToken).ConfigureAwait(false))
                     {
+                        RevealPastedContent();
                         submitted = true;
-                        return buffer.ToString();
+                        return buffer.Text;
                     }
 
-                    // 粘贴流中的换行：插入 \n，并消费 \r\n 中紧随的 \n（Windows 剪贴板
-                    // 默认 \r\n），避免 \r、\n 各触发一次 Enter 产生双换行。
-                    Insert("\n");
+                    // 粘贴流中的换行：消费 \r\n 中紧随的 \n（Windows 剪贴板默认 \r\n）。
+                    // 若这一对之后已经空闲，它是一次手动 Enter 的双事件表示，应提交而非换行。
                     if (Console.KeyAvailable)
                     {
                         var next = await console.Input.ReadKeyAsync(true, cancellationToken).ConfigureAwait(false);
                         if (next is { } nk && (nk.KeyChar == '\r' || nk.KeyChar == '\n'))
                         {
+                            if (await IsInputIdleAsync(cancellationToken).ConfigureAwait(false))
+                            {
+                                RevealPastedContent();
+                                submitted = true;
+                                return buffer.Text;
+                            }
+
+                            Insert("\n");
                             // 成对的 \r\n 已归一为单个 \n，后半被消费
                         }
                         else
                         {
+                            Insert("\n");
                             pendingKeys.Enqueue(next); // 非换行对，放回待主循环处理
                         }
+                    }
+                    else
+                    {
+                        Insert("\n");
                     }
                     continue;
                 }
@@ -117,53 +169,40 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
                 switch (key.Key)
                 {
                     case ConsoleKey.Backspace:
-                        if (caret > 0)
+                        if (buffer.Backspace())
                         {
-                            // 代理对（emoji 等）成对删除，避免留下孤立 surrogate
-                            var remove = 1;
-                            if (caret >= 2 && char.IsLowSurrogate(buffer[caret - 1]) && char.IsHighSurrogate(buffer[caret - 2]))
-                                remove = 2;
-                            buffer.Remove(caret - remove, remove);
-                            caret -= remove;
                             Redraw();
                         }
                         break;
 
                     case ConsoleKey.Delete:
-                        if (caret < buffer.Length)
+                        if (buffer.Delete())
                         {
-                            // 代理对成对删除
-                            var remove = 1;
-                            if (caret + 1 < buffer.Length && char.IsHighSurrogate(buffer[caret]) && char.IsLowSurrogate(buffer[caret + 1]))
-                                remove = 2;
-                            buffer.Remove(caret, remove);
                             Redraw();
                         }
                         break;
 
                     case ConsoleKey.LeftArrow:
-                        if (caret > 0)
+                        if (buffer.MoveLeft())
                         {
-                            caret--;
                             PositionCaret();
                         }
                         break;
 
                     case ConsoleKey.RightArrow:
-                        if (caret < buffer.Length)
+                        if (buffer.MoveRight())
                         {
-                            caret++;
                             PositionCaret();
                         }
                         break;
 
                     case ConsoleKey.Home:
-                        caret = LineStart(caret);
+                        buffer.MoveHome();
                         PositionCaret();
                         break;
 
                     case ConsoleKey.End:
-                        caret = LineEnd(caret);
+                        buffer.MoveEnd();
                         PositionCaret();
                         break;
 
@@ -199,12 +238,17 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
             // 未正常提交（异常/取消/ReadKey 返回 null）时清理编辑区，避免残留
             if (!submitted)
                 ClearEditor(rowCount);
+
+            if (bracketedPasteEnabled)
+            {
+                Console.Write(DisableBracketedPaste);
+                Console.Out.Flush();
+            }
         }
 
         void Insert(string text)
         {
-            buffer.Insert(caret, text);
-            caret += text.Length;
+            buffer.InsertText(text);
             Redraw();
         }
 
@@ -221,6 +265,94 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
             return true;
         }
 
+        async Task<string?> TryReadBracketedPasteAsync(CancellationToken ct)
+        {
+            var prefix = new List<ConsoleKeyInfo?>();
+            foreach (var expected in BracketedPasteStart)
+            {
+                var next = await console.Input.ReadKeyAsync(true, ct).ConfigureAwait(false);
+                if (next is null)
+                    return null;
+
+                prefix.Add(next);
+                if (next.Value.KeyChar == expected)
+                    continue;
+
+                foreach (var pending in prefix)
+                    pendingKeys.Enqueue(pending);
+                return null;
+            }
+
+            var pasted = new StringBuilder();
+            var endMatchLength = 0;
+            while (true)
+            {
+                var next = await console.Input.ReadKeyAsync(true, ct).ConfigureAwait(false);
+                if (next is null)
+                    return pasted.ToString();
+
+                var character = next.Value.KeyChar;
+                pasted.Append(character);
+                endMatchLength = character == BracketedPasteEnd[endMatchLength]
+                    ? endMatchLength + 1
+                    : character == BracketedPasteEnd[0] ? 1 : 0;
+                if (endMatchLength != BracketedPasteEnd.Length)
+                    continue;
+
+                pasted.Length -= BracketedPasteEnd.Length;
+                return pasted.ToString();
+            }
+        }
+
+        static string NormalizeLineEndings(string text) =>
+            text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
+
+        async Task<List<ConsoleKeyInfo>> ReadAvailableInputBurstAsync(ConsoleKeyInfo first, CancellationToken ct)
+        {
+            var result = new List<ConsoleKeyInfo> { first };
+            while (Console.KeyAvailable)
+            {
+                var next = await console.Input.ReadKeyAsync(true, ct).ConfigureAwait(false);
+                if (next is null)
+                    break;
+
+                result.Add(next.Value);
+            }
+            return result;
+        }
+
+        static bool IsPasteBurst(IReadOnlyList<ConsoleKeyInfo> input)
+        {
+            if (input.Any(static item => item.KeyChar == '\0'))
+                return false;
+
+            // 单独的 Enter（有些主机表现为连续的 \r / \n）必须留给提交逻辑。
+            // 只有换行与普通文本在同一突发中到达，才可判定为粘贴。
+            var containsLineBreak = input.Any(static item => item.KeyChar is '\r' or '\n');
+            var containsText = input.Any(static item => item.KeyChar is not '\r' and not '\n');
+            return input.Count >= 8 || containsLineBreak && containsText;
+        }
+
+        // 占位符仅用于编辑阶段。提交前将其替换为原文，确保用户回看终端历史、
+        // Agent 接收的输入与会话持久化内容一致。
+        void RevealPastedContent()
+        {
+            if (!buffer.ContainsPaste)
+                return;
+
+            Console.Write("\u001B[u");
+            for (var i = 0; i < rowCount; i++)
+            {
+                Console.Write("\u001B[K");
+                if (i < rowCount - 1)
+                    Console.Write("\r\n");
+            }
+
+            Console.Write("\u001B[u");
+            Console.Write(buffer.Text);
+            Console.Out.Flush();
+        }
+
         // 整块重绘：恢复到锚点，清空编辑区所有物理行并重写整个 buffer（按终端宽度
         // 折行），再把光标定位到 caret。相比增量维护行宽，所有边界统一处理。
         void Redraw()
@@ -228,7 +360,7 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
             Console.Write("\u001B[u"); // 恢复光标到锚点
 
             var physicalLines = new List<string>();
-            foreach (var line in buffer.ToString().Split('\n'))
+            foreach (var line in buffer.DisplayText.Split('\n'))
                 physicalLines.AddRange(WrapLine(line));
 
             var newRowCount = Math.Max(1, physicalLines.Count);
@@ -294,14 +426,15 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
         {
             var row = 0;
             var col = 0;
-            for (var i = 0; i < caret; i++)
+            var displayBeforeCaret = buffer.DisplayTextBeforeCaret;
+            for (var i = 0; i < displayBeforeCaret.Length; i++)
             {
-                if (buffer[i] == '\n')
+                if (displayBeforeCaret[i] == '\n')
                 {
                     row++;
                     col = 0;
                 }
-                else if (char.IsHighSurrogate(buffer[i]) && i + 1 < buffer.Length && char.IsLowSurrogate(buffer[i + 1]))
+                else if (char.IsHighSurrogate(displayBeforeCaret[i]) && i + 1 < displayBeforeCaret.Length && char.IsLowSurrogate(displayBeforeCaret[i + 1]))
                 {
                     // 代理对整体占 2 列，避免折行拆开
                     if (col + 2 > termWidth)
@@ -314,7 +447,7 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
                 }
                 else
                 {
-                    var w = GetWidth(buffer[i]);
+                    var w = GetWidth(displayBeforeCaret[i]);
                     if (col + w > termWidth)
                     {
                         row++;
@@ -345,19 +478,6 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
             Console.Out.Flush();
         }
 
-        int LineStart(int index)
-        {
-            while (index > 0 && buffer[index - 1] != '\n')
-                index--;
-            return index;
-        }
-
-        int LineEnd(int index)
-        {
-            while (index < buffer.Length && buffer[index] != '\n')
-                index++;
-            return index;
-        }
     }
 
     /// <summary>
