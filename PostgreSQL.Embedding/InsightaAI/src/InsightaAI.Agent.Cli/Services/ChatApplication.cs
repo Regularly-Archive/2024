@@ -192,7 +192,7 @@ public sealed class ChatApplication : IChatApplication
         while (true)
         {
             // 清空控制台输入缓冲区，防止 agent 执行期间残留的按键（如 ESC）泄漏到 prompt
-            while (Console.KeyAvailable)
+            while (Terminal.SupportsKeyAvailable && Console.KeyAvailable)
             {
                 Console.ReadKey(intercept: true);
             }
@@ -390,22 +390,24 @@ public sealed class ChatApplication : IChatApplication
 
         // 启动 ESC 监听后台任务
         // 注意：不能把 cts.Token 传给 Task.Delay，否则取消时会抛异常导致任务异常退出
-        var escListenerTask = Task.Run(async () =>
-        {
-            while (!cts.IsCancellationRequested)
+        var escListenerTask = Terminal.SupportsKeyAvailable
+            ? Task.Run(async () =>
             {
-                if (Console.KeyAvailable)
+                while (!cts.IsCancellationRequested)
                 {
-                    var key = Console.ReadKey(intercept: true);
-                    if (key.Key == ConsoleKey.Escape)
+                    if (Console.KeyAvailable)
                     {
-                        cts.Cancel();
-                        break;
+                        var key = Console.ReadKey(intercept: true);
+                        if (key.Key == ConsoleKey.Escape)
+                        {
+                            cts.Cancel();
+                            break;
+                        }
                     }
+                    await Task.Delay(50).ConfigureAwait(false);
                 }
-                await Task.Delay(50).ConfigureAwait(false);
-            }
-        });
+            })
+            : Task.CompletedTask;
 
         try
         {

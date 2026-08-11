@@ -30,6 +30,12 @@ public static class Terminal
         !string.Equals(Environment.GetEnvironmentVariable("TERM"), "dumb", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
+    /// 是否可安全查询输入队列。git bash 的 winpty 输入不支持 <see cref="Console.KeyAvailable"/>。
+    /// </summary>
+    public static bool SupportsKeyAvailable =>
+        !IsGitBash && !Console.IsInputRedirected;
+
+    /// <summary>
     /// 清空屏幕。兼容 git bash（winpty/mintty）与常规 Windows 控制台。
     /// </summary>
     public static void Clear()

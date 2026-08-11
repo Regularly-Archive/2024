@@ -7,10 +7,11 @@ namespace InsightaAI.Agent.Cli.UI;
 /// <summary>
 /// 支持多行输入与行内编辑的文本提示。
 ///
-/// 解决终端粘贴多行内容时被首个换行截断的问题：
-/// - Enter 仅在输入队列空转稳定（约 60ms 无新按键，手动按下）时提交；
-/// - Enter 且输入队列仍有数据（粘贴注入的换行）时作为换行收集，直到最后一个换行后队列空转稳定才提交；
-/// - 粘贴的 \r\n 归一位 \n，避免产生双换行；
+/// 输入策略：
+/// - 仅当输入源提供完整 bracketed-paste 协议边界时，粘贴内容才折叠为原子块；
+/// - 无协议边界的文本一律作为普通输入处理，绝不按到达速度或字符数猜测粘贴；
+/// - Enter 在输入队列空转稳定（约 60ms）后提交；连续到达的换行仍可作为多行内容收集；
+/// - 已确认的粘贴会将 \r\n 归一为 \n，避免产生双换行；
 /// - Shift+Enter / Ctrl+Enter 手动换行，与发送互不混淆；
 /// - ←/→ 逐字符移动光标，Home/End 跳到行首/行尾，支持在任意位置插入与删除；
 /// - 超长行按终端宽度自动折行（宽字符不拆开），Ctrl+C 取消输入。
@@ -26,8 +27,6 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
     private const string PromptIndent = "  ";
     private const string EnableBracketedPaste = "\u001B[?2004h";
     private const string DisableBracketedPaste = "\u001B[?2004l";
-    private const string BracketedPasteStart = "[200~";
-    private const string BracketedPasteEnd = "\u001B[201~";
 
     /// <inheritdoc />
     public string Show(IAnsiConsole console)
@@ -56,8 +55,7 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
         // 首行的提示符与后续行的缩进均占两列，内容折行需要排除这部分宽度。
         var termWidth = Math.Max(1, GetTerminalWidth() - PromptIndent.Length);
 
-        // ReadKey 无法"放回"已读的键，peek 消费的多余键暂存于此，主循环优先取出。
-        var pendingKeys = new Queue<ConsoleKeyInfo?>();
+        using var input = PromptInputSourceFactory.Create(console.Input, bracketedPasteEnabled);
         var submitted = false;
 
         try
@@ -66,42 +64,18 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var fromPendingQueue = pendingKeys.Count > 0;
-                var rawKey = fromPendingQueue
-                    ? pendingKeys.Dequeue()
-                    : await console.Input.ReadKeyAsync(true, cancellationToken).ConfigureAwait(false);
-                if (rawKey == null)
+                var inputEvent = await input.ReadAsync(cancellationToken).ConfigureAwait(false);
+                if (inputEvent is PromptEndOfInputEvent)
                     return string.Empty;
 
-                var key = rawKey.Value;
-
-                if (bracketedPasteEnabled && key.KeyChar == '\u001B')
+                if (inputEvent is PromptPasteInputEvent paste)
                 {
-                    var pastedText = await TryReadBracketedPasteAsync(cancellationToken).ConfigureAwait(false);
-                    if (pastedText is not null)
-                    {
-                        buffer.InsertPaste(NormalizeLineEndings(pastedText));
-                        Redraw();
-                        continue;
-                    }
+                    buffer.InsertPaste(NormalizeLineEndings(paste.Text));
+                    Redraw();
+                    continue;
                 }
 
-                // Windows 的 Console.ReadKey 会吞掉 bracketed paste 包装符，导致无法走上方
-                // 的协议路径。此处将一次已到达的输入突发作为回退：多字符或含换行的突发
-                // 折叠为粘贴块；普通输入和方向键仍逐个处理。
-                if (!fromPendingQueue && key.Key != ConsoleKey.Enter && key.KeyChar != '\u001B')
-                {
-                    var burst = await ReadAvailableInputBurstAsync(key, cancellationToken).ConfigureAwait(false);
-                    if (IsPasteBurst(burst))
-                    {
-                        buffer.InsertPaste(NormalizeLineEndings(string.Concat(burst.Select(static item => item.KeyChar))));
-                        Redraw();
-                        continue;
-                    }
-
-                    foreach (var pending in burst.Skip(1))
-                        pendingKeys.Enqueue(pending);
-                }
+                var key = ((PromptKeyInputEvent)inputEvent).Key;
 
                 // Ctrl+C 取消输入（与 rawKey == null 一样返回空串约定）
                 if (key.Key == ConsoleKey.C && key.Modifiers.HasFlag(ConsoleModifiers.Control))
@@ -124,9 +98,8 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
                         continue;
                     }
 
-                    // 区分手动 Enter 与粘贴注入的换行：短暂等待后输入队列仍空才提交。
-                    // 手动按键事件间隔通常远大于粘贴字节流的到达间隔，避免瞬时
-                    // KeyAvailable 在快速输入/IME 上屏时误判为"换行"导致 Enter 不发送。
+                    // 短暂等待后输入队列仍空才提交。无协议边界的连续换行会继续
+                    // 作为多行文本收集，但不会触发粘贴折叠。
                     if (await IsInputIdleAsync(cancellationToken).ConfigureAwait(false))
                     {
                         RevealPastedContent();
@@ -134,12 +107,12 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
                         return buffer.Text;
                     }
 
-                    // 粘贴流中的换行：消费 \r\n 中紧随的 \n（Windows 剪贴板默认 \r\n）。
+                    // 连续输入中的换行：消费 \r\n 中紧随的 \n，避免双换行。
                     // 若这一对之后已经空闲，它是一次手动 Enter 的双事件表示，应提交而非换行。
-                    if (Console.KeyAvailable)
+                    if (input.IsInputAvailable)
                     {
-                        var next = await console.Input.ReadKeyAsync(true, cancellationToken).ConfigureAwait(false);
-                        if (next is { } nk && (nk.KeyChar == '\r' || nk.KeyChar == '\n'))
+                        var nextInput = await input.ReadAsync(cancellationToken).ConfigureAwait(false);
+                        if (nextInput is PromptKeyInputEvent { Key: var nk } && (nk.KeyChar == '\r' || nk.KeyChar == '\n'))
                         {
                             if (await IsInputIdleAsync(cancellationToken).ConfigureAwait(false))
                             {
@@ -154,7 +127,7 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
                         else
                         {
                             Insert("\n");
-                            pendingKeys.Enqueue(next); // 非换行对，放回待主循环处理
+                            input.PushBack(nextInput); // 非换行事件交还给主循环处理
                         }
                     }
                     else
@@ -210,16 +183,15 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
                             // 代理对（emoji 等）：读取低代理合并插入，避免拆成两个
                             // 孤立 surrogate 导致显示/宽度/删除错乱。
                             var hi = key.KeyChar;
-                            var next = await console.Input.ReadKeyAsync(true, cancellationToken).ConfigureAwait(false);
-                            if (next is { } nk && char.IsLowSurrogate(nk.KeyChar))
+                            var nextInput = await input.ReadAsync(cancellationToken).ConfigureAwait(false);
+                            if (nextInput is PromptKeyInputEvent { Key: var nk } && char.IsLowSurrogate(nk.KeyChar))
                             {
                                 Insert(new string(new[] { hi, nk.KeyChar }));
                             }
                             else
                             {
                                 Insert(hi.ToString());
-                                if (next is not null)
-                                    pendingKeys.Enqueue(next);
+                                input.PushBack(nextInput);
                             }
                             break;
                         }
@@ -257,79 +229,14 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
             for (var i = 0; i < 3; i++)
             {
                 await Task.Delay(20, ct).ConfigureAwait(false);
-                if (Console.KeyAvailable)
+                if (input.IsInputAvailable)
                     return false;
             }
             return true;
         }
 
-        async Task<string?> TryReadBracketedPasteAsync(CancellationToken ct)
-        {
-            var prefix = new List<ConsoleKeyInfo?>();
-            foreach (var expected in BracketedPasteStart)
-            {
-                var next = await console.Input.ReadKeyAsync(true, ct).ConfigureAwait(false);
-                if (next is null)
-                    return null;
-
-                prefix.Add(next);
-                if (next.Value.KeyChar == expected)
-                    continue;
-
-                foreach (var pending in prefix)
-                    pendingKeys.Enqueue(pending);
-                return null;
-            }
-
-            var pasted = new StringBuilder();
-            var endMatchLength = 0;
-            while (true)
-            {
-                var next = await console.Input.ReadKeyAsync(true, ct).ConfigureAwait(false);
-                if (next is null)
-                    return pasted.ToString();
-
-                var character = next.Value.KeyChar;
-                pasted.Append(character);
-                endMatchLength = character == BracketedPasteEnd[endMatchLength]
-                    ? endMatchLength + 1
-                    : character == BracketedPasteEnd[0] ? 1 : 0;
-                if (endMatchLength != BracketedPasteEnd.Length)
-                    continue;
-
-                pasted.Length -= BracketedPasteEnd.Length;
-                return pasted.ToString();
-            }
-        }
-
         static string NormalizeLineEndings(string text) =>
             text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
-
-        async Task<List<ConsoleKeyInfo>> ReadAvailableInputBurstAsync(ConsoleKeyInfo first, CancellationToken ct)
-        {
-            var result = new List<ConsoleKeyInfo> { first };
-            while (Console.KeyAvailable)
-            {
-                var next = await console.Input.ReadKeyAsync(true, ct).ConfigureAwait(false);
-                if (next is null)
-                    break;
-
-                result.Add(next.Value);
-            }
-            return result;
-        }
-
-        static bool IsPasteBurst(IReadOnlyList<ConsoleKeyInfo> input)
-        {
-            if (input.Any(static item => item.KeyChar == '\0'))
-                return false;
-
-            // 单独的 Enter（有些主机表现为连续的 \r / \n）必须留给提交逻辑。
-            // 只有换行与普通文本在同一突发中到达，才可判定为粘贴。
-            var containsLineBreak = input.Any(static item => item.KeyChar is '\r' or '\n');
-            var containsText = input.Any(static item => item.KeyChar is not '\r' and not '\n');
-            return input.Count >= 8 || containsLineBreak && containsText;
-        }
 
         // 占位符仅用于编辑阶段。提交前将其替换为原文，确保用户回看终端历史、
         // Agent 接收的输入与会话持久化内容一致。

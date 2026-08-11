@@ -7,6 +7,7 @@
 | 文件 | 职责 |
 | --- | --- |
 | `src/InsightaAI.Agent.Cli/UI/MultiLineTextPrompt.cs` | 读取按键、识别粘贴、重绘编辑区、提交输入 |
+| `src/InsightaAI.Agent.Cli/UI/PromptInputSource.cs` | 将底层终端输入转换为 `Key` / `Paste` / EOF 事件 |
 | `src/InsightaAI.Agent.Cli/UI/PromptInputBuffer.cs` | 保存“真实文本”和“编辑态显示文本” |
 | `src/InsightaAI.Agent.Cli/UI/Terminal.cs` | 判断终端能力与封装基础 VT 操作 |
 | `src/InsightaAI.Agent.Cli/UI/ChatRenderer.cs` | 在普通终端使用多行输入；Git Bash 走安全的单行降级 |
@@ -155,29 +156,45 @@ ESC[200~<原始粘贴内容>ESC[201~
 ESC[?2004l
 ```
 
-在该路径中，`TryReadBracketedPasteAsync` 会：
+在该路径中，`ConsolePromptInputSource` 会：
 
 1. 收到 ESC 后验证后续 `[200~` 起始标记。
 2. 连续读取粘贴正文，直到 `ESC[201~` 结束标记。
 3. 将 `\r\n` 和孤立 `\r` 统一为 `\n`。
 4. 用 `InsertPaste` 插入一个原子粘贴块并触发一次重绘。
 
-如果 ESC 后并不是起始标记，已经读取的字符会放回 `pendingKeys` 队列，由常规按键逻辑处理；不能因为误判吞掉用户输入。
+如果 ESC 后并不是起始标记，已经读取的字符会放回输入源的待处理队列，由常规按键逻辑处理；不能因为误判吞掉用户输入。
 
 该路径在能把原始 VT 输入交给应用的 xterm 类终端中最可靠。`Terminal.SupportsBracketedPaste` 仅在输入、输出均未重定向且 `TERM` 不是 `dumb` 时尝试启用；它是保守的“可尝试”判断，而不是功能探测的数学证明。
 
-### 5.2 Windows Console 回退：输入突发
+### 5.2 无协议边界时：安全降级
 
 实践中，Windows 的 `Console.ReadKeyAsync` 可能经过 Win32 Console 输入层。该层会把 bracketed-paste 的边界标记吞掉，只把正文转换为普通 `ConsoleKeyInfo` 事件。此时即使终端支持协议，应用也看不到 `ESC[200~` 与 `ESC[201~`。
 
-为覆盖这一现实场景，组件在每次收到普通按键后，读取当时已经到达的其余按键，并将以下情况判定为粘贴突发：
+旧版本曾按“同一批输入同时出现换行与正文”猜测粘贴。这个策略会受终端缓冲方式、快速输入与 IME 上屏影响，不能证明输入确实来自剪贴板，因此已移除。
 
-- 一次突发中至少有 8 个可显示字符；或
-- 同一突发同时含有换行和普通文本。
+当前降级规则只有一条：**没有完整协议边界，就作为普通文本输入，不生成粘贴块。**
 
-单独的 Enter，以及仅由 `\r`/`\n` 组成的输入，不会被判为粘贴。这个限制很关键：若将“任意换行”视为粘贴，用户按 Enter 会得到 `[pasted 1 characters]`，导致永远无法发送。
+这意味着某些 Windows Console 主机中的粘贴会直接显示原文；但手动输入、快速输入和 IME 上屏永远保持可逐字符编辑，也不会被错误折叠为原子块。功能降级优先于错误识别。
 
-突发检测是**回退启发式**，不可能和协议边界一样精确：快速人工输入理论上可能被误判，极短粘贴也可能保留为普通文本。它的价值是让 Windows Console 这类无法透传边界标记的环境仍能提供实用体验。
+`IPromptInputSource` 为未来的输入适配器预留了边界：若某个宿主可以可靠读取原始 VT 字节或提供原生粘贴事件，它只需产生 `PromptPasteInputEvent`，无需修改缓冲区、重绘或 Chat 业务代码。
+
+### 5.3 输入源实现与选择
+
+Windows 首选 `WindowsVtPromptInputSource`。它同时启用 VT input、bracketed paste（DEC private mode 2004）和 Win32 Input Mode（private mode 9001）：外层 `ESC[200~ ... ESC[201~` 提供确定的粘贴边界，Win32 key record 则保留 Shift/Ctrl/Alt 修饰状态。
+
+需要特别注意，Win32 Input Mode 开启后，终端可能在 bracketed-paste 正文内部继续使用 `CSI Vk;Sc;Uc;Kd;Cs;Rc_` 表示控制字符。例如换行可能表示为 KeyDown `ESC[13;28;13;1;0;1_` 和 KeyUp `ESC[13;28;13;0;0;1_`。粘贴解析器必须继续解码这层记录：只追加 KeyDown 的 `UnicodeChar`，忽略 KeyUp，再统一换行；否则控制序列会进入用户正文，且原有换行会消失。未知或格式不合法的 CSI 序列必须原样保留，不能静默吞掉。
+
+编辑器不直接调用 `Console.ReadKeyAsync`，而是通过 `IPromptInputSource` 接收事件：
+
+| 输入源 | 适用场景 | 行为 |
+| --- | --- | --- |
+| `WindowsVtPromptInputSource` | 支持 VT input 的 Windows 终端 | 启用 VT input 与 Win32 Input Mode，同时解析 bracketed paste、Win32 key record 和常用光标键；这是 Windows 首选路径 |
+| `WindowsConsolePromptInputSource` | Windows VT input 无法启用时 | 通过 `ReadConsoleInputW` 读取原生键盘记录，保留 Unicode、虚拟键和 Shift/Ctrl/Alt 修饰状态；若宿主不提供粘贴边界则安全显示原文 |
+| `VtPromptInputSource` | 任意已提供原始 VT 字符流的宿主 | 跨平台解析器，识别 bracketed paste 与常用光标键；不自行改变终端模式 |
+| `ConsolePromptInputSource` | 上述能力不可用时 | 使用 Spectre 的 `ReadKeyAsync`；只在该 API 实际透传边界时折叠，否则显示原文 |
+
+Windows 首先尝试 `ENABLE_VIRTUAL_TERMINAL_INPUT`，将输入转换为 VT 序列供标准输入流读取，再通过 Win32 Input Mode 保留 Shift+Enter 与 Ctrl+Enter 的修饰信息。若设置 VT input mode 失败，工厂才回退到 `ReadConsoleInputW` 原生事件路径。[Microsoft 文档](https://learn.microsoft.com/zh-cn/windows/console/setconsolemode)
 
 ## 6. Enter、换行与 CRLF
 
@@ -187,9 +204,9 @@ ESC[?2004l
 | --- | --- |
 | Enter，输入队列在短暂窗口内保持空闲 | 提交 `buffer.Text` |
 | Shift+Enter 或 Ctrl+Enter | 插入普通换行 |
-| 后面仍有按键的 Enter | 视为粘贴流中可能的换行，继续收集 |
+| 后面仍有按键的 Enter | 视为连续文本中的换行，继续收集 |
 
-Windows 或某些终端可能把一次 Enter 表示为 `\r\n` 两个连续事件。为避免把它误认为两次操作，组件在发现连续换行后再次等待：若队列随后空闲，则仍提交；若后面还有正文，则归一为粘贴中的一个 `\n`。
+Windows 或某些终端可能把一次 Enter 表示为 `\r\n` 两个连续事件。为避免把它误认为两次操作，组件在发现连续换行后再次等待：若队列随后空闲，则仍提交；若后面还有正文，则归一为一个 `\n`。
 
 这是当前实现中较容易误读的一段逻辑。它解决的不是文本编码，而是不同终端对“同一物理按键”如何排队输入事件的差异。
 
@@ -248,9 +265,9 @@ Agent.RunStreamAsync / 会话持久化 / 标题生成
 
 若将粘贴内容逐字符插入，删除和光标移动会退化为数千次操作，折叠摘要也失去意义。新增编辑操作时，应首先判断它对粘贴块是否应保持原子性。
 
-### 不要把单独 Enter 判为粘贴
+### 不要从按键时序推断粘贴
 
-回退启发式必须排除只有 `\r`、`\n` 的突发。手动 Enter 的发送优先级高于“猜测它也许是粘贴”。
+`ConsoleKeyInfo` 不携带“来自剪贴板”的语义。不要以字符数、到达速度、输入批次或换行混合情况创建 `PromptPasteInputEvent`；只有终端协议或原生 API 的明确边界可以产生它。
 
 ### 不要忘记在 finally 中关闭 bracketed paste
 
@@ -262,7 +279,7 @@ Agent.RunStreamAsync / 会话持久化 / 标题生成
 
 ## 10. 已知限制与后续方向
 
-1. **突发检测不是完美粘贴检测。** 理想方案是获得原始终端输入字节并使用 bracketed paste 边界；Windows 的 `Console.ReadKeyAsync` 路径无法始终做到这一点。后续可评估独立终端输入层或 Windows VT input 模式，但必须验证不会破坏现有 `ConsoleKeyInfo` 键盘处理。
+1. **部分宿主会吞掉协议边界。** Windows Console 会优先尝试 `WindowsVtPromptInputSource`；若无法启用该模式则安全回退。POSIX/SSH 的原始模式适配器尚未实现，但可直接复用 `VtPromptInputSource`，不会影响 Chat 层。
 2. **摘要计数目前是 .NET `string.Length`。** 它统计 UTF-16 code unit；emoji 代理对会计为 2。若需要面向用户的 Unicode 标量或字素簇计数，可改为 `Rune` 或 `StringInfo`，并明确产品文案含义。
 3. **显示宽度是简化估算。** 组合字符、ZWJ emoji 序列、部分 East Asian Ambiguous Width 字符的列宽仍可能与具体终端不同。需要高保真时，应引入经过验证的 `wcwidth` 实现。
 4. **粘贴块当前不可展开编辑。** 用户只能整体删除后重新粘贴，或在块前后追加文本。这是当前交互模型的有意取舍。若未来需要“展开后编辑”，应增加显式命令或按键，不应在普通 Backspace 中隐式展开。
@@ -275,11 +292,11 @@ Agent.RunStreamAsync / 会话持久化 / 标题生成
 
 1. 普通英文、中文输入后按 Enter 能发送。
 2. Shift+Enter / Ctrl+Enter 能插入换行，随后 Enter 能发送。
-3. 粘贴多行文本时显示一个摘要块。
+3. 在支持并透传 bracketed-paste 边界的终端中，粘贴多行文本时显示一个摘要块。
 4. 发送后摘要被完整原文替换；Agent 收到的也是完整原文。
 5. 在摘要块前后按 Left/Right，光标一次跨块。
 6. 在块前按 Delete、在块后按 Backspace，均整块删除且发送文本不含原文。
-7. 粘贴后按 Enter 不会出现 `[pasted 1 characters]`。
+7. 在无法透传边界的终端中，粘贴显示原文；快速输入和 IME 上屏不会变成 `[pasted N characters]`。
 8. Ctrl+C、取消、输入流 EOF 后终端仍可正常使用，后续程序不收到残留的 bracketed paste 标记。
 9. 窄终端、含 CJK 与 emoji 的输入不会让光标明显错行。
 10. Git Bash、重定向与 `TERM=dumb` 能走降级路径，不输出可见控制字符。
