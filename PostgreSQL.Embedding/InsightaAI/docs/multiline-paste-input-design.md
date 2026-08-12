@@ -7,10 +7,22 @@
 | 文件 | 职责 |
 | --- | --- |
 | `src/InsightaAI.Agent.Cli/UI/MultiLineTextPrompt.cs` | 读取按键、识别粘贴、重绘编辑区、提交输入 |
-| `src/InsightaAI.Agent.Cli/UI/PromptInputSource.cs` | 将底层终端输入转换为 `Key` / `Paste` / EOF 事件 |
+| `src/InsightaAI.Agent.Cli/UI/PromptInputSource.cs` | 定义通用输入事件、VT 解析与输入源选择工厂 |
+| `src/InsightaAI.Agent.Cli/UI/WindowsVtPromptInputSource.cs` | Windows 优先路径：启用 VT input 与 Win32 Input Mode，解析按键记录和 bracketed paste |
+| `src/InsightaAI.Agent.Cli/UI/WindowsConsolePromptInputSource.cs` | Windows 回退路径：从 Console 按键事件读取普通输入和可用的粘贴边界 |
 | `src/InsightaAI.Agent.Cli/UI/PromptInputBuffer.cs` | 保存“真实文本”和“编辑态显示文本” |
 | `src/InsightaAI.Agent.Cli/UI/Terminal.cs` | 判断终端能力与封装基础 VT 操作 |
 | `src/InsightaAI.Agent.Cli/UI/ChatRenderer.cs` | 在普通终端使用多行输入；Git Bash 走安全的单行降级 |
+
+### 输入源选择顺序
+
+`PromptInputSourceFactory` 按能力选择底层输入源，Chat 层只消费统一的 `PromptKeyInputEvent` / `PromptPasteInputEvent`：
+
+1. Windows 首先尝试 `WindowsVtPromptInputSource`。它将 Console 切换到 `ENABLE_VIRTUAL_TERMINAL_INPUT`，并使用 `ESC[?9001h` 请求终端将 Win32 键盘记录编码为 VT 序列；这使 Shift/Ctrl+Enter 的修饰键与 bracketed paste 边界能在同一字节流中传递。
+2. 若 VT 输入模式无法启用，回退到 `WindowsConsolePromptInputSource`，保留普通按键输入能力。
+3. 非 Windows 或上述原生路径不可用时，使用通用 `ConsolePromptInputSource`，解析标准 VT 按键与 bracketed paste 序列。
+
+所有会修改终端模式的输入源都必须在 `Dispose` / `finally` 中恢复原始 Console mode，并关闭 Win32 Input Mode 与 bracketed paste。
 
 ## 1. 要解决的问题
 

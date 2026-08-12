@@ -58,6 +58,15 @@ insighta mcp list                   # 查看 MCP 服务
 /exit                               退出
 ```
 
+### 聊天输入与显示
+
+- Enter 发送；Shift+Enter 或 Ctrl+Enter 插入换行。
+- 在支持 bracketed paste / VT input 的终端中，粘贴文本会在编辑阶段折叠为 `[pasted N characters]`，发送时仍提交完整原文。
+- 不支持粘贴边界协议的终端会显示原文，不会根据输入速度猜测粘贴。Git Bash 当前降级为单行输入。
+- 对话时间线中，`●` 是助手文本，`○` 是工具调用，`⎿` 是工具结果，`◆` 是权限确认或 AskUser 交互。
+
+技术细节见 [多行输入与折叠粘贴设计](docs/multiline-paste-input-design.md)。
+
 ## 上下文管理
 
 上下文占用率和压缩阈值统一基于可用输入预算：

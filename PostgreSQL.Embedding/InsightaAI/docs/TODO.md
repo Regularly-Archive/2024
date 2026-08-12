@@ -53,6 +53,7 @@
 - [x] `ISummaryService.GenerateTitleAsync` 根据首条用户消息生成简短标题
 - [x] 独立 `session-title.txt` Prompt，同语言输出且禁用工具
 - [x] 标题请求与首轮 Agent 请求并行，不阻塞主要生成流程
+- [x] 标题生成与保存作为后台 best-effort 任务，Usage 显示后不等待它完成，下一轮 Prompt 立即可用
 - [x] 推理模型输出预算从 256 tokens 起步，MaxTokens 时扩容到 512 tokens 重试
 - [x] LLM 失败时使用首条用户输入降级，Unicode 安全截断到 30 字符
 - [x] JSONL/PostgreSQL 使用 `UpdateSessionTitleAsync` 原子更新标题
@@ -72,9 +73,10 @@
 - [x] HookContext 和 ToolExecutionContext 移除 LlmClient，统一通过 Services 解析
 - [x] SessionMemoryHook 改用 `context.Services?.GetService<ILlmClient>()`
 
-**待优化：**
+**当前约定：**
 - [x] Agent 实现 IDisposable，释放旧构造函数创建的 ServiceProvider
-- [ ] 未来如需 Scoped 服务（如 DbContext），需在 Agent Loop 时 CreateScope 创建子容器
+- [x] Agent 私有 Provider 只支持 Singleton/Transient，当前不支持 Scoped；见 `agent-service-lifetime.md`
+- [ ] 未来若确有 DbContext 等 Scoped 需求，先定义 Host / Chat Session / Turn 作用域边界，再重新设计容器关系，不在现有 Agent Loop 中局部加 `CreateScope`
 
 ---
 
@@ -448,7 +450,9 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 ## 当前优先级
 
 1. Memory 自动注入校准：基于已记录的候选与入选/淘汰原因，根据真实会话调整门槛与身份查询兜底策略。
-2. Agent 服务生命周期：明确 Singleton/Scoped 支持策略。
-3. Hook：明确取消/中止场景的 Agent 事件契约。
-4. MCP Telemetry：完成 tag 命名分层与去重。
-5. Agent 安全增强（#14）：Phase 1 DenyList → Phase 2 敏感文件保护（L1+L3）。
+2. Hook：明确取消/中止场景的 Agent 事件契约。
+3. MCP Telemetry：完成 tag 命名分层与去重。
+4. Agent 安全增强（#14）：Phase 1 DenyList → Phase 2 敏感文件保护（L1+L3）。
+5. CLI 并行工具渲染（#15）：按 `ToolCallId` 将调用与结果整块显示，消除结果归属歧义。
+
+Agent 服务生命周期已完成当前阶段决策：私有 Provider 支持 Singleton/Transient，不支持 Scoped；见 `agent-service-lifetime.md`。

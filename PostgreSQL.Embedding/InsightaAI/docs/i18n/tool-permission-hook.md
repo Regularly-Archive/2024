@@ -27,6 +27,6 @@
 ## 备注
 
 - 选项匹配使用枚举 `ToolPermissionChoice { Allow, AllowAlways, Reject }`，避免本地化文本参与 switch 匹配。
-- 选项通过公共类型 `MenuChoice<TAction>`（`Models/MenuChoice.cs`）承载：`Value` 稳定用于匹配，`Label` 本地化用于展示（`UseConverter(c => c.Label)`）。
+- 选项通过公共类型 `MenuChoice<TAction>`（`Models/MenuChoice.cs`）承载：`Value` 稳定用于匹配，`Label` 本地化用于展示；`UseConverter` 只为标题和选项增加显示缩进，不改变返回值。
 - `MenuChoice<T>` 与 ConfigCommand 共用，勿在 Hook 内复制私有实现。
-- 第 35 行的 `[yellow]●[/]` 图标与 `[cyan]...[/]` 工具名高亮在代码侧用插值拼接，翻译时无需关心 Spectre markup。
+- `◆` 是需要用户参与的权限/AskUser 事件标记；`[yellow]◆[/]` 与 `[cyan]...[/]` 工具名高亮在代码侧拼接，翻译时无需关心 Spectre markup。

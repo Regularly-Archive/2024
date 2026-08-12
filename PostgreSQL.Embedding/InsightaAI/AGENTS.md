@@ -151,8 +151,22 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 - `ToolPermissionHook` 的权限确认 SelectionPrompt 完成国际化：标题、选项 Label 与工具调用提示语均走 `CliStrings` 资源（`ToolPermissionProceedTitle` / `ToolPermissionAllow` / `ToolPermissionAllowAlways` / `ToolPermissionReject` / `ToolPermissionWantsToUseFormat`）。
 - 匹配逻辑从字符串 switch 改为枚举 `ToolPermissionChoice`，规避"本地化文本做 switch 匹配"失效的陷阱；沿用 ConfigCommand 的 `MenuChoice<T>` 模式——Value 稳定用于匹配，Label 本地化仅作展示。
 - `MenuChoice<T>` 从 ConfigCommand 的 private record 提取为公共类型（`Models/MenuChoice.cs`），供各命令/ Hook 复用。
-- Spectre markup 颜色标签（如 `[yellow]●[/]`、`[cyan]...[/]`）留在代码侧拼接，资源值只含可翻译纯文本。
+- Spectre markup 颜色标签（如 `[yellow]◆[/]`、`[cyan]...[/]`）留在代码侧拼接，资源值只含可翻译纯文本。
 - 资源清单见 `docs/i18n/tool-permission-hook.md`。
+
+### CLI 协议感知的多行输入（2026-08-11）
+
+- `MultiLineTextPrompt` 将真实文本与编辑态投影分离；终端明确标记的粘贴在输入阶段折叠为 `[pasted N characters]`，提交给 Agent 和持久化层的始终是完整原文。
+- 不再根据字符数或到达速度猜测粘贴；只有 bracketed paste 或原生输入协议的明确边界才会生成粘贴块，避免 IME 和快速输入被误折叠。
+- Windows 优先使用 VT input + Win32 Input Mode，失败时回退到 Windows Console 输入源；通用 VT 输入源保留为跨平台路径。
+- Shift+Enter / Ctrl+Enter 插入换行，Enter 发送；粘贴块在光标移动和删除时保持原子性。设计细节见 `docs/multiline-paste-input-design.md`，实现提交见 `22c2147`。
+
+### CLI 对话事件时间线（2026-08-12）
+
+- 助手文本、工具调用、工具结果和用户交互不再伪装成同一层助手消息：`●` 表示助手文本片段，`○` 表示工具调用，缩进的 `⎿` 表示工具结果，`◆` 表示权限确认或 AskUser。
+- `HangingIndentWriter` 只对显式换行增加挂起缩进，不向文本注入硬换行，保证助手消息在终端显示对齐且复制内容不变。
+- 会话标题生成改为后台 best-effort 辅助任务，不再在 Usage 显示后阻塞下一个用户 Prompt。实现提交见 `5b60099`。
+- 并行工具的 Start/End 事件可交错，当前存在结果视觉归属歧义；数据已由 `ToolCallId` 准确关联，后续渲染方案见 `docs/TODO.md` #15。
 
 ### MCP 工具调用元数据管道（2026-07-21）
 
@@ -196,15 +210,19 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 ### 当前待办
 
 1. **Memory 自动注入校准** — 用本地候选筛选日志和真实会话调整初始覆盖门槛。
-2. **Agent 生命周期** — 明确 Scoped 服务支持策略。
-3. **Hook 事件契约** — 细化取消/中止场景（`DoneReason.Aborted`、`OperationCanceledException`）。
-4. **Telemetry** — 完成 MCP tag 命名清理（`CurrentRoundContext` 不安全字典索引已消除，2026-08-05 随 AgentFactoryTests 修复完成，见 TODO.md 6.1）。
-5. **运行时用量** — 区分流式模型未返回 token usage 与真实的 0。
+2. **Hook 事件契约** — 细化取消/中止场景（`DoneReason.Aborted`、`OperationCanceledException`）。
+3. **Telemetry** — 完成 MCP tag 命名清理（`CurrentRoundContext` 不安全字典索引已消除，2026-08-05 随 AgentFactoryTests 修复完成，见 TODO.md 6.1）。
+4. **运行时用量** — 区分流式模型未返回 token usage 与真实的 0。
+5. **CLI 并行工具渲染** — 按 `ToolCallId` 使调用与结果作为完整块显示，解决结果归属歧义。
 6. **L3 Orchestrator** — 继续开发编排能力。
+
+Agent 服务生命周期已明确：当前 Agent 私有 Provider 只支持 Singleton 和 Transient，不支持 Scoped；约定见 `docs/agent-service-lifetime.md`。
 
 ## 最近验证
 
 - 2026-08-04：MemoryManager 与 SqliteMemoryProvider 定向测试 42 项通过，覆盖自动快照筛选、访问计数和 SQLite FTS 行为。
+- 2026-08-11：协议感知多行输入在 Windows Terminal 与 Warp 实机验证通过，包括 Shift/Ctrl+Enter、bracketed paste、Win32 Input Mode 与控制序列清理。
+- 2026-08-12：CLI 对话时间线、挂起缩进、交互选项对齐和后台标题生成完成实机验证；完整测试 401 项通过。
 
 ## 愿景与里程碑
 
