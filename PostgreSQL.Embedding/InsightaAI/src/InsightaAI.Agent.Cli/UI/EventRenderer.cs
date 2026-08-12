@@ -116,16 +116,19 @@ public class EventRenderer : IDisposable
         var toolArgs = toolStart.Arguments.Truncate(50);
         var displayText = $"{toolStart.ToolName}({EscapeMarkup(toolArgs)})";
         _pendingTools[toolStart.ToolCallId] = displayText;
-        AnsiConsole.MarkupLine($"[dim]○ {displayText}[/]");
     }
 
     private void HandleToolEnd(AgentToolEndEvent toolEnd)
     {
-        if (!_pendingTools.ContainsKey(toolEnd.ToolCallId))
-        {
-            CloseAssistantSegment();
-            AnsiConsole.MarkupLine($"[dim]○ {EscapeMarkup(toolEnd.ToolName)}[/]");
-        }
+        var toolDisplay = _pendingTools.TryGetValue(toolEnd.ToolCallId, out var displayText)
+            ? displayText
+            : EscapeMarkup(toolEnd.ToolName);
+
+        // A parallel tool result can arrive after other ToolStart events. Render the call and
+        // result together only when its matching ToolEnd arrives, so the visual hierarchy remains
+        // unambiguous without relying on terminal cursor rewrites.
+        CloseAssistantSegment();
+        AnsiConsole.MarkupLine($"[dim]○ {toolDisplay}[/]");
 
         if (toolEnd.IsError)
         {

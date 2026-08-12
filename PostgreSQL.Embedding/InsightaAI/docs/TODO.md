@@ -430,20 +430,19 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 
 ---
 
-### 15. CLI 并行工具调用的结果归属渲染（优先级：中）
+### 15. CLI 并行工具调用的结果归属渲染（已完成）
 
 **问题描述：**
-开启 `ParallelToolExecution` 时，事件可能按“多个 `AgentToolStartEvent` 连续到达，再按完成顺序到达多个 `AgentToolEndEvent`”的顺序输出。`EventRenderer` 当前在 Start 时立即输出调用，End 时只输出缩进的结果，因此多个结果在视觉上会都像是最后一个工具的子节点。
+开启 `ParallelToolExecution` 时，事件可能按“多个 `AgentToolStartEvent` 连续到达，再按完成顺序到达多个 `AgentToolEndEvent`”的顺序输出。此前 `EventRenderer` 在 Start 时立即输出调用、End 时只输出缩进结果，导致多个结果在视觉上都会像是最后一个工具的子节点。
 
-**当前事实：**
-- `_pendingTools` 已使用 `ToolCallId` 准确匹配 Start/End，数据没有丢失，问题仅在终端展示。
-- 权限确认只适用于 `ToolPermissionHook.TargetTools`；例如 `web_fetch` 需确认，`web_search` 不需确认，这与并行渲染问题无关。
+**实施：**
+- [x] `ToolStart` 时按 `ToolCallId` 缓存调用信息，不立即写入终端历史。
+- [x] `ToolEnd` 时按 ID 取回调用，将 `○ tool(args)` 与 `  ⎿ result` 作为一个完整块输出。
+- [x] 不采用 ANSI 光标回写已输出行：自动换行、终端滚动、权限/AskUser 交互插入及不同终端的光标行为会导致定位不可靠。
+- [x] 工具仍在 Start 后并行执行；终端仅按完成顺序追加完整块，因此视觉上像同步输出，但不改变执行并发度。
 
-**推荐方案：**
-- [ ] `ToolStart` 时按 `ToolCallId` 缓存调用信息，不立即写入终端历史。
-- [ ] `ToolEnd` 时按 ID 取回调用，将 `○ tool(args)` 与 `  ⎿ result` 作为一个完整块输出。
+**后续：**
 - [ ] 补充串行、并行、完成顺序反转、工具错误和权限交互插入场景的渲染测试。
-- [ ] 不采用 ANSI 光标回写已输出行：自动换行、终端滚动、权限/AskUser 交互插入及不同终端的光标行为会导致定位不可靠。
 
 ---
 
@@ -453,6 +452,5 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 2. Hook：明确取消/中止场景的 Agent 事件契约。
 3. MCP Telemetry：完成 tag 命名分层与去重。
 4. Agent 安全增强（#14）：Phase 1 DenyList → Phase 2 敏感文件保护（L1+L3）。
-5. CLI 并行工具渲染（#15）：按 `ToolCallId` 将调用与结果整块显示，消除结果归属歧义。
 
 Agent 服务生命周期已完成当前阶段决策：私有 Provider 支持 Singleton/Transient，不支持 Scoped；见 `agent-service-lifetime.md`。

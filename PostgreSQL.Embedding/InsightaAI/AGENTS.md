@@ -166,7 +166,7 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 - 助手文本、工具调用、工具结果和用户交互不再伪装成同一层助手消息：`●` 表示助手文本片段，`○` 表示工具调用，缩进的 `⎿` 表示工具结果，`◆` 表示权限确认或 AskUser。
 - `HangingIndentWriter` 只对显式换行增加挂起缩进，不向文本注入硬换行，保证助手消息在终端显示对齐且复制内容不变。
 - 会话标题生成改为后台 best-effort 辅助任务，不再在 Usage 显示后阻塞下一个用户 Prompt。实现提交见 `5b60099`。
-- 并行工具的 Start/End 事件可交错，当前存在结果视觉归属歧义；数据已由 `ToolCallId` 准确关联，后续渲染方案见 `docs/TODO.md` #15。
+- 并行工具仍在 Start 后同时执行；终端只在对应 ToolEnd 按 `ToolCallId` 一次性渲染 `○` 调用和 `⎿` 结果。工具块按完成顺序追加，消除结果归属歧义；仍需补自动化渲染测试。
 
 ### MCP 工具调用元数据管道（2026-07-21）
 
@@ -213,8 +213,7 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 2. **Hook 事件契约** — 细化取消/中止场景（`DoneReason.Aborted`、`OperationCanceledException`）。
 3. **Telemetry** — 完成 MCP tag 命名清理（`CurrentRoundContext` 不安全字典索引已消除，2026-08-05 随 AgentFactoryTests 修复完成，见 TODO.md 6.1）。
 4. **运行时用量** — 区分流式模型未返回 token usage 与真实的 0。
-5. **CLI 并行工具渲染** — 按 `ToolCallId` 使调用与结果作为完整块显示，解决结果归属歧义。
-6. **L3 Orchestrator** — 继续开发编排能力。
+5. **L3 Orchestrator** — 继续开发编排能力。
 
 Agent 服务生命周期已明确：当前 Agent 私有 Provider 只支持 Singleton 和 Transient，不支持 Scoped；约定见 `docs/agent-service-lifetime.md`。
 
