@@ -35,12 +35,28 @@ Chat 主流程的用户可见文本已迁移到 `CliStrings.resx` 和 `CliString
 | `ChatWelcomeClearHint` | 清空命令提示 | 无 |
 | `ChatContextCleared` | 上下文已清空 | 无 |
 | `ChatModelUsageHint` | `/model` 用法 | 无 |
+| `ChatSlashCommandModelDescription` | `/model` 候选说明 | 无 |
+| `ChatSlashCommandCompactDescription` | `/compact` 候选说明 | 无 |
+| `ChatSlashCommandClearDescription` | `/clear` 候选说明 | 无 |
+| `ChatSlashCommandExitDescription` | `/exit` 候选说明 | 无 |
+| `ChatSlashCommandQuitDescription` | `/quit` 候选说明 | 无 |
 | `ChatCurrentModelFormat` | 当前模型 | `{0}` = model |
 | `ChatAvailableModels` | 可用模型标题 | 无 |
 | `ChatCurrentModelMarker` | 当前模型标记 | 无 |
 | `ChatProviderNotConfiguredFormat` | Provider 未配置 | `{0}` = provider |
 | `ChatModelNotConfiguredFormat` | Model 未配置 | `{0}` = modelRef |
 | `ChatModelSwitchedFormat` | 模型已切换 | `{0}` = provider, `{1}` = model |
+
+### Slash 命令候选
+
+`ChatApplication` 集中维护可用命令的名称、是否接受参数和本地化说明；`MultiLineTextPrompt` 只消费该表，不持有命令业务逻辑。
+
+- 输入单行 `/` 前缀时，在输入行下方留一空行并显示按前缀过滤的候选；命令列按最长候选名补齐，说明从固定列开始。
+- 输入精确匹配命令、普通文本、多行内容或折叠粘贴块时，候选区立即隐藏。
+- `Tab` 仅在光标位于末尾且候选唯一时补全；接受参数的命令补全后追加空格。其余场景的 Tab 保持为普通制表符。
+- `Ctrl+C` 从输入组件返回取消信号，`ChatApplication` 将其解释为正常退出 chat 会话，而不是空输入重试。
+
+候选区属于输入组件临时渲染的一部分：每次重绘会先清理旧行，发送、取消或候选隐藏时不残留到终端历史。
 
 ## 压缩、用量与中断
 

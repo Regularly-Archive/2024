@@ -67,7 +67,7 @@ public class ChatRenderer
     /// <summary>
     /// 提示用户输入（支持多行：粘贴换行不会触发提交，Shift+Enter 手动换行，Enter 发送）
     /// </summary>
-    public string? PromptUser()
+    public string? PromptUser(IReadOnlyList<SlashCommand>? slashCommands = null)
     {
         AnsiConsole.WriteLine();
 
@@ -81,7 +81,7 @@ public class ChatRenderer
                     .AllowEmpty());
         }
 
-        return new MultiLineTextPrompt().Show(AnsiConsole.Console);
+        return new MultiLineTextPrompt(slashCommands).Show(AnsiConsole.Console);
     }
 
     /// <summary>

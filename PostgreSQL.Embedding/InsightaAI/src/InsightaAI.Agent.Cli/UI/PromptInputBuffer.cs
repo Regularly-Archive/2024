@@ -13,6 +13,8 @@ internal sealed class PromptInputBuffer
 
     public int Count => _entries.Count;
 
+    public bool IsCaretAtEnd => Caret == _entries.Count;
+
     public bool ContainsPaste => _entries.Any(static entry => entry.RawText != entry.DisplayText);
 
     public string Text => string.Concat(_entries.Select(static entry => entry.RawText));

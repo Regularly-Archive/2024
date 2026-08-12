@@ -167,6 +167,7 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 - `HangingIndentWriter` 只对显式换行增加挂起缩进，不向文本注入硬换行，保证助手消息在终端显示对齐且复制内容不变。
 - 会话标题生成改为后台 best-effort 辅助任务，不再在 Usage 显示后阻塞下一个用户 Prompt。实现提交见 `5b60099`。
 - 并行工具仍在 Start 后同时执行；终端只在对应 ToolEnd 按 `ToolCallId` 一次性渲染 `○` 调用和 `⎿` 结果。工具块按完成顺序追加，消除结果归属歧义；仍需补自动化渲染测试。
+- Chat 输入以单行 `/` 开头时显示本地化命令候选与说明，精确匹配时隐藏；`Tab` 仅补全唯一候选。候选区随 Prompt 重绘清理，不写入聊天历史；`Ctrl+C` 正常退出 chat。
 
 ### MCP 工具调用元数据管道（2026-07-21）
 
@@ -222,6 +223,7 @@ Agent 服务生命周期已明确：当前 Agent 私有 Provider 只支持 Singl
 - 2026-08-04：MemoryManager 与 SqliteMemoryProvider 定向测试 42 项通过，覆盖自动快照筛选、访问计数和 SQLite FTS 行为。
 - 2026-08-11：协议感知多行输入在 Windows Terminal 与 Warp 实机验证通过，包括 Shift/Ctrl+Enter、bracketed paste、Win32 Input Mode 与控制序列清理。
 - 2026-08-12：CLI 对话时间线、挂起缩进、交互选项对齐和后台标题生成完成实机验证；完整测试 401 项通过。
+- 2026-08-12：Slash 命令候选完成实机验证：候选筛选、描述对齐与中英文资源、Tab 唯一补全、候选清理和 Ctrl+C 退出均通过；Agent 测试 286 项通过。
 
 ## 愿景与里程碑
 

@@ -508,6 +508,21 @@
   <data name="ChatModelUsageHint" xml:space="preserve">
     <value>用法: /model provider/model_key</value>
   </data>
+  <data name="ChatSlashCommandModelDescription" xml:space="preserve">
+    <value>切换当前会话使用的模型</value>
+  </data>
+  <data name="ChatSlashCommandCompactDescription" xml:space="preserve">
+    <value>压缩当前会话的上下文</value>
+  </data>
+  <data name="ChatSlashCommandClearDescription" xml:space="preserve">
+    <value>清空当前会话的上下文</value>
+  </data>
+  <data name="ChatSlashCommandExitDescription" xml:space="preserve">
+    <value>保存会话并退出</value>
+  </data>
+  <data name="ChatSlashCommandQuitDescription" xml:space="preserve">
+    <value>保存会话并退出</value>
+  </data>
   <data name="ChatAvailableModels" xml:space="preserve">
     <value>可用模型:</value>
   </data>

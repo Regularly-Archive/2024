@@ -37,6 +37,14 @@ public sealed class ChatApplication : IChatApplication
     private const string CommandQuit = "/quit";
     private const string CommandClear = "/clear";
     private const string CommandModel = "/model";
+    private static readonly IReadOnlyList<SlashCommand> SlashCommands =
+    [
+        new(CommandModel, CliStrings.ChatSlashCommandModelDescription, AcceptsArgument: true),
+        new("/compact", CliStrings.ChatSlashCommandCompactDescription, AcceptsArgument: true),
+        new(CommandClear, CliStrings.ChatSlashCommandClearDescription),
+        new(CommandExit, CliStrings.ChatSlashCommandExitDescription),
+        new(CommandQuit, CliStrings.ChatSlashCommandQuitDescription)
+    ];
 
     private readonly IMessageStorage _storage;
     private readonly IAgentFactory _agentFactory;
@@ -197,7 +205,12 @@ public sealed class ChatApplication : IChatApplication
                 Console.ReadKey(intercept: true);
             }
 
-            var userInput = _renderer.PromptUser();
+            var userInput = _renderer.PromptUser(SlashCommands);
+
+            // Ctrl+C cancels the prompt and returns null. Exit the chat session rather than
+            // treating it as an empty message and immediately prompting again.
+            if (userInput is null)
+                break;
 
             if (string.IsNullOrWhiteSpace(userInput))
                 continue;

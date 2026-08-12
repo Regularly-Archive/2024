@@ -27,6 +27,12 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
     private const string PromptIndent = "  ";
     private const string EnableBracketedPaste = "\u001B[?2004h";
     private const string DisableBracketedPaste = "\u001B[?2004l";
+    private readonly IReadOnlyList<SlashCommand> _slashCommands;
+
+    public MultiLineTextPrompt(IReadOnlyList<SlashCommand>? slashCommands = null)
+    {
+        _slashCommands = slashCommands ?? [];
+    }
 
     /// <inheritdoc />
     public string Show(IAnsiConsole console)
@@ -50,7 +56,8 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
         }
 
         var buffer = new PromptInputBuffer();
-        var rowCount = 1; // 编辑区当前占用的物理终端行数（含折行）
+        var inputRowCount = 1; // 输入文本当前占用的物理终端行数（含折行）
+        var renderedRowCount = 1; // 输入文本与命令候选区合计占用的物理终端行数
         var cursorRow = 0; // 当前光标相对编辑区锚点的物理行号
         // 首行的提示符与后续行的缩进均占两列，内容折行需要排除这部分宽度。
         var termWidth = Math.Max(1, GetTerminalWidth() - PromptIndent.Length);
@@ -81,8 +88,8 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
                 if (key.Key == ConsoleKey.C && key.Modifiers.HasFlag(ConsoleModifiers.Control))
                 {
                     submitted = true;
-                    ClearEditor(rowCount);
-                    return string.Empty;
+                    ClearEditor(renderedRowCount);
+                    return null!;
                 }
 
                 if (key.Key == ConsoleKey.Enter)
@@ -102,6 +109,7 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
                     // 作为多行文本收集，但不会触发粘贴折叠。
                     if (await IsInputIdleAsync(cancellationToken).ConfigureAwait(false))
                     {
+                        ClearSlashCommandSuggestions();
                         RevealPastedContent();
                         submitted = true;
                         return buffer.Text;
@@ -116,6 +124,7 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
                         {
                             if (await IsInputIdleAsync(cancellationToken).ConfigureAwait(false))
                             {
+                                ClearSlashCommandSuggestions();
                                 RevealPastedContent();
                                 submitted = true;
                                 return buffer.Text;
@@ -139,6 +148,17 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
 
                 switch (key.Key)
                 {
+                    case ConsoleKey.Tab:
+                        if (TryCompleteSlashCommand())
+                        {
+                            Redraw();
+                        }
+                        else
+                        {
+                            Insert("\t");
+                        }
+                        break;
+
                     case ConsoleKey.Backspace:
                         if (buffer.Backspace())
                         {
@@ -207,7 +227,7 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
         {
             // 未正常提交（异常/取消/ReadKey 返回 null）时清理编辑区，避免残留
             if (!submitted)
-                ClearEditor(rowCount);
+                ClearEditor(renderedRowCount);
 
             if (bracketedPasteEnabled)
             {
@@ -246,16 +266,36 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
                 return;
 
             MoveToAnchor();
-            for (var i = 0; i < rowCount; i++)
+            for (var i = 0; i < inputRowCount; i++)
             {
                 Console.Write("\u001B[K");
-                if (i < rowCount - 1)
+                if (i < inputRowCount - 1)
                     Console.Write("\r\n");
             }
 
-            MoveFromLastRenderedRowToAnchor(rowCount);
+            MoveFromLastRenderedRowToAnchor(inputRowCount);
             Console.Write(buffer.Text);
             Console.Out.Flush();
+        }
+
+        void ClearSlashCommandSuggestions()
+        {
+            var suggestionRows = renderedRowCount - inputRowCount;
+            if (suggestionRows <= 0)
+                return;
+
+            MoveToAnchor();
+            Console.Write("\r");
+            Console.Write($"\u001B[{inputRowCount}B");
+            for (var i = 0; i < suggestionRows; i++)
+            {
+                Console.Write("\u001B[K");
+                if (i < suggestionRows - 1)
+                    Console.Write("\r\n");
+            }
+
+            renderedRowCount = inputRowCount;
+            PositionCaret();
         }
 
         // 整块重绘：恢复到锚点，清空编辑区所有物理行并重写整个 buffer（按终端宽度
@@ -269,7 +309,12 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
                 physicalLines.AddRange(WrapLine(line));
 
             var newRowCount = Math.Max(1, physicalLines.Count);
-            var total = Math.Max(newRowCount, rowCount);
+            var suggestions = GetSlashCommandSuggestions();
+            var commandColumnWidth = suggestions.Count == 0
+                ? 0
+                : suggestions.Max(static suggestion => suggestion.Name.Length);
+            var newRenderedRowCount = newRowCount + (suggestions.Count > 0 ? suggestions.Count + 1 : 0);
+            var total = Math.Max(newRenderedRowCount, renderedRowCount);
 
             for (var i = 0; i < total; i++)
             {
@@ -280,14 +325,50 @@ public sealed class MultiLineTextPrompt : IPrompt<string>
                         Console.Write(PromptIndent);
                     Console.Write(physicalLines[i]);
                 }
+                else if (i > newRowCount && i < newRenderedRowCount)
+                {
+                    Console.Write(PromptIndent);
+                    var suggestion = suggestions[i - newRowCount - 1];
+                    Console.Write($"{suggestion.Name.PadRight(commandColumnWidth)}  {suggestion.Description}");
+                }
                 if (i < total - 1)
                     Console.Write("\r\n");
             }
 
-            rowCount = newRowCount;
+            inputRowCount = newRowCount;
+            renderedRowCount = newRenderedRowCount;
             MoveFromLastRenderedRowToAnchor(total);
             cursorRow = 0;
             PositionCaret();
+        }
+
+        IReadOnlyList<SlashCommand> GetSlashCommandSuggestions()
+        {
+            var text = buffer.Text;
+            if (buffer.ContainsPaste || text.Contains('\n') || !text.StartsWith('/') || _slashCommands.Count == 0)
+                return [];
+
+            return _slashCommands
+                .Where(command => !command.Name.Equals(text, StringComparison.OrdinalIgnoreCase)
+                    && command.Name.StartsWith(text, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+        }
+
+        bool TryCompleteSlashCommand()
+        {
+            if (!buffer.IsCaretAtEnd)
+                return false;
+
+            var suggestions = GetSlashCommandSuggestions();
+            if (suggestions.Count != 1)
+                return false;
+
+            var command = suggestions[0];
+            var input = buffer.Text;
+            buffer.InsertText(command.Name[input.Length..]);
+            if (command.AcceptsArgument)
+                buffer.InsertText(" ");
+            return true;
         }
 
         // 按终端宽度把一行切成多段物理行；宽字符（2 列）在边界不拆开，剩余不足时换行。

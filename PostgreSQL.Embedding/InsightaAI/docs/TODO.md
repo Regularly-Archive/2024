@@ -26,6 +26,14 @@
 - [x] `ask_user` 工具 `question` 参数增加 `Markup.Escape` 防护
 - [x] 构建通过，0 Error / 0 Warning，202 个单元测试全部通过
 
+### X.2 Chat Slash 命令候选与补全（已完成）
+
+- [x] 由 `ChatApplication` 集中定义 `/model`、`/compact`、`/clear`、`/exit`、`/quit` 的命令元数据。
+- [x] 单行 `/` 前缀实时显示候选；精确匹配、多行、普通文本和折叠粘贴时隐藏。
+- [x] 候选展示命令和 `ChatSlashCommand*Description` 本地化说明，命令列固定宽度对齐，输入与候选之间保留空行。
+- [x] `Tab` 对唯一候选补全；带参数命令自动追加空格，其他场景保留制表符输入。
+- [x] 修复候选重绘时旧行多于新行造成的索引越界；修复 `Ctrl+C` 被误作空输入而无法退出 chat。
+
 ### 1. 摘要服务统一（优先级：中）
 
 **问题描述：**

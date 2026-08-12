@@ -121,6 +121,11 @@ public static class CliStrings
     public static string ChatGoodbye => Get(nameof(ChatGoodbye));
     public static string ChatContextCleared => Get(nameof(ChatContextCleared));
     public static string ChatModelUsageHint => Get(nameof(ChatModelUsageHint));
+    public static string ChatSlashCommandModelDescription => Get(nameof(ChatSlashCommandModelDescription));
+    public static string ChatSlashCommandCompactDescription => Get(nameof(ChatSlashCommandCompactDescription));
+    public static string ChatSlashCommandClearDescription => Get(nameof(ChatSlashCommandClearDescription));
+    public static string ChatSlashCommandExitDescription => Get(nameof(ChatSlashCommandExitDescription));
+    public static string ChatSlashCommandQuitDescription => Get(nameof(ChatSlashCommandQuitDescription));
     public static string ChatAvailableModels => Get(nameof(ChatAvailableModels));
     public static string ChatCurrentModelMarker => Get(nameof(ChatCurrentModelMarker));
     public static string ChatNothingToCompact => Get(nameof(ChatNothingToCompact));
