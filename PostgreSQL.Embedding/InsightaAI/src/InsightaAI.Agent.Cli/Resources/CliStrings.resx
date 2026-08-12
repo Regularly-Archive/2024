@@ -575,7 +575,7 @@
     <value>[grey]Usage:[/]</value>
   </data>
   <data name="ChatInterruptedTitle" xml:space="preserve">
-    <value>[dim]● The task has been cancelled by user [/]</value>
+    <value>[dim]○ The task has been cancelled by user [/]</value>
   </data>
   <data name="ChatInterruptedHint" xml:space="preserve">
     <value>[red]⎿ Interrupted [dim]· Please tell Insighta what you want it to do instead.[/] [/]</value>

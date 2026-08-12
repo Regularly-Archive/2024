@@ -68,8 +68,8 @@ Chat 主流程的用户可见文本已迁移到 `CliStrings.resx` 和 `CliString
 | `ChatCompactFailedFormat` | 压缩失败 | `{0}` = error |
 | `ChatAutoCompactedFormat` | 自动压缩结果 | 策略与压缩前后统计 |
 | `ChatTokenUsageLabel` | Usage 标签 | 无 |
-| `ChatInterruptedTitle` | 用户中断标题 | 无 |
-| `ChatInterruptedHint` | 中断后提示 | 无 |
+| `ChatInterruptedTitle` | 用户中断标题（`○` 独立事件标记） | 无 |
+| `ChatInterruptedHint` | 中断后提示（`⎿` 为标题子项） | 无 |
 | `ChatThinkingInitial` | Thinking 初始状态 | 无 |
 | `ChatThinkingProgressFormat` | Thinking 进度 | `{0}` = dots |
 

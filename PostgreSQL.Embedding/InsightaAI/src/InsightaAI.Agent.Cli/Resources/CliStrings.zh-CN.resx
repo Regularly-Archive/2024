@@ -575,7 +575,7 @@
     <value>[grey]用量:[/]</value>
   </data>
   <data name="ChatInterruptedTitle" xml:space="preserve">
-    <value>[dim]● 任务已被用户取消 [/]</value>
+    <value>[dim]○ 任务已被用户取消 [/]</value>
   </data>
   <data name="ChatInterruptedHint" xml:space="preserve">
     <value>[red]⎿ 已中断 [dim]· 请告诉 Insighta 你想怎么做？[/] [/]</value>
