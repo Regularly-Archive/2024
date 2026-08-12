@@ -442,7 +442,8 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 - [x] 工具仍在 Start 后并行执行；终端仅按完成顺序追加完整块，因此视觉上像同步输出，但不改变执行并发度。
 
 **后续：**
-- [ ] 补充串行、并行、完成顺序反转、工具错误和权限交互插入场景的渲染测试。
+- [x] 单元测试：串行延迟输出、并行完成顺序反转、工具错误与缺失 Start 的降级显示。
+- [ ] 补充权限/AskUser 交互插入场景的渲染测试（该交互由 `ChatApplication` / `ToolPermissionHook` 输出，不经过 `EventRenderer`）。
 
 ---
 

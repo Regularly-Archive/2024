@@ -16,10 +16,16 @@ public class EventRenderer : IDisposable
         AnsiConsole.Console,
         "[dim]● [/]",
         "  ");
+    private readonly IAnsiConsole _console;
     private bool _isThinking;
     private CancellationTokenSource? _thinkingCts;
     private Task _thinkingTask = Task.CompletedTask;
     private readonly Dictionary<string, string> _pendingTools = [];
+
+    public EventRenderer(IAnsiConsole? console = null)
+    {
+        _console = console ?? AnsiConsole.Console;
+    }
 
     /// <summary>
     /// 累积的完整文本
@@ -128,7 +134,7 @@ public class EventRenderer : IDisposable
         // result together only when its matching ToolEnd arrives, so the visual hierarchy remains
         // unambiguous without relying on terminal cursor rewrites.
         CloseAssistantSegment();
-        AnsiConsole.MarkupLine($"[dim]○ {toolDisplay}[/]");
+        _console.MarkupLine($"[dim]○ {toolDisplay}[/]");
 
         if (toolEnd.IsError)
         {
@@ -140,7 +146,7 @@ public class EventRenderer : IDisposable
             WriteIndentedMarkup(toolEnd.ResultPreview ?? "", "  ⎿ ", "    ", "green");
         }
 
-        AnsiConsole.WriteLine();
+        _console.WriteLine();
         _pendingTools.Remove(toolEnd.ToolCallId);
     }
 
@@ -157,10 +163,10 @@ public class EventRenderer : IDisposable
     private void HandleContextCompacted(AgentContextCompactedEvent compactedEvent)
     {
         CloseAssistantSegment();
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine(
+        _console.WriteLine();
+        _console.MarkupLine(
             CliStrings.Format("ChatAutoCompactedFormat", compactedEvent.Strategy, compactedEvent.PreCompactMessages, compactedEvent.PostCompactMessages, compactedEvent.PreCompactTokens, compactedEvent.PostCompactTokens));
-        AnsiConsole.WriteLine();
+        _console.WriteLine();
     }
 
     private void ShowTokenUsage(TokenUsage? usage, int estimatedContextTokens = 0, int availableInputTokens = 0)
@@ -199,8 +205,8 @@ public class EventRenderer : IDisposable
             cacheText,
             contextText);
 
-        AnsiConsole.WriteLine();
-        AnsiConsole.Write(grid);
+        _console.WriteLine();
+        _console.Write(grid);
     }
 
     /// <summary>
@@ -214,8 +220,8 @@ public class EventRenderer : IDisposable
 
         CloseAssistantSegment();
 
-        AnsiConsole.MarkupLine(CliStrings.ChatInterruptedTitle);
-        AnsiConsole.MarkupLine(CliStrings.ChatInterruptedHint);
+        _console.MarkupLine(CliStrings.ChatInterruptedTitle);
+        _console.MarkupLine(CliStrings.ChatInterruptedHint);
     }
 
     /// <summary>
@@ -237,7 +243,7 @@ public class EventRenderer : IDisposable
         }
     }
 
-    private static void WriteIndentedMarkup(
+    private void WriteIndentedMarkup(
         string text,
         string firstPrefix,
         string continuationIndent,
@@ -251,7 +257,7 @@ public class EventRenderer : IDisposable
         for (var i = 0; i < lines.Length; i++)
         {
             var prefix = i == 0 ? firstPrefix : continuationIndent;
-            AnsiConsole.MarkupLine($"[{color}]{prefix}{EscapeMarkup(lines[i])}[/]");
+            _console.MarkupLine($"[{color}]{prefix}{EscapeMarkup(lines[i])}[/]");
         }
     }
 
@@ -266,7 +272,7 @@ public class EventRenderer : IDisposable
             {
                 var dotCount = 0;
 
-                await AnsiConsole.Status()
+                await _console.Status()
                     .Spinner(Spinner.Known.Dots)
                     .StartAsync(CliStrings.ChatThinkingInitial, async ctx =>
                     {
