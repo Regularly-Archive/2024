@@ -12,12 +12,14 @@ namespace InsightaAI.Agent.Cli.UI;
 /// </summary>
 public class EventRenderer : IDisposable
 {
-    private bool _headerShown;
+    private readonly HangingIndentWriter _assistantWriter = new(
+        AnsiConsole.Console,
+        "[dim]● [/]",
+        "  ");
     private bool _isThinking;
     private CancellationTokenSource? _thinkingCts;
     private Task _thinkingTask = Task.CompletedTask;
     private readonly Dictionary<string, string> _pendingTools = [];
-    private string _lastText = "";
 
     /// <summary>
     /// 累积的完整文本
@@ -40,8 +42,8 @@ public class EventRenderer : IDisposable
 
             case AgentErrorEvent errorEvent:
                 await StopThinkingAsync();
-                AnsiConsole.MarkupLine($"[red]●[/] [dim][/]");
-                AnsiConsole.MarkupLine($"[red]⎿ {EscapeMarkup(errorEvent.ErrorMessage)}[/]");
+                CloseAssistantSegment();
+                WriteIndentedMarkup(errorEvent.ErrorMessage, "◆ ", "  ", "red");
                 break;
 
             case AgentToolStartEvent toolStart:
@@ -86,21 +88,22 @@ public class EventRenderer : IDisposable
 
             case TextStartEvent:
                 await StopThinkingAsync();
-                // 不在这里显示 header，等实际有文本时再显示
+                // A response may contain multiple text segments separated by tool calls.
+                // Delay the marker until the first non-empty delta so empty segments stay invisible.
+                CloseAssistantSegment();
                 break;
 
             case TextDeltaEvent textDelta:
                 await StopThinkingAsync();
                 if (!string.IsNullOrEmpty(textDelta.Delta))
                 {
-                    EnsureHeader();
                     FullText += textDelta.Delta;
-                    _lastText = textDelta.Delta;
-                    AnsiConsole.Write("{0}", textDelta.Delta);
+                    _assistantWriter.Write(textDelta.Delta);
                 }
                 break;
-            case TextEndEvent textEnd:
+            case TextEndEvent:
                 await StopThinkingAsync();
+                CloseAssistantSegment();
                 break;
         }
     }
@@ -108,58 +111,41 @@ public class EventRenderer : IDisposable
     private async Task HandleToolStartAsync(AgentToolStartEvent toolStart)
     {
         await StopThinkingAsync();
-        // 防御性调用：正常流程中 TextDeltaEvent 已调用过 EnsureHeader
-        if (!string.IsNullOrEmpty(_lastText))
-        {
-            EnsureHeader();
-        }
+        CloseAssistantSegment();
 
         var toolArgs = toolStart.Arguments.Truncate(50);
         var displayText = $"{toolStart.ToolName}({EscapeMarkup(toolArgs)})";
         _pendingTools[toolStart.ToolCallId] = displayText;
-        //AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine($"[dim]○ {displayText}[/]");
     }
 
     private void HandleToolEnd(AgentToolEndEvent toolEnd)
     {
-        var toolDisplay = _pendingTools.TryGetValue(toolEnd.ToolCallId, out var text)
-            ? text
-            : toolEnd.ToolName;
-
-        if (!string.IsNullOrEmpty(_lastText))
+        if (!_pendingTools.ContainsKey(toolEnd.ToolCallId))
         {
-            AnsiConsole.WriteLine();
+            CloseAssistantSegment();
+            AnsiConsole.MarkupLine($"[dim]○ {EscapeMarkup(toolEnd.ToolName)}[/]");
         }
-        
 
         if (toolEnd.IsError)
         {
             var errorMessage = (toolEnd.ResultPreview ?? "error").Truncate(60);
-
-            AnsiConsole.MarkupLine($"[red]●[/] [dim]{toolDisplay}[/]");
-            AnsiConsole.MarkupLine($"[red]⎿ {EscapeMarkup(errorMessage)}[/]");
+            WriteIndentedMarkup(errorMessage, "  ⎿ ", "    ", "red");
         }
         else
         {
-            AnsiConsole.MarkupLine($"[green]●[/] [dim]{toolDisplay}[/]");
-            AnsiConsole.MarkupLine($"[green]⎿ {EscapeMarkup(toolEnd.ResultPreview ?? "")}[/]");
+            WriteIndentedMarkup(toolEnd.ResultPreview ?? "", "  ⎿ ", "    ", "green");
         }
 
         AnsiConsole.WriteLine();
         _pendingTools.Remove(toolEnd.ToolCallId);
-        _lastText = string.Empty;
     }
 
     private async Task HandleCompleteAsync(AgentTurnEndEvent completeEvent)
     {
         await StopThinkingAsync();
 
-        // 只有当有文本输出时才添加空行
-        if (_headerShown && !string.IsNullOrEmpty(FullText))
-        {
-            AnsiConsole.WriteLine();
-            AnsiConsole.WriteLine();
-        }
+        CloseAssistantSegment();
 
         ShowTokenUsage(completeEvent.Result!.Usage, completeEvent.Result!.EstimatedContextTokens,
             completeEvent.Result!.AvailableInputTokens);
@@ -167,6 +153,7 @@ public class EventRenderer : IDisposable
 
     private void HandleContextCompacted(AgentContextCompactedEvent compactedEvent)
     {
+        CloseAssistantSegment();
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine(
             CliStrings.Format("ChatAutoCompactedFormat", compactedEvent.Strategy, compactedEvent.PreCompactMessages, compactedEvent.PostCompactMessages, compactedEvent.PreCompactTokens, compactedEvent.PostCompactTokens));
@@ -222,10 +209,7 @@ public class EventRenderer : IDisposable
         // 否则 AnsiConsole.Status 的渲染循环可能仍在运行，干扰后续输出
         await StopThinkingAsync();
 
-        if (!string.IsNullOrEmpty(FullText))
-        {
-            AnsiConsole.WriteLine();
-        }
+        CloseAssistantSegment();
 
         AnsiConsole.MarkupLine(CliStrings.ChatInterruptedTitle);
         AnsiConsole.MarkupLine(CliStrings.ChatInterruptedHint);
@@ -237,17 +221,34 @@ public class EventRenderer : IDisposable
     public void Reset()
     {
         FullText = "";
-        _lastText = "";
-        _headerShown = false;
+        _assistantWriter.Reset();
         _pendingTools.Clear();
     }
 
-    private void EnsureHeader()
+    private void CloseAssistantSegment()
     {
-        if (!_headerShown)
+        if (_assistantWriter.HasStarted)
         {
-            _headerShown = true;
-            AnsiConsole.Markup("[dim]● [/]");
+            _assistantWriter.EnsureLineBreak();
+            _assistantWriter.Reset();
+        }
+    }
+
+    private static void WriteIndentedMarkup(
+        string text,
+        string firstPrefix,
+        string continuationIndent,
+        string color)
+    {
+        var normalized = text
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n');
+        var lines = normalized.Split('\n');
+
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var prefix = i == 0 ? firstPrefix : continuationIndent;
+            AnsiConsole.MarkupLine($"[{color}]{prefix}{EscapeMarkup(lines[i])}[/]");
         }
     }
 

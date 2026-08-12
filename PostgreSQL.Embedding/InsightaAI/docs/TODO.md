@@ -428,6 +428,23 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 
 ---
 
+### 15. CLI 并行工具调用的结果归属渲染（优先级：中）
+
+**问题描述：**
+开启 `ParallelToolExecution` 时，事件可能按“多个 `AgentToolStartEvent` 连续到达，再按完成顺序到达多个 `AgentToolEndEvent`”的顺序输出。`EventRenderer` 当前在 Start 时立即输出调用，End 时只输出缩进的结果，因此多个结果在视觉上会都像是最后一个工具的子节点。
+
+**当前事实：**
+- `_pendingTools` 已使用 `ToolCallId` 准确匹配 Start/End，数据没有丢失，问题仅在终端展示。
+- 权限确认只适用于 `ToolPermissionHook.TargetTools`；例如 `web_fetch` 需确认，`web_search` 不需确认，这与并行渲染问题无关。
+
+**推荐方案：**
+- [ ] `ToolStart` 时按 `ToolCallId` 缓存调用信息，不立即写入终端历史。
+- [ ] `ToolEnd` 时按 ID 取回调用，将 `○ tool(args)` 与 `  ⎿ result` 作为一个完整块输出。
+- [ ] 补充串行、并行、完成顺序反转、工具错误和权限交互插入场景的渲染测试。
+- [ ] 不采用 ANSI 光标回写已输出行：自动换行、终端滚动、权限/AskUser 交互插入及不同终端的光标行为会导致定位不可靠。
+
+---
+
 ## 当前优先级
 
 1. Memory 自动注入校准：基于已记录的候选与入选/淘汰原因，根据真实会话调整门槛与身份查询兜底策略。

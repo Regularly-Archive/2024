@@ -16,6 +16,7 @@ namespace InsightaAI.Agent.Cli.Hooks;
 /// </summary>
 public class ToolPermissionHook : IToolHook
 {
+    private const string PromptIndent = "  ";
     private readonly List<string>? _targetTools;
 
     /// <summary>
@@ -35,10 +36,10 @@ public class ToolPermissionHook : IToolHook
         ToolExecutionContext context)
     {
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine($"[yellow]●[/] {CliStrings.Format("ToolPermissionWantsToUseFormat", $"[cyan]{EscapeMarkup(toolName)}[/]")}");
+        AnsiConsole.MarkupLine($"[yellow]◆[/] {CliStrings.Format("ToolPermissionWantsToUseFormat", $"[cyan]{EscapeMarkup(toolName)}[/]")}");
 
         var displayArgs = arguments.TruncateToConsoleWidth(offset: 4);
-        AnsiConsole.MarkupLine($"[dim]⎿ {EscapeMarkup(displayArgs)}[/]");
+        AnsiConsole.MarkupLine($"[dim]  ⎿ {EscapeMarkup(displayArgs)}[/]");
 
         // 对 edit_file 工具显示 diff 预览
         if (toolName == "edit_file")
@@ -55,8 +56,8 @@ public class ToolPermissionHook : IToolHook
 
         var choice = AnsiConsole.Prompt(
             new SelectionPrompt<MenuChoice<ToolPermissionChoice>>()
-                .Title(CliStrings.ToolPermissionProceedTitle)
-                .UseConverter(c => c.Label)
+                .Title($"{PromptIndent}{CliStrings.ToolPermissionProceedTitle}")
+                .UseConverter(c => $"{PromptIndent}{c.Label}")
                 .AddChoices([
                     new(ToolPermissionChoice.Allow, CliStrings.ToolPermissionAllow),
                     new(ToolPermissionChoice.AllowAlways, CliStrings.ToolPermissionAllowAlways),

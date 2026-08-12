@@ -202,6 +202,10 @@ public sealed class ChatApplication : IChatApplication
             if (string.IsNullOrWhiteSpace(userInput))
                 continue;
 
+            // MultiLineTextPrompt returns while the caret is still at the end of the submitted
+            // input. The first line break closes the user message; the second separates it from
+            // the next assistant or system event.
+            AnsiConsole.WriteLine();
             AnsiConsole.WriteLine();
 
             if (userInput.Equals(CommandExit, StringComparison.OrdinalIgnoreCase) ||
@@ -230,9 +234,12 @@ public sealed class ChatApplication : IChatApplication
                 continue;
             }
 
-            var titleTask = session.TryBeginTitleGeneration()
-                ? GenerateAndSaveSessionTitleAsync(session, summaryService, userInput)
-                : Task.CompletedTask;
+            if (session.TryBeginTitleGeneration())
+            {
+                // Title generation is auxiliary work. It must not delay the next user prompt
+                // after the main agent response has already completed.
+                _ = GenerateAndSaveSessionTitleAsync(session, summaryService, userInput);
+            }
 
             // 构建上下文（用户消息由 Agent 自动持久化）
             var context = new AgentContext
@@ -243,7 +250,6 @@ public sealed class ChatApplication : IChatApplication
 
             // 执行 Agent（消息持久化由 Agent 通过 IMessageStorage 自动处理）
             await ExecuteAgentAsync(currentAgent, userInput, context);
-            await titleTask;
         }
     }
 
@@ -252,10 +258,17 @@ public sealed class ChatApplication : IChatApplication
         ISummaryService summaryService,
         string initialUserMessage)
     {
-        var title = await summaryService.GenerateTitleAsync(initialUserMessage);
+        try
+        {
+            var title = await summaryService.GenerateTitleAsync(initialUserMessage);
 
-        if (!string.IsNullOrWhiteSpace(title))
-            await session.UpdateTitleAsync(title);
+            if (!string.IsNullOrWhiteSpace(title))
+                await session.UpdateTitleAsync(title);
+        }
+        catch
+        {
+            // Title generation is best-effort and must not affect the chat loop.
+        }
     }
 
     /// <summary>
@@ -455,7 +468,8 @@ public sealed class ChatApplication : IChatApplication
                 // 多选模式
                 var selected = AnsiConsole.Prompt(
                     new MultiSelectionPrompt<string>()
-                        .Title(CliStrings.ChatAskUserMultiSelectTitle)
+                        .Title($"  {CliStrings.ChatAskUserMultiSelectTitle}")
+                        .UseConverter(option => $"  {option}")
                         .NotRequired()
                         .AddChoices(options));
 
@@ -466,7 +480,8 @@ public sealed class ChatApplication : IChatApplication
                 // 单选模式
                 var selected = AnsiConsole.Prompt(
                     new SelectionPrompt<string>()
-                        .Title(CliStrings.ChatAskUserSelectTitle)
+                        .Title($"  {CliStrings.ChatAskUserSelectTitle}")
+                        .UseConverter(option => $"  {option}")
                         .AddChoices(options));
 
                 return selected;

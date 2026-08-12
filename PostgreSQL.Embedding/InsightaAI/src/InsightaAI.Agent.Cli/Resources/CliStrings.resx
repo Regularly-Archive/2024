@@ -614,7 +614,7 @@
     <value>[yellow]⟳[/] Context compacted ([dim]{0}[/]): {1} → {2} messages, ~{3:N0} → ~{4:N0} tokens</value>
   </data>
   <data name="ChatAskUserPromptFormat" xml:space="preserve">
-    <value>[yellow]●[/] Insighta wants to ask you: {0}</value>
+    <value>[yellow]◆[/] Insighta wants to ask you: {0}</value>
   </data>
   <data name="ChatWelcomeProviderModelFormat" xml:space="preserve">
     <value>Provider: {0} | Model: {1}</value>

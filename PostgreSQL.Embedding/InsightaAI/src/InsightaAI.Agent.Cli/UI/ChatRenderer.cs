@@ -57,8 +57,9 @@ public class ChatRenderer
         else if (message.Role == RoleAssistant)
         {
             AnsiConsole.WriteLine();
-            AnsiConsole.Markup("[white]● [/]");
-            Console.WriteLine(text);
+            var writer = new HangingIndentWriter(AnsiConsole.Console, "[white]● [/]", "  ");
+            writer.Write(text);
+            writer.EnsureLineBreak();
             AnsiConsole.WriteLine();
         }
     }

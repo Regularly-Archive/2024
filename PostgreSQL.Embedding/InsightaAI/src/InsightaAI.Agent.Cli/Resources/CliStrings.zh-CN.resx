@@ -614,7 +614,7 @@
     <value>[yellow]⟳[/] 上下文已压缩 ([dim]{0}[/]): {1} → {2} 条消息, ~{3:N0} → ~{4:N0} tokens</value>
   </data>
   <data name="ChatAskUserPromptFormat" xml:space="preserve">
-    <value>[yellow]●[/] Insighta 想问你: {0}</value>
+    <value>[yellow]◆[/] Insighta 想问你: {0}</value>
   </data>
   <data name="ChatWelcomeProviderModelFormat" xml:space="preserve">
     <value>供应商: {0} | 模型: {1}</value>
