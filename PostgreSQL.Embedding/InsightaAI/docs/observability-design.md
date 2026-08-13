@@ -156,7 +156,9 @@ Prometheus exporter 将 OTel attribute 中的点号转换为下划线，并为 C
 2. **总览 Stat**：Turn 数、LLM 请求数、总 input/output token、工具错误率；错误率以百分比显示。
 3. **LLM**：按 `gen_ai_request_model` 分组展示请求速率、p50/p95 延迟及 input/output token 速率。
 4. **Agent**：Round p50/p95 与每 Turn 平均 Round 数；后者需要新增低基数计数器或从 trace 派生，不能使用 `round_number` 标签。
-5. **Tool**：独立的 `InsightaAI Tools` Dashboard 按 `gen_ai_tool_name` 展示 p50/p95、成功率最高的工具与失败率最高的工具；并按 `insighta_skill_name` 展示成功激活次数最多的 Skill。Skill 只在 `activate_skill` 被允许且成功时计数，不把失败、拒绝或未找到的 Skill 计入。
+5. **Tool**：独立的 `InsightaAI Tools` Dashboard 按 `gen_ai_tool_name` 展示 p50/p95（使用 Grafana 自适应的 `$__rate_interval`）、成功率最高的工具与失败率最高的工具；成功/失败率的分子和分母都限定 `gen_ai_tool_is_allowed=true`，权限拒绝不视为工具故障。并按 `insighta_skill_name` 展示成功激活次数最多的 Skill。Skill 只在 `activate_skill` 被允许且成功时计数，不把失败、拒绝或未找到的 Skill 计入。
+
+Skill 面板使用 `max_over_time(counter[$__range])` 而不是 `increase()`：OTel Counter 的首次 `Add(1)` 可能早于 Prometheus 首次 scrape，导致窗口内没有可供 `increase()` 计算的跳变；取各进程时序在范围内的累计最大值可以展示此类首次激活。面板因此表示所选时间范围内可见的进程累计激活量，而非严格的时间窗口增量。
 6. **MCP**：当前只在 Jaeger trace 中使用 `mcp.server.*`、`mcp.config.*`、`mcp.method.name` 排障。若要进入 metric，只新增稳定低基数的 server/config/method 名，不带 description、endpoint、arguments、session 或 user。
 7. **Trace 关联**：将慢/失败面板与 Jaeger 查询关联，定位某一 Turn、Round 或 MCP 调用。
 
