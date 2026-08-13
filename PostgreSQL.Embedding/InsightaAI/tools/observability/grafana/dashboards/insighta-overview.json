@@ -2,42 +2,16 @@
   "annotations": { "list": [] },
   "editable": true,
   "panels": [
-    {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
-      "id": 1,
-      "targets": [{ "expr": "histogram_quantile(0.95, sum by (le) (rate(insighta_tool_execution_duration_milliseconds_bucket[5m])))", "legendFormat": "p95" }],
-      "title": "Tool execution p95",
-      "type": "timeseries"
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
-      "id": 2,
-      "targets": [{ "expr": "histogram_quantile(0.95, sum by (le) (rate(insighta_agent_round_duration_milliseconds_bucket[5m])))", "legendFormat": "p95" }],
-      "title": "Agent round p95",
-      "type": "timeseries"
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "tokens" }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
-      "id": 3,
-      "targets": [{ "expr": "sum(rate(gen_ai_client_tokens_input_total[5m]))", "legendFormat": "input" }, { "expr": "sum(rate(gen_ai_client_tokens_output_total[5m]))", "legendFormat": "output" }],
-      "title": "Token rate",
-      "type": "timeseries"
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
-      "id": 4,
-      "targets": [{ "expr": "sum(rate(insighta_tool_execution_duration_milliseconds_count{gen_ai_tool_is_error=\"true\"}[5m])) / clamp_min(sum(rate(insighta_tool_execution_duration_milliseconds_count[5m])), 1)", "legendFormat": "error rate" }],
-      "title": "Tool error rate",
-      "type": "timeseries"
-    }
+    { "datasource": { "type": "prometheus", "uid": "prometheus" }, "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }, "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 }, "id": 1, "targets": [{ "expr": "sum(increase(insighta_agent_run_runs_total[$__range]))", "legendFormat": "turns" }], "title": "Agent turns", "type": "stat" },
+    { "datasource": { "type": "prometheus", "uid": "prometheus" }, "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }, "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 }, "id": 2, "targets": [{ "expr": "sum(increase(gen_ai_client_operation_duration_milliseconds_count[$__range]))", "legendFormat": "requests" }], "title": "LLM requests", "type": "stat" },
+    { "datasource": { "type": "prometheus", "uid": "prometheus" }, "fieldConfig": { "defaults": { "unit": "tokens" }, "overrides": [] }, "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 }, "id": 3, "targets": [{ "expr": "sum(increase(gen_ai_client_tokens_input_total[$__range])) + sum(increase(gen_ai_client_tokens_output_total[$__range]))", "legendFormat": "tokens" }], "title": "Total tokens", "type": "stat" },
+    { "datasource": { "type": "prometheus", "uid": "prometheus" }, "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 2 }, "overrides": [] }, "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 }, "id": 4, "targets": [{ "expr": "sum(rate(insighta_tool_execution_duration_milliseconds_count{gen_ai_tool_is_error=\"true\"}[5m])) / clamp_min(sum(rate(insighta_tool_execution_duration_milliseconds_count[5m])), 1)", "legendFormat": "error rate" }], "title": "Tool error rate", "type": "stat" },
+    { "datasource": { "type": "prometheus", "uid": "prometheus" }, "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] }, "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 }, "id": 5, "targets": [{ "expr": "histogram_quantile(0.50, sum by (le, gen_ai_request_model) (rate(gen_ai_client_operation_duration_milliseconds_bucket[5m])))", "legendFormat": "{{gen_ai_request_model}} p50" }, { "expr": "histogram_quantile(0.95, sum by (le, gen_ai_request_model) (rate(gen_ai_client_operation_duration_milliseconds_bucket[5m])))", "legendFormat": "{{gen_ai_request_model}} p95" }], "title": "LLM request latency by model", "type": "timeseries" },
+    { "datasource": { "type": "prometheus", "uid": "prometheus" }, "fieldConfig": { "defaults": { "unit": "tokens" }, "overrides": [] }, "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 }, "id": 6, "targets": [{ "expr": "sum by (gen_ai_request_model) (rate(gen_ai_client_tokens_input_total[5m]))", "legendFormat": "{{gen_ai_request_model}} input" }, { "expr": "sum by (gen_ai_request_model) (rate(gen_ai_client_tokens_output_total[5m]))", "legendFormat": "{{gen_ai_request_model}} output" }], "title": "Token rate by model", "type": "timeseries" },
+    { "datasource": { "type": "prometheus", "uid": "prometheus" }, "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] }, "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 }, "id": 7, "targets": [{ "expr": "histogram_quantile(0.50, sum by (le, gen_ai_tool_name) (rate(insighta_tool_execution_duration_milliseconds_bucket[5m])))", "legendFormat": "{{gen_ai_tool_name}} p50" }, { "expr": "histogram_quantile(0.95, sum by (le, gen_ai_tool_name) (rate(insighta_tool_execution_duration_milliseconds_bucket[5m])))", "legendFormat": "{{gen_ai_tool_name}} p95" }], "title": "Tool latency by tool", "type": "timeseries" },
+    { "datasource": { "type": "prometheus", "uid": "prometheus" }, "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 2 }, "overrides": [] }, "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 }, "id": 8, "targets": [{ "expr": "sum by (gen_ai_tool_name) (rate(insighta_tool_execution_duration_milliseconds_count{gen_ai_tool_is_error=\"true\"}[5m])) / clamp_min(sum by (gen_ai_tool_name) (rate(insighta_tool_execution_duration_milliseconds_count[5m])), 1)", "legendFormat": "{{gen_ai_tool_name}}" }], "title": "Tool error rate by tool", "type": "timeseries" },
+    { "datasource": { "type": "prometheus", "uid": "prometheus" }, "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] }, "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 }, "id": 9, "targets": [{ "expr": "histogram_quantile(0.50, sum by (le, gen_ai_request_model) (rate(insighta_agent_round_duration_milliseconds_bucket[5m])))", "legendFormat": "{{gen_ai_request_model}} p50" }, { "expr": "histogram_quantile(0.95, sum by (le, gen_ai_request_model) (rate(insighta_agent_round_duration_milliseconds_bucket[5m])))", "legendFormat": "{{gen_ai_request_model}} p95" }], "title": "Agent round latency by model", "type": "timeseries" },
+    { "datasource": { "type": "prometheus", "uid": "prometheus" }, "fieldConfig": { "defaults": { "unit": "short", "decimals": 2 }, "overrides": [] }, "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 }, "id": 10, "targets": [{ "expr": "sum(rate(insighta_agent_round_rounds_total[5m])) / clamp_min(sum(rate(insighta_agent_run_runs_total[5m])), 1)", "legendFormat": "rounds per turn" }], "title": "Average rounds per turn", "type": "timeseries" }
   ],
   "schemaVersion": 41,
   "tags": ["insighta", "opentelemetry"],
@@ -45,5 +19,5 @@
   "time": { "from": "now-1h", "to": "now" },
   "title": "InsightaAI Overview",
   "uid": "insighta-overview",
-  "version": 1
+  "version": 2
 }

@@ -90,6 +90,12 @@ public sealed class AgentEventTelemetryHook : IAgentEventHook
         }
 
         _roundStopwatch = Stopwatch.StartNew();
+
+        TelemetryConstants.AgentRoundCounter.Add(1,
+        [
+            new KeyValuePair<string, object?>("agent.id", _agentId),
+            new KeyValuePair<string, object?>("gen_ai.request.model", _model)
+        ]);
         return Task.CompletedTask;
     }
 
@@ -135,7 +141,7 @@ public sealed class AgentEventTelemetryHook : IAgentEventHook
             TelemetryConstants.AgentRoundDuration.Record(durationMs,
             [
                 new KeyValuePair<string, object?>("agent.id", _agentId),
-                new KeyValuePair<string, object?>("round.number", _currentRound)
+                new KeyValuePair<string, object?>("gen_ai.request.model", _model)
             ]);
         }
     }

@@ -35,6 +35,8 @@ internal static class TelemetryConstants
         Meter.CreateCounter<long>("gen_ai.client.tokens.cache_hit", "tokens", "Cache hit tokens");
     public static readonly Counter<long> AgentRunCounter =
         Meter.CreateCounter<long>("insighta.agent.run.total", "runs", "Total agent runs");
+    public static readonly Counter<long> AgentRoundCounter =
+        Meter.CreateCounter<long>("insighta.agent.round.total", "rounds", "Total agent rounds");
 
     // Histogram instruments
     public static readonly Histogram<double> LlmRequestDuration =

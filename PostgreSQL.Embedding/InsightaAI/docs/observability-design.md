@@ -134,21 +134,22 @@ var instrumentedClient = llmClient.WithTelemetry();
 | `gen_ai_client_tokens_{input,output,cache_hit}_total` | 同上 | 模型维度 token 消耗趋势 |
 | `insighta_tool_execution_duration_milliseconds` | `gen_ai_tool_name`、`gen_ai_tool_is_error`、`gen_ai_tool_is_allowed` | 工具延迟、失败率与权限拒绝 |
 | `insighta_agent_run_runs_total` | `agent_id`、`gen_ai_request_model` | 完成的 Agent Turn 数 |
-| `insighta_agent_round_duration_milliseconds` | 当前还含 `round_number`，见下方问题 | Round 延迟 |
+| `insighta_agent_round_rounds_total` | `agent_id`、`gen_ai_request_model` | Agent Round 数与每 Turn 平均 Round 数 |
+| `insighta_agent_round_duration_milliseconds` | `agent_id`、`gen_ai_request_model` | Round 延迟 |
 
 Prometheus exporter 将 OTel attribute 中的点号转换为下划线，并为 Counter / unit 补充 `_total` / `_milliseconds` 等后缀。因此 Grafana 与 PromQL 必须以 Prometheus 实际暴露的名称和 label 为准，而不是只按 .NET instrument 名推测。
 
 ### 已发现问题：`round_number` 是高基数标签
 
-`insighta_agent_round_duration_milliseconds` 当前包含 `round_number`。轮次在每个 Turn 中递增，长期运行会持续创建新的 time series，不适合作为 Prometheus label。
+`insighta_agent_round_duration_milliseconds` 曾包含 `round_number`。轮次在每个 Turn 中递增，长期运行会持续创建新的 time series，不适合作为 Prometheus label。
 
-修复原则：从 Round Histogram 的 metric tag 中移除 `round_number`，但可继续保留在 Jaeger round span attribute，供单条 trace 排障。Dashboard 聚合时不应依赖该标签。
+修复：Round Histogram 的 metric tag 只保留 `agent_id` 与 `gen_ai_request_model`；新增低基数 `insighta_agent_round_rounds_total` Counter。`round.number` 继续保留在 Jaeger round span attribute，供单条 trace 排障。Dashboard 不依赖轮次标签。
 
 ## 8. Dashboard v2 待办
 
 当前 `InsightaAI Overview` 只有 Tool p95、Round p95、Token rate 和 Tool error rate 四个验证面板。后续 Dashboard v2 按以下优先级演进：
 
-1. **先修指标基数**：移除 Round metric 的 `round_number`；持续禁止 `sessionId`、`userId`、请求 ID、工具参数与 endpoint 进入 Prometheus label。
+1. **指标基数（已完成）**：Round metric 已移除 `round_number`，并新增低基数 Round counter；持续禁止 `sessionId`、`userId`、请求 ID、工具参数与 endpoint 进入 Prometheus label。
 2. **总览 Stat**：Turn 数、LLM 请求数、总 input/output token、工具错误率；错误率以百分比显示。
 3. **LLM**：按 `gen_ai_request_model` 分组展示请求速率、p50/p95 延迟及 input/output token 速率。
 4. **Agent**：Round p50/p95 与每 Turn 平均 Round 数；后者需要新增低基数计数器或从 trace 派生，不能使用 `round_number` 标签。
