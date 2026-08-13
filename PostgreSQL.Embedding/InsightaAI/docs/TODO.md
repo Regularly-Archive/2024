@@ -455,6 +455,22 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 
 ---
 
+### 16. Token 用量归属与审计（优先级：中）
+
+**目标：** 精确统计每个用户、会话和模型的 LLM token 消耗，同时避免向 Prometheus 写入高基数的 user/session label。
+
+- [ ] 在 `Agent/Usage/` 定义 `UsageRecord`、`UsageQuery`、`UsageSummary` 与 `IUsageStore`
+- [ ] 新增 `AgentContext.UserId`，将用户与会话归属带入所有 LLM Round
+- [ ] 提供 `SqliteUsageStore`；CLI 注入默认 `~/.insighta/usage/usage.db`
+- [ ] Agent Loop 在收到每轮最终 `TokenUsage` 后同步持久化，不依赖 Telemetry
+- [ ] 补齐 Session / User / Model 聚合查询与可靠性测试
+- [ ] 新增 `insighta usage` 查询命令
+- [ ] 单独决策会话删除与 usage 审计记录的保留/级联删除策略
+
+**设计文档：** [usage-accounting-design.md](usage-accounting-design.md)
+
+---
+
 ## 当前优先级
 
 1. Memory 自动注入校准：基于已记录的候选与入选/淘汰原因，根据真实会话调整门槛与身份查询兜底策略。
