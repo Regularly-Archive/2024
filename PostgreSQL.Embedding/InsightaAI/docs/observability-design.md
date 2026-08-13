@@ -148,26 +148,34 @@ Prometheus exporter 将 OTel attribute 中的点号转换为下划线，并为 C
 
 修复：Round Histogram 的 metric tag 只保留 `agent_id` 与 `gen_ai_request_model`；新增低基数 `insighta_agent_round_rounds_total` Counter。`round.number` 继续保留在 Jaeger round span attribute，供单条 trace 排障。Dashboard 不依赖轮次标签。
 
-## 8. Dashboard v2 待办
+## 8. Grafana Dashboard（当前）
 
-当前 `InsightaAI Overview` 只有 Tool p95、Round p95、Token rate 和 Tool error rate 四个验证面板。后续 Dashboard v2 按以下优先级演进：
+### InsightaAI Overview
 
-1. **指标基数（已完成）**：Round metric 已移除 `round_number`，并新增低基数 Round counter；持续禁止 `sessionId`、`userId`、请求 ID、工具参数与 endpoint 进入 Prometheus label。
-2. **总览 Stat**：Turn 数、LLM 请求数、总 input/output token、工具错误率；错误率以百分比显示。
-3. **LLM**：按 `gen_ai_request_model` 分组展示请求速率、p50/p95 延迟及 input/output token 速率。
-4. **Agent**：Round p50/p95 与每 Turn 平均 Round 数；后者需要新增低基数计数器或从 trace 派生，不能使用 `round_number` 标签。
-5. **Tool**：独立的 `InsightaAI Tools` Dashboard 按 `gen_ai_tool_name` 展示 p50/p95（使用 Grafana 自适应的 `$__rate_interval`）、成功率最高的工具与失败率最高的工具；成功/失败率的分子和分母都限定 `gen_ai_tool_is_allowed=true`，权限拒绝不视为工具故障。并按 `insighta_skill_name` 展示成功激活次数最多的 Skill。Skill 只在 `activate_skill` 被允许且成功时计数，不把失败、拒绝或未找到的 Skill 计入。
+- **Agent turns / LLM requests**：所选时间范围内完成的 Turn 和 LLM 请求总数。
+- **Token 概览**：总 token、input cache hit ratio、未命中缓存的 input token、input:output token 比。仅缓存命中率设有阈值：低于 90% 为红色；token 总量本身不代表故障。
+- **LLM**：按 `gen_ai_request_model` 展示 p50/p95 请求延迟、input token rate 与 output token rate。
+- **Agent**：按模型展示 Round p50/p95 延迟及平均每 Turn Round 数。Round metric 已移除高基数的 `round_number`；不使用 `sessionId`、`userId`、请求 ID、工具参数或 endpoint 作为 Prometheus label。
 
-Skill 面板使用 `max_over_time(counter[$__range])` 而不是 `increase()`：OTel Counter 的首次 `Add(1)` 可能早于 Prometheus 首次 scrape，导致窗口内没有可供 `increase()` 计算的跳变；取各进程时序在范围内的累计最大值可以展示此类首次激活。面板因此表示所选时间范围内可见的进程累计激活量，而非严格的时间窗口增量。
-6. **MCP**：当前只在 Jaeger trace 中使用 `mcp.server.*`、`mcp.config.*`、`mcp.method.name` 排障。若要进入 metric，只新增稳定低基数的 server/config/method 名，不带 description、endpoint、arguments、session 或 user。
-7. **Trace 关联**：将慢/失败面板与 Jaeger 查询关联，定位某一 Turn、Round 或 MCP 调用。
+### InsightaAI Tools
 
-### 成本与行为面板（已加入 Dashboard v5）
+- **Tool latency by tool**：按 `gen_ai_tool_name` 的 p50/p95，使用 Grafana 自适应 `$__rate_interval`，只统计实际被允许执行的调用。
+- **Most reliable / failure-prone tools**：在所选时间范围内按成功率与失败率取前五名；分子和分母都限定 `gen_ai_tool_is_allowed=true`，因此权限拒绝不被计为执行成功或工具故障。
+- **Most frequently activated skills**：按 `insighta_skill_name` 展示最多十项成功激活的 Skill。只在 `activate_skill` 被允许且成功时计数，不把失败、拒绝或未找到的 Skill 计入。
+
+Skill 面板使用 `max_over_time(counter[$__range])` 而不是 `increase()`：OTel Counter 的首次 `Add(1)` 可能早于 Prometheus 首次 scrape，导致窗口内没有可供 `increase()` 计算的跳变；取各进程时序在范围内的累计最大值可以展示此类首次激活。面板因此表示所选时间范围内可见的进程累计激活量，而非严格的时间窗口增量，也不应跨已结束的 CLI 进程直接视为全局累计用量。
+
+### 后续方向
+
+1. **MCP**：当前只在 Jaeger trace 中使用 `mcp.server.*`、`mcp.config.*`、`mcp.method.name` 排障。若要进入 metric，只新增稳定低基数的 server/config/method 名，不带 description、endpoint、arguments、session 或 user。
+2. **Trace 关联**：将慢/失败面板与 Jaeger 查询关联，定位某一 Turn、Round 或 MCP 调用。
+3. **Agent 行为**：如需要每 Turn 工具链长度、AskUser 频率或 context compaction 次数，应新增专用的低基数指标，不从现有聚合 Counter 反推。
+
+### 成本与行为指标说明
 
 - **Input cache hit ratio**：当前时间范围内 `cache_hit_tokens / input_tokens`。它反映缓存复用效率；缓存 token 通常价格更低，但最终账单仍取决于各模型供应商的计费规则。
 - **Uncached input tokens**：`input_tokens - cache_hit_tokens`，用于估算未享受缓存折扣的输入规模，不等同于货币金额。
 - **Input : output token ratio**：输入与输出总量的比值，用于观察 Agent 的读写行为是否发生明显漂移。
-- **Tool call distribution**：按工具名计算调用数占比，用于区分 bash、文件、搜索和其他工具主导的工作模式。
 
 `service_instance_id` 代表一次 CLI/进程实例，不是持久会话 ID；`sessionId`、`userId` 继续禁止作为 Prometheus label。每 Turn 的 Round 数分位数也不能由当前聚合 Counter 反推，若有需求需引入独立低基数 Histogram。
 
