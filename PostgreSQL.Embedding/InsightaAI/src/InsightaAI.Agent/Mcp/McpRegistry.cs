@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using InsightaAI.Agent.Abstractions;
 using InsightaAI.LLM.Models;
-using System.Text.Json;
 
 namespace InsightaAI.Agent.Mcp;
 
@@ -14,12 +13,6 @@ public class McpRegistry
     private readonly IMcpConnectionPool _connectionPool;
     private readonly ConcurrentDictionary<string, McpServerConfig> _serverCache = new();
     private readonly ConcurrentDictionary<string, McpToolMetadata> _activeTools = new();
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
-    };
-
     public McpRegistry(IMcpConnectionPool connectionPool)
     {
         _connectionPool = connectionPool;
@@ -103,15 +96,7 @@ public class McpRegistry
             {
                 var arguments = args.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
                 var callResult = await _connectionPool.CallToolAsync(config, toolName, arguments, ctx.CancellationToken);
-                var metadata = new Dictionary<string, object?>(callResult.Metadata ?? new Dictionary<string, object?>())
-                {
-                    ["mcp.client.name"] = config.Name,
-                    ["mcp.client.description"] = config.Description,
-                    ["mcp.client.endpoint"] = config.Endpoint,
-                    ["mcp.client.transport"] = config.Transport,
-                    ["mcp.method.name"] = toolName,
-                    ["mcp.method.arguments"] = JsonSerializer.Serialize(arguments,JsonOptions),
-                };
+                var metadata = McpTelemetryMetadata.ForToolCall(config, toolName, callResult.Metadata);
 
                 return new ToolResult
                 {
