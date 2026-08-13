@@ -37,6 +37,8 @@ internal static class TelemetryConstants
         Meter.CreateCounter<long>("insighta.agent.run.total", "runs", "Total agent runs");
     public static readonly Counter<long> AgentRoundCounter =
         Meter.CreateCounter<long>("insighta.agent.round.total", "rounds", "Total agent rounds");
+    public static readonly Counter<long> SkillActivationCounter =
+        Meter.CreateCounter<long>("insighta.skill.activation", "activations", "Successful skill activations");
 
     // Histogram instruments
     public static readonly Histogram<double> LlmRequestDuration =

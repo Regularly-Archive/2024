@@ -1,0 +1,61 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum by (le, gen_ai_tool_name) (rate(insighta_tool_execution_duration_milliseconds_bucket[5m])))", "legendFormat": "{{gen_ai_tool_name}} p50" },
+        { "expr": "histogram_quantile(0.95, sum by (le, gen_ai_tool_name) (rate(insighta_tool_execution_duration_milliseconds_bucket[5m])))", "legendFormat": "{{gen_ai_tool_name}} p95" }
+      ],
+      "title": "Tool latency by tool (p50 / p95)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 2, "min": 0, "max": 1 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "id": 2,
+      "options": { "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "showUnfilled": true },
+      "targets": [
+        { "expr": "topk(5, (1 - sum by (gen_ai_tool_name) (increase(insighta_tool_execution_duration_milliseconds_count{gen_ai_tool_is_error=\"true\"}[$__range])) / clamp_min(sum by (gen_ai_tool_name) (increase(insighta_tool_execution_duration_milliseconds_count[$__range])), 1)) and on (gen_ai_tool_name) (sum by (gen_ai_tool_name) (increase(insighta_tool_execution_duration_milliseconds_count[$__range])) > 0))", "legendFormat": "{{gen_ai_tool_name}}" }
+      ],
+      "title": "Most reliable tools (success rate)",
+      "type": "bargauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 2, "min": 0, "max": 1 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+      "id": 3,
+      "options": { "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "showUnfilled": true },
+      "targets": [
+        { "expr": "topk(5, (sum by (gen_ai_tool_name) (increase(insighta_tool_execution_duration_milliseconds_count{gen_ai_tool_is_error=\"true\"}[$__range])) / clamp_min(sum by (gen_ai_tool_name) (increase(insighta_tool_execution_duration_milliseconds_count[$__range])), 1)) and on (gen_ai_tool_name) (sum by (gen_ai_tool_name) (increase(insighta_tool_execution_duration_milliseconds_count[$__range])) > 0))", "legendFormat": "{{gen_ai_tool_name}}" }
+      ],
+      "title": "Most failure-prone tools (failure rate)",
+      "type": "bargauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "min": 0 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 17 },
+      "id": 4,
+      "options": { "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "showUnfilled": true },
+      "targets": [
+        { "expr": "topk(10, sum by (insighta_skill_name) (increase(insighta_skill_activation_activations_total[$__range])))", "legendFormat": "{{insighta_skill_name}}" }
+      ],
+      "title": "Most frequently activated skills",
+      "type": "bargauge"
+    }
+  ],
+  "schemaVersion": 41,
+  "tags": ["insighta", "opentelemetry", "tools"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "InsightaAI Tools",
+  "uid": "insighta-tools",
+  "version": 2
+}

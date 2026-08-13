@@ -1,5 +1,6 @@
 using InsightaAI.Agent.Tools;
 using System.Diagnostics;
+using System.Text.Json;
 
 namespace InsightaAI.Agent.Diagnostics;
 
@@ -64,6 +65,20 @@ public static class ToolCallHandlerTelemetryWrapper
                     new KeyValuePair<string, object?>("gen_ai.tool.is_error", response.ToolResult.IsError),
                     new KeyValuePair<string, object?>("gen_ai.tool.is_allowed", response.IsAllowed)
                 ]);
+
+                if (request.ToolCall.Name == "activate_skill" &&
+                    response.IsAllowed &&
+                    !response.ToolResult.IsError &&
+                    request.ToolCall.Arguments.ValueKind == JsonValueKind.Object &&
+                    request.ToolCall.Arguments.TryGetProperty("skill_name", out var skillNameElement) &&
+                    skillNameElement.ValueKind == JsonValueKind.String &&
+                    !string.IsNullOrWhiteSpace(skillNameElement.GetString()))
+                {
+                    TelemetryConstants.SkillActivationCounter.Add(1,
+                    [
+                        new KeyValuePair<string, object?>("insighta.skill.name", skillNameElement.GetString())
+                    ]);
+                }
 
                 return response;
             }

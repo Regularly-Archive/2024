@@ -107,6 +107,8 @@ Turn span 在 `OnAgentTurnStartedAsync` 中创建并立即 Dispose。设计意�
 | OutputTokenCounter | `gen_ai.client.tokens.output` | Counter\<long\> |
 | CacheHitTokenCounter | `gen_ai.client.tokens.cache_hit` | Counter\<long\> |
 | AgentRunCounter | `insighta.agent.run.total` | Counter\<long\> |
+| AgentRoundCounter | `insighta.agent.round.total` | Counter\<long\> |
+| SkillActivationCounter | `insighta.skill.activation` | Counter\<long\> |
 | LlmRequestDuration | `gen_ai.client.operation.duration` | Histogram\<double\> |
 | ToolExecutionDuration | `insighta.tool.execution.duration` | Histogram\<double\> |
 | AgentRoundDuration | `insighta.agent.round.duration` | Histogram\<double\> |
@@ -136,6 +138,7 @@ var instrumentedClient = llmClient.WithTelemetry();
 | `insighta_agent_run_runs_total` | `agent_id`、`gen_ai_request_model` | 完成的 Agent Turn 数 |
 | `insighta_agent_round_rounds_total` | `agent_id`、`gen_ai_request_model` | Agent Round 数与每 Turn 平均 Round 数 |
 | `insighta_agent_round_duration_milliseconds` | `agent_id`、`gen_ai_request_model` | Round 延迟 |
+| `insighta_skill_activation_activations_total` | `insighta_skill_name` | 成功激活 Skill 的次数 |
 
 Prometheus exporter 将 OTel attribute 中的点号转换为下划线，并为 Counter / unit 补充 `_total` / `_milliseconds` 等后缀。因此 Grafana 与 PromQL 必须以 Prometheus 实际暴露的名称和 label 为准，而不是只按 .NET instrument 名推测。
 
@@ -153,7 +156,7 @@ Prometheus exporter 将 OTel attribute 中的点号转换为下划线，并为 C
 2. **总览 Stat**：Turn 数、LLM 请求数、总 input/output token、工具错误率；错误率以百分比显示。
 3. **LLM**：按 `gen_ai_request_model` 分组展示请求速率、p50/p95 延迟及 input/output token 速率。
 4. **Agent**：Round p50/p95 与每 Turn 平均 Round 数；后者需要新增低基数计数器或从 trace 派生，不能使用 `round_number` 标签。
-5. **Tool**：按 `gen_ai_tool_name` 分组展示 p50/p95、调用速率、失败率与拒绝率。
+5. **Tool**：独立的 `InsightaAI Tools` Dashboard 按 `gen_ai_tool_name` 展示 p50/p95、成功率最高的工具与失败率最高的工具；并按 `insighta_skill_name` 展示成功激活次数最多的 Skill。Skill 只在 `activate_skill` 被允许且成功时计数，不把失败、拒绝或未找到的 Skill 计入。
 6. **MCP**：当前只在 Jaeger trace 中使用 `mcp.server.*`、`mcp.config.*`、`mcp.method.name` 排障。若要进入 metric，只新增稳定低基数的 server/config/method 名，不带 description、endpoint、arguments、session 或 user。
 7. **Trace 关联**：将慢/失败面板与 Jaeger 查询关联，定位某一 Turn、Round 或 MCP 调用。
 
