@@ -1,0 +1,49 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "targets": [{ "expr": "histogram_quantile(0.95, sum by (le) (rate(insighta_tool_execution_duration_milliseconds_bucket[5m])))", "legendFormat": "p95" }],
+      "title": "Tool execution p95",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "targets": [{ "expr": "histogram_quantile(0.95, sum by (le) (rate(insighta_agent_round_duration_milliseconds_bucket[5m])))", "legendFormat": "p95" }],
+      "title": "Agent round p95",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "tokens" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "id": 3,
+      "targets": [{ "expr": "sum(rate(gen_ai_client_tokens_input_total[5m]))", "legendFormat": "input" }, { "expr": "sum(rate(gen_ai_client_tokens_output_total[5m]))", "legendFormat": "output" }],
+      "title": "Token rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "id": 4,
+      "targets": [{ "expr": "sum(rate(insighta_tool_execution_duration_milliseconds_count{gen_ai_tool_is_error=\"true\"}[5m])) / clamp_min(sum(rate(insighta_tool_execution_duration_milliseconds_count[5m])), 1)", "legendFormat": "error rate" }],
+      "title": "Tool error rate",
+      "type": "timeseries"
+    }
+  ],
+  "schemaVersion": 41,
+  "tags": ["insighta", "opentelemetry"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "InsightaAI Overview",
+  "uid": "insighta-overview",
+  "version": 1
+}
