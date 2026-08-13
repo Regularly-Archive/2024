@@ -12,7 +12,7 @@ public sealed class CliEnvironment : IEnvironmentVariableReader
     [
         "INSIGHTA_LANGUAGE",
         "INSIGHTA_TELEMETRY",
-        "INSIGHTA_OTEL_ENDPOINT"
+        "INSIGHTA_OTLP_ENDPOINT"
     ];
 
     private readonly IReadOnlyDictionary<string, string> _configuredValues;

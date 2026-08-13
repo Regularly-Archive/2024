@@ -23,7 +23,7 @@ public sealed record CliBootstrap(
         var language = environment.Get("INSIGHTA_LANGUAGE") ?? config.Language;
         var telemetryEnabled = string.Equals(
             environment.Get("INSIGHTA_TELEMETRY"), "1", StringComparison.OrdinalIgnoreCase);
-        var otlpEndpoint = environment.Get("INSIGHTA_OTEL_ENDPOINT") ?? DefaultOtlpEndpoint;
+        var otlpEndpoint = environment.Get("INSIGHTA_OTLP_ENDPOINT") ?? DefaultOtlpEndpoint;
 
         return new CliBootstrap(environment, language, telemetryEnabled, otlpEndpoint);
     }

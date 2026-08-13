@@ -11,7 +11,7 @@ public sealed class CliBootstrapTests
     [
         "INSIGHTA_LANGUAGE",
         "INSIGHTA_TELEMETRY",
-        "INSIGHTA_OTEL_ENDPOINT"
+        "INSIGHTA_OTLP_ENDPOINT"
     ];
 
     [Fact]
@@ -30,7 +30,7 @@ public sealed class CliBootstrapTests
                     {
                         ["INSIGHTA_LANGUAGE"] = CliCulture.Chinese,
                         ["INSIGHTA_TELEMETRY"] = "1",
-                        ["INSIGHTA_OTEL_ENDPOINT"] = "http://collector.example:4318"
+                        ["INSIGHTA_OTLP_ENDPOINT"] = "http://collector.example:4318"
                     }
                 };
 
@@ -41,7 +41,7 @@ public sealed class CliBootstrapTests
                 Assert.Equal("http://collector.example:4318", bootstrap.OtlpEndpoint);
                 Assert.Equal(CliCulture.Chinese, Environment.GetEnvironmentVariable("INSIGHTA_LANGUAGE"));
                 Assert.Equal("1", Environment.GetEnvironmentVariable("INSIGHTA_TELEMETRY"));
-                Assert.Equal("http://collector.example:4318", Environment.GetEnvironmentVariable("INSIGHTA_OTEL_ENDPOINT"));
+                Assert.Equal("http://collector.example:4318", Environment.GetEnvironmentVariable("INSIGHTA_OTLP_ENDPOINT"));
             }
             finally
             {
@@ -60,7 +60,7 @@ public sealed class CliBootstrapTests
             {
                 Environment.SetEnvironmentVariable("INSIGHTA_LANGUAGE", CliCulture.English);
                 Environment.SetEnvironmentVariable("INSIGHTA_TELEMETRY", "0");
-                Environment.SetEnvironmentVariable("INSIGHTA_OTEL_ENDPOINT", "http://process.example:4317");
+                Environment.SetEnvironmentVariable("INSIGHTA_OTLP_ENDPOINT", "http://process.example:4317");
 
                 var bootstrap = CliBootstrap.Initialize(new CliConfig
                 {
@@ -68,7 +68,7 @@ public sealed class CliBootstrapTests
                     {
                         ["INSIGHTA_LANGUAGE"] = CliCulture.Chinese,
                         ["INSIGHTA_TELEMETRY"] = "1",
-                        ["INSIGHTA_OTEL_ENDPOINT"] = "http://config.example:4318"
+                        ["INSIGHTA_OTLP_ENDPOINT"] = "http://config.example:4318"
                     }
                 });
 
