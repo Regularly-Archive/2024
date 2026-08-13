@@ -202,6 +202,16 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 
 **效果**：关闭遥测时启动 ~250ms 与干净 baseline 一致；开启遥测时仅 chat 会话承担 exporter 连接开销，管理命令零遥测开销。
 
+### MCP Telemetry 与本地可观测性栈（2026-08-13）
+
+- MCP 工具结果元数据由 `ToolCallHandlerTelemetryWrapper` 统一写入 trace：远端握手身份使用 `mcp.server.*`，本地配置使用 `mcp.config.*`；不把工具参数、endpoint、description、sessionId 或 userId 写入 Prometheus label。
+- Telemetry endpoint 统一使用 `INSIGHTA_OTLP_ENDPOINT`；`INSIGHTA_OTEL_ENDPOINT` 已废弃。CLI 仅在真正进入 chat 会话后初始化 Telemetry。
+- 本地栈位于 `tools/observability/`：OTel Collector 接收 OTLP（4317/4318）、转发 trace 到 Jaeger（16686），并以 9464 暴露 Prometheus scrape endpoint；Prometheus（9090）供 Grafana（3000）查询。启动：`docker compose up -d`。
+- Grafana 由 provisioning 加载两个 Dashboard：`InsightaAI Overview` 与 `InsightaAI Tools`。修改 JSON 后需 `docker compose restart grafana` 才会重新加载。
+- Overview 第一行是 Agent turns 与 LLM requests；第二行是 token 概览（总量、cache hit ratio、uncached input、input:output）；其余为按模型的 LLM/Agent 延迟与速率。仅 cache hit ratio 低于 90% 标红，token 总量不是错误信号。
+- Tools 只统计 `gen_ai_tool_is_allowed=true` 的实际执行：延迟为 p50/p95；成功率、失败率分别显示 Top 5 工具，权限拒绝不算执行失败。Skill 激活在通用 `ToolCallHandlerTelemetryWrapper` 中从 `activate_skill` 参数读取名称，成功且允许时写 `insighta.skill.activation`；不改动 Skill 实现。Skill 面板显示 Top 5 名称及 Activations。
+- Skill Counter 首次增量可能发生在 Prometheus 首次 scrape 之前，故面板用 `max_over_time(counter[$__range])` 展示可见进程累计量，而不是 `increase()`；它不是跨已结束 CLI 进程的全局用量。
+
 ### AgentBuilder 与 AgentFactory
 
 `AgentBuilder` 是 Agent 级服务组合入口。它注册默认 `ToolRegistry` 和显式依赖，支持 `ConfigureServices()` 扩展当前 Agent 的服务集合，并在 `Build()` 时创建 Agent 专属 ServiceProvider。`AgentFactory` 只负责准备 CLI 业务依赖，再交给 Builder 组装；`Agent` 释放时负责释放该 Provider。旧的显式构造函数暂时保留，用于兼容现有调用方。
@@ -212,7 +222,7 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 
 1. **Memory 自动注入校准** — 用本地候选筛选日志和真实会话调整初始覆盖门槛。
 2. **Hook 事件契约** — 细化取消/中止场景（`DoneReason.Aborted`、`OperationCanceledException`）。
-3. **Telemetry** — 完成 MCP tag 命名清理（`CurrentRoundContext` 不安全字典索引已消除，2026-08-05 随 AgentFactoryTests 修复完成，见 TODO.md 6.1）。
+3. **Telemetry** — 继续补充 Agent 行为指标（每 Turn 工具链长度、AskUser 频率、context compaction）；MCP tag 命名清理已完成。
 4. **运行时用量** — 区分流式模型未返回 token usage 与真实的 0。
 5. **L3 Orchestrator** — 继续开发编排能力。
 

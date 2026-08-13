@@ -19,11 +19,14 @@
       "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 2, "min": 0, "max": 1 }, "overrides": [] },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
       "id": 2,
-      "options": { "showHeader": true, "sortBy": [{ "desc": true, "displayName": "Value" }] },
-      "targets": [
-        { "expr": "topk(5, (sum by (gen_ai_tool_name) (increase(insighta_tool_execution_duration_milliseconds_count{gen_ai_tool_is_allowed=\"true\",gen_ai_tool_is_error=\"false\"}[$__range])) / clamp_min(sum by (gen_ai_tool_name) (increase(insighta_tool_execution_duration_milliseconds_count{gen_ai_tool_is_allowed=\"true\"}[$__range])), 1)) and on (gen_ai_tool_name) (sum by (gen_ai_tool_name) (increase(insighta_tool_execution_duration_milliseconds_count{gen_ai_tool_is_allowed=\"true\"}[$__range])) > 0))", "legendFormat": "{{gen_ai_tool_name}}" }
+      "options": { "showHeader": true },
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true }, "indexByName": { "gen_ai_tool_name": 0, "Value": 1 }, "renameByName": { "gen_ai_tool_name": "Tool", "Value": "Success rate" } } }
       ],
-      "title": "Most reliable tools (success rate)",
+      "targets": [
+        { "expr": "topk(5, (sum by (gen_ai_tool_name) (increase(insighta_tool_execution_duration_milliseconds_count{gen_ai_tool_is_allowed=\"true\",gen_ai_tool_is_error=\"false\"}[$__range])) / clamp_min(sum by (gen_ai_tool_name) (increase(insighta_tool_execution_duration_milliseconds_count{gen_ai_tool_is_allowed=\"true\"}[$__range])), 1)) and on (gen_ai_tool_name) (sum by (gen_ai_tool_name) (increase(insighta_tool_execution_duration_milliseconds_count{gen_ai_tool_is_allowed=\"true\"}[$__range])) > 0))", "format": "table", "instant": true, "legendFormat": "{{gen_ai_tool_name}}" }
+      ],
+      "title": "Top 5 tools by success rate",
       "type": "table"
     },
     {
@@ -31,11 +34,14 @@
       "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 2, "min": 0, "max": 1 }, "overrides": [] },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
       "id": 3,
-      "options": { "showHeader": true, "sortBy": [{ "desc": true, "displayName": "Value" }] },
-      "targets": [
-        { "expr": "topk(5, (sum by (gen_ai_tool_name) (increase(insighta_tool_execution_duration_milliseconds_count{gen_ai_tool_is_allowed=\"true\",gen_ai_tool_is_error=\"true\"}[$__range])) / clamp_min(sum by (gen_ai_tool_name) (increase(insighta_tool_execution_duration_milliseconds_count{gen_ai_tool_is_allowed=\"true\"}[$__range])), 1)) and on (gen_ai_tool_name) (sum by (gen_ai_tool_name) (increase(insighta_tool_execution_duration_milliseconds_count{gen_ai_tool_is_allowed=\"true\"}[$__range])) > 0))", "legendFormat": "{{gen_ai_tool_name}}" }
+      "options": { "showHeader": true },
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true }, "indexByName": { "gen_ai_tool_name": 0, "Value": 1 }, "renameByName": { "gen_ai_tool_name": "Tool", "Value": "Failure rate" } } }
       ],
-      "title": "Most failure-prone tools (failure rate)",
+      "targets": [
+        { "expr": "topk(5, (sum by (gen_ai_tool_name) (increase(insighta_tool_execution_duration_milliseconds_count{gen_ai_tool_is_allowed=\"true\",gen_ai_tool_is_error=\"true\"}[$__range])) / clamp_min(sum by (gen_ai_tool_name) (increase(insighta_tool_execution_duration_milliseconds_count{gen_ai_tool_is_allowed=\"true\"}[$__range])), 1)) and on (gen_ai_tool_name) (sum by (gen_ai_tool_name) (increase(insighta_tool_execution_duration_milliseconds_count{gen_ai_tool_is_allowed=\"true\"}[$__range])) > 0))", "format": "table", "instant": true, "legendFormat": "{{gen_ai_tool_name}}" }
+      ],
+      "title": "Top 5 tools by failure rate",
       "type": "table"
     },
     {
@@ -43,11 +49,14 @@
       "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "min": 0 }, "overrides": [] },
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 17 },
       "id": 4,
-      "options": { "showHeader": true, "sortBy": [{ "desc": true, "displayName": "Value" }] },
-      "targets": [
-        { "expr": "topk(10, sum by (insighta_skill_name) (max_over_time(insighta_skill_activation_activations_total[$__range])))", "legendFormat": "{{insighta_skill_name}}" }
+      "options": { "showHeader": true },
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true }, "indexByName": { "insighta_skill_name": 0, "Value": 1 }, "renameByName": { "insighta_skill_name": "Skill", "Value": "Activations" } } }
       ],
-      "title": "Most frequently activated skills (process total)",
+      "targets": [
+        { "expr": "topk(5, sum by (insighta_skill_name) (max_over_time(insighta_skill_activation_activations_total[$__range])))", "format": "table", "instant": true, "legendFormat": "{{insighta_skill_name}}" }
+      ],
+      "title": "Top 5 most frequently activated skills",
       "type": "table"
     }
   ],
