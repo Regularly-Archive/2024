@@ -160,8 +160,8 @@ Prometheus exporter 将 OTel attribute 中的点号转换为下划线，并为 C
 ### InsightaAI Tools
 
 - **Tool latency by tool**：按 `gen_ai_tool_name` 的 p50/p95，使用 Grafana 自适应 `$__rate_interval`，只统计实际被允许执行的调用。
-- **Most reliable / failure-prone tools**：在所选时间范围内按成功率与失败率取前五名；分子和分母都限定 `gen_ai_tool_is_allowed=true`，因此权限拒绝不被计为执行成功或工具故障。
-- **Most frequently activated skills**：按 `insighta_skill_name` 展示最多十项成功激活的 Skill。只在 `activate_skill` 被允许且成功时计数，不把失败、拒绝或未找到的 Skill 计入。
+- **Most reliable / failure-prone tools**：以数值表格显示所选时间范围内按成功率与失败率取前五名；分子和分母都限定 `gen_ai_tool_is_allowed=true`，因此权限拒绝不被计为执行成功或工具故障。
+- **Most frequently activated skills**：以数值表格显示按 `insighta_skill_name` 聚合的最多十项成功激活 Skill。只在 `activate_skill` 被允许且成功时计数，不把失败、拒绝或未找到的 Skill 计入。Top N 排行不使用会按当前最大值填满的 Bar gauge，避免少量候选时放大视觉信号。
 
 Skill 面板使用 `max_over_time(counter[$__range])` 而不是 `increase()`：OTel Counter 的首次 `Add(1)` 可能早于 Prometheus 首次 scrape，导致窗口内没有可供 `increase()` 计算的跳变；取各进程时序在范围内的累计最大值可以展示此类首次激活。面板因此表示所选时间范围内可见的进程累计激活量，而非严格的时间窗口增量，也不应跨已结束的 CLI 进程直接视为全局累计用量。
 

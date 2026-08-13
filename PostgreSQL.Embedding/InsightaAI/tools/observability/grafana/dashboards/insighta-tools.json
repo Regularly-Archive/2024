@@ -19,36 +19,36 @@
       "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 2, "min": 0, "max": 1 }, "overrides": [] },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
       "id": 2,
-      "options": { "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "showUnfilled": true },
+      "options": { "showHeader": true, "sortBy": [{ "desc": true, "displayName": "Value" }] },
       "targets": [
         { "expr": "topk(5, (sum by (gen_ai_tool_name) (increase(insighta_tool_execution_duration_milliseconds_count{gen_ai_tool_is_allowed=\"true\",gen_ai_tool_is_error=\"false\"}[$__range])) / clamp_min(sum by (gen_ai_tool_name) (increase(insighta_tool_execution_duration_milliseconds_count{gen_ai_tool_is_allowed=\"true\"}[$__range])), 1)) and on (gen_ai_tool_name) (sum by (gen_ai_tool_name) (increase(insighta_tool_execution_duration_milliseconds_count{gen_ai_tool_is_allowed=\"true\"}[$__range])) > 0))", "legendFormat": "{{gen_ai_tool_name}}" }
       ],
       "title": "Most reliable tools (success rate)",
-      "type": "bargauge"
+      "type": "table"
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 2, "min": 0, "max": 1 }, "overrides": [] },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
       "id": 3,
-      "options": { "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "showUnfilled": true },
+      "options": { "showHeader": true, "sortBy": [{ "desc": true, "displayName": "Value" }] },
       "targets": [
         { "expr": "topk(5, (sum by (gen_ai_tool_name) (increase(insighta_tool_execution_duration_milliseconds_count{gen_ai_tool_is_allowed=\"true\",gen_ai_tool_is_error=\"true\"}[$__range])) / clamp_min(sum by (gen_ai_tool_name) (increase(insighta_tool_execution_duration_milliseconds_count{gen_ai_tool_is_allowed=\"true\"}[$__range])), 1)) and on (gen_ai_tool_name) (sum by (gen_ai_tool_name) (increase(insighta_tool_execution_duration_milliseconds_count{gen_ai_tool_is_allowed=\"true\"}[$__range])) > 0))", "legendFormat": "{{gen_ai_tool_name}}" }
       ],
       "title": "Most failure-prone tools (failure rate)",
-      "type": "bargauge"
+      "type": "table"
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "min": 0 }, "overrides": [] },
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 17 },
       "id": 4,
-      "options": { "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "showUnfilled": true },
+      "options": { "showHeader": true, "sortBy": [{ "desc": true, "displayName": "Value" }] },
       "targets": [
         { "expr": "topk(10, sum by (insighta_skill_name) (max_over_time(insighta_skill_activation_activations_total[$__range])))", "legendFormat": "{{insighta_skill_name}}" }
       ],
       "title": "Most frequently activated skills (process total)",
-      "type": "bargauge"
+      "type": "table"
     }
   ],
   "schemaVersion": 41,
