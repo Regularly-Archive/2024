@@ -157,6 +157,15 @@ Prometheus exporter 将 OTel attribute 中的点号转换为下划线，并为 C
 6. **MCP**：当前只在 Jaeger trace 中使用 `mcp.server.*`、`mcp.config.*`、`mcp.method.name` 排障。若要进入 metric，只新增稳定低基数的 server/config/method 名，不带 description、endpoint、arguments、session 或 user。
 7. **Trace 关联**：将慢/失败面板与 Jaeger 查询关联，定位某一 Turn、Round 或 MCP 调用。
 
+### 成本与行为面板（已加入 Dashboard v5）
+
+- **Input cache hit ratio**：当前时间范围内 `cache_hit_tokens / input_tokens`。它反映缓存复用效率；缓存 token 通常价格更低，但最终账单仍取决于各模型供应商的计费规则。
+- **Uncached input tokens**：`input_tokens - cache_hit_tokens`，用于估算未享受缓存折扣的输入规模，不等同于货币金额。
+- **Input : output token ratio**：输入与输出总量的比值，用于观察 Agent 的读写行为是否发生明显漂移。
+- **Tool call distribution**：按工具名计算调用数占比，用于区分 bash、文件、搜索和其他工具主导的工作模式。
+
+`service_instance_id` 代表一次 CLI/进程实例，不是持久会话 ID；`sessionId`、`userId` 继续禁止作为 Prometheus label。每 Turn 的 Round 数分位数也不能由当前聚合 Counter 反推，若有需求需引入独立低基数 Histogram。
+
 ## 9. Dependencies
 
 - `OpenTelemetry.Api` (v1.16.0) — 仅 API，不引入 SDK/Exporter
