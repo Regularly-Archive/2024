@@ -473,6 +473,8 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 
 ## 当前优先级
 
+待处理：可观测性 Dashboard v2——先移除 `round_number` metric label，再补全 LLM、Agent、Tool 的低基数诊断面板；见 `observability-design.md` §8。
+
 1. Memory 自动注入校准：基于已记录的候选与入选/淘汰原因，根据真实会话调整门槛与身份查询兜底策略。
 2. Hook：明确取消/中止场景的 Agent 事件契约。
 3. MCP Telemetry：完成 tag 命名分层与去重。
