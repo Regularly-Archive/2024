@@ -153,9 +153,16 @@ Prometheus exporter 将 OTel attribute 中的点号转换为下划线，并为 C
 ### InsightaAI Overview
 
 - **Agent turns / LLM requests**：所选时间范围内完成的 Turn 和 LLM 请求总数。
-- **Token 概览**：总 token、input cache hit ratio、未命中缓存的 input token、input:output token 比。仅缓存命中率设有阈值：低于 90% 为红色；token 总量本身不代表故障。
-- **LLM**：按 `gen_ai_request_model` 展示 p50/p95 请求延迟、input token rate 与 output token rate。
-- **Agent**：按模型展示 Round p50/p95 延迟及平均每 Turn Round 数。Round metric 已移除高基数的 `round_number`；不使用 `sessionId`、`userId`、请求 ID、工具参数或 endpoint 作为 Prometheus label。
+- **Input cache hit ratio**：唯一的成本健康信号；低于 90% 为红色。Overview 不以 token 总量作为故障判断，避免把正常的高工作量误判为异常。
+
+### InsightaAI LLM
+
+- **Token 概览**：总 token、总 input、总 output、总 cache hit、未命中缓存的 input token、input:output token 比；每行三项，用于理解模型使用模式而非告警。
+- **模型趋势**：按 `gen_ai_request_model` 展示 p50/p95 请求延迟、input token rate 与 output token rate；时间窗口使用 Grafana 自适应 `$__rate_interval`。
+
+### InsightaAI Agent
+
+- **执行行为**：按模型展示 Round p50/p95 延迟及平均每 Turn Round 数。Round metric 已移除高基数的 `round_number`；不使用 `sessionId`、`userId`、请求 ID、工具参数或 endpoint 作为 Prometheus label。
 
 ### InsightaAI Tools
 

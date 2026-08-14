@@ -471,9 +471,34 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 
 ---
 
+### 17. 可观测性 Dashboard 拆分与复核（已完成）
+
+**背景：** 原 Overview Dashboard 承载全部指标，Agent/LLM 细节混杂。昨日日报目标为拆分出独立的 Agent 与 LLM Dashboard，并复核查询语义。
+
+**已完成：**
+- [x] 拆出 `insighta-agent.json`（Round 延迟 p50/p95、平均每 Turn Round 数）与 `insighta-llm.json`（按模型的请求量、p50/p95 延迟、输入/输出 Token、cached/uncached、Token rate、input:output ratio）
+- [x] Overview 保持健康摘要（turns / requests / cache hit ratio 三个 stat）
+- [x] Insighta 独立复核全部 4 个 Dashboard，用真实 Prometheus 数据验证 PromQL（见 `docs/observability-dashboard-review.md`）
+- [x] Anthropic 归一化：`InputTokens = input_tokens + cache_creation + cache_read`（`AnthropicAdapter.cs`），与 OpenAI/Gemini 口径统一，修复 Anthropic 下 cache hit ratio 失真
+- [x] rounds per turn 去掉 `clamp_min` 除零假值（分母为 0 不绘制）
+- [x] input:output ratio 按 `gen_ai_request_model` 分组
+- [x] 完整测试 69 项通过（`chore/mcp-telemetry-tags` 分支）
+
+**复核中驳回的修改（保持原样）：**
+- Skill Top 5 的 `max_over_time` 是正确语义：短生命周期 CLI 进程 counter 随进程重置，`increase` 跨进程归零；`max_over_time` 反映可见累计量
+- Tools Top 5 的 `$__range` 是用户可选范围，非 bug
+- `histogram_quantile` 不加 `{le="+Inf"}` 兜底（会只保留最后一个桶破坏分位数计算）
+
+**遗留：**
+- [ ] Agent Dashboard 补充 Turn 指标（当前仅 2 个面板）
+- [ ] context compaction / 工具链长度 / AskUser 频率等低基数指标仍未埋点（仅停留在评估）
+- [ ] Jaeger Trace Drilldown 未做（Jaeger 数据源已配 `uid: jaeger`，dashboard 无 drilldown 链接）
+
+---
+
 ## 当前优先级
 
-待处理：继续完善可观测性 Dashboard，重点是 MCP 低基数指标与 Jaeger Trace 关联；见 `observability-design.md` §8。
+待处理：Dashboard 拆分与 Anthropic 归一化已完成（#17）。继续完善可观测性：Agent Dashboard 补 Turn 指标、新增 context compaction / 工具链长度 / AskUser 频率低基数指标、Jaeger Trace Drilldown 关联；见 `observability-design.md` §8。
 
 1. Memory 自动注入校准：基于已记录的候选与入选/淘汰原因，根据真实会话调整门槛与身份查询兜底策略。
 2. Hook：明确取消/中止场景的 Agent 事件契约。

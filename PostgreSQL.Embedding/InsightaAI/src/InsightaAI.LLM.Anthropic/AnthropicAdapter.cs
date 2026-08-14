@@ -433,6 +433,12 @@ public class AnthropicAdapter : IProviderAdapter
         var inputTokens = usage.TryGetProperty("input_tokens", out var it) ? it.GetInt32() : 0;
         var outputTokens = usage.TryGetProperty("output_tokens", out var ot) ? ot.GetInt32() : 0;
         var cacheHit = 0;
+        var cacheCreation = 0;
+
+        if (usage.TryGetProperty("cache_creation_input_tokens", out var cc))
+        {
+            cacheCreation = cc.GetInt32();
+        }
 
         if (usage.TryGetProperty("cache_read_input_tokens", out var cr))
         {
@@ -441,7 +447,8 @@ public class AnthropicAdapter : IProviderAdapter
 
         return new TokenUsage
         {
-            InputTokens = inputTokens,
+            // Normalize to the cross-provider TokenUsage contract: input includes cache creation and hits.
+            InputTokens = inputTokens + cacheCreation + cacheHit,
             OutputTokens = outputTokens,
             CacheHitTokens = cacheHit
         };

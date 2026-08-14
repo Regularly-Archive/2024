@@ -170,3 +170,59 @@ Use an explicit empty Dictionary when constructing a record whose parameter type
 - **Notes**: Replaced the collection expression with `new Dictionary<string, string>()`.
 
 ---
+
+## [ERR-20260814-001] grafana-provisioning-path
+
+**Logged**: 2026-08-14T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: infra
+
+### Summary
+Assumed Grafana dashboard provisioning used a `dashboards.yml` filename instead of locating the actual configuration first.
+
+### Error
+```text
+Get-Content: ... provisioning\\dashboards\\dashboards.yml ... path does not exist
+```
+
+### Suggested Fix
+Use `rg --files tools/observability` to locate provisioned Grafana configuration before opening a presumed path.
+
+### Metadata
+- Reproducible: yes
+- Related Files: tools/observability/grafana/provisioning/dashboards/dashboards.yaml
+
+### Resolution
+- **Resolved**: 2026-08-14T00:00:00+08:00
+- **Notes**: Confirmed the provisioner uses `dashboards.yaml` and automatically loads all JSON files in the dashboard directory.
+
+---
+
+## [ERR-20260814-002] grafana-search-api-authentication
+
+**Logged**: 2026-08-14T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: infra
+
+### Summary
+Attempted to list provisioned dashboards through Grafana's search API without credentials after a successful health check.
+
+### Error
+```text
+401 Unauthorized from /api/search
+```
+
+### Suggested Fix
+Treat `/api/health` as the unauthenticated liveness check; use Grafana credentials only when dashboard API enumeration is necessary.
+
+### Metadata
+- Reproducible: yes
+- Related Files: tools/observability/docker-compose.yml
+
+### Resolution
+- **Resolved**: 2026-08-14T00:00:00+08:00
+- **Notes**: Provisioned dashboard JSON and Prometheus queries were validated before Grafana restart.
+
+---

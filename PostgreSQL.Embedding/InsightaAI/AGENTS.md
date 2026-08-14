@@ -207,10 +207,19 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 - MCP 工具结果元数据由 `ToolCallHandlerTelemetryWrapper` 统一写入 trace：远端握手身份使用 `mcp.server.*`，本地配置使用 `mcp.config.*`；不把工具参数、endpoint、description、sessionId 或 userId 写入 Prometheus label。
 - Telemetry endpoint 统一使用 `INSIGHTA_OTLP_ENDPOINT`；`INSIGHTA_OTEL_ENDPOINT` 已废弃。CLI 仅在真正进入 chat 会话后初始化 Telemetry。
 - 本地栈位于 `tools/observability/`：OTel Collector 接收 OTLP（4317/4318）、转发 trace 到 Jaeger（16686），并以 9464 暴露 Prometheus scrape endpoint；Prometheus（9090）供 Grafana（3000）查询。启动：`docker compose up -d`。
-- Grafana 由 provisioning 加载两个 Dashboard：`InsightaAI Overview` 与 `InsightaAI Tools`。修改 JSON 后需 `docker compose restart grafana` 才会重新加载。
+- Grafana 由 provisioning 加载四个 Dashboard（`tools/observability/grafana/dashboards/`）：`InsightaAI Overview`（健康摘要）、`InsightaAI Tools`（工具延迟/成功率/Skill Top 5）、`InsightaAI Agent`（Round 延迟、平均每 Turn Round 数）、`InsightaAI LLM`（按模型的请求量/延迟/Token/Cache）。修改 JSON 后需 `docker compose restart grafana` 才会重新加载。
 - Overview 第一行是 Agent turns 与 LLM requests；第二行是 token 概览（总量、cache hit ratio、uncached input、input:output）；其余为按模型的 LLM/Agent 延迟与速率。仅 cache hit ratio 低于 90% 标红，token 总量不是错误信号。
 - Tools 只统计 `gen_ai_tool_is_allowed=true` 的实际执行：延迟为 p50/p95；成功率、失败率分别显示 Top 5 工具，权限拒绝不算执行失败。Skill 激活在通用 `ToolCallHandlerTelemetryWrapper` 中从 `activate_skill` 参数读取名称，成功且允许时写 `insighta.skill.activation`；不改动 Skill 实现。Skill 面板显示 Top 5 名称及 Activations。
 - Skill Counter 首次增量可能发生在 Prometheus 首次 scrape 之前，故面板用 `max_over_time(counter[$__range])` 展示可见进程累计量，而不是 `increase()`；它不是跨已结束 CLI 进程的全局用量。
+
+### Dashboard 复核与 Anthropic 归一化（2026-08-14）
+
+- Insighta 独立复核 4 个 Dashboard（`docs/observability-dashboard-review.md`），并用真实 Prometheus 数据验证了全部 PromQL；随后通过 `codex exec` 交 Codex 复核并实施修改（改动在 `chore/mcp-telemetry-tags` 分支，已提交）。
+- **AnthropicAdapter.cs**：归一化 `TokenUsage.InputTokens = input_tokens + cache_creation_input_tokens + cache_read_input_tokens`，与 OpenAI/Gemini 口径统一（原实现 input 不含 cache，导致 dashboard 的 cache hit ratio 在 Anthropic 下失真）。OpenAI 口径为 `cached_tokens ⊆ input_tokens`；Anthropic 为互斥字段。
+- **insighta-agent.json**：`Average rounds per turn` 去掉 `clamp_min(...,1)` 假值，分母为 0 时不绘制。
+- **insighta-llm.json**：`Input : output token ratio` 按 `gen_ai_request_model` 分组。
+- **复核教训**：短生命周期 CLI 进程的 counter 随进程重置，Skill Top 5 用 `max_over_time` 反映可见累计量是正确语义（`increase` 会跨进程归零），勿改回 `increase`。
+- **遗留**：Agent Dashboard 只有 2 个面板（Round 延迟、rounds per turn），缺 Turn 指标与 context compaction/工具链长度/AskUser 频率等低基数指标；Jaeger Trace Drilldown 未做（Jaeger 数据源已配 `uid: jaeger`）。
 
 ### AgentBuilder 与 AgentFactory
 
@@ -222,7 +231,7 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 
 1. **Memory 自动注入校准** — 用本地候选筛选日志和真实会话调整初始覆盖门槛。
 2. **Hook 事件契约** — 细化取消/中止场景（`DoneReason.Aborted`、`OperationCanceledException`）。
-3. **Telemetry** — 继续补充 Agent 行为指标（每 Turn 工具链长度、AskUser 频率、context compaction）；MCP tag 命名清理已完成。
+3. **Telemetry** — 继续补充 Agent 行为指标（每 Turn 工具链长度、AskUser 频率、context compaction）；MCP tag 命名清理已完成。Dashboard 拆分（Agent/LLM）与 Anthropic 归一化已完成，遗留：Agent Dashboard 补 Turn 指标、Jaeger Trace Drilldown。
 4. **运行时用量** — 区分流式模型未返回 token usage 与真实的 0。
 5. **L3 Orchestrator** — 继续开发编排能力。
 
@@ -234,6 +243,7 @@ Agent 服务生命周期已明确：当前 Agent 私有 Provider 只支持 Singl
 - 2026-08-11：协议感知多行输入在 Windows Terminal 与 Warp 实机验证通过，包括 Shift/Ctrl+Enter、bracketed paste、Win32 Input Mode 与控制序列清理。
 - 2026-08-12：CLI 对话时间线、挂起缩进、交互选项对齐和后台标题生成完成实机验证；完整测试 401 项通过。
 - 2026-08-12：Slash 命令候选完成实机验证：候选筛选、描述对齐与中英文资源、Tab 唯一补全、候选清理和 Ctrl+C 退出均通过；Agent 测试 286 项通过。
+- 2026-08-14：Dashboard 复核通过真实 Prometheus 数据验证全部 PromQL；Anthropic 归一化后完整测试 69 项通过（改动在 `chore/mcp-telemetry-tags` 分支）。
 
 ## 愿景与里程碑
 
