@@ -5,6 +5,7 @@ using InsightaAI.Agent.Memory;
 using InsightaAI.Agent.Models;
 using InsightaAI.Agent.Skills;
 using InsightaAI.Agent.Storage;
+using InsightaAI.Agent.Security;
 using InsightaAI.LLM.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -35,6 +36,7 @@ public sealed class AgentBuilder
 
         _services.AddSingleton(config);
         _services.AddSingleton(new ToolRegistry());
+        _services.AddSingleton<ISecretRedactor>(_ => SecretRedactionPipeline.CreateDefault());
     }
 
     /// <summary>

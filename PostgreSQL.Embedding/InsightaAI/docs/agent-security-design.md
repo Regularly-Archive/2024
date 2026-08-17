@@ -1,6 +1,6 @@
 ﻿# Agent 安全增强设计（DenyList 与敏感文件保护）
 
-> 创建：2026-08-07，由元培与 Insighta 讨论产出，尚未实现
+> 创建：2026-08-07，由元培与 Insighta 讨论产出；Phase 1 DenyList 已于 2026-08-17 实现。
 
 ## 1. 背景与目标
 
@@ -58,12 +58,14 @@ CliConfig (~/.insighta/config.json)      ← 最终配置链路（Load()）
    ↓ AgentFactory.CreateAsync() 映射     ← AgentFactory.cs:45-55
 AgentConfig                              ← 数据传播链路（传给 AgentBuilder）
    ↓ AgentBuilder.Build()
-Agent → SecurityPolicyHook (IToolHook)   ← 消费（与 ToolPermissionHook 同层）
+Agent → Security/SecurityPolicyHook (IToolHook)   ← 执行前拒绝（与 ToolPermissionHook 同层）
+  → Tools/ToolResultProcessor → Security/ISecretRedactor ← 结果脱敏、artifact 与上下文投影
 ```
 
 - **CliConfig**：最终配置链路，持有 JSON 映射形状（`SecurityConfig`）。
 - **AgentConfig**：数据传播链路，是 Agent 内核的数据契约（`DenyRules`），任何宿主（CLI / 其他嵌入方）都能配置。
 - 两者结构刻意解耦，Agent 内核不依赖 CLI 模型。
+- **Agent/Security/**：集中安全规则模型、执行前策略 Hook 与内容脱敏实现；`ToolResultProcessor` 在 artifact、投影和 ToolEnd 预览前调用 `ISecretRedactor`。
 
 ## 5. DenyList 设计
 
@@ -129,11 +131,32 @@ public sealed record DenyRule(string Pattern, DenyMatchMode Mode);  // exact | g
 
 **分层语义：**
 ```
-内置高危规则（rm -rf /、Remove-Item -Recurse -Force C:\…）→ 强制拒绝，不可放行
+现有 BashTool 内置高危规则（rm -rf /、mkfs、dd if= 等） → 工具内部强制拒绝
 用户 DenyList（CliConfig.security.deny_list）              → 强制拒绝，不可放行
 ```
 
+这两层少量重叠是有意的纵深防御，而非重复配置：`IsDangerousCommand()` 是不可配置的工具级最后防线，在未注册 `SecurityPolicyHook` 的其他 Agent 宿主中仍然有效；它采用子串匹配，也能识别链式命令中的极端危险片段。DenyList 则是用户或项目的可配置策略，按完整 bash `command` 匹配，适合关机、特定目录删除或业务限制。
+
+Phase 1 不把内置高危规则迁移为默认 DenyList，避免用户误以为删除配置即可解除框架级保护，也避免无配置时扩大现有拦截面。用户可按项目需要显式配置 DenyList；无论是否已经选择过 Allow always，`SecurityPolicyHook` 都会继续执行，规则不可绕过。
+
 若未来需要"软拒绝"，可单独加 `deny_list_mode: "block" | "confirm"` 开关，默认 `block`。第一版不加。
+
+### 5.5 Phase 1 验证结论与边界（2026-08-17）
+
+真实 CLI 验证确认以下行为：
+
+| 场景 | 结论 | 原因 |
+|------|------|------|
+| `bcdedit /enum` 命中 `bcdedit *` | 已拒绝 | glob 对规范化后的整条命令锚定匹配 |
+| 大小写、多空格或 tab 变体 | 已拒绝 | 匹配前会 trim、转小写并折叠空白 |
+| 已选择 Allow always 后命中规则 | 已拒绝 | `SecurityPolicyHook` 始终在 Allow always 后继续评估 |
+| `echo hi; bcdedit /enum` | 可绕过用户 DenyList | glob/exact 对整条命令匹配，不解析 shell 链式语法 |
+| `$(...)`、`bash -c`、参数插入、注释 | 可绕过部分用户 DenyList | 不解析 shell / PowerShell 语法树，命令可任意变形 |
+| `read_file` / `grep` 读取敏感文件 | 不属于 Phase 1 | `SecurityPolicyHook` 当前只作用于 `bash`；交互确认仍是 CLI 的临时兜底 |
+
+这不是 Phase 1 的实现缺陷：DenyList 的定位是防止 Agent 误操作，而不是在本地任意命令执行前提下抵御恶意或刻意绕过的 Agent。内置 `BashTool.IsDangerousCommand()` 仍可能拦截包含其已知危险片段的链式命令，但不能覆盖用户自定义规则，例如 `bcdedit *`。
+
+后续优先级：先实施 Phase 2 的 L1（结构化敏感路径拦截）与 L3（敏感输出打码），防止机密进入 LLM 上下文；链式命令拆分检测暂缓。原因是 PowerShell 与 Bash 的引号、管道、子表达式语义复杂，按 `;`、`&&`、`|` 简单切分会误判并造成虚假的安全保证。
 
 ## 6. 敏感文件保护：纵深防御分层
 
@@ -156,18 +179,27 @@ L4 最小权限执行（根治）    IShellExecutor 换 Docker/受限用户，ba
 ## 7. 落地顺序与工作量
 
 ### Phase 1：DenyList（危险命令拦截）
-- `AgentConfig` 加 `DenyRules` 字段
-- `CliConfig.SecurityConfig.DenyList` + JSON 映射
-- `SecurityPolicyHook`（`IToolHook`）实现 exact/glob/regex 匹配
-- 内置默认高危规则（用户 DenyList 追加而非覆盖）
-- 单元测试 + 集成测试
-- **工作量：约 0.5 天**
+- [x] `AgentConfig` 加 `DenyRules` 字段
+- [x] `CliConfig.SecurityConfig.DenyList` + JSON 映射
+- [x] `SecurityPolicyHook`（`IToolHook`）实现 exact/glob/regex 匹配
+- [x] Phase 1 仅作用于 bash，并从结构化参数提取 `command` 后匹配
+- [x] 单元测试 + Allow always 不可绕过的集成测试
+- [ ] 默认高危规则清单：暂不新增，保留为待决策项
+- [ ] 为 `BashTool.IsDangerousCommand()` 补充分层语义注释与定向测试（框架级不可配置底线）
 
 ### Phase 2：敏感文件保护
 - `SecurityConfig.SensitivePaths`（glob 模式，如 `**/.env`、`**/.ssh/**`、`~/.insighta/config.json`）
 - L1：`SecurityPolicyHook` 按路径拦截 `read_file` / `grep` / `write_file`
-- L3：`OnAfterExecutionAsync` 输出打码
+- [x] L3：`ToolResultProcessor` 统一脱敏文本结果，确保 artifact、上下文投影和 ToolEnd 预览只收到脱敏内容。
+  - 初始规则覆盖 JSON、XML、`.env` / INI / YAML 风格键值、连接字符串、私钥 PEM 块和 URI 密码。
+  - JSON/XML 保留非敏感字段；连接字符串仅替换密码或 token 段。
+  - `read_file` 在内容前添加文件元数据、并为每行添加行号和 Tab；因此 JSON、XML 与键值回退规则必须接受该显示包装，不能只假设收到原始文件正文。
+  - 键值规则在匹配前统一将 `CRLF` / `CR` 归一化为 `LF`，完成后按原始换行风格恢复。Windows 的 `FileReadTool.AppendLine()` 会产生 `CRLF`；若直接在 `(?m)` 正则中以 `$` 锚定行尾，会因 `$` 位于 `\n` 前而遗留 `\r` 导致整行不匹配。
+  - 回归覆盖真实 `read_file` 行号包装、嵌套 JSON、XML 片段、YAML / `.env` 键值，以及 Windows `CRLF` 输入与原换行恢复。
+  - 不依赖 `IToolHook.OnAfterExecutionAsync`，因为该 Hook 无法替换结果且处理时机晚于原有 artifact 保存流程。
 - **工作量：约 0.5~1 天**
+
+> 优先级：高于链式命令拆分检测；先解决结构化工具可直接读取机密的主要风险。
 
 ### 关键技术点
 - bash 命令路径提取（`~` 展开 + 环境变量解析）是主要难点，Phase 1 可先只做命令匹配，路径高危检测放 Phase 2。
@@ -176,7 +208,7 @@ L4 最小权限执行（根治）    IShellExecutor 换 Docker/受限用户，ba
 
 ## 8. 待决策项
 
-- [ ] `DenyRule` 匹配对象：整条命令规范化匹配（Phase 1 采用）还是拆解命令 token（Phase 2）
+- [x] `DenyRule` 匹配对象：Phase 1 对 bash 的整条命令规范化匹配
 - [ ] 内置默认规则清单范围
 - [ ] L2 启发式检测的阈值（哪些算"明显"敏感路径）
 - [ ] L4 沙箱执行器是否立项、用 Docker 还是受限用户

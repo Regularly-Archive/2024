@@ -1,5 +1,6 @@
 using InsightaAI.LLM;
 using InsightaAI.Agent.Abstractions;
+using InsightaAI.Agent.Security;
 using InsightaAI.LLM.Models;
 
 namespace InsightaAI.Agent.Models;
@@ -62,6 +63,9 @@ public sealed record AgentConfig
 
     /// <summary>工作目录（用于加载 AGENTS.md 等项目上下文）</summary>
     public string? WorkingDirectory { get; init; }
+
+    /// <summary>执行前强制拒绝的工具调用规则</summary>
+    public IReadOnlyList<DenyRule> DenyRules { get; init; } = [];
 
     /// <summary>自定义元数据</summary>
     public Dictionary<string, object>? Metadata { get; init; }

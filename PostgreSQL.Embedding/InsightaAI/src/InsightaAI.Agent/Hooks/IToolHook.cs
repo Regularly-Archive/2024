@@ -13,6 +13,12 @@ public interface IToolHook
     IReadOnlyList<string>? TargetTools => null;
 
     /// <summary>
+    /// Whether this hook must still run when the user has allowed the tool for the current session.
+    /// Security policies use this to remain non-bypassable.
+    /// </summary>
+    bool EvaluateWhenToolAlwaysAllowed => false;
+
+    /// <summary>
     /// 工具执行前的钩子
     /// </summary>
     /// <param name="toolName">工具名称</param>
@@ -48,5 +54,8 @@ public enum ToolHookResult
     AllowAlways,
 
     /// <summary>拒绝执行</summary>
-    Deny
+    Deny,
+
+    /// <summary>安全策略拒绝执行</summary>
+    DenyByPolicy
 }

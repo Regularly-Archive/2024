@@ -1,5 +1,6 @@
 using System.Text;
 using InsightaAI.Agent.Abstractions;
+using InsightaAI.Agent.Security;
 using InsightaAI.LLM.Models;
 
 namespace InsightaAI.Agent.Tools;
@@ -18,41 +19,47 @@ public sealed class ToolResultProcessor
 
     private readonly ToolRegistry _toolRegistry;
     private readonly IToolResultArtifactStore _artifactStore;
+    private readonly ISecretRedactor _secretRedactor;
 
-    public ToolResultProcessor(ToolRegistry toolRegistry, IToolResultArtifactStore artifactStore)
+    public ToolResultProcessor(
+        ToolRegistry toolRegistry,
+        IToolResultArtifactStore artifactStore,
+        ISecretRedactor? secretRedactor = null)
     {
         _toolRegistry = toolRegistry;
         _artifactStore = artifactStore;
+        _secretRedactor = secretRedactor ?? SecretRedactionPipeline.CreateDefault();
     }
 
-    public async Task<ProcessedToolResult> ProcessAsync(string sessionId, string toolName,
-        string toolCallId, ToolResult result, bool enabled, CancellationToken cancellationToken = default)
+    public async Task<ProcessedToolResult> ProcessAsync(string sessionId, ToolCallBlock toolCall,
+        ToolResult result, bool enabled, CancellationToken cancellationToken = default)
     {
-        var text = string.Join("\n", result.Content.OfType<TextBlock>().Select(x => x.Text));
+        var redactedResult = RedactTextContent(result, ToolRedactionContextFactory.Create(toolCall));
+        var text = string.Join("\n", redactedResult.Content.OfType<TextBlock>().Select(x => x.Text));
         var lineCount = new Lazy<int>(() => text.Length == 0 ? 0 : text.Count(c => c == '\n') + 1);
-        var projector = _toolRegistry.GetExecutor(toolName) as IToolResultProjector;
+        var projector = _toolRegistry.GetExecutor(toolCall.Name) as IToolResultProjector;
         var effectiveProjector = projector ?? DefaultToolResultProjector.Instance;
         var policy = projector?.RetentionPolicy ?? DefaultToolResultProjector.DefaultPolicy;
 
         ToolResultArtifactInfo? artifact = null;
         var shouldPersist = enabled && Encoding.UTF8.GetByteCount(text) > DefaultPersistenceThresholdBytes;
         if (shouldPersist)
-            artifact = await _artifactStore.SaveAsync(sessionId, toolName, toolCallId, text, cancellationToken);
+            artifact = await _artifactStore.SaveAsync(sessionId, toolCall.Name, toolCall.Id, text, cancellationToken);
 
         var context = new ToolResultProjectionContext
         {
-            ToolName = toolName,
-            ToolCallId = toolCallId,
+            ToolName = toolCall.Name,
+            ToolCallId = toolCall.Id,
             OriginalLength = text.Length,
             OriginalLineCount = lineCount,
             Artifact = artifact
         };
 
         var projection = shouldPersist
-            ? effectiveProjector.CreatePreview(result, context)
-            : new ToolResultProjection { Content = result.Content, Level = ToolResultRetentionLevel.Full };
+            ? effectiveProjector.CreatePreview(redactedResult, context)
+            : new ToolResultProjection { Content = redactedResult.Content, Level = ToolResultRetentionLevel.Full };
 
-        var processed = result with { Content = projection.Content };
+        var processed = redactedResult with { Content = projection.Content };
         return new ProcessedToolResult
         {
             Result = processed,
@@ -67,6 +74,14 @@ public sealed class ToolResultProcessor
                 MinimumLevel = policy.MinimumLevel
             }
         };
+    }
+
+    private ToolResult RedactTextContent(ToolResult result, RedactionContext context)
+    {
+        var content = result.Content.Select(block => block is TextBlock textBlock
+            ? (ContentBlock)(textBlock with { Text = _secretRedactor.Redact(textBlock.Text, context).Content })
+            : block).ToArray();
+        return result with { Content = content };
     }
 }
 

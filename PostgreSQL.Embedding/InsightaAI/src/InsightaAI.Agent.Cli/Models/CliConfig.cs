@@ -59,6 +59,23 @@ public class ModelEntry
     public int? ContextWindow { get; set; }
 }
 
+/// <summary>工具安全策略配置</summary>
+public sealed class SecurityConfig
+{
+    [JsonPropertyName("deny_list")]
+    public List<DenyEntry> DenyList { get; set; } = [];
+}
+
+/// <summary>单条工具拒绝规则配置</summary>
+public sealed class DenyEntry
+{
+    [JsonPropertyName("pattern")]
+    public string Pattern { get; set; } = "";
+
+    [JsonPropertyName("mode")]
+    public string Mode { get; set; } = "glob";
+}
+
 /// <summary>
 /// 认证配置（~/.insighta/auth.json）
 /// </summary>
@@ -245,6 +262,10 @@ public class CliConfig
     /// </summary>
     [JsonPropertyName("envs")]
     public Dictionary<string, string> Envs { get; set; } = [];
+
+    /// <summary>工具安全策略</summary>
+    [JsonPropertyName("security")]
+    public SecurityConfig Security { get; set; } = new();
 
     /// <summary>
     /// 解析 primary_model，返回 (ProviderName, ModelKey)

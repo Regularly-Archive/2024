@@ -6,6 +6,7 @@ using InsightaAI.Agent.Context;
 using InsightaAI.Agent.Context.Compaction;
 using InsightaAI.Agent.Context.Summary;
 using InsightaAI.Agent.Diagnostics;
+using InsightaAI.Agent.Hooks;
 using InsightaAI.Agent.Mcp;
 using InsightaAI.Agent.Memory;
 using InsightaAI.Agent.MetaLearning;
@@ -13,9 +14,11 @@ using InsightaAI.Agent.Models;
 using InsightaAI.Agent.Mcp.Local;
 using InsightaAI.Agent.Skills;
 using InsightaAI.Agent.Storage;
+using InsightaAI.Agent.Security;
 using InsightaAI.LLM.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Text.RegularExpressions;
 
 namespace InsightaAI.Agent.Cli.Services;
 
@@ -53,6 +56,7 @@ public sealed class AgentFactory : IAgentFactory
             MaxToolRounds = options.Config.MaxToolRounds,
             UserId = userId,
             WorkingDirectory = Directory.GetCurrentDirectory(),
+            DenyRules = CreateDenyRules(options.Config.Security),
         };
 
         SessionMemoryHook? sessionMemoryHook = null;
@@ -89,6 +93,7 @@ public sealed class AgentFactory : IAgentFactory
             })
             .Build();
 
+        agent.AddHook(new SecurityPolicyHook(agentConfig.DenyRules));
         agent.AddHook(new ToolPermissionHook("bash", "write_file", "read_file", "edit_file", "web_fetch"));
 
         var metaLearningStore = new MetaLearningStore();
@@ -162,5 +167,34 @@ public sealed class AgentFactory : IAgentFactory
         var userId = $"user_{Guid.NewGuid().ToString("N")[..12]}";
         File.WriteAllText(userIdFile, userId);
         return userId;
+    }
+
+    private static IReadOnlyList<DenyRule> CreateDenyRules(SecurityConfig security)
+    {
+        ArgumentNullException.ThrowIfNull(security);
+
+        return security.DenyList.Select(entry =>
+        {
+            if (string.IsNullOrWhiteSpace(entry.Pattern))
+                throw new InvalidOperationException("security.deny_list entries require a non-empty pattern.");
+
+            if (!Enum.TryParse<DenyMatchMode>(entry.Mode, ignoreCase: true, out var mode))
+                throw new InvalidOperationException($"Unsupported security.deny_list mode '{entry.Mode}'. Use exact, glob, or regex.");
+
+            if (mode == DenyMatchMode.Regex)
+            {
+                try
+                {
+                    _ = new Regex(entry.Pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+                }
+                catch (ArgumentException exception)
+                {
+                    throw new InvalidOperationException(
+                        $"Invalid security.deny_list regex '{entry.Pattern}'.", exception);
+                }
+            }
+
+            return new DenyRule(entry.Pattern, mode);
+        }).ToArray();
     }
 }

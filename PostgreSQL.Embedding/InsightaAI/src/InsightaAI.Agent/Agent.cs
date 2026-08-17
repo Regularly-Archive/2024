@@ -509,16 +509,12 @@ public class Agent : IDisposable
     /// <summary>
     /// 执行钩子检查
     /// </summary>
-    private async Task<bool> CheckToolPermissionAsync(
+    private async Task<ToolHookResult> CheckToolPermissionAsync(
         string toolName,
         string arguments,
         ToolExecutionContext context)
     {
-        // 如果工具已被标记为始终允许，跳过检查
-        if (_alwaysAllowedTools.Contains(toolName))
-        {
-            return true;
-        }
+        var alwaysAllowed = _alwaysAllowedTools.Contains(toolName);
 
         foreach (var hook in _toolHooks)
         {
@@ -526,6 +522,11 @@ public class Agent : IDisposable
             if (hook.TargetTools != null && !hook.TargetTools.Contains(toolName))
             {
                 continue; // 跳过不适用的钩子
+            }
+
+            if (alwaysAllowed && !hook.EvaluateWhenToolAlwaysAllowed)
+            {
+                continue;
             }
 
             var result = await hook.OnBeforeExecutionAsync(toolName, arguments, context);
@@ -537,17 +538,19 @@ public class Agent : IDisposable
 
                 case ToolHookResult.AllowAlways:
                     _alwaysAllowedTools.Add(toolName);
-                    return true; // 标记为始终允许，继续执行
+                    alwaysAllowed = true;
+                    continue;
 
                 case ToolHookResult.Deny:
-                    return false; // 拒绝执行
+                case ToolHookResult.DenyByPolicy:
+                    return result;
 
                 default:
                     continue;
             }
         }
 
-        return true; // 所有钩子都允许
+        return ToolHookResult.Allow; // 所有钩子都允许
     }
 
     /// <summary>
@@ -729,7 +732,8 @@ public class Agent : IDisposable
         };
 
         // 检查钩子
-        var allowed = await CheckToolPermissionAsync(toolCall.Name, arguments, toolContext);
+        var permissionResult = await CheckToolPermissionAsync(toolCall.Name, arguments, toolContext);
+        var allowed = permissionResult is ToolHookResult.Allow or ToolHookResult.AllowAlways;
 
         ToolResult toolResult;
         if (allowed)
@@ -738,7 +742,9 @@ public class Agent : IDisposable
         }
         else
         {
-            toolResult = ToolResult.FromError("Tool execution denied by user. Use `ask_user` if need to understand reason.");
+            toolResult = ToolResult.FromError(permissionResult == ToolHookResult.DenyByPolicy
+                ? "Tool execution denied by security policy because it matches a configured deny rule."
+                : "Tool execution denied by user. Use `ask_user` if need to understand reason.");
         }
 
         return (allowed, toolResult);

@@ -1,6 +1,7 @@
 ﻿using InsightaAI.Agent.Abstractions;
 using InsightaAI.Agent.Context;
 using InsightaAI.Agent.Models;
+using InsightaAI.Agent.Security;
 using InsightaAI.Agent.Harness.Local;
 using InsightaAI.LLM.Models;
 using Microsoft.Extensions.DependencyInjection;
@@ -35,8 +36,9 @@ public class ToolCallExecutor
         var fileSystem = serviceProvider.GetService<IFileSystem>() ?? new LocalFileSystem();
         var artifactStore = serviceProvider.GetService<IToolResultArtifactStore>()
             ?? new ToolResultArtifactStore(fileSystem);
+        var redactor = serviceProvider.GetService<ISecretRedactor>() ?? SecretRedactionPipeline.CreateDefault();
         _resultProcessor = serviceProvider.GetService<ToolResultProcessor>()
-            ?? new ToolResultProcessor(toolRegistry, artifactStore);
+            ?? new ToolResultProcessor(toolRegistry, artifactStore, redactor);
         _enableInterception = enableInterception;
     }
 
@@ -50,7 +52,7 @@ public class ToolCallExecutor
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var toolEvents = Channel.CreateUnbounded<AgentEvent>();
-        var toolResults = new Dictionary<string, ToolResult>();
+        var toolResults = new Dictionary<string, ToolExecutionResult>();
         var toolResultsLock = new object();
 
         var tasks = toolCalls.Select(async toolCall =>
@@ -70,23 +72,24 @@ public class ToolCallExecutor
 
             var toolCallRequest = new ToolCallRequest() { ToolCall = toolCall, SessionId = _sessionId, Arguments = arguments };
             var toolCallResponse = await _handler.Invoke(toolCallRequest, cancellationToken);
-            var toolResult = toolCallResponse.ToolResult;
+            var processed = await _resultProcessor.ProcessAsync(
+                _sessionId, toolCall, toolCallResponse.ToolResult, _enableInterception, cancellationToken);
 
             // 发送工具完成事件
-            var resultText = toolResult.Content.OfType<TextBlock>().FirstOrDefault()?.Text;
+            var resultText = processed.Result.Content.OfType<TextBlock>().FirstOrDefault()?.Text;
             await toolEvents.Writer.WriteAsync(new AgentToolEndEvent
             {
                 AgentId = _agentId,
                 ToolCallId = toolCall.Id,
                 ToolName = toolCall.Name,
-                IsError = toolResult.IsError,
+                IsError = processed.Result.IsError,
                 ResultPreview = resultText?.Length > 100 ? resultText[..100] + "..." : resultText
             }, cancellationToken);
 
             // 收集结果
             lock (toolResultsLock)
             {
-                toolResults[toolCall.Id] = toolResult;
+                toolResults[toolCall.Id] = new ToolExecutionResult(toolCall, processed.Result, processed.State);
             }
         }).ToArray();
 
@@ -102,16 +105,7 @@ public class ToolCallExecutor
         // 等待所有任务完成
         await Task.WhenAll(tasks);
 
-        // 拦截结果并存储（不再直接操作 messages）
-        var finalResults = new List<ToolExecutionResult>();
-        foreach (var toolCall in toolCalls)
-        {
-            var processed = await _resultProcessor.ProcessAsync(
-                _sessionId, toolCall.Name, toolCall.Id, toolResults[toolCall.Id],
-                _enableInterception, cancellationToken);
-            finalResults.Add(new ToolExecutionResult(toolCall, processed.Result, processed.State));
-        }
-        Results = finalResults;
+        Results = toolCalls.Select(toolCall => toolResults[toolCall.Id]).ToArray();
     }
 
     public async IAsyncEnumerable<AgentEvent> ExecuteToolsSequentialAsync(
@@ -137,23 +131,20 @@ public class ToolCallExecutor
 
             var toolCallRequest = new ToolCallRequest() { ToolCall = toolCall, SessionId = _sessionId, Arguments = arguments };
             var toolCallResponse = await _handler.Invoke(toolCallRequest, cancellationToken);
-            var toolResult = toolCallResponse.ToolResult;
+            var processed = await _resultProcessor.ProcessAsync(
+                _sessionId, toolCall, toolCallResponse.ToolResult, _enableInterception, cancellationToken);
 
             // 发送工具完成事件
-            var resultText = toolResult.Content.OfType<TextBlock>().FirstOrDefault()?.Text;
+            var resultText = processed.Result.Content.OfType<TextBlock>().FirstOrDefault()?.Text;
             yield return new AgentToolEndEvent
             {
                 AgentId = _agentId,
                 ToolCallId = toolCall.Id,
                 ToolName = toolCall.Name,
-                IsError = toolResult.IsError,
+                IsError = processed.Result.IsError,
                 ResultPreview = resultText?.Length > 100 ? resultText[..100] + "..." : resultText
             };
 
-            // 拦截结果并存储
-            var processed = await _resultProcessor.ProcessAsync(
-                _sessionId, toolCall.Name, toolCall.Id, toolResult,
-                _enableInterception, cancellationToken);
             finalResults.Add(new ToolExecutionResult(toolCall, processed.Result, processed.State));
         }
 

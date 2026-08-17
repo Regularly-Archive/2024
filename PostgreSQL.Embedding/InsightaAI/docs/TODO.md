@@ -416,17 +416,21 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 - L3 bash 输出打码：`OnAfterExecutionAsync` 扫 stdout，命中敏感模式替换为 `[REDACTED]` 再交给 LLM（兜底防泄漏进上下文）
 - L4 最小权限执行：`IShellExecutor` 换 Docker/沙箱（根治，独立大工程，单独立项）
 
-**Phase 1：DenyList（约 0.5 天）**
-- [ ] `AgentConfig` 加 `DenyRules`（`DenyRule(Pattern, DenyMatchMode)`，模式 exact/glob/regex）
-- [ ] `CliConfig.SecurityConfig.DenyList` + JSON 映射（`security.deny_list`）
-- [ ] `SecurityPolicyHook`（`IToolHook`，AgentBuilder 默认注册）实现三种模式匹配
-- [ ] 内置默认高危规则（用户 DenyList 追加而非覆盖）
-- [ ] 单元测试 + 集成测试
+**Phase 1：DenyList（已完成）**
+- [x] `AgentConfig` 加 `DenyRules`（`DenyRule(Pattern, DenyMatchMode)`，模式 exact/glob/regex）
+- [x] `CliConfig.SecurityConfig.DenyList` + JSON 映射（`security.deny_list`）
+- [x] `SecurityPolicyHook`（`IToolHook`，由 CLI `AgentFactory` 在交互权限 Hook 前注册）实现三种模式匹配
+- [x] 规则命中不可被 Allow always 绕过；Phase 1 仅匹配 bash 的 `command`
+- [x] 单元测试 + 集成测试
+- [ ] 内置默认高危规则清单（暂不新增，保留待决策）
+- [ ] 补充 `BashTool.IsDangerousCommand()` 的分层语义注释与定向测试：它是不可配置的工具级底线，不是默认 DenyList
 
 **Phase 2：敏感文件保护（约 0.5~1 天）**
 - [ ] `SecurityConfig.SensitivePaths`（glob 模式：`**/.env`、`**/.ssh/**`、`~/.insighta/config.json`）
 - [ ] L1：按路径拦截 `read_file`/`grep`/`write_file`（解析 arguments 中 file_path/path 参数）
-- [ ] L3：`OnAfterExecutionAsync` 输出打码
+- [x] L3：`ToolResultProcessor` 在 artifact、投影和 ToolEnd 预览前统一脱敏，不依赖无法替换结果的 `OnAfterExecutionAsync`；`read_file` 行号包装及 Windows `CRLF` 在匹配前归一化、输出后恢复原换行风格
+- [ ] 扩展格式化脱敏：YAML 完整语法（当前为键值风格）、TOML 与专用配置格式；继续保留通用文本兜底
+- [ ] 链式命令拆分检测：暂缓。简单按 `;`、`&&`、`|` 切分无法正确处理 PowerShell/Bash 引号、管道和子表达式，不能作为安全边界。
 
 **待决策：**
 - [ ] DenyRule 匹配对象：整条命令规范化匹配（Phase 1）还是拆解命令 token（Phase 2）
