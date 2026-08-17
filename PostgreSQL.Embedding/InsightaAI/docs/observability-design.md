@@ -162,7 +162,9 @@ Prometheus exporter 将 OTel attribute 中的点号转换为下划线，并为 C
 
 ### InsightaAI Agent
 
+- **Turn 摘要**：展示所选范围内完成的 Turn 总数，以及按 `gen_ai_request_model` 汇总的整数 Turn 数；它不表示未完成、取消或失败的尝试。
 - **执行行为**：按模型展示 Round p50/p95 延迟及平均每 Turn Round 数。Round metric 已移除高基数的 `round_number`；不使用 `sessionId`、`userId`、请求 ID、工具参数或 endpoint 作为 Prometheus label。
+- **Trace Drilldown**：Dashboard 级链接直接打开 Jaeger 的 `insighta-cli` 服务搜索页，并携带 Grafana 当前时间范围。它用于从汇总指标进入同一时间窗口的 Trace 排障，不宣称某一个 Prometheus 点能精确对应到一条 Trace；精确跳转需另行验证 exemplar 链路。
 
 ### InsightaAI Tools
 

@@ -1,9 +1,24 @@
 {
   "annotations": { "list": [] },
   "editable": true,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeTimeRange": true,
+      "keepTime": true,
+      "targetBlank": true,
+      "title": "Explore traces in Jaeger",
+      "tooltip": "Search InsightaAI traces in Jaeger",
+      "type": "link",
+      "url": "http://localhost:16686/search?service=insighta-cli"
+    }
+  ],
   "panels": [
-    { "datasource": { "type": "prometheus", "uid": "prometheus" }, "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] }, "gridPos": { "h": 10, "w": 12, "x": 0, "y": 0 }, "id": 1, "targets": [{ "expr": "histogram_quantile(0.50, sum by (le, gen_ai_request_model) (rate(insighta_agent_round_duration_milliseconds_bucket[$__rate_interval])))", "legendFormat": "{{gen_ai_request_model}} p50" }, { "expr": "histogram_quantile(0.95, sum by (le, gen_ai_request_model) (rate(insighta_agent_round_duration_milliseconds_bucket[$__rate_interval])))", "legendFormat": "{{gen_ai_request_model}} p95" }], "title": "Agent round latency by model", "type": "timeseries" },
-    { "datasource": { "type": "prometheus", "uid": "prometheus" }, "fieldConfig": { "defaults": { "unit": "short", "decimals": 2 }, "overrides": [] }, "gridPos": { "h": 10, "w": 12, "x": 12, "y": 0 }, "id": 2, "targets": [{ "expr": "(sum(rate(insighta_agent_round_rounds_total[$__rate_interval])) / sum(rate(insighta_agent_run_runs_total[$__rate_interval]))) and on() (sum(rate(insighta_agent_run_runs_total[$__rate_interval])) > 0)", "legendFormat": "rounds per turn" }], "title": "Average rounds per turn", "type": "timeseries" }
+    { "datasource": { "type": "prometheus", "uid": "prometheus" }, "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] }, "gridPos": { "h": 4, "w": 8, "x": 0, "y": 0 }, "id": 1, "targets": [{ "expr": "round(sum(increase(insighta_agent_run_runs_total[$__range])))", "legendFormat": "turns" }], "title": "Completed agent turns", "type": "stat" },
+    { "datasource": { "type": "prometheus", "uid": "prometheus" }, "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] }, "gridPos": { "h": 4, "w": 16, "x": 8, "y": 0 }, "id": 2, "options": { "showHeader": true }, "transformations": [{ "id": "organize", "options": { "excludeByName": { "Time": true }, "indexByName": { "gen_ai_request_model": 0, "Value": 1 }, "renameByName": { "gen_ai_request_model": "Model", "Value": "Turns" } } }], "targets": [{ "expr": "round(sum by (gen_ai_request_model) (increase(insighta_agent_run_runs_total[$__range])))", "format": "table", "instant": true, "legendFormat": "{{gen_ai_request_model}}" }], "title": "Completed agent turns by model", "type": "table" },
+    { "datasource": { "type": "prometheus", "uid": "prometheus" }, "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] }, "gridPos": { "h": 10, "w": 12, "x": 0, "y": 4 }, "id": 3, "targets": [{ "expr": "histogram_quantile(0.50, sum by (le, gen_ai_request_model) (rate(insighta_agent_round_duration_milliseconds_bucket[$__rate_interval])))", "legendFormat": "{{gen_ai_request_model}} p50" }, { "expr": "histogram_quantile(0.95, sum by (le, gen_ai_request_model) (rate(insighta_agent_round_duration_milliseconds_bucket[$__rate_interval])))", "legendFormat": "{{gen_ai_request_model}} p95" }], "title": "Agent round latency by model", "type": "timeseries" },
+    { "datasource": { "type": "prometheus", "uid": "prometheus" }, "fieldConfig": { "defaults": { "unit": "short", "decimals": 2 }, "overrides": [] }, "gridPos": { "h": 10, "w": 12, "x": 12, "y": 4 }, "id": 4, "targets": [{ "expr": "(sum by (gen_ai_request_model) (rate(insighta_agent_round_rounds_total[$__rate_interval])) / sum by (gen_ai_request_model) (rate(insighta_agent_run_runs_total[$__rate_interval]))) and on (gen_ai_request_model) (sum by (gen_ai_request_model) (rate(insighta_agent_run_runs_total[$__rate_interval])) > 0)", "legendFormat": "{{gen_ai_request_model}}" }], "title": "Average rounds per turn by model", "type": "timeseries" }
   ],
   "schemaVersion": 41,
   "tags": ["insighta", "opentelemetry", "agent"],
@@ -11,5 +26,5 @@
   "time": { "from": "now-1h", "to": "now" },
   "title": "InsightaAI Agent",
   "uid": "insighta-agent",
-  "version": 1
+  "version": 2
 }

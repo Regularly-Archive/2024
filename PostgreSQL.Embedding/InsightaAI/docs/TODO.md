@@ -491,7 +491,9 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 
 **遗留：**
 - [ ] Agent Dashboard 补充 Turn 指标（当前仅 2 个面板）
-- [ ] context compaction / 工具链长度 / AskUser 频率等低基数指标仍未埋点（仅停留在评估）
+- [ ] 评估 context compaction 指标：用于长会话压缩健康分析；当前暂不埋点，待 Memory/压缩校准阶段确定语义与展示方式。
+- [ ] 评估每 Turn 工具链长度：当前事件契约无法在 TurnEnd 可靠取得工具调用数；暂不扩展事件模型或引入聚合状态。
+- [ ] 评估 AskUser 频率：可在工具包装器低成本统计，但当前不新增行为指标，待确认自主性分析需求后再实施。
 - [ ] Jaeger Trace Drilldown 未做（Jaeger 数据源已配 `uid: jaeger`，dashboard 无 drilldown 链接）
 
 ---
