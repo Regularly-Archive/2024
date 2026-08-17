@@ -130,3 +130,4 @@ code-runner/backend/legacy/static/projects/mkqb8wf6/executions/exec_ad13189d73fc
 code-runner/backend/legacy/__pycache__/
 code-runner/backend/legacy/handlers/__pycache__/
 code-runner/backend/legacy/services/__pycache__/
+PostgreSQL.Embedding/InsightaAI/.artifacts/

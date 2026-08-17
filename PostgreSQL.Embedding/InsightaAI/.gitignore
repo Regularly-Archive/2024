@@ -48,3 +48,5 @@ bld/
 **/appsettings.json
 *.env
 .env*
+
+PostgreSQL.Embedding/InsightaAI/.artifacts/
