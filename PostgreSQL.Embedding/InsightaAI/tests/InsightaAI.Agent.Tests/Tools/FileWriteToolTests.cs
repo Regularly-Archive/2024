@@ -25,6 +25,25 @@ public sealed class FileWriteToolTests
         Assert.False(File.Exists(path));
     }
 
+    [Fact]
+    public async Task ExecuteAsync_ShouldRejectRedactionPlaceholder()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"insighta-redaction-{Guid.NewGuid():N}.txt");
+        var tool = new FileWriteTool(new LocalFileSystem(), new LocalPathValidator());
+
+        var result = await tool.ExecuteAsync(
+            new Dictionary<string, object>
+            {
+                ["file_path"] = path,
+                ["content"] = "apiKey=[REDACTED]"
+            },
+            new ToolExecutionContext { AgentId = "test", ToolCallId = "call-1" });
+
+        Assert.True(result.IsError);
+        Assert.Contains("secret-redaction placeholder", result.Content.OfType<InsightaAI.LLM.Models.TextBlock>().Single().Text);
+        Assert.False(File.Exists(path));
+    }
+
     private sealed class RejectingPathValidator : IPathValidator
     {
         public PathValidationResult Validate(string path, string? workingDirectory = null) =>

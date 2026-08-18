@@ -429,6 +429,8 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 - [ ] `SecurityConfig.SensitivePaths`（glob 模式：`**/.env`、`**/.ssh/**`、`~/.insighta/config.json`）
 - [ ] L1：按路径拦截 `read_file`/`grep`/`write_file`（解析 arguments 中 file_path/path 参数）
 - [x] L3：`ToolResultProcessor` 在 artifact、投影和 ToolEnd 预览前统一脱敏，不依赖无法替换结果的 `OnAfterExecutionAsync`；`read_file` 行号包装及 Windows `CRLF` 在匹配前归一化、输出后恢复原换行风格
+- [x] JSON 格式保真：`read_file` 的行号包装使完整输出不是 JSON，但 `SensitiveLine` 匹配带引号 JSON 键时保留字符串 value 的双引号和尾部逗号（`"key": "[REDACTED]"`），而不是输出未加引号的占位符。
+- [x] 脱敏占位符写入保护：`write_file.content`、`edit_file.old_string` 与 `edit_file.new_string` 含 `[REDACTED]` 时明确拒绝，避免模型把脱敏展示文本落盘。
 - [ ] 扩展格式化脱敏：YAML 完整语法（当前为键值风格）、TOML 与专用配置格式；继续保留通用文本兜底
 - [ ] 链式命令拆分检测：暂缓。简单按 `;`、`&&`、`|` 切分无法正确处理 PowerShell/Bash 引号、管道和子表达式，不能作为安全边界。
 

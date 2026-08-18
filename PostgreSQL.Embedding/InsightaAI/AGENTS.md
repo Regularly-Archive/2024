@@ -225,6 +225,13 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 
 `AgentBuilder` 是 Agent 级服务组合入口。它注册默认 `ToolRegistry` 和显式依赖，支持 `ConfigureServices()` 扩展当前 Agent 的服务集合，并在 `Build()` 时创建 Agent 专属 ServiceProvider。`AgentFactory` 只负责准备 CLI 业务依赖，再交给 Builder 组装；`Agent` 释放时负责释放该 Provider。旧的显式构造函数暂时保留，用于兼容现有调用方。
 
+### Agent 安全策略与工具结果脱敏（2026-08-17）
+
+- `Agent/Security/` 集中 `DenyRule`、不可被 AllowAlways 绕过的 `SecurityPolicyHook`、`ISecretRedactor` 及默认 pipeline；CLI 将 `security.deny_list` 映射到 `AgentConfig.DenyRules`，当前只对 `bash` 生效。
+- `ToolResultProcessor` 在 artifact、上下文投影、`AgentToolEndEvent` 预览之前统一脱敏；覆盖 JSON / XML 片段、`.env` / INI / YAML 风格键值、连接字符串、PEM 私钥与 URI 密码，敏感键包含 `API_KEY`、`SECRET_KEY`、`password`、`token`、`secret`、`key` 等。
+- `read_file` 输出含文件元数据、行号和 Tab，不能只按原始文件正文解析。键值脱敏遵循 `FileEditTool` 的换行策略：先将 CRLF/CR 规范为 LF 匹配，再恢复原换行风格，避免 Windows `\r\n` 与多行 `$` 锚点导致漏脱敏。真实样例已验证 JSON、XML、连接串、YAML、`.env` 与纯文本均不泄露机密。带引号 JSON 键的字符串 value 保留为 `"key": "[REDACTED]"`，并保留尾部逗号。
+- 为防止脱敏展示文本污染文件，`write_file.content`、`edit_file.old_string` 与 `edit_file.new_string` 一旦包含 `[REDACTED]` 即拒绝；`edit_file` 的精确替换继续使用 `read_file` 缓存的原始全文。
+
 ## 当前问题与改进方向
 
 ### 当前待办

@@ -1,5 +1,6 @@
 using InsightaAI.Agent.Abstractions;
 using InsightaAI.Agent.Models;
+using InsightaAI.Agent.Security;
 using InsightaAI.LLM.Models;
 using System.Text.Json;
 
@@ -74,6 +75,14 @@ public class FileEditTool : ITool
             var oldString = arguments.GetString("old_string");
             var newString = arguments.GetString("new_string");
             var replaceAll = arguments.GetBoolean("replace_all");
+
+            if (SecretRedactionRules.ContainsRedactionPlaceholder(oldString) ||
+                SecretRedactionRules.ContainsRedactionPlaceholder(newString))
+            {
+                return ToolResult.FromError(
+                    "Edit blocked: old_string or new_string contains the [REDACTED] secret-redaction placeholder. " +
+                    "Do not use redacted tool output as file content.");
+            }
 
             // 路径安全验证
             var validation = _pathValidator.Validate(filePath);

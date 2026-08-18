@@ -196,6 +196,8 @@ L4 最小权限执行（根治）    IShellExecutor 换 Docker/受限用户，ba
   - `read_file` 在内容前添加文件元数据、并为每行添加行号和 Tab；因此 JSON、XML 与键值回退规则必须接受该显示包装，不能只假设收到原始文件正文。
   - 键值规则在匹配前统一将 `CRLF` / `CR` 归一化为 `LF`，完成后按原始换行风格恢复。Windows 的 `FileReadTool.AppendLine()` 会产生 `CRLF`；若直接在 `(?m)` 正则中以 `$` 锚定行尾，会因 `$` 位于 `\n` 前而遗留 `\r` 导致整行不匹配。
   - 回归覆盖真实 `read_file` 行号包装、嵌套 JSON、XML 片段、YAML / `.env` 键值，以及 Windows `CRLF` 输入与原换行恢复。
+  - 实机交叉验证：在含机密的 JSON / XML 文件上，`edit_file` 可编辑非敏感字段；它使用 `FileReadState` 缓存的原文精确匹配，不依赖展示给模型的脱敏结果。
+  - 写入保护：`write_file.content`、`edit_file.old_string` 和 `edit_file.new_string` 不接受 `[REDACTED]`。`edit_file` 本就使用 `read_file` 缓存的原文精确匹配，但仍须阻止模型把展示占位符作为新内容写入；`write_file` 直接接收模型内容，必须同样拒绝。
   - 不依赖 `IToolHook.OnAfterExecutionAsync`，因为该 Hook 无法替换结果且处理时机晚于原有 artifact 保存流程。
 - **工作量：约 0.5~1 天**
 

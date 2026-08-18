@@ -4,6 +4,8 @@
 
 > **最终结论（2026-08-17）**：并非 DI 覆盖或 `RedactionContext.Format` 门控。`read_file` 会加入文件元数据、行号和 Tab，使完整 JSON/XML 解析需要片段回退；更关键的是 Windows `FileReadTool.AppendLine()` 产生 `CRLF`，`KeyValueSecretRedactor` 的多行 `$` 锚点停在 `\n` 前、无法跨越残留的 `\r`，导致裸键值规则完全不匹配。实现现已统一换行符为 `LF` 后匹配，并恢复原始换行风格；运行时复验中 `probe.txt`、`app.yaml`、`.env`、JSON、XML 与连接串均通过。
 
+> **最终实机验证（2026-08-18）**：`config.json`（嵌套 JSON）、`settings.xml`、`app.yaml`、`.env`、`probe.txt`、`conn.txt` 及 `.insighta/config.json` 均已脱敏；JSON 字符串显示保留为 `"key": "[REDACTED]"`。在含机密的 JSON/XML 文件上使用 `edit_file` 编辑非敏感字段成功，证明它基于 `FileReadState` 缓存原文精确替换，不会把展示用占位符写回文件。`write_file.content`、`edit_file.old_string` 与 `edit_file.new_string` 若包含 `[REDACTED]` 将被明确拒绝。
+
 ## 1. 目标
 
 确认 `read_file` 机密文件后工具结果是否被脱敏为 `[REDACTED]`，定位"源码/DLL/单测全对、运行时只生效 2/5 redactor"的断层。

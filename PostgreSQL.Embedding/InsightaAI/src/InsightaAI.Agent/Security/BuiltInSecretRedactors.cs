@@ -9,6 +9,9 @@ internal static class SecretRedactionRules
 {
     public const string Replacement = "[REDACTED]";
 
+    public static bool ContainsRedactionPlaceholder(string value) =>
+        value.Contains(Replacement, StringComparison.Ordinal);
+
     public static bool IsSensitiveKey(string key)
     {
         var normalized = Regex.Replace(key, "[^a-z0-9]", "", RegexOptions.IgnoreCase).ToLowerInvariant();
@@ -202,6 +205,10 @@ internal sealed class KeyValueSecretRedactor : ISecretRedactor
         "\\\"(?<key>[A-Za-z_][A-Za-z0-9_.-]*)\\\"[ \\t]*:[ \\t]*\\\"(?<value>(?:\\\\.|[^\\\"\\\\])*)\\\"",
         RegexOptions.CultureInvariant);
 
+    private static readonly Regex JsonStringValue = new(
+        "^\\\"(?:\\\\.|[^\\\"\\\\])*\\\"(?<suffix>.*)$",
+        RegexOptions.CultureInvariant);
+
     public RedactionResult Redact(string content, RedactionContext context)
     {
         var findings = new List<RedactionFinding>();
@@ -219,7 +226,9 @@ internal sealed class KeyValueSecretRedactor : ISecretRedactor
                     match.Groups["value"].Value, findings, key);
 
             findings.Add(new RedactionFinding("sensitive_key", key));
-            return match.Groups["prefix"].Value + SecretRedactionRules.Replacement;
+            return match.Groups["prefix"].Value + CreateReplacementValue(
+                match.Groups["value"].Value,
+                match.Groups["quotedKey"].Success);
         });
 
         redacted = QuotedJsonProperty.Replace(redacted, match =>
@@ -246,6 +255,17 @@ internal sealed class KeyValueSecretRedactor : ISecretRedactor
     }
 
     private static string NormalizeLineEndings(string text) => text.Replace("\r\n", "\n").Replace("\r", "\n");
+
+    private static string CreateReplacementValue(string value, bool quotedJsonKey)
+    {
+        if (!quotedJsonKey)
+            return SecretRedactionRules.Replacement;
+
+        var match = JsonStringValue.Match(value);
+        return match.Success
+            ? $"\"{SecretRedactionRules.Replacement}\"{match.Groups["suffix"].Value}"
+            : SecretRedactionRules.Replacement;
+    }
 
     private static string ApplyLineEnding(string text, string lineEnding) => text.Replace("\n", lineEnding);
 

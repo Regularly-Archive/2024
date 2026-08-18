@@ -75,7 +75,8 @@ public sealed class SecretRedactionPipelineTests
 
         Assert.DoesNotContain(apiKey, result.Content);
         Assert.DoesNotContain(password, result.Content);
-        Assert.Contains("[REDACTED]", result.Content);
+        Assert.Contains("\"apiKey\": \"[REDACTED]\",", result.Content);
+        Assert.Contains("\"password\": \"[REDACTED]\"", result.Content);
     }
 
     [Fact]

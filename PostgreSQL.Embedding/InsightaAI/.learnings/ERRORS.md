@@ -171,6 +171,118 @@ Use an explicit empty Dictionary when constructing a record whose parameter type
 
 ---
 
+## [ERR-20260818-004] file-edit-test-context-namespace
+
+**Logged**: 2026-08-18T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: tests
+
+### Summary
+The new FileEditTool placeholder test omitted the namespace that defines ToolExecutionContext.
+
+### Error
+```text
+CS0246: ToolExecutionContext could not be found
+```
+
+### Suggested Fix
+Import InsightaAI.Agent.Abstractions in direct built-in tool tests that construct execution contexts.
+
+### Metadata
+- Reproducible: yes
+- Related Files: tests/InsightaAI.Agent.Tests/Tools/FileEditToolTests.cs
+
+### Resolution
+- **Resolved**: 2026-08-18T00:00:00+08:00
+- **Notes**: Added the test-only namespace reference.
+
+---
+
+## [ERR-20260818-003] combined-security-patch-context
+
+**Logged**: 2026-08-18T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: backend
+
+### Summary
+A combined implementation patch used an assumed using-block context and was atomically rejected before any change was applied.
+
+### Error
+```text
+apply_patch verification failed: Failed to find expected lines in FileWriteTool.cs
+```
+
+### Suggested Fix
+Read exact file headers and apply focused patches per component when modifying multiple security boundaries.
+
+### Metadata
+- Reproducible: yes
+- Related Files: src/InsightaAI.Agent/Tools/BuiltIn/FileWriteTool.cs
+
+### Resolution
+- **Resolved**: 2026-08-18T00:00:00+08:00
+- **Notes**: The rejection was atomic; no business files changed.
+
+---
+
+## [ERR-20260818-002] optional-file-edit-test-search
+
+**Logged**: 2026-08-18T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: tests
+
+### Summary
+An optional search for an existing FileEditTool test class returned no matches and made the combined inspection command exit non-zero.
+
+### Error
+```text
+rg exit code: 1
+```
+
+### Suggested Fix
+Treat absent optional test files as a discovery result and create focused coverage in the existing tools test area.
+
+### Metadata
+- Reproducible: yes
+- Related Files: tests/InsightaAI.Agent.Tests/Tools
+
+### Resolution
+- **Resolved**: 2026-08-18T00:00:00+08:00
+- **Notes**: Added coverage will be placed with the tool tests instead of assuming a pre-existing class.
+
+---
+
+## [ERR-20260818-001] file-read-state-path-assumption
+
+**Logged**: 2026-08-18T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: backend
+
+### Summary
+A source inspection assumed `FileReadState` was stored in its own file, but the type is colocated elsewhere.
+
+### Error
+```text
+FileReadState.cs: The system cannot find the file specified.
+```
+
+### Suggested Fix
+Use repository file discovery before requesting a concrete source path for a colocated type.
+
+### Metadata
+- Reproducible: yes
+- Related Files: src/InsightaAI.Agent/Tools/BuiltIn
+
+### Resolution
+- **Resolved**: 2026-08-18T00:00:00+08:00
+- **Notes**: The relevant `FileReadTool` and `FileEditTool` paths were already inspected successfully.
+
+---
+
 ## [ERR-20260817-011] secret-redaction-sample-leak
 
 **Logged**: 2026-08-17T00:00:00+08:00

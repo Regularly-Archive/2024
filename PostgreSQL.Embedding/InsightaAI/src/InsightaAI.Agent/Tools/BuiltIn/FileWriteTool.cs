@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using InsightaAI.Agent.Abstractions;
+using InsightaAI.Agent.Security;
 using InsightaAI.LLM.Models;
 
 namespace InsightaAI.Agent.Tools.BuiltIn;
@@ -64,6 +65,13 @@ public class FileWriteTool : ITool
             var filePath = arguments.GetString("file_path");
             var content = arguments.GetString("content");
             var append = arguments.GetBoolean("append");
+
+            if (SecretRedactionRules.ContainsRedactionPlaceholder(content))
+            {
+                return ToolResult.FromError(
+                    "Write blocked: content contains the [REDACTED] secret-redaction placeholder. " +
+                    "Do not write redacted tool output back to a file.");
+            }
 
             // 路径安全验证
             var validation = _pathValidator.Validate(filePath);
