@@ -171,6 +171,70 @@ Use an explicit empty Dictionary when constructing a record whose parameter type
 
 ---
 
+## [ERR-20260820-001] functions-exec-tool-name
+
+**Logged**: 2026-08-20T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: infra
+
+### Summary
+Project status inspection used a nonexistent nested tool name.
+
+### Error
+```text
+TypeError: tools.shell_command is not a function
+```
+
+### Context
+- Attempted operation: inspect recent Git changes and TODO items through `functions.exec`.
+- The available nested command is `tools.exec_command`, not `tools.shell_command`.
+
+### Suggested Fix
+Use `tools.exec_command` for terminal work invoked through `functions.exec`.
+
+### Metadata
+- Reproducible: yes
+- Related Files: .learnings/ERRORS.md
+
+### Resolution
+- **Resolved**: 2026-08-20T00:00:00+08:00
+- **Notes**: Corrected the command before any repository operation was performed.
+
+---
+
+## [ERR-20260820-002] git-index-lock-sandbox
+
+**Logged**: 2026-08-20T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: infra
+
+### Summary
+The sandbox could not create the parent repository Git index lock while staging documentation changes.
+
+### Error
+```text
+fatal: Unable to create 'D:/Projects/2024/.git/index.lock': Permission denied
+```
+
+### Context
+- Attempted operation: stage and commit `docs/TODO.md` and `.learnings/ERRORS.md`.
+- The repository Git directory is above the writable workspace root.
+
+### Suggested Fix
+Use the approved elevated Git operation for repository index updates; retain explicit, scoped paths.
+
+### Metadata
+- Reproducible: yes
+- Related Files: docs/TODO.md, .learnings/ERRORS.md
+
+### Resolution
+- **Resolved**: 2026-08-20T00:00:00+08:00
+- **Notes**: Retried with elevated repository-index permission.
+
+---
+
 ## [ERR-20260818-004] file-edit-test-context-namespace
 
 **Logged**: 2026-08-18T00:00:00+08:00

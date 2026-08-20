@@ -506,11 +506,12 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 
 ## 当前优先级
 
-待处理：Dashboard 拆分与 Anthropic 归一化已完成（#17）。继续完善可观测性：Agent Dashboard 补 Turn 指标、新增 context compaction / 工具链长度 / AskUser 频率低基数指标、Jaeger Trace Drilldown 关联；见 `observability-design.md` §8。
+已完成：Dashboard 拆分与 Anthropic 归一化（#17），以及 MCP Telemetry tag 命名分层与去重（#12）。后续可观测性工作保留 Agent Dashboard 的 Turn 指标、低基数行为指标评估和 Jaeger Trace Drilldown；见 `observability-design.md` §8。
 
-1. Memory 自动注入校准：基于已记录的候选与入选/淘汰原因，根据真实会话调整门槛与身份查询兜底策略。
-2. Hook：明确取消/中止场景的 Agent 事件契约。
-3. MCP Telemetry：完成 tag 命名分层与去重。
-4. Agent 安全增强（#14）：Phase 1 DenyList → Phase 2 敏感文件保护（L1+L3）。
+1. Agent 安全增强（#14）：优先完成 Phase 2 L1 敏感路径保护——按 `SecurityConfig.SensitivePaths` 拦截 `read_file` / `grep` / `write_file` 等结构化工具；L3 结果脱敏已完成。
+2. 运行时用量：区分流式模型未返回 token usage 与真实的 0，并继续推进 #16 的用户、会话与模型用量审计设计。
+3. 可观测性：补充 Agent Dashboard 的 Turn 指标与 Jaeger Trace Drilldown；context compaction、每 Turn 工具链长度、AskUser 频率仅在确认语义后新增低基数指标。
+4. Memory 自动注入校准：基于已记录的候选与入选/淘汰原因，根据真实会话调整门槛与身份查询兜底策略。
+5. Hook：明确取消/中止场景的 Agent 事件契约。
 
 Agent 服务生命周期已完成当前阶段决策：私有 Provider 支持 Singleton/Transient，不支持 Scoped；见 `agent-service-lifetime.md`。
