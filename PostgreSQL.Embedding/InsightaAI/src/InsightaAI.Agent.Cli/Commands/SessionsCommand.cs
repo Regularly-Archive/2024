@@ -144,7 +144,7 @@ public class SessionsCommand
             return;
         }
 
-        var session = await _storage.GetSessionAsync(sessionId);
+        var session = await _storage.GetMainSessionAsync(sessionId);
         if (session == null)
         {
             _renderer.ShowWarning(CliStrings.Format("SessionNotFoundFormat", Markup.Escape(sessionId)));

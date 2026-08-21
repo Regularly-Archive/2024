@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using InsightaAI.Agent.Abstractions;
 using InsightaAI.Agent.Models;
+using InsightaAI.Agents.Subagents.Invocation;
 using InsightaAI.LLM.Abstractions;
 using InsightaAI.Agents.Orchestrator.Events;
 using InsightaAI.Agents.Orchestrator.Execution;
@@ -28,12 +29,12 @@ public sealed class Orchestrator
     public Orchestrator(
         ILlmClient llmClient,
         Team? team = null,
-        Func<string[], ToolRegistry>? toolRegistryFactory = null)
+        SubagentDispatcher? subagentDispatcher = null)
     {
         ArgumentNullException.ThrowIfNull(llmClient);
         _llmClient = llmClient;
         _team = team;
-        _nodeExecutor = new NodeExecutor(llmClient, team, toolRegistryFactory);
+        _nodeExecutor = new NodeExecutor(team, subagentDispatcher);
         _memory = team?.SharedMemory ?? new SharedMemory();
         _artifactStore = team?.ArtifactStore ?? new ArtifactStore();
     }

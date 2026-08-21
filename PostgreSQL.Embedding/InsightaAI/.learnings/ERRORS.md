@@ -235,6 +235,707 @@ Use the approved elevated Git operation for repository index updates; retain exp
 
 ---
 
+## [ERR-20260821-003] git-index-root-permission
+
+**Logged**: 2026-08-21T00:00:00+08:00
+**Priority**: medium
+**Status**: resolved
+**Area**: config
+
+### Summary
+Git staging from the InsightaAI subdirectory cannot create the repository-level index lock under the parent workspace root.
+
+### Error
+```text
+fatal: Unable to create 'D:/Projects/2024/.git/index.lock': Permission denied
+```
+
+### Suggested Fix
+Run the authorized Git staging and commit operation with access to the parent repository `.git` directory.
+
+### Metadata
+- Reproducible: yes
+- Related Files: D:/Projects/2024/.git/index
+
+### Resolution
+- **Resolved**: 2026-08-21T00:00:00+08:00
+- **Notes**: Re-ran the authorized staging and commit operations with parent repository index access.
+
+---
+
+## [ERR-20260821-002] powershell-multiple-path-enumeration
+
+**Logged**: 2026-08-21T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: tests
+
+### Summary
+A diagnostic file listing passed two paths to `Get-ChildItem` without a separating parameter, causing the second path to be resolved relative to the first.
+
+### Error
+```text
+Get-ChildItem : Could not find part of the path '...\\tests\\InsightaAI.Agents.Subagents.Tests\\src'.
+```
+
+### Suggested Fix
+Use separate `Get-ChildItem` invocations or the explicit `-Path` array parameter when inspecting multiple roots.
+
+### Metadata
+- Reproducible: yes
+- Related Files: tests/InsightaAI.Agents.Subagents.Tests
+
+### Resolution
+- **Resolved**: 2026-08-21T00:00:00+08:00
+- **Notes**: The error occurred only in a read-only diagnostic command and did not affect source or test results.
+
+---
+
+## [ERR-20260821-001] subagent-test-agent-namespace-shadowing
+
+**Logged**: 2026-08-21T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: tests
+
+### Summary
+The CLI subagent adapter test namespace contains `Agents`, which shadowed the imported `InsightaAI.Agent.Agent` runtime type.
+
+### Error
+```text
+CS0118: 'Agent' is a namespace but is used like a type.
+```
+
+### Suggested Fix
+Use the fully qualified `InsightaAI.Agent.Agent` type in test implementations of `IAgentFactory`.
+
+### Metadata
+- Reproducible: yes
+- Related Files: tests/InsightaAI.Agents.Subagents.Tests/Invocation/CliInsightaSubagentAdapterTests.cs
+
+### Resolution
+- **Resolved**: 2026-08-21T00:00:00+08:00
+- **Notes**: Qualified the test factory return type and construction site.
+
+---
+
+## [ERR-20260820-003] orchestrator-test-team-namespace
+
+**Logged**: 2026-08-20T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: tests
+
+### Summary
+The new Orchestrator AgentNode test referenced `Team` without importing its Core namespace.
+
+### Error
+```text
+CS0246: The type or namespace name 'Team' could not be found
+```
+
+### Suggested Fix
+Import `InsightaAI.Agents.Orchestrator.Core` in the test file.
+
+### Metadata
+- Reproducible: yes
+- Related Files: tests/InsightaAI.Agents.Orchestrator.Tests/Core/OrchestratorTests.cs
+
+### Resolution
+- **Resolved**: 2026-08-20T00:00:00+08:00
+- **Notes**: Added the missing test namespace before rerunning the focused suite.
+
+---
+
+## [ERR-20260820-004] session-storage-test-patch-context
+
+**Logged**: 2026-08-20T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: tests
+
+### Summary
+A combined session-storage patch assumed an incorrect JSONL test-class declaration and was rejected before any files changed.
+
+### Error
+```text
+apply_patch verification failed: expected JsonlMessageStorageTests : IDisposable declaration was not found
+```
+
+### Suggested Fix
+Read the exact test fixture declaration and apply the production and test edits in smaller patches.
+
+### Metadata
+- Reproducible: yes
+- Related Files: tests/InsightaAI.Agent.Tests/Storage/JsonlMessageStorageTests.cs
+
+### Resolution
+- **Resolved**: 2026-08-20T00:00:00+08:00
+- **Notes**: No partial edit occurred; the fixture will be inspected before retrying.
+
+---
+
+## [ERR-20260820-005] agent-creation-options-read-path
+
+**Logged**: 2026-08-20T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: infra
+
+### Summary
+A source inspection used `InsightaAI.Agent/Cli` instead of the actual `InsightaAI.Agent.Cli` project path.
+
+### Error
+```text
+Get-Content: path src\\InsightaAI.Agent\\Cli\\Services\\AgentCreationOptions.cs was not found
+```
+
+### Suggested Fix
+Use the exact project directory `src/InsightaAI.Agent.Cli` when reading CLI sources.
+
+### Metadata
+- Reproducible: yes
+- Related Files: src/InsightaAI.Agent.Cli/Services/AgentCreationOptions.cs
+
+### Resolution
+- **Resolved**: 2026-08-20T00:00:00+08:00
+- **Notes**: The required storage conversion source was read successfully; the incorrect secondary path was not used.
+
+---
+
+## [ERR-20260820-006] orchestrator-test-file-path
+
+**Logged**: 2026-08-20T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: tests
+
+### Summary
+An inspection assumed the Orchestrator test file was at the test-project root instead of its `Core/` folder.
+
+### Error
+```text
+Get-Content: ... tests\\InsightaAI.Agents.Orchestrator.Tests\\OrchestratorTests.cs path was not found
+```
+
+### Suggested Fix
+Use `rg --files` to locate nested test files before reading a specific path.
+
+### Metadata
+- Reproducible: yes
+- Related Files: tests/InsightaAI.Agents.Orchestrator.Tests/Core/OrchestratorTests.cs
+
+### Resolution
+- **Resolved**: 2026-08-20T00:00:00+08:00
+- **Notes**: Located and inspected the test under `Core/` before editing.
+
+---
+
+## [ERR-20260820-007] apply-patch-replace-file-operation
+
+**Logged**: 2026-08-20T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: docs
+
+### Summary
+An attempt to delete and add the same design document in one patch was rejected by the patch tool.
+
+### Error
+```text
+apply_patch verification failed: invalid patch: multiple operations target docs/agent-invocation-design.md
+```
+
+### Suggested Fix
+Replace a complete file through separate delete and add patches, or use a single verified update hunk.
+
+### Metadata
+- Reproducible: yes
+- Related Files: docs/agent-invocation-design.md
+
+### Resolution
+- **Resolved**: 2026-08-20T00:00:00+08:00
+- **Notes**: The rejected patch was atomic; replacement will be split into two operations.
+
+---
+
+## [ERR-20260820-008] todo-invocation-block-context
+
+**Logged**: 2026-08-20T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: docs
+
+### Summary
+The TODO Invocation block differed from the assumed historical wording, so its broad replacement was rejected.
+
+### Error
+```text
+apply_patch verification failed: Failed to find expected lines in docs/TODO.md
+```
+
+### Suggested Fix
+Anchor a small documentation update on a unique verified ASCII link rather than replacing an assumed multilingual block.
+
+### Metadata
+- Reproducible: yes
+- Related Files: docs/TODO.md
+
+### Resolution
+- **Resolved**: 2026-08-20T00:00:00+08:00
+- **Notes**: The rejected patch was atomic; the follow-up uses the design-document link as its anchor.
+
+---
+
+## [ERR-20260820-009] new-project-no-restore
+
+**Logged**: 2026-08-20T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: tests
+
+### Summary
+The first focused test run used `--no-restore` after adding a new project reference, so NuGet had no project metadata for it.
+
+### Error
+```text
+NU1105: Unable to find project information for InsightaAI.Agents.Subagents.csproj
+```
+
+### Suggested Fix
+Run restore once after adding a project, then use `--no-restore` for subsequent focused test runs.
+
+### Metadata
+- Reproducible: yes
+- Related Files: InsightaAI.sln, src/InsightaAI.Agents.Subagents/InsightaAI.Agents.Subagents.csproj
+
+### Resolution
+- **Resolved**: 2026-08-20T00:00:00+08:00
+- **Notes**: A restore will refresh the solution graph before the rerun.
+
+---
+
+## [ERR-20260820-010] nuget-restore-sandbox-network
+
+**Logged**: 2026-08-20T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: infra
+
+### Summary
+Sandboxed restore could not reach NuGet's repository-signature endpoint after the new project required a restore.
+
+### Error
+```text
+NU1301: Unable to retrieve repository signature information from api.nuget.org
+```
+
+### Suggested Fix
+Retry the required restore with the scoped elevated network permission, then rerun focused tests without restore.
+
+### Metadata
+- Reproducible: yes
+- Related Files: InsightaAI.sln
+
+### Resolution
+- **Resolved**: 2026-08-20T00:00:00+08:00
+- **Notes**: Escalated restore is requested only to refresh the solution dependency graph.
+
+---
+
+## [ERR-20260820-011] orchestrator-toolregistry-using
+
+**Logged**: 2026-08-20T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: backend
+
+### Summary
+Removing obsolete Invocation imports also removed the `ToolRegistry` namespace used by Orchestrator's retained compatibility method.
+
+### Error
+```text
+CS0246: The type or namespace name 'ToolRegistry' could not be found
+```
+
+### Suggested Fix
+Keep `InsightaAI.Agent.Abstractions` imported until `RunAgentAsync` is removed or migrated.
+
+### Metadata
+- Reproducible: yes
+- Related Files: src/InsightaAI.Agents.Orchestrator/Core/Orchestrator.cs
+
+### Resolution
+- **Resolved**: 2026-08-20T00:00:00+08:00
+- **Notes**: Restored only the required abstraction namespace.
+
+---
+
+## [ERR-20260820-012] powershell-bash-or-syntax
+
+**Logged**: 2026-08-20T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: infra
+
+### Summary
+A final verification command used Bash `||` syntax in the PowerShell shell.
+
+### Error
+```text
+ParserError: The token '||' is not a valid statement separator in this version.
+```
+
+### Suggested Fix
+Use separate commands or PowerShell conditional syntax when an optional ripgrep search may return no matches.
+
+### Metadata
+- Reproducible: yes
+- Related Files: none
+
+### Resolution
+- **Resolved**: 2026-08-20T00:00:00+08:00
+- **Notes**: No repository operation ran; verification will use separate commands.
+
+---
+
+## [ERR-20260820-013] agentfactory-test-toolhook-namespace
+
+**Logged**: 2026-08-20T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: tests
+
+### Summary
+The new AgentFactory composition test referenced `IToolHook` without importing its Hooks namespace.
+
+### Error
+```text
+CS0246: The type or namespace name 'IToolHook' could not be found
+```
+
+### Suggested Fix
+Import `InsightaAI.Agent.Hooks` in tests that inspect the Agent tool-hook collection.
+
+### Metadata
+- Reproducible: yes
+- Related Files: tests/InsightaAI.Agent.Tests/AgentFactoryTests.cs
+
+### Resolution
+- **Resolved**: 2026-08-20T00:00:00+08:00
+- **Notes**: Add the test-only import and rerun the focused suite.
+
+---
+
+## [ERR-20260820-014] local-subagent-directory-absent
+
+**Logged**: 2026-08-20T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: config
+
+### Summary
+Initial discovery confirmed that the project has no `.insighta` directory yet.
+
+### Error
+```text
+rg: .insighta: The system cannot find the file specified
+```
+
+### Suggested Fix
+Treat the absent optional local catalog directory as first-run state; create it through the scoped catalog implementation and descriptors.
+
+### Metadata
+- Reproducible: yes
+- Related Files: .insighta/subagents
+
+### Resolution
+- **Resolved**: 2026-08-20T00:00:00+08:00
+- **Notes**: The directory will be added as the project-local named Subagent catalog.
+
+---
+
+## [ERR-20260821-001] subagent-test-solution-context
+
+**Logged**: 2026-08-21T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: tests
+
+### Summary
+The first combined patch for the Subagents test project assumed an outdated solution nested-project entry.
+
+### Error
+```text
+apply_patch verification failed: Failed to find expected lines in InsightaAI.sln
+```
+
+### Suggested Fix
+Read the exact solution project and nested-project sections, then add the project in focused patches.
+
+### Metadata
+- Reproducible: yes
+- Related Files: InsightaAI.sln
+
+### Resolution
+- **Resolved**: 2026-08-21T00:00:00+08:00
+- **Notes**: The failed patch was atomic; no test project or solution changes were applied.
+
+---
+
+## [ERR-20260821-002] chat-subagent-integration-context
+
+**Logged**: 2026-08-21T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: backend
+
+### Summary
+A broad ChatApplication integration patch used an imprecise comment context and was rejected atomically.
+
+### Error
+```text
+apply_patch verification failed: Failed to find expected lines in ChatApplication.cs
+```
+
+### Suggested Fix
+Apply ChatApplication changes around stable method calls and object initializer fields in focused patches.
+
+### Metadata
+- Reproducible: yes
+- Related Files: src/InsightaAI.Agent.Cli/Services/ChatApplication.cs
+
+### Resolution
+- **Resolved**: 2026-08-21T00:00:00+08:00
+- **Notes**: No production file changed; integration will be split into verified edits.
+
+---
+
+## [ERR-20260821-003] delegate-tool-test-handler-namespace
+
+**Logged**: 2026-08-21T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: tests
+
+### Summary
+The migrated DelegateTool integration test did not import the CLI service namespace that contains its delegation handler.
+
+### Error
+```text
+CS0246: The type or namespace name 'CliSubagentDelegationHandler' could not be found
+```
+
+### Suggested Fix
+Add `using InsightaAI.Agent.Cli.Services;` to the focused test fixture and rerun the suite.
+
+### Metadata
+- Reproducible: yes
+- Related Files: tests/InsightaAI.Agents.Subagents.Tests/Tools/SubagentToolTests.cs
+
+### Resolution
+- **Resolved**: 2026-08-21T00:00:00+08:00
+- **Notes**: Added the test-only using directive.
+
+---
+
+## [ERR-20260821-004] chatapplication-path-assumption
+
+**Logged**: 2026-08-21T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: backend
+
+### Summary
+A source check assumed ChatApplication was at the CLI project root instead of locating its actual services path.
+
+### Error
+```text
+rg: src\\InsightaAI.Agent.Cli\\ChatApplication.cs: The system cannot find the file specified
+```
+
+### Suggested Fix
+Use `rg --files src/InsightaAI.Agent.Cli` before addressing a concrete CLI source path.
+
+### Metadata
+- Reproducible: yes
+- Related Files: src/InsightaAI.Agent.Cli/Services/ChatApplication.cs
+
+### Resolution
+- **Resolved**: 2026-08-21T00:00:00+08:00
+- **Notes**: Subsequent verification uses the confirmed Services path.
+
+---
+
+## [ERR-20260821-005] mcp-tools-source-path-assumption
+
+**Logged**: 2026-08-21T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: backend
+
+### Summary
+A capability review assumed the MCP tool registrar was located under the Mcp source directory.
+
+### Error
+```text
+Get-Content: src\\InsightaAI.Agent\\Mcp\\McpTools.cs path was not found
+```
+
+### Suggested Fix
+Use repository discovery before opening a colocated tool-registration implementation.
+
+### Metadata
+- Reproducible: yes
+- Related Files: src/InsightaAI.Agent/Tools
+
+### Resolution
+- **Resolved**: 2026-08-21T00:00:00+08:00
+- **Notes**: Follow-up inspection uses `rg --files` to locate the registrar.
+
+---
+
+## [ERR-20260821-006] mcp-tools-built-in-path-assumption
+
+**Logged**: 2026-08-21T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: backend
+
+### Summary
+After discovery identified the BuiltIn location, the follow-up read still used the parent Tools path.
+
+### Error
+```text
+Get-Content: src\\InsightaAI.Agent\\Tools\\McpTools.cs path was not found
+```
+
+### Suggested Fix
+Use the discovered path exactly: `src/InsightaAI.Agent/Tools/BuiltIn/McpTools.cs`.
+
+### Metadata
+- Reproducible: yes
+- Related Files: src/InsightaAI.Agent/Tools/BuiltIn/McpTools.cs
+- See Also: ERR-20260821-005
+
+### Resolution
+- **Resolved**: 2026-08-21T00:00:00+08:00
+- **Notes**: The missing file was not modified; inspection resumes at the confirmed path.
+
+---
+
+## [ERR-20260821-007] removed-runtime-namespace-using
+
+**Logged**: 2026-08-21T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: backend
+
+### Summary
+The runtime-capability type was removed but AgentBuilder retained its namespace import.
+
+### Error
+```text
+CS0234: InsightaAI.Agent.Runtime does not exist in AgentBuilder.cs
+```
+
+### Suggested Fix
+After removing a namespace-owned type, run a repository reference search and remove all remaining imports before testing.
+
+### Metadata
+- Reproducible: yes
+- Related Files: src/InsightaAI.Agent/AgentBuilder.cs
+
+### Resolution
+- **Resolved**: 2026-08-21T00:00:00+08:00
+- **Notes**: Removed the obsolete using directive; subsequent verification checks for remaining Runtime references.
+
+---
+
+## [ERR-20260821-008] agentfactory-test-mcp-namespace
+
+**Logged**: 2026-08-21T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: tests
+
+### Summary
+The new DI retention assertion referenced McpRegistry without importing its namespace.
+
+### Error
+```text
+CS0246: The type or namespace name 'McpRegistry' could not be found
+```
+
+### Suggested Fix
+Import `InsightaAI.Agent.Mcp` in the AgentFactory test fixture.
+
+### Metadata
+- Reproducible: yes
+- Related Files: tests/InsightaAI.Agent.Tests/AgentFactoryTests.cs
+
+### Resolution
+- **Resolved**: 2026-08-21T00:00:00+08:00
+- **Notes**: Added the test-only namespace reference.
+
+---
+
+## [ERR-20260821-009] agentfactory-test-skill-service-type
+
+**Logged**: 2026-08-21T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: tests
+
+### Summary
+The infrastructure-retention test requested SkillRegistry by its concrete type although AgentBuilder intentionally registers it as ISkillRegistry.
+
+### Error
+```text
+Assert.NotNull() Failure: GetService<SkillRegistry>() returned null
+```
+
+### Suggested Fix
+Assert the public DI contract (`ISkillRegistry`) rather than an unregistered concrete implementation.
+
+### Metadata
+- Reproducible: yes
+- Related Files: tests/InsightaAI.Agent.Tests/AgentFactoryTests.cs
+
+### Resolution
+- **Resolved**: 2026-08-21T00:00:00+08:00
+- **Notes**: The AgentFactory registration was correct; only the test requested the wrong service type.
+
+---
+
+## [ERR-20260821-010] insighta-version-option-absent
+
+**Logged**: 2026-08-21T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: infra
+
+### Summary
+The installed Insighta CLI does not expose a `--version` command-line option.
+
+### Error
+```text
+Unrecognized command or argument '--version'.
+```
+
+### Suggested Fix
+Verify a local global-tool installation through its store DLL timestamp or package metadata rather than invoking an unsupported version option.
+
+### Metadata
+- Reproducible: yes
+- Related Files: build-insighta.ps1
+
+### Resolution
+- **Resolved**: 2026-08-21T00:00:00+08:00
+- **Notes**: Installation verification now reads the installed CLI assembly metadata.
+
+---
+
 ## [ERR-20260818-004] file-edit-test-context-namespace
 
 **Logged**: 2026-08-18T00:00:00+08:00

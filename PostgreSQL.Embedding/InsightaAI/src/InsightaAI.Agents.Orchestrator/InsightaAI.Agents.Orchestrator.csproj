@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\InsightaAI.LLM\InsightaAI.LLM.csproj" />
     <ProjectReference Include="..\InsightaAI.Agent\InsightaAI.Agent.csproj" />
+    <ProjectReference Include="..\InsightaAI.Agents.Subagents\InsightaAI.Agents.Subagents.csproj" />
   </ItemGroup>
 
 </Project>

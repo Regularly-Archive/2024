@@ -1,9 +1,7 @@
 using System.Diagnostics;
-using InsightaAI.Agent;
-using InsightaAI.Agent.Abstractions;
 using InsightaAI.Agent.Models;
-using InsightaAI.LLM.Abstractions;
-using InsightaAI.LLM.Models;
+using InsightaAI.Agents.Subagents.Definitions;
+using InsightaAI.Agents.Subagents.Invocation;
 using InsightaAI.Agents.Orchestrator.Core;
 using InsightaAI.Agents.Orchestrator.Nodes;
 using InsightaAI.Agents.Orchestrator.Results;
@@ -16,15 +14,13 @@ namespace InsightaAI.Agents.Orchestrator.Execution;
 /// </summary>
 internal sealed class NodeExecutor
 {
-    private readonly ILlmClient _llmClient;
     private readonly Team? _team;
-    private readonly Func<string[], ToolRegistry>? _toolRegistryFactory;
+    private readonly SubagentDispatcher? _subagentDispatcher;
 
-    public NodeExecutor(ILlmClient llmClient, Team? team, Func<string[], ToolRegistry>? toolRegistryFactory = null)
+    public NodeExecutor(Team? team, SubagentDispatcher? subagentDispatcher)
     {
-        _llmClient = llmClient;
         _team = team;
-        _toolRegistryFactory = toolRegistryFactory;
+        _subagentDispatcher = subagentDispatcher;
     }
 
     /// <summary>
@@ -101,31 +97,47 @@ internal sealed class NodeExecutor
             if (agentConfig == null)
                 throw new InvalidOperationException($"Agent '{node.AgentId}' not found in team");
 
-            // 2. 构建 ToolRegistry（通过工厂或创建空注册表）
-            var toolRegistry = node.ToolNames != null && _toolRegistryFactory != null
-                ? _toolRegistryFactory(node.ToolNames)
-                : new ToolRegistry();
+            if (_subagentDispatcher == null)
+                throw new InvalidOperationException(
+                    "AgentNode execution requires a SubagentDispatcher supplied by the host.");
 
-            // 3. 使用节点指令覆盖 Agent 的 CustomInstructions
-            var config = agentConfig;
-            if (!string.IsNullOrEmpty(node.SystemPrompt))
+            // 2. 使用节点指令覆盖 Agent 的 CustomInstructions
+            var definition = new InsightaSubagentDefinition
             {
-                config = config with { CustomInstructions = node.SystemPrompt };
-            }
+                Id = agentConfig.Id,
+                Name = agentConfig.Name,
+                Model = agentConfig.Model,
+                Instructions = node.SystemPrompt ?? agentConfig.CustomInstructions,
+                MaxTokens = agentConfig.MaxTokens,
+                MaxToolRounds = agentConfig.MaxToolRounds,
+                ToolNames = node.ToolNames ?? [],
+                Capabilities = InsightaSubagentCapabilities.RestrictedDefault
+            };
 
-            // 4. 构建输入文本
+            // 3. 构建输入文本
             var input = BuildAgentInput(node, context);
 
-            // 5. 创建 Agent 实例并执行
-            var agent = new InsightaAI.Agent.Agent(config, _llmClient, toolRegistry);
-            var result = await agent.RunAsync(input, null, cancellationToken);
+            // 4. 委托宿主创建和运行独立 Agent，Orchestrator 不直接构造 Agent。
+            var invocation = await _subagentDispatcher.InvokeAsync(new SubagentInvocationRequest
+            {
+                Definition = definition,
+                Input = input,
+            }, cancellationToken);
 
             sw.Stop();
 
-            // 6. 提取输出
-            var output = result.Message?.Content?
-                .OfType<TextBlock>()
-                .FirstOrDefault()?.Text ?? "";
+            if (invocation.Status != SubagentInvocationStatus.Completed)
+            {
+                return new NodeResult
+                {
+                    NodeId = node.Id,
+                    NodeName = node.Name,
+                    NodeKind = node.Kind,
+                    Status = NodeResultStatus.Failed,
+                    Error = invocation.Error ?? $"Subagent invocation ended with status '{invocation.Status}'.",
+                    DurationMs = sw.ElapsedMilliseconds
+                };
+            }
 
             return new NodeResult
             {
@@ -133,7 +145,7 @@ internal sealed class NodeExecutor
                 NodeName = node.Name,
                 NodeKind = node.Kind,
                 Status = NodeResultStatus.Success,
-                Output = output,
+                Output = invocation.Output ?? string.Empty,
                 DurationMs = sw.ElapsedMilliseconds
             };
         }

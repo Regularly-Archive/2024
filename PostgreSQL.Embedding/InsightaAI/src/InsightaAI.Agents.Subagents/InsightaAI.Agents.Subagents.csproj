@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>InsightaAI.Agents.Subagents</RootNamespace>
+    <PackageId>InsightaAI.Agents.Subagents</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>Insighta</Authors>
+    <Description>Host-neutral contracts for invoking named and ephemeral subagents.</Description>
+    <PackageTags>llm;ai;agent;subagent;invocation</PackageTags>
+  </PropertyGroup>
+
+</Project>

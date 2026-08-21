@@ -113,7 +113,7 @@ public class ChatSession
     /// </summary>
     public static async Task<ChatSession?> LoadAsync(IMessageStorage storage, string sessionId)
     {
-        var session = await storage.GetSessionAsync(sessionId);
+        var session = await storage.GetMainSessionAsync(sessionId);
         if (session == null) return null;
 
         var chatSession = new ChatSession(storage, session);

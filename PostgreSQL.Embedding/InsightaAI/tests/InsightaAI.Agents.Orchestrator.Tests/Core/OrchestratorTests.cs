@@ -1,6 +1,10 @@
 using InsightaAI.Agents.Orchestrator.Events;
+using InsightaAI.Agents.Orchestrator.Core;
 using InsightaAI.Agents.Orchestrator.Nodes;
 using InsightaAI.Agents.Orchestrator.Results;
+using InsightaAI.Agent.Models;
+using InsightaAI.Agents.Subagents.Definitions;
+using InsightaAI.Agents.Subagents.Invocation;
 using InsightaAI.Tests.Shared;
 using OrchestratorImpl = InsightaAI.Agents.Orchestrator.Core.Orchestrator;
 
@@ -373,5 +377,68 @@ public class OrchestratorTests
 
         Assert.Single(plan.Nodes);
         Assert.Equal(NodeKind.SubAgent, plan.Nodes[0].Kind);
+    }
+
+    [Fact]
+    public async Task RunTasksAsync_AgentNode_ShouldInvokeHostAgentInvoker()
+    {
+        var adapter = new RecordingSubagentAdapter("analysis complete");
+        var team = new Team
+        {
+            Name = "test-team",
+            Agents =
+            [
+                new AgentConfig
+                {
+                    Id = "analyst",
+                    Name = "Analyst",
+                    Model = "test-model",
+                    CustomInstructions = "Base instructions"
+                }
+            ]
+        };
+        var dispatcher = new SubagentDispatcher([adapter]);
+        var orchestrator = new OrchestratorImpl(new MockLlmClient(), team, dispatcher);
+
+        var result = await orchestrator.RunTasksAsync(
+        [
+            new AgentNode
+            {
+                Id = "analysis",
+                Name = "Analysis",
+                AgentId = "analyst",
+                ToolNames = ["read_file"],
+                SystemPrompt = "Node instructions",
+                TaskDescription = "Analyze the input"
+            }
+        ]);
+
+        Assert.Equal(TeamResultStatus.Completed, result.Status);
+        Assert.Equal("analysis complete", result.FinalOutput);
+        Assert.NotNull(adapter.LastRequest);
+        var definition = Assert.IsType<InsightaSubagentDefinition>(adapter.LastRequest!.Definition);
+        Assert.Equal("Node instructions", definition.Instructions);
+        Assert.Equal(["read_file"], definition.ToolNames);
+        Assert.Contains("Analyze the input", adapter.LastRequest.Input);
+    }
+
+    private sealed class RecordingSubagentAdapter(string output) : ISubagentAdapter
+    {
+        public SubagentInvocationRequest? LastRequest { get; private set; }
+
+        public bool CanInvoke(SubagentDefinition definition) => definition is InsightaSubagentDefinition;
+
+        public Task<SubagentInvocationResult> InvokeAsync(
+            SubagentInvocationRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            LastRequest = request;
+            return Task.FromResult(new SubagentInvocationResult
+            {
+                InvocationId = "test-invocation",
+                Output = output,
+                Status = SubagentInvocationStatus.Completed
+            });
+        }
     }
 }

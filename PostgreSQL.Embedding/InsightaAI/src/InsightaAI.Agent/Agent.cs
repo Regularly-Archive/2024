@@ -75,6 +75,7 @@ public class Agent : IDisposable
         _config = config;
         _llmClient = llmClient;
         _toolRegistry = toolRegistry;
+        _toolRegistry.Exclude(_config.ExcludedToolNames);
         _skillRegistry = skillRegistry;
         _mcpRegistry = mcpRegistry;
         _contextManager = contextManager;
@@ -124,6 +125,7 @@ public class Agent : IDisposable
         _serviceProvider = serviceProvider;
         _llmClient = serviceProvider.GetRequiredService<ILlmClient>();
         _toolRegistry = serviceProvider.GetRequiredService<ToolRegistry>();
+        _toolRegistry.Exclude(_config.ExcludedToolNames);
         _skillRegistry = serviceProvider.GetService<ISkillRegistry>();
         _mcpRegistry = serviceProvider.GetService<McpRegistry>();
         _contextManager = serviceProvider.GetService<IContextManager>();
@@ -273,11 +275,11 @@ public class Agent : IDisposable
         ActiveMemorySnapshot? memorySnapshot = null,
         CancellationToken cancellationToken = default)
     {
-        var allSkills = _skillRegistry != null
+        var allSkills = _toolRegistry.HasTool("activate_skill") && _toolRegistry.HasTool("list_skills") && _skillRegistry != null
             ? await _skillRegistry.ListAllSkillsAsync(cancellationToken)
             : null;
 
-        var mcps = _mcpRegistry != null
+        var mcps = _toolRegistry.HasTool("list_mcp_tools") && _mcpRegistry != null
             ? await _mcpRegistry.ListAllServersAsync(cancellationToken)
             : null;
 
@@ -286,7 +288,7 @@ public class Agent : IDisposable
         return await Context.SystemPrompt.SystemPromptBuilder.BuildAsync(new Context.SystemPrompt.SystemPromptParams
         {
             CustomInstructions = _config.CustomInstructions,
-            AgentsMd = LoadAgentsMd(),
+            AgentsMd = _config.IncludeProjectInstructions ? LoadAgentsMd() : null,
             AllSkills = allSkills,
             ActivatedSkills = _activatedSkills,
             McpServers = mcps,

@@ -22,6 +22,7 @@
   <ItemGroup>
     <ProjectReference Include="..\InsightaAI.Tests.Shared\InsightaAI.Tests.Shared.csproj" />
     <ProjectReference Include="..\..\src\InsightaAI.Agents.Orchestrator\InsightaAI.Agents.Orchestrator.csproj" />
+    <ProjectReference Include="..\..\src\InsightaAI.Agents.Subagents\InsightaAI.Agents.Subagents.csproj" />
   </ItemGroup>
 
 </Project>

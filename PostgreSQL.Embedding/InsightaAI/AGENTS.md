@@ -232,6 +232,16 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 - `read_file` 输出含文件元数据、行号和 Tab，不能只按原始文件正文解析。键值脱敏遵循 `FileEditTool` 的换行策略：先将 CRLF/CR 规范为 LF 匹配，再恢复原换行风格，避免 Windows `\r\n` 与多行 `$` 锚点导致漏脱敏。真实样例已验证 JSON、XML、连接串、YAML、`.env` 与纯文本均不泄露机密。带引号 JSON 键的字符串 value 保留为 `"key": "[REDACTED]"`，并保留尾部逗号。
 - 为防止脱敏展示文本污染文件，`write_file.content`、`edit_file.old_string` 与 `edit_file.new_string` 一旦包含 `[REDACTED]` 即拒绝；`edit_file` 的精确替换继续使用 `read_file` 缓存的原始全文。
 
+### Agent Invocation 与受限 Subagent（2026-08-21）
+
+- `InsightaAI.Agents.Subagents` 提供不依赖 CLI、Agent 或 Orchestrator 的公共契约：`SubagentDefinition`、Catalog、Adapter、Dispatcher 以及 invocation context / request / result；命名 Definition 可来自本地文件、数据库或服务端，临时 Definition 可由编排直接构造。
+- CLI 的 `LocalSubagentCatalog` 从 `.insighta/subagents/{id}/subagent.json` 加载定义；当前预置 reviewer、explorer、planner。`CliInsightaSubagentAdapter` 复用 `AgentFactory` 创建独立子会话，并将 user、父 session 和父 tool call 写入存储关联。
+- 核心只有一个 `DelegateTool`（参数为 `agent_id`、`task`）；宿主以 `IAgentDelegationHandler` 实现 Definition 查找、Dispatcher 调用和输出边界。CLI 不再维护平行的 `subagent` 工具协议，模型切换后会以当前运行时模板重建该处理器。
+- `AgentConfig.ExcludedToolNames` 通过 `ToolRegistry.Exclude()` 统一收紧能力：被排除工具既不暴露给 LLM，也不能被查找或执行；后续 `Register()` 不会绕过该策略。子 Agent 是静态预授权：不注册交互式 `ToolPermissionHook`，但保留 `SecurityPolicyHook`；Definition 只能收紧宿主工具与 Skills / MCP / Memory / AGENTS.md 能力。CLI 子 Agent Profile 以此排除 `delegate`，当前强制最大委派深度为 1。子 Agent 输出回到父工具结果处理链，先脱敏再进入父上下文。
+- CLI 始终将 SkillRegistry、McpRegistry 与 `IMemoryManager` 注入 Agent 私有 Provider，并保留自动记忆快照、`SessionMemoryHook` 与项目级 Memory Index。子 Agent 对 Skill、MCP、Memory 的限制仅通过工具排除名单实现；因此没有相应工具时不能主动操作这些基础设施，但仍保有宿主提供的运行时上下文。
+- 子 Agent 的 Layer 3 不只包含 descriptor `instructions`：CLI 会根据最终 `ExcludedToolNames` 追加 Runtime constraints，说明无法委派、以及 Skill / MCP / Memory 工具是否不可用。它解决 Layer 1 通用工具指引与受限工具集的冲突；descriptor 无需重复硬编码这些宿主计算出的事实。
+- 测试独立置于 `tests/InsightaAI.Agents.Subagents.Tests`，覆盖 Catalog、Dispatcher 与 CLI 的 delegate host bridge；设计见 `docs/agent-invocation-design.md`。
+
 ## 当前问题与改进方向
 
 ### 当前待办

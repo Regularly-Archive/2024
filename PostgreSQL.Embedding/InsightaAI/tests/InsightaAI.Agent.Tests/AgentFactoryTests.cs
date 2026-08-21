@@ -1,10 +1,16 @@
 using System.Diagnostics;
+using System.Reflection;
 using System.Text.Json;
 using InsightaAI.Agent.Abstractions;
+using InsightaAI.Agent.Cli.Hooks;
 using InsightaAI.Agent.Cli.Models;
 using InsightaAI.Agent.Cli.Services;
 using InsightaAI.Agent.Context.Summary;
+using InsightaAI.Agent.Hooks;
+using InsightaAI.Agent.Memory;
+using InsightaAI.Agent.Mcp;
 using InsightaAI.Agent.Models;
+using InsightaAI.Agent.Security;
 using InsightaAI.Agent.Skills;
 using InsightaAI.Agent.Storage;
 using InsightaAI.LLM.Models;
@@ -65,6 +71,7 @@ public sealed class AgentFactoryTests
                 servicesResolved =
                     context.Services?.GetService<AgentConfig>() is not null &&
                     ReferenceEquals(context.Services.GetService<IMessageStorage>(), storage) &&
+                    context.Services.GetService<IMemoryManager>() is not null &&
                     context.Services.GetService<IEnvironmentVariableReader>()?.Get("TEST_AGENT_ENV") == "configured";
                 return Task.FromResult(ToolResult.FromText("inspected"));
             });
@@ -118,5 +125,126 @@ public sealed class AgentFactoryTests
 
         Assert.Equal(AgentStatus.Completed, result.Status);
         Assert.True(servicesResolved);
+        Assert.NotNull(toolRegistry.GetExecutor("search_memory"));
+        Assert.NotNull(toolRegistry.GetExecutor("save_memory"));
+    }
+
+    [Fact]
+    public async Task CreateAsync_ShouldUseValidatedProfileIdentityButKeepCliSecurity()
+    {
+        var storage = new JsonlMessageStorage(Path.Combine(Path.GetTempPath(), "insighta-agent-profile-tests", Guid.NewGuid().ToString("N")));
+        using var loggerFactory = LoggerFactory.Create(_ => { });
+        using var llmClient = new MockLlmClient();
+        var factory = new AgentFactory(storage, loggerFactory);
+        var profile = new AgentConfig
+        {
+            Id = "explorer",
+            Name = "Explorer",
+            Model = "test-model",
+            CustomInstructions = "Read-only exploration.",
+            MaxToolRounds = 1,
+            DenyRules = [new DenyRule("ignored", DenyMatchMode.Exact)]
+        };
+
+        using var agent = await factory.CreateAsync(new AgentCreationOptions
+        {
+            Config = new CliConfig { PrimaryModel = "test/model", MaxToolRounds = 4 },
+            Auth = new AuthConfig(),
+            LlmClient = llmClient,
+            Model = new ModelEntry { ModelId = "test-model", MaxTokens = 128, ContextWindow = 4096 },
+            ToolRegistry = new ToolRegistry(),
+            SkillRegistry = new SkillRegistry(),
+            SummaryService = new SummaryService(new SummaryOptions { Model = "test/model", ClientFactory = _ => new MockLlmClient() }),
+            AgentConfigOverride = profile
+        });
+
+        Assert.Equal("explorer", agent.Config.Id);
+        Assert.Equal("Explorer", agent.Config.Name);
+        Assert.Equal("Read-only exploration.", agent.Config.CustomInstructions);
+        Assert.Equal(1, agent.Config.MaxToolRounds);
+        Assert.Empty(agent.Config.DenyRules);
+        Assert.False(string.IsNullOrWhiteSpace(agent.Config.UserId));
+    }
+
+    [Fact]
+    public async Task CreateAsync_PreAuthorizedAgent_ShouldSkipInteractivePermissionButKeepSecurityHook()
+    {
+        var storage = new JsonlMessageStorage(Path.Combine(Path.GetTempPath(), "insighta-agent-permission-tests", Guid.NewGuid().ToString("N")));
+        using var loggerFactory = LoggerFactory.Create(_ => { });
+        using var llmClient = new MockLlmClient();
+        var factory = new AgentFactory(storage, loggerFactory);
+
+        using var agent = await factory.CreateAsync(new AgentCreationOptions
+        {
+            Config = new CliConfig { PrimaryModel = "test/model" },
+            Auth = new AuthConfig(),
+            LlmClient = llmClient,
+            Model = new ModelEntry { ModelId = "test-model", MaxTokens = 128, ContextWindow = 4096 },
+            ToolRegistry = new ToolRegistry(),
+            SkillRegistry = new SkillRegistry(),
+            SummaryService = new SummaryService(new SummaryOptions { Model = "test/model", ClientFactory = _ => new MockLlmClient() }),
+            EnableInteractiveToolPermission = false
+        });
+
+        var hooks = GetToolHooks(agent);
+
+        Assert.DoesNotContain(hooks, hook => hook is ToolPermissionHook);
+        Assert.Contains(hooks, hook => hook is SecurityPolicyHook);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ExcludedToolGroups_ShouldKeepServicesButHideTools()
+    {
+        var storage = new JsonlMessageStorage(Path.Combine(Path.GetTempPath(), "insighta-agent-capability-tests", Guid.NewGuid().ToString("N")));
+        using var loggerFactory = LoggerFactory.Create(_ => { });
+        using var llmClient = new MockLlmClient();
+        var factory = new AgentFactory(storage, loggerFactory);
+        var tools = new ToolRegistry();
+
+        using var agent = await factory.CreateAsync(new AgentCreationOptions
+        {
+            Config = new CliConfig { PrimaryModel = "test/model" },
+            Auth = new AuthConfig(),
+            LlmClient = llmClient,
+            Model = new ModelEntry { ModelId = "test-model", MaxTokens = 128, ContextWindow = 4096 },
+            ToolRegistry = tools,
+            SkillRegistry = new SkillRegistry(),
+            SummaryService = new SummaryService(new SummaryOptions { Model = "test/model", ClientFactory = _ => new MockLlmClient() }),
+            AgentConfigOverride = new AgentConfig
+            {
+                Id = "restricted",
+                Name = "Restricted",
+                Model = "test-model",
+                ExcludedToolNames =
+                [
+                    "activate_skill", "list_skills",
+                    "list_mcp_tools", "activate_mcp_tool", "deactivate_mcp_tool",
+                    "save_memory", "update_memory", "delete_memory", "search_memory", "get_user_profile"
+                ]
+            }
+        });
+
+        Assert.Null(tools.GetExecutor("activate_skill"));
+        Assert.Null(tools.GetExecutor("list_skills"));
+        Assert.Null(tools.GetExecutor("list_mcp_tools"));
+        Assert.Null(tools.GetExecutor("activate_mcp_tool"));
+        Assert.Null(tools.GetExecutor("deactivate_mcp_tool"));
+        Assert.Null(tools.GetExecutor("search_memory"));
+        Assert.Null(tools.GetExecutor("save_memory"));
+        Assert.NotNull(GetAgentServiceProvider(agent).GetService<IMemoryManager>());
+        Assert.NotNull(GetAgentServiceProvider(agent).GetService<ISkillRegistry>());
+        Assert.NotNull(GetAgentServiceProvider(agent).GetService<McpRegistry>());
+    }
+
+    private static IReadOnlyList<IToolHook> GetToolHooks(Agent agent)
+    {
+        var field = typeof(Agent).GetField("_toolHooks", BindingFlags.Instance | BindingFlags.NonPublic);
+        return Assert.IsAssignableFrom<IReadOnlyList<IToolHook>>(field?.GetValue(agent));
+    }
+
+    private static IServiceProvider GetAgentServiceProvider(Agent agent)
+    {
+        var field = typeof(Agent).GetField("_serviceProvider", BindingFlags.Instance | BindingFlags.NonPublic);
+        return Assert.IsAssignableFrom<IServiceProvider>(field?.GetValue(agent));
     }
 }

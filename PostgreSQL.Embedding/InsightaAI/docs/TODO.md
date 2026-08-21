@@ -504,6 +504,30 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 
 ---
 
+### 18. Agent Invocation 与受限 Subagent（优先级：中）
+
+**目标：** 以 `Invocation` 作为一次独立 Agent 工作单元的统一术语，让 Orchestrator 的 Agent 节点和未来的 Subagent 工具共享标准 Agent 构建、运行、释放和取消链路。
+
+- [x] Invocation 通用契约迁至 `InsightaAI.Agents.Subagents`，不在 `Agent` 核心暴露 `AgentConfig`
+- [x] CLI 内部 adapter 复用 `AgentFactory`；宿主负责工具、Skill、MCP、Hook、Memory、Telemetry 与安全策略装配
+- [x] Session 存储已补充 `ParentSessionId` / `ParentInvocationId`；仍需单独决策父会话删除后的保留策略
+- [x] 新建 `InsightaAI.Agents.Subagents`：定义 `SubagentDefinition`、`ISubagentCatalog`、`ISubagentAdapter` 与 `SubagentDispatcher`
+- [x] Orchestrator 的 `NodeExecutor` 改依赖 `SubagentDispatcher`，移除 `Agent/Invocation` 依赖
+- [x] CLI 提供 `CliInsightaSubagentAdapter`；Definition 只能收紧工具、CLI 保留安全配置主导权
+- [x] Subagent 采用静态预授权：不注册交互式 `ToolPermissionHook`，始终保留 `SecurityPolicyHook`
+- [x] 子 Agent 的 Skill、MCP、Memory 工具组统一映射为 `AgentConfig.ExcludedToolNames`；基础设施保留在 DI，项目指令作为独立 Prompt 选项
+- [x] 实现项目级 `LocalSubagentCatalog`，并提供 reviewer / explorer / planner 三个只读定义
+- [x] 建立独立 `InsightaAI.Agents.Subagents.Tests` 项目，覆盖 dispatcher 与 local catalog
+- [x] CLI 主 Agent 注册核心 `delegate` 工具，通过本地 Catalog 委派，最大深度为 1
+- [x] 提供最大深度为 1、权限只能收紧、结果先脱敏的核心 `delegate` 工具
+- [ ] 以工具白名单实现 CLI `Explorer` Profile；不以 Prompt 代替只读约束
+
+**设计文档：** [agent-invocation-design.md](agent-invocation-design.md)
+
+**当前边界：** 第一阶段只实现 Insighta 内部 adapter。外部 Codex / Claude Code 暂缓接入，未来以新的 Definition 类型和 adapter 扩展，不将未确定的外部 CLI 协议写入公共契约。
+
+---
+
 ## 当前优先级
 
 已完成：Dashboard 拆分与 Anthropic 归一化（#17），以及 MCP Telemetry tag 命名分层与去重（#12）。后续可观测性工作保留 Agent Dashboard 的 Turn 指标、低基数行为指标评估和 Jaeger Trace Drilldown；见 `observability-design.md` §8。

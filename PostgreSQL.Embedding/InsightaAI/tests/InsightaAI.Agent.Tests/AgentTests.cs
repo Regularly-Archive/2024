@@ -83,6 +83,21 @@ public class AgentTests
     }
 
     [Fact]
+    public void Agent_Should_Apply_Configured_Tool_Exclusions()
+    {
+        var registry = new ToolRegistry();
+        registry.Register(new GetCurrentTimeTool());
+
+        using var agent = new Agent(
+            CreateConfig() with { ExcludedToolNames = ["get_current_time"] },
+            new MockLlmClient(),
+            registry);
+
+        Assert.DoesNotContain(registry.GetDefinitions(), definition => definition.Name == "get_current_time");
+        Assert.Null(registry.GetExecutor("get_current_time"));
+    }
+
+    [Fact]
     public void TerminateTool_Should_Be_Registered()
     {
         // Assert

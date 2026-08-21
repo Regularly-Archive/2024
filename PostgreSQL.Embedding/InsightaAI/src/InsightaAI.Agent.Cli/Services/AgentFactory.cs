@@ -45,8 +45,8 @@ public sealed class AgentFactory : IAgentFactory
         ArgumentNullException.ThrowIfNull(options);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var userId = GetOrCreateUserId();
-        var agentConfig = new AgentConfig
+        var userId = options.UserId ?? GetOrCreateUserId();
+        var defaultAgentConfig = new AgentConfig
         {
             Id = "cli-agent",
             Name = "InsightaAI CLI",
@@ -58,6 +58,9 @@ public sealed class AgentFactory : IAgentFactory
             WorkingDirectory = Directory.GetCurrentDirectory(),
             DenyRules = CreateDenyRules(options.Config.Security),
         };
+        var agentConfig = options.AgentConfigOverride is { } profile
+            ? ApplyProfile(profile, defaultAgentConfig, options)
+            : defaultAgentConfig;
 
         SessionMemoryHook? sessionMemoryHook = null;
         if (!string.IsNullOrEmpty(options.SessionId))
@@ -76,6 +79,8 @@ public sealed class AgentFactory : IAgentFactory
             options.ToolRegistry);
 
         var mcpRegistry = options.McpRegistry ?? new McpRegistry(new SimpleMcpConnectionPool());
+        // Memory storage is an Agent service. Tool exclusions constrain access without
+        // removing the service from an isolated subagent's DI container.
         var memoryManager = CreateMemoryManager();
         var environment = new CliEnvironment(options.Config.Envs);
         var agent = new AgentBuilder(agentConfig)
@@ -94,7 +99,10 @@ public sealed class AgentFactory : IAgentFactory
             .Build();
 
         agent.AddHook(new SecurityPolicyHook(agentConfig.DenyRules));
-        agent.AddHook(new ToolPermissionHook("bash", "write_file", "read_file", "edit_file", "web_fetch"));
+        if (options.EnableInteractiveToolPermission)
+        {
+            agent.AddHook(new ToolPermissionHook("bash", "write_file", "read_file", "edit_file", "web_fetch"));
+        }
 
         var metaLearningStore = new MetaLearningStore();
         await metaLearningStore.EnsureInitializedAsync();
@@ -151,7 +159,7 @@ public sealed class AgentFactory : IAgentFactory
         return new ContextManager(new CharTokenEstimator(), budget, strategies);
     }
 
-    private static string GetOrCreateUserId()
+    internal static string GetOrCreateUserId()
     {
         var configDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
@@ -196,5 +204,28 @@ public sealed class AgentFactory : IAgentFactory
 
             return new DenyRule(entry.Pattern, mode);
         }).ToArray();
+    }
+
+    private static AgentConfig ApplyProfile(
+        AgentConfig profile,
+        AgentConfig cliDefaults,
+        AgentCreationOptions options)
+    {
+        if (!string.Equals(profile.Model, options.Model.ModelId, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Invocation AgentConfig model '{profile.Model}' does not match resolved CLI model '{options.Model.ModelId}'.");
+        }
+
+        return profile with
+        {
+            MaxTokens = profile.MaxTokens is { } profileMaxTokens && cliDefaults.MaxTokens is { } cliMaxTokens
+                ? Math.Min(profileMaxTokens, cliMaxTokens)
+                : profile.MaxTokens ?? cliDefaults.MaxTokens,
+            MaxToolRounds = Math.Min(profile.MaxToolRounds, cliDefaults.MaxToolRounds),
+            UserId = cliDefaults.UserId,
+            WorkingDirectory = cliDefaults.WorkingDirectory,
+            DenyRules = cliDefaults.DenyRules
+        };
     }
 }

@@ -35,6 +35,18 @@ public class SessionRecord
     [JsonPropertyName("work_dir")]
     public string? WorkDir { get; set; }
 
+    [SugarColumn(IsNullable = true, Length = 50)]
+    [JsonPropertyName("parent_session_id")]
+    public string? ParentSessionId { get; set; }
+
+    [SugarColumn(IsNullable = true, Length = 50)]
+    [JsonPropertyName("parent_invocation_id")]
+    public string? ParentInvocationId { get; set; }
+
+    [SugarColumn(IsNullable = true, Length = 50)]
+    [JsonPropertyName("invocation_id")]
+    public string? InvocationId { get; set; }
+
     [JsonPropertyName("message_count")]
     public int MessageCount { get; set; }
 

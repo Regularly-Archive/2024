@@ -64,6 +64,35 @@ public class AgentSkillIntegrationTests
     }
 
     [Fact]
+    public async Task Agent_Should_Not_List_Skills_When_Skill_Tools_Are_Excluded()
+    {
+        var skillRegistry = new SkillRegistry();
+        skillRegistry.RegisterProvider(new MockSkillProvider([
+            new() { Name = "code-review", Description = "Code review guidance" }
+        ]));
+        var toolRegistry = new ToolRegistry();
+        string? capturedSystemPrompt = null;
+        var llmClient = new CapturingMockLlmClient(
+            firstResponseToolCalls: null,
+            secondResponse: "Done",
+            onCaptureSystemPrompt: prompt => capturedSystemPrompt = prompt);
+
+        using var agent = new Agent(
+            CreateConfig() with { ExcludedToolNames = ["activate_skill", "list_skills"] },
+            llmClient,
+            toolRegistry,
+            skillRegistry);
+
+        await agent.RunAsync("Review the current change.");
+
+        Assert.False(toolRegistry.HasTool("activate_skill"));
+        Assert.False(toolRegistry.HasTool("list_skills"));
+        Assert.NotNull(capturedSystemPrompt);
+        Assert.DoesNotContain("code-review", capturedSystemPrompt);
+        Assert.DoesNotContain("## Available Skills", capturedSystemPrompt);
+    }
+
+    [Fact]
     public async Task Agent_Should_Activate_Skill_Via_Tool_Call()
     {
         // Arrange

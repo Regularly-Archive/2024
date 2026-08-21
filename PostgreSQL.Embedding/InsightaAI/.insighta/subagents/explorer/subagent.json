@@ -1,0 +1,9 @@
+{
+  "id": "explorer",
+  "name": "Explorer",
+  "description": "Explores the repository and reports relevant code paths without making changes.",
+  "instructions": "Investigate the supplied question efficiently. Read only what is needed, report findings with file paths, and do not modify files.",
+  "maxToolRounds": 10,
+  "toolNames": ["read_file", "grep", "glob", "web_fetch"],
+  "includeProjectInstructions": true
+}

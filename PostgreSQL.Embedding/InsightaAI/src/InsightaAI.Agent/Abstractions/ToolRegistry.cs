@@ -9,6 +9,26 @@ namespace InsightaAI.Agent.Abstractions;
 public class ToolRegistry
 {
     private readonly ConcurrentDictionary<string, ITool> _executors = new();
+    private readonly ConcurrentDictionary<string, byte> _excludedToolNames = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Marks tool names as unavailable to the current Agent. Registration is retained so a
+    /// host can reuse its registry, but excluded names are neither exposed nor executable.
+    /// </summary>
+    public ToolRegistry Exclude(IEnumerable<string> toolNames)
+    {
+        ArgumentNullException.ThrowIfNull(toolNames);
+
+        foreach (var toolName in toolNames)
+        {
+            if (string.IsNullOrWhiteSpace(toolName))
+                throw new ArgumentException("Excluded tool names must not be empty.", nameof(toolNames));
+
+            _excludedToolNames.TryAdd(toolName, 0);
+        }
+
+        return this;
+    }
 
     /// <summary>
     /// 注册工具执行器
@@ -51,6 +71,7 @@ public class ToolRegistry
     public ToolDefinition[] GetDefinitions()
     {
         return _executors.Values
+            .Where(executor => !IsExcluded(executor.Name))
             .Select(e => e.Definition)
             .ToArray();
     }
@@ -62,6 +83,11 @@ public class ToolRegistry
         ToolCallBlock toolCall,
         ToolExecutionContext context)
     {
+        if (IsExcluded(toolCall.Name))
+        {
+            return ToolResult.FromError($"Tool '{toolCall.Name}' is excluded for this agent.");
+        }
+
         if (!_executors.TryGetValue(toolCall.Name, out var executor))
         {
             return ToolResult.FromError($"Tool '{toolCall.Name}' not found.");
@@ -82,13 +108,13 @@ public class ToolRegistry
     /// <summary>
     /// 检查工具是否已注册
     /// </summary>
-    public bool HasTool(string name) => _executors.ContainsKey(name);
+    public bool HasTool(string name) => !IsExcluded(name) && _executors.ContainsKey(name);
 
     /// <summary>
     /// 获取工具执行器（用于调用 Intercept 等方法）
     /// </summary>
-    public ITool? GetExecutor(string name) => 
-        _executors.TryGetValue(name, out var executor) ? executor : null;
+    public ITool? GetExecutor(string name) =>
+        !IsExcluded(name) && _executors.TryGetValue(name, out var executor) ? executor : null;
 
     /// <summary>
     /// 移除已注册的工具
@@ -102,6 +128,9 @@ public class ToolRegistry
     /// 获取已注册的工具名称
     /// </summary>
     public IEnumerable<string> GetRegisteredToolNames() => _executors.Keys;
+
+    /// <summary>Returns whether a tool name is unavailable for this Agent.</summary>
+    public bool IsExcluded(string name) => _excludedToolNames.ContainsKey(name);
 
     private static IDictionary<string, object> ParseArguments(System.Text.Json.JsonElement arguments)
     {

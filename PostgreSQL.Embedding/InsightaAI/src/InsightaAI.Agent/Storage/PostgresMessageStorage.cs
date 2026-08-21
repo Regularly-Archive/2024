@@ -36,7 +36,7 @@ public class PostgresMessageStorage : IMessageStorage
         _db = db;
     }
 
-    public async Task<SessionRecord> CreateSessionAsync(string model, string provider, string? title = null, string? userId = null, string? workDir = null)
+    public async Task<SessionRecord> CreateSessionAsync(string model, string provider, string? title = null, string? userId = null, string? workDir = null, string? parentSessionId = null, string? parentInvocationId = null, string? invocationId = null)
     {
         var session = new SessionRecord
         {
@@ -44,7 +44,10 @@ public class PostgresMessageStorage : IMessageStorage
             Provider = provider,
             Title = title,
             UserId = userId,
-            WorkDir = workDir
+            WorkDir = workDir,
+            ParentSessionId = parentSessionId,
+            ParentInvocationId = parentInvocationId,
+            InvocationId = invocationId
         };
 
         await _db.Insertable(session).ExecuteCommandAsync();
@@ -58,9 +61,17 @@ public class PostgresMessageStorage : IMessageStorage
             .FirstAsync();
     }
 
+    public async Task<SessionRecord?> GetMainSessionAsync(string sessionId)
+    {
+        return await _db.Queryable<SessionRecord>()
+            .Where(s => s.Id == sessionId && (s.ParentSessionId == null || s.ParentSessionId == ""))
+            .FirstAsync();
+    }
+
     public async Task<List<SessionRecord>> GetSessionsAsync(string? userId = null, int offset = 0, int limit = 50)
     {
-        var query = _db.Queryable<SessionRecord>();
+        var query = _db.Queryable<SessionRecord>()
+            .Where(s => s.ParentSessionId == null || s.ParentSessionId == "");
 
         if (!string.IsNullOrEmpty(userId))
         {
@@ -77,7 +88,7 @@ public class PostgresMessageStorage : IMessageStorage
     public async Task<SessionRecord?> GetLastSessionForWorkDirAsync(string workDir)
     {
         return await _db.Queryable<SessionRecord>()
-            .Where(s => s.WorkDir == workDir)
+            .Where(s => s.WorkDir == workDir && (s.ParentSessionId == null || s.ParentSessionId == ""))
             .OrderByDescending(s => s.UpdatedAt)
             .FirstAsync();
     }

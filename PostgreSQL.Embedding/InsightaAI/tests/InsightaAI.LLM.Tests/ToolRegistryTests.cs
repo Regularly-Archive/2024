@@ -113,6 +113,35 @@ public class ToolRegistryTests
     }
 
     [Fact]
+    public async Task Exclude_Should_Hide_And_Block_A_Tool_Registered_Before_Or_Afterward()
+    {
+        _registry.Register(new CalculatorTool());
+        _registry.Exclude(["calculator"]);
+
+        _registry.Register(new CalculatorTool());
+
+        Assert.False(_registry.HasTool("calculator"));
+        Assert.True(_registry.IsExcluded("calculator"));
+        Assert.Contains("calculator", _registry.GetRegisteredToolNames());
+        Assert.DoesNotContain(_registry.GetDefinitions(), definition => definition.Name == "calculator");
+        Assert.Null(_registry.GetExecutor("calculator"));
+
+        var result = await _registry.ExecuteAsync(new ToolCallBlock
+        {
+            Id = "call-1",
+            Name = "calculator",
+            Arguments = JsonSerializer.Deserialize<JsonElement>("{}")
+        }, new ToolExecutionContext
+        {
+            AgentId = "test-agent",
+            ToolCallId = "call-1"
+        });
+
+        Assert.True(result.IsError);
+        Assert.Contains("excluded", result.Content.OfType<TextBlock>().First().Text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void RegisterFunction_Should_Register_Delegate_Tool()
     {
         var parameters = JsonSerializer.Deserialize<JsonElement>(@"{

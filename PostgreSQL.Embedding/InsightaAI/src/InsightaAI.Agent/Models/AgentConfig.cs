@@ -64,8 +64,16 @@ public sealed record AgentConfig
     /// <summary>工作目录（用于加载 AGENTS.md 等项目上下文）</summary>
     public string? WorkingDirectory { get; init; }
 
+    /// <summary>是否将工作目录中的 AGENTS.md 作为项目提示词上下文加载。</summary>
+    public bool IncludeProjectInstructions { get; init; } = true;
+
     /// <summary>执行前强制拒绝的工具调用规则</summary>
     public IReadOnlyList<DenyRule> DenyRules { get; init; } = [];
+
+    /// <summary>
+    /// 当前 Agent 不可用的工具名称。这些工具不会暴露给 LLM，也不能被执行。
+    /// </summary>
+    public IReadOnlyList<string> ExcludedToolNames { get; init; } = [];
 
     /// <summary>自定义元数据</summary>
     public Dictionary<string, object>? Metadata { get; init; }

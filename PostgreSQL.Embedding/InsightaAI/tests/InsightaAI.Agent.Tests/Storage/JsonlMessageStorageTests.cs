@@ -52,6 +52,40 @@ public sealed class JsonlMessageStorageTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateSessionAsync_ShouldPersistParentInvocationMetadata()
+    {
+        var session = await _storage.CreateSessionAsync(
+            "model", "provider", parentSessionId: "parent-session", parentInvocationId: "parent-invocation", invocationId: "child-invocation");
+
+        var loaded = await _storage.GetSessionAsync(session.Id);
+
+        Assert.NotNull(loaded);
+        Assert.Equal("parent-session", loaded!.ParentSessionId);
+        Assert.Equal("parent-invocation", loaded.ParentInvocationId);
+        Assert.Equal("child-invocation", loaded.InvocationId);
+    }
+
+    [Fact]
+    public async Task UserVisibleSessionQueries_ShouldExcludeSubagentSessions()
+    {
+        var main = await _storage.CreateSessionAsync("model", "provider", workDir: "project");
+        main.UpdatedAt = DateTime.UtcNow.AddMinutes(-1);
+        await _storage.UpdateSessionAsync(main);
+
+        var child = await _storage.CreateSessionAsync(
+            "model", "provider", workDir: "project", parentSessionId: main.Id);
+
+        var sessions = await _storage.GetSessionsAsync();
+        var last = await _storage.GetLastSessionForWorkDirAsync("project");
+
+        Assert.Single(sessions);
+        Assert.Equal(main.Id, sessions[0].Id);
+        Assert.Equal(main.Id, last!.Id);
+        Assert.Null(await _storage.GetMainSessionAsync(child.Id));
+        Assert.NotNull(await _storage.GetSessionAsync(child.Id));
+    }
+
+    [Fact]
     public async Task DeleteSessionAsync_Should_RemoveSessionAndMessageDirectory()
     {
         var session = await _storage.CreateSessionAsync("model", "provider");

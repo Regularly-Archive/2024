@@ -32,7 +32,7 @@ public class JsonlMessageStorage : IMessageStorage
         Directory.CreateDirectory(_basePath);
     }
 
-    public async Task<SessionRecord> CreateSessionAsync(string model, string provider, string? title = null, string? userId = null, string? workDir = null)
+    public async Task<SessionRecord> CreateSessionAsync(string model, string provider, string? title = null, string? userId = null, string? workDir = null, string? parentSessionId = null, string? parentInvocationId = null, string? invocationId = null)
     {
         var session = new SessionRecord
         {
@@ -40,7 +40,10 @@ public class JsonlMessageStorage : IMessageStorage
             Provider = provider,
             Title = title,
             UserId = userId,
-            WorkDir = workDir
+            WorkDir = workDir,
+            ParentSessionId = parentSessionId,
+            ParentInvocationId = parentInvocationId,
+            InvocationId = invocationId
         };
 
         await _lock.WaitAsync();
@@ -68,9 +71,20 @@ public class JsonlMessageStorage : IMessageStorage
         return sessions.FirstOrDefault(s => s.Id == sessionId);
     }
 
+    public async Task<SessionRecord?> GetMainSessionAsync(string sessionId)
+    {
+        var sessions = await ReadAllSessionsAsync();
+        return sessions.FirstOrDefault(s =>
+            s.Id == sessionId && string.IsNullOrWhiteSpace(s.ParentSessionId));
+    }
+
     public async Task<List<SessionRecord>> GetSessionsAsync(string? userId = null, int offset = 0, int limit = 50)
     {
         var sessions = await ReadAllSessionsAsync();
+
+        sessions = sessions
+            .Where(s => string.IsNullOrWhiteSpace(s.ParentSessionId))
+            .ToList();
 
         if (!string.IsNullOrEmpty(userId))
         {
@@ -88,7 +102,7 @@ public class JsonlMessageStorage : IMessageStorage
     {
         var sessions = await ReadAllSessionsAsync();
         return sessions
-            .Where(s => s.WorkDir == workDir)
+            .Where(s => s.WorkDir == workDir && string.IsNullOrWhiteSpace(s.ParentSessionId))
             .OrderByDescending(s => s.UpdatedAt)
             .FirstOrDefault();
     }

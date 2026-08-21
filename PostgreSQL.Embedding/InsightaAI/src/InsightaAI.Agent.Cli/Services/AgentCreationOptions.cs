@@ -4,6 +4,7 @@ using InsightaAI.Agent.Skills;
 using InsightaAI.Agent.Context.Summary;
 using InsightaAI.Agent.Cli.Models;
 using InsightaAI.LLM.Abstractions;
+using InsightaAI.Agent.Models;
 
 namespace InsightaAI.Agent.Cli.Services;
 
@@ -21,4 +22,15 @@ public sealed record AgentCreationOptions
     public required ISummaryService SummaryService { get; init; }
     public McpRegistry? McpRegistry { get; init; }
     public string? SessionId { get; init; }
+    /// <summary>Host-validated user identity for this Agent instance.</summary>
+    public string? UserId { get; init; }
+    /// <summary>
+    /// Whether this Agent may request interactive confirmation for selected tools.
+    /// Hosts must set this to false for statically preauthorized subagents.
+    /// </summary>
+    public bool EnableInteractiveToolPermission { get; init; } = true;
+    /// <summary>
+    /// Host-validated child Agent profile. CLI-owned identity, security and working-directory values remain authoritative.
+    /// </summary>
+    public AgentConfig? AgentConfigOverride { get; init; }
 }

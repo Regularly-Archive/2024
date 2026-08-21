@@ -19,6 +19,7 @@ using InsightaAI.Agent.Skills.Local;
 using InsightaAI.Agent.Storage;
 using InsightaAI.Agent.Tools;
 using InsightaAI.Agent.Tools.BuiltIn;
+using InsightaAI.Agents.Subagents.Invocation;
 using InsightaAI.LLM.Abstractions;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
@@ -113,9 +114,10 @@ public sealed class ChatApplication : IChatApplication
         if (session == null) return 1;
 
         var summaryService = CreateSummaryService(config, auth);
+        var userId = AgentFactory.GetOrCreateUserId();
 
         // 创建 Agent（传入 sessionId 以注册会话记忆钩子）
-        var agent = await _agentFactory.CreateAsync(new AgentCreationOptions
+        var agentOptions = new AgentCreationOptions
         {
             Config = config,
             Auth = auth,
@@ -125,15 +127,18 @@ public sealed class ChatApplication : IChatApplication
             SkillRegistry = skillRegistry,
             SummaryService = summaryService,
             McpRegistry = mcpRegistry,
-            SessionId = session.SessionId
-        });
+            SessionId = session.SessionId,
+            UserId = userId
+        };
+        RegisterDelegationTool(toolRegistry, agentOptions);
+        var agent = await _agentFactory.CreateAsync(agentOptions);
 
         // 显示欢迎信息
         _renderer.ShowWelcome(providerName, model.ModelId, session.SessionId, toolRegistry.GetDefinitions().Length, availableSkills.Count);
         _renderer.ShowHistory(session.Messages);
 
         // 运行对话循环
-        await RunChatLoopAsync(session, agent, summaryService, config, auth, toolRegistry, skillRegistry, mcpRegistry);
+        await RunChatLoopAsync(session, agent, summaryService, config, auth, toolRegistry, skillRegistry, mcpRegistry, userId);
 
         _renderer.ShowInfo(CliStrings.Format("ChatSessionSavedFormat", session.SessionId));
         _renderer.ShowInfo(CliStrings.Format("ChatSessionResumeHintFormat", session.SessionId));
@@ -193,7 +198,7 @@ public sealed class ChatApplication : IChatApplication
         }
     }
 
-    private async Task RunChatLoopAsync(ChatSession session, Agent agent, ISummaryService summaryService, CliConfig config, AuthConfig auth, ToolRegistry toolRegistry, SkillRegistry skillRegistry, McpRegistry? mcpRegistry)
+    private async Task RunChatLoopAsync(ChatSession session, Agent agent, ISummaryService summaryService, CliConfig config, AuthConfig auth, ToolRegistry toolRegistry, SkillRegistry skillRegistry, McpRegistry? mcpRegistry, string userId)
     {
         var currentAgent = agent;
 
@@ -243,7 +248,7 @@ public sealed class ChatApplication : IChatApplication
 
             if (userInput.StartsWith(CommandModel, StringComparison.OrdinalIgnoreCase))
             {
-                currentAgent = await HandleModelSwitchAsync(userInput, currentAgent, config, auth, session, summaryService, toolRegistry, skillRegistry, mcpRegistry);
+                currentAgent = await HandleModelSwitchAsync(userInput, currentAgent, config, auth, session, summaryService, toolRegistry, skillRegistry, mcpRegistry, userId);
                 continue;
             }
 
@@ -287,7 +292,7 @@ public sealed class ChatApplication : IChatApplication
     /// <summary>
     /// 处理 /model 命令 - 会话内切换模型
     /// </summary>
-    private async Task<Agent> HandleModelSwitchAsync(string input, Agent currentAgent, CliConfig config, AuthConfig auth, ChatSession session, ISummaryService summaryService, ToolRegistry toolRegistry, SkillRegistry skillRegistry, McpRegistry? mcpRegistry)
+    private async Task<Agent> HandleModelSwitchAsync(string input, Agent currentAgent, CliConfig config, AuthConfig auth, ChatSession session, ISummaryService summaryService, ToolRegistry toolRegistry, SkillRegistry skillRegistry, McpRegistry? mcpRegistry, string userId)
     {
         var parts = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length < 2)
@@ -352,7 +357,7 @@ public sealed class ChatApplication : IChatApplication
         currentAgent.Dispose();
 
         // 用新模型重建 Agent
-        var newAgent = await _agentFactory.CreateAsync(new AgentCreationOptions
+        var agentOptions = new AgentCreationOptions
         {
             Config = config,
             Auth = auth,
@@ -362,8 +367,11 @@ public sealed class ChatApplication : IChatApplication
             SkillRegistry = skillRegistry,
             SummaryService = summaryService,
             McpRegistry = mcpRegistry,
-            SessionId = session.SessionId
-        });
+            SessionId = session.SessionId,
+            UserId = userId
+        };
+        RegisterDelegationTool(toolRegistry, agentOptions);
+        var newAgent = await _agentFactory.CreateAsync(agentOptions);
 
         _renderer.ShowSuccess(CliStrings.Format("ChatModelSwitchedFormat", newProviderName, newModel.ModelId));
         return newAgent;
@@ -502,6 +510,15 @@ public sealed class ChatApplication : IChatApplication
         }));
 
         return registry;
+    }
+
+    private void RegisterDelegationTool(ToolRegistry toolRegistry, AgentCreationOptions template)
+    {
+        var adapter = new CliInsightaSubagentAdapter(_agentFactory, _storage, template);
+        var dispatcher = new SubagentDispatcher([adapter]);
+        var catalog = new LocalSubagentCatalog(Directory.GetCurrentDirectory());
+        var handler = new CliSubagentDelegationHandler(catalog, dispatcher, template.UserId!);
+        toolRegistry.Register(new DelegateTool(handler));
     }
 
     private static ISummaryService CreateSummaryService(CliConfig config, AuthConfig auth)
