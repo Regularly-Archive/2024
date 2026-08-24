@@ -1,7 +1,7 @@
 我来仔细审阅这份关于 InsightaAI Agent 的工具结果截断与持久化设计文档，从架构、实现细节和潜在风险等角度进行分析。
 
 > 状态：Archived / Superseded（已归档、已被取代）
-> 当前设计：[tool-result-lifecycle-design-v2.md](tool-result-lifecycle-design-v2.md)。本文审阅的是 v1 方案，其中的类型与建议不代表当前实现。
+> 当前设计：[tool-result-lifecycle-design-v2.md](../tools/tool-result-lifecycle-design-v2.md)。本文审阅的是 v1 方案，其中的类型与建议不代表当前实现。
 
 ---
 

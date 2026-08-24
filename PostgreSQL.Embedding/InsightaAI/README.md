@@ -65,7 +65,7 @@ insighta mcp list                   # 查看 MCP 服务
 - 不支持粘贴边界协议的终端会显示原文，不会根据输入速度猜测粘贴。Git Bash 当前降级为单行输入。
 - 对话时间线中，`●` 是助手文本，`○` 是工具调用，`⎿` 是工具结果，`◆` 是权限确认或 AskUser 交互。
 
-技术细节见 [多行输入与折叠粘贴设计](docs/multiline-paste-input-design.md)。
+技术细节见 [多行输入与折叠粘贴设计](docs/tools/multiline-paste-input-design.md)。
 
 ## 上下文管理
 
@@ -114,9 +114,9 @@ dotnet build src/InsightaAI.Agent.Cli/InsightaAI.Agent.Cli.csproj
 
 - [项目愿景](docs/VISION.md)
 - [待办事项](docs/TODO.md)
-- [工具结果生命周期 v2](docs/tool-result-lifecycle-design-v2.md)
-- [系统提示词设计](docs/core-instructions-design.md)
-- [Agent Loop 研究](docs/agent-loop-research.md)
-- [可观测性设计](docs/observability-design.md)
+- [工具结果生命周期 v2](docs/tools/tool-result-lifecycle-design-v2.md)
+- [系统提示词设计](docs/prompts/core-instructions-design.md)
+- [Agent Loop 研究](docs/references/agent-loop-research.md)
+- [可观测性设计](docs/observability/observability-design.md)
 
-`docs/context-compression-design.md`、`docs/tool-result-truncation-design.md` 和对应 Review 为历史设计，当前实现以工具结果生命周期 v2 文档和代码为准。
+`docs/archives/context-compression-design.md`、`docs/archives/tool-result-truncation-design.md` 和对应 Review 为历史设计，当前实现以工具结果生命周期 v2 文档和代码为准。

@@ -1,7 +1,7 @@
 # InsightaAI Agent - Context Compression Design Document
 
 > 状态：Historical Design（历史设计）
-> 当前实现：压缩阈值、两阶段提交和工具结果生命周期以 [tool-result-lifecycle-design-v2.md](tool-result-lifecycle-design-v2.md) 与 [TODO.md](TODO.md) 为准。本文保留早期方案、命令设想和实施路线，不代表当前 CLI 行为。
+> 当前实现：压缩阈值、两阶段提交和工具结果生命周期以 [tool-result-lifecycle-design-v2.md](../tools/tool-result-lifecycle-design-v2.md) 与 [TODO.md](../TODO.md) 为准。本文保留早期方案、命令设想和实施路线，不代表当前 CLI 行为。
 
 ## 1. Background & Problem
 

@@ -31,9 +31,9 @@
 
 历史设计见：
 
-- `docs/tool-result-truncation-design.md`
-- `docs/tool-result-truncation-design-review.md`
-- `docs/context-compression-design.md`
+- `../archives/tool-result-truncation-design.md`
+- `../archives/tool-result-truncation-design-review.md`
+- `../archives/context-compression-design.md`
 
 v1 通过 `ITool.Intercept()`、`InterceptionResult` 和 `Message.ToolResultIntercepted` 实现执行时截断与部分工具落盘。该设计解决了超大结果直接进入上下文的问题，但存在职责交叉、状态表达不足、持久化元数据丢失和无法继续渐进降级等限制。
 

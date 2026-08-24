@@ -83,7 +83,7 @@
 
 **当前约定：**
 - [x] Agent 实现 IDisposable，释放旧构造函数创建的 ServiceProvider
-- [x] Agent 私有 Provider 只支持 Singleton/Transient，当前不支持 Scoped；见 `agent-service-lifetime.md`
+- [x] Agent 私有 Provider 只支持 Singleton/Transient，当前不支持 Scoped；见 `architecture/agent-service-lifetime.md`
 - [ ] 未来若确有 DbContext 等 Scoped 需求，先定义 Host / Chat Session / Turn 作用域边界，再重新设计容器关系，不在现有 Agent Loop 中局部加 `CreateScope`
 
 ---
@@ -215,7 +215,7 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 - [ ] 收紧身份查询的兜底策略：当前 `explicit_type` 会放行全部 `User` 候选；应改为依赖少量 Core 用户画像，普通 User 记忆仍按相关性筛选
 - [ ] Memory Update/Delete 授权：`UpdateMemoryAsync` / `DeleteMemoryAsync` 当前只按 `memoryId` 操作，尚未验证调用方 `userId`。暂不修复；后续先定义 Team memory 的项目成员授权模型，再为 Private 校验 `existing.UserId == userId`，并为 Team 校验项目成员权限。不得以调用方可传入的 project 字符串代替授权。
 
-**设计文档：** [memory-index-optimization-design.md](memory-index-optimization-design.md)
+**设计文档：** [memory-index-optimization-design.md](memory/memory-index-optimization-design.md)
 
 ---
 
@@ -260,8 +260,8 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
   - [x] 移除 `InterceptionResult`、`TruncationContext`、`Intercept()` 和冗余 `ToolTruncationStrategy`
   - [x] 更新生命周期 v2、压缩、Memory 与项目入口文档；旧设计标记为历史文档
 
-**当前设计文档：** [tool-result-lifecycle-design-v2.md](tool-result-lifecycle-design-v2.md)
-**历史设计文档：** [tool-result-truncation-design.md](tool-result-truncation-design.md)
+**当前设计文档：** [tool-result-lifecycle-design-v2.md](tools/tool-result-lifecycle-design-v2.md)
+**历史设计文档：** [tool-result-truncation-design.md](archives/tool-result-truncation-design.md)
 
 ---
 
@@ -440,7 +440,7 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 - [ ] L2 启发式检测阈值
 - [ ] L4 沙箱执行器是否立项（Docker 还是受限用户）
 
-**设计文档：** [agent-security-design.md](agent-security-design.md)
+**设计文档：** [agent-security-design.md](security/agent-security-design.md)
 
 ---
 
@@ -473,7 +473,7 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 - [ ] 新增 `insighta usage` 查询命令
 - [ ] 单独决策会话删除与 usage 审计记录的保留/级联删除策略
 
-**设计文档：** [usage-accounting-design.md](usage-accounting-design.md)
+**设计文档：** [usage-accounting-design.md](tools/usage-accounting-design.md)
 
 ---
 
@@ -484,7 +484,7 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 **已完成：**
 - [x] 拆出 `insighta-agent.json`（Round 延迟 p50/p95、平均每 Turn Round 数）与 `insighta-llm.json`（按模型的请求量、p50/p95 延迟、输入/输出 Token、cached/uncached、Token rate、input:output ratio）
 - [x] Overview 保持健康摘要（turns / requests / cache hit ratio 三个 stat）
-- [x] Insighta 独立复核全部 4 个 Dashboard，用真实 Prometheus 数据验证 PromQL（见 `docs/observability-dashboard-review.md`）
+- [x] Insighta 独立复核全部 4 个 Dashboard，用真实 Prometheus 数据验证 PromQL（见 `observability/observability-dashboard-review.md`）
 - [x] Anthropic 归一化：`InputTokens = input_tokens + cache_creation + cache_read`（`AnthropicAdapter.cs`），与 OpenAI/Gemini 口径统一，修复 Anthropic 下 cache hit ratio 失真
 - [x] rounds per turn 去掉 `clamp_min` 除零假值（分母为 0 不绘制）
 - [x] input:output ratio 按 `gen_ai_request_model` 分组
@@ -523,7 +523,7 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 - [x] 提供最大深度为 1、权限只能收紧、结果先脱敏且完整 artifact 落盘的核心 `delegate` 工具
 - [ ] 以工具白名单实现 CLI `Explorer` Profile；不以 Prompt 代替只读约束
 
-**设计文档：** [agent-invocation-design.md](agent-invocation-design.md)
+**设计文档：** [agent-invocation-design.md](architecture/agent-invocation-design.md)
 
 **当前边界：** 第一阶段只实现 Insighta 内部 adapter。外部 Codex / Claude Code 暂缓接入，未来以新的 Definition 类型和 adapter 扩展，不将未确定的外部 CLI 协议写入公共契约。
 
@@ -542,13 +542,13 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 - [ ] 后续评估 MCP progress notification，并为其他长运行工具补阶段性状态或 Heartbeat
 - [ ] 单独设计 detached/background process 的 Job / Process Handle 模型，不依赖 shell `&`
 
-**设计文档：** [tool-progress-reporting-design.md](tool-progress-reporting-design.md)
+**设计文档：** [tool-progress-reporting-design.md](tools/tool-progress-reporting-design.md)
 
 ---
 
 ## 当前优先级
 
-已完成：Dashboard 拆分与 Anthropic 归一化（#17），以及 MCP Telemetry tag 命名分层与去重（#12）。后续可观测性工作保留 Agent Dashboard 的 Turn 指标、低基数行为指标评估和 Jaeger Trace Drilldown；见 `observability-design.md` §8。
+已完成：Dashboard 拆分与 Anthropic 归一化（#17），以及 MCP Telemetry tag 命名分层与去重（#12）。后续可观测性工作保留 Agent Dashboard 的 Turn 指标、低基数行为指标评估和 Jaeger Trace Drilldown；见 `observability/observability-design.md` §8。
 
 1. Agent 安全增强（#14）：优先完成 Phase 2 L1 敏感路径保护——按 `SecurityConfig.SensitivePaths` 拦截 `read_file` / `grep` / `write_file` 等结构化工具；L3 结果脱敏已完成。
 2. 运行时用量：区分流式模型未返回 token usage 与真实的 0，并继续推进 #16 的用户、会话与模型用量审计设计。
@@ -556,4 +556,4 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 4. Memory 自动注入校准：基于已记录的候选与入选/淘汰原因，根据真实会话调整门槛与身份查询兜底策略。
 5. Hook：明确取消/中止场景的 Agent 事件契约。
 
-Agent 服务生命周期已完成当前阶段决策：私有 Provider 支持 Singleton/Transient，不支持 Scoped；见 `agent-service-lifetime.md`。
+Agent 服务生命周期已完成当前阶段决策：私有 Provider 支持 Singleton/Transient，不支持 Scoped；见 `architecture/agent-service-lifetime.md`。

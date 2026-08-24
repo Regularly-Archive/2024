@@ -126,7 +126,7 @@ var instrumentedClient = llmClient.WithTelemetry();
 
 ## 7. Prometheus 与 Grafana 本地验证（2026-08-13）
 
-本地观测栈通过 OpenTelemetry Collector 接收 OTLP；trace 转发到 Jaeger，metric 由 Prometheus 抓取，再由 Grafana 查询。部署与启动方式见 [`../tools/observability/README.md`](../tools/observability/README.md)。
+本地观测栈通过 OpenTelemetry Collector 接收 OTLP；trace 转发到 Jaeger，metric 由 Prometheus 抓取，再由 Grafana 查询。部署与启动方式见 [`../../tools/observability/README.md`](../../tools/observability/README.md)。
 
 已由真实 CLI 会话验证的 Prometheus 指标及其低基数维度：
 

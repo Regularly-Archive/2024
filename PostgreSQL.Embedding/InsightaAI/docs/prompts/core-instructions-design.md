@@ -162,7 +162,7 @@ USER.md / User Profile 信息通过 Memory 系统注入（Layer 4），不写入
 | 文件 | 说明 |
 |------|------|
 | `Prompts/core-instructions.txt` | Core Instructions 模板 |
-| `docs/core-instructions-design.md` | 本设计文档 |
+| `docs/prompts/core-instructions-design.md` | 本设计文档 |
 
 ### 5.2 修改文件
 

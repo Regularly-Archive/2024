@@ -1,6 +1,6 @@
 # Session Memory Hook LLM 增强设计 — Review
 
-> 基于 `docs/session-memory-llm-enhancement.md`（设计文档）与当前代码实现的差异分析。
+> 基于 `docs/memory/session-memory-llm-enhancement.md`（设计文档）与当前代码实现的差异分析。
 > Review 日期: 2025-06-23
 
 ---

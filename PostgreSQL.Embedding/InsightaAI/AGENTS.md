@@ -159,7 +159,7 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 - `MultiLineTextPrompt` 将真实文本与编辑态投影分离；终端明确标记的粘贴在输入阶段折叠为 `[pasted N characters]`，提交给 Agent 和持久化层的始终是完整原文。
 - 不再根据字符数或到达速度猜测粘贴；只有 bracketed paste 或原生输入协议的明确边界才会生成粘贴块，避免 IME 和快速输入被误折叠。
 - Windows 优先使用 VT input + Win32 Input Mode，失败时回退到 Windows Console 输入源；通用 VT 输入源保留为跨平台路径。
-- Shift+Enter / Ctrl+Enter 插入换行，Enter 发送；粘贴块在光标移动和删除时保持原子性。设计细节见 `docs/multiline-paste-input-design.md`，实现提交见 `22c2147`。
+- Shift+Enter / Ctrl+Enter 插入换行，Enter 发送；粘贴块在光标移动和删除时保持原子性。设计细节见 `docs/tools/multiline-paste-input-design.md`，实现提交见 `22c2147`。
 
 ### CLI 对话事件时间线（2026-08-12）
 
@@ -174,7 +174,7 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 - `IToolProgressReporter` 让工具以 `Status` / `Output` / `Heartbeat` 报告旁路进度；Runtime 先脱敏，再以 `AgentToolProgressEvent` 从 `RunStreamAsync()` 有界分发。过程文本不进入 LLM 上下文或会话历史；bash 逐行转发 stdout/stderr，`delegate` 转发子 Agent 的文本、round 与子工具状态。
 - CLI 的 `ToolProgressWindow` 是纯呈现状态：按 `ToolCallId` 保留最近 6 行 / 2 KB，交互式终端通过 Spectre `Live` 临时显示，工具完成后仍由普通 `ToolEnd` 块输出权威结果。窗口的增删改和渲染使用同一把锁，防止 Live 刷新与 progress 写入并发修改集合。
 - 串行 `ToolCallExecutor` 不再只等待前一个工具任务结束：每个 Tool Call 有独立 event channel；只有消费端处理完前一个 `ToolEnd` 并继续枚举，才启动下一个工具。CLI 因而能先收束前一最终结果，再显示下一工具的权限确认，避免 ToolEnd 结果混入确认块。并行分支保持原有并发语义。
-- Spectre `Live` 不能与 `SelectionPrompt` / `ask_user` 并行拥有终端。CLI 的交互权限场景应使用串行工具执行；仍需在真实交互终端完成这一组合的回归验证。设计见 `docs/tool-progress-reporting-design.md`。
+- Spectre `Live` 不能与 `SelectionPrompt` / `ask_user` 并行拥有终端。CLI 的交互权限场景应使用串行工具执行；仍需在真实交互终端完成这一组合的回归验证。设计见 `docs/tools/tool-progress-reporting-design.md`。
 
 ### MCP 工具调用元数据管道（2026-07-21）
 
@@ -221,7 +221,7 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 
 ### Dashboard 复核与 Anthropic 归一化（2026-08-14）
 
-- Insighta 独立复核 4 个 Dashboard（`docs/observability-dashboard-review.md`），并用真实 Prometheus 数据验证了全部 PromQL；随后通过 `codex exec` 交 Codex 复核并实施修改（改动在 `chore/mcp-telemetry-tags` 分支，已提交）。
+- Insighta 独立复核 4 个 Dashboard（`docs/observability/observability-dashboard-review.md`），并用真实 Prometheus 数据验证了全部 PromQL；随后通过 `codex exec` 交 Codex 复核并实施修改（改动在 `chore/mcp-telemetry-tags` 分支，已提交）。
 - **AnthropicAdapter.cs**：归一化 `TokenUsage.InputTokens = input_tokens + cache_creation_input_tokens + cache_read_input_tokens`，与 OpenAI/Gemini 口径统一（原实现 input 不含 cache，导致 dashboard 的 cache hit ratio 在 Anthropic 下失真）。OpenAI 口径为 `cached_tokens ⊆ input_tokens`；Anthropic 为互斥字段。
 - **insighta-agent.json**：`Average rounds per turn` 去掉 `clamp_min(...,1)` 假值，分母为 0 时不绘制。
 - **insighta-llm.json**：`Input : output token ratio` 按 `gen_ai_request_model` 分组。
@@ -247,7 +247,7 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 - `AgentConfig.ExcludedToolNames` 通过 `ToolRegistry.Exclude()` 统一收紧能力：被排除工具既不暴露给 LLM，也不能被查找或执行；后续 `Register()` 不会绕过该策略。子 Agent 是静态预授权：不注册交互式 `ToolPermissionHook`，但保留 `SecurityPolicyHook`；Definition 只能收紧宿主工具与 Skills / MCP / Memory / AGENTS.md 能力。CLI 子 Agent Profile 以此排除 `delegate`，当前强制最大委派深度为 1。子 Agent 输出回到父工具结果处理链，先脱敏再进入父上下文。
 - CLI 始终将 SkillRegistry、McpRegistry 与 `IMemoryManager` 注入 Agent 私有 Provider，并保留自动记忆快照、`SessionMemoryHook` 与项目级 Memory Index。子 Agent 对 Skill、MCP、Memory 的限制仅通过工具排除名单实现；因此没有相应工具时不能主动操作这些基础设施，但仍保有宿主提供的运行时上下文。
 - 子 Agent 的 Layer 3 不只包含 descriptor `instructions`：CLI 会根据最终 `ExcludedToolNames` 追加 Runtime constraints，说明无法委派、以及 Skill / MCP / Memory 工具是否不可用。它解决 Layer 1 通用工具指引与受限工具集的冲突；descriptor 无需重复硬编码这些宿主计算出的事实。
-- 测试独立置于 `tests/InsightaAI.Agents.Subagents.Tests`，覆盖 Catalog、Dispatcher 与 CLI 的 delegate host bridge；设计见 `docs/agent-invocation-design.md`。
+- 测试独立置于 `tests/InsightaAI.Agents.Subagents.Tests`，覆盖 Catalog、Dispatcher 与 CLI 的 delegate host bridge；设计见 `docs/architecture/agent-invocation-design.md`。
 
 ## 当前问题与改进方向
 
@@ -259,7 +259,7 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 4. **运行时用量** — 区分流式模型未返回 token usage 与真实的 0。
 5. **L3 Orchestrator** — 继续开发编排能力。
 
-Agent 服务生命周期已明确：当前 Agent 私有 Provider 只支持 Singleton 和 Transient，不支持 Scoped；约定见 `docs/agent-service-lifetime.md`。
+Agent 服务生命周期已明确：当前 Agent 私有 Provider 只支持 Singleton 和 Transient，不支持 Scoped；约定见 `docs/architecture/agent-service-lifetime.md`。
 
 ## 最近验证
 
@@ -293,13 +293,14 @@ Agent 服务生命周期已明确：当前 Agent 私有 Provider 只支持 Singl
 
 | 文档 | 路径 |
 |------|------|
+| 文档索引 | `docs/README.md` |
 | 使用说明 | `README.md` |
 | 项目愿景 | `docs/VISION.md` |
 | 待办事项 | `docs/TODO.md` |
-| 工具结果生命周期 | `docs/tool-result-lifecycle-design-v2.md` |
-| 提示词设计 | `docs/core-instructions-design.md` |
-| Agent Loop 研究 | `docs/agent-loop-research.md` |
-| 可观测性设计 | `docs/observability-design.md` |
+| 工具结果生命周期 | `docs/tools/tool-result-lifecycle-design-v2.md` |
+| 提示词设计 | `docs/prompts/core-instructions-design.md` |
+| Agent Loop 研究 | `docs/references/agent-loop-research.md` |
+| 可观测性设计 | `docs/observability/observability-design.md` |
 | Core Instructions | `src/InsightaAI.Agent/Prompts/core-instructions.txt` |
 | CLI 国际化资源清单 | `docs/i18n/` |
 

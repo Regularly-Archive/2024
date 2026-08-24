@@ -1,7 +1,7 @@
 ﻿# InsightaAI Agent - Tool Result Truncation & Persistence Design
 
 > 状态：Archived / Superseded（已归档、已被取代）
-> 当前设计：[tool-result-lifecycle-design-v2.md](tool-result-lifecycle-design-v2.md)。本文保留 v1 的 `Intercept`、`InterceptionResult` 和 `ToolResultIntercepted` 方案，仅用于历史追溯。
+> 当前设计：[tool-result-lifecycle-design-v2.md](../tools/tool-result-lifecycle-design-v2.md)。本文保留 v1 的 `Intercept`、`InterceptionResult` 和 `ToolResultIntercepted` 方案，仅用于历史追溯。
 
 ## 1. Background & Problem
 
