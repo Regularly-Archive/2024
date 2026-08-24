@@ -45,6 +45,20 @@ public sealed class DelegateToolTests
         Assert.Contains("was not found", Assert.IsType<TextBlock>(result.Content.Single()).Text);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_ResolvedDefinition_DoesNotTruncateHostOutput()
+    {
+        var output = new string('x', 12_001) + " complete";
+        var definition = new InsightaSubagentDefinition { Id = "reviewer", Name = "Reviewer" };
+        var registry = new ToolRegistry();
+        registry.Register(new DelegateTool(new CliSubagentDelegationHandler(
+            new FixedCatalog(definition), new SubagentDispatcher([new RecordingAdapter(output)]), "host-user")));
+
+        var result = await ExecuteAsync(registry, """{ "agent_id": "reviewer", "task": "Review this change" }""");
+
+        Assert.Equal(output, Assert.IsType<TextBlock>(result.Content.Single()).Text);
+    }
+
     private static Task<ToolResult> ExecuteAsync(ToolRegistry registry, string arguments)
     {
         using var document = JsonDocument.Parse(arguments);
@@ -74,7 +88,7 @@ public sealed class DelegateToolTests
         }
     }
 
-    private sealed class RecordingAdapter : ISubagentAdapter
+    private sealed class RecordingAdapter(string output = "reviewed") : ISubagentAdapter
     {
         public SubagentInvocationRequest? Request { get; private set; }
         public bool CanInvoke(SubagentDefinition definition) => definition is InsightaSubagentDefinition;
@@ -86,7 +100,7 @@ public sealed class DelegateToolTests
             {
                 InvocationId = "child-call",
                 Status = SubagentInvocationStatus.Completed,
-                Output = "reviewed"
+                Output = output
             });
         }
     }

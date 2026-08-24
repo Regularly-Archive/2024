@@ -5,7 +5,7 @@ using InsightaAI.Agents.Subagents.Definitions;
 namespace InsightaAI.Agent.Cli.Services;
 
 /// <summary>Loads named Insighta subagents from <c>~/.insighta/subagents/{id}/subagent.json</c>.</summary>
-public sealed class LocalSubagentCatalog : ISubagentCatalog
+public sealed class LocalSubagentDefinitionStore : ISubagentDefinitionStore
 {
     private const string DescriptorFileName = "subagent.json";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -15,7 +15,7 @@ public sealed class LocalSubagentCatalog : ISubagentCatalog
     /// Creates a catalog rooted at the global Insighta subagent directory. Tests may supply an
     /// isolated root directory without changing the production lookup scope.
     /// </summary>
-    public LocalSubagentCatalog(string? rootDirectory = null)
+    public LocalSubagentDefinitionStore(string? rootDirectory = null)
     {
         _rootDirectory = rootDirectory is null
             ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".insighta", "subagents")
@@ -37,6 +37,38 @@ public sealed class LocalSubagentCatalog : ISubagentCatalog
         {
             throw new InvalidOperationException($"Subagent descriptor '{path}' contains invalid JSON.", exception);
         }
+    }
+
+    public async Task CreateAsync(SubagentDefinition definition, CancellationToken cancellationToken = default)
+    {
+        var insightaDefinition = ValidateDefinition(definition);
+        var descriptorPath = GetDescriptorPath(insightaDefinition.Id);
+        if (File.Exists(descriptorPath))
+            throw new InvalidOperationException($"Subagent '{insightaDefinition.Id}' already exists.");
+
+        await WriteAsync(insightaDefinition, descriptorPath, overwrite: false, cancellationToken);
+    }
+
+    public async Task UpdateAsync(SubagentDefinition definition, CancellationToken cancellationToken = default)
+    {
+        var insightaDefinition = ValidateDefinition(definition);
+        var descriptorPath = GetDescriptorPath(insightaDefinition.Id);
+        if (!File.Exists(descriptorPath))
+            throw new InvalidOperationException($"Subagent '{insightaDefinition.Id}' was not found.");
+
+        await WriteAsync(insightaDefinition, descriptorPath, overwrite: true, cancellationToken);
+    }
+
+    public Task<bool> DeleteAsync(string id, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ValidateId(id);
+        var directory = Path.Combine(_rootDirectory, id);
+        if (!Directory.Exists(directory))
+            return Task.FromResult(false);
+
+        Directory.Delete(directory, recursive: true);
+        return Task.FromResult(true);
     }
 
     public async IAsyncEnumerable<SubagentDefinition> ListAsync(
@@ -108,6 +140,50 @@ public sealed class LocalSubagentCatalog : ISubagentCatalog
         if (string.IsNullOrWhiteSpace(definition.Name))
             throw new InvalidOperationException($"Subagent descriptor '{path}' requires a non-empty name.");
         return definition;
+    }
+
+    private static InsightaSubagentDefinition ValidateDefinition(SubagentDefinition definition)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        if (definition is not InsightaSubagentDefinition insightaDefinition)
+            throw new InvalidOperationException("The local subagent store only supports Insighta subagent definitions.");
+
+        ValidateId(insightaDefinition.Id);
+        if (string.IsNullOrWhiteSpace(insightaDefinition.Name))
+            throw new InvalidOperationException("Subagent definitions require a non-empty name.");
+        return insightaDefinition;
+    }
+
+    private async Task WriteAsync(
+        InsightaSubagentDefinition definition,
+        string descriptorPath,
+        bool overwrite,
+        CancellationToken cancellationToken)
+    {
+        var directory = Path.GetDirectoryName(descriptorPath)!;
+        Directory.CreateDirectory(directory);
+        var temporaryPath = Path.Combine(directory, $".{DescriptorFileName}.{Guid.NewGuid():N}.tmp");
+
+        try
+        {
+            var json = JsonSerializer.Serialize(definition, new JsonSerializerOptions(JsonSerializerDefaults.Web)
+            {
+                WriteIndented = true
+            });
+            await File.WriteAllTextAsync(temporaryPath, json, cancellationToken);
+            File.Move(temporaryPath, descriptorPath, overwrite);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+                File.Delete(temporaryPath);
+        }
+    }
+
+    private string GetDescriptorPath(string id)
+    {
+        ValidateId(id);
+        return Path.Combine(_rootDirectory, id, DescriptorFileName);
     }
 
     private static void ValidateId(string id)

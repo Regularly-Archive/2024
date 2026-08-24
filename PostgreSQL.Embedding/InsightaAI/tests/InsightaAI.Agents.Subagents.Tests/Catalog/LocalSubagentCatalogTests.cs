@@ -4,7 +4,7 @@ using InsightaAI.Agents.Subagents.Definitions;
 
 namespace InsightaAI.Agents.Subagents.Tests.Catalog;
 
-public sealed class LocalSubagentCatalogTests : IDisposable
+public sealed class LocalSubagentDefinitionStoreTests : IDisposable
 {
     private readonly string _rootDirectory = Path.Combine(Path.GetTempPath(), "insighta-subagent-catalog-tests", Guid.NewGuid().ToString("N"));
 
@@ -17,7 +17,7 @@ public sealed class LocalSubagentCatalogTests : IDisposable
             Name = "Explorer",
             ToolNames = ["read_file"]
         });
-        var catalog = new LocalSubagentCatalog(_rootDirectory);
+        var catalog = new LocalSubagentDefinitionStore(_rootDirectory);
 
         var definition = await catalog.FindAsync("explorer");
 
@@ -32,7 +32,7 @@ public sealed class LocalSubagentCatalogTests : IDisposable
     {
         await WriteDescriptorAsync("reviewer", new InsightaSubagentDefinition { Id = "reviewer", Name = "Reviewer" });
         await WriteDescriptorAsync("explorer", new InsightaSubagentDefinition { Id = "explorer", Name = "Explorer" });
-        var catalog = new LocalSubagentCatalog(_rootDirectory);
+        var catalog = new LocalSubagentDefinitionStore(_rootDirectory);
 
         var ids = new List<string>();
         await foreach (var definition in catalog.ListAsync())
@@ -45,7 +45,7 @@ public sealed class LocalSubagentCatalogTests : IDisposable
     public async Task FindAsync_MismatchedDirectoryId_ThrowsClearError()
     {
         await WriteDescriptorAsync("explorer", new InsightaSubagentDefinition { Id = "reviewer", Name = "Reviewer" });
-        var catalog = new LocalSubagentCatalog(_rootDirectory);
+        var catalog = new LocalSubagentDefinitionStore(_rootDirectory);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () => await catalog.FindAsync("explorer"));
 
@@ -55,7 +55,7 @@ public sealed class LocalSubagentCatalogTests : IDisposable
     [Fact]
     public async Task FindAsync_PathTraversalId_RejectsInput()
     {
-        var catalog = new LocalSubagentCatalog(_rootDirectory);
+        var catalog = new LocalSubagentDefinitionStore(_rootDirectory);
 
         await Assert.ThrowsAsync<ArgumentException>(async () => await catalog.FindAsync(".."));
     }
@@ -64,7 +64,7 @@ public sealed class LocalSubagentCatalogTests : IDisposable
     public async Task FindAsync_MalformedDescriptor_ThrowsClearError()
     {
         await WriteRawDescriptorAsync("reviewer", "{ not valid json }");
-        var catalog = new LocalSubagentCatalog(_rootDirectory);
+        var catalog = new LocalSubagentDefinitionStore(_rootDirectory);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () => await catalog.FindAsync("reviewer"));
 
@@ -76,7 +76,7 @@ public sealed class LocalSubagentCatalogTests : IDisposable
     {
         await WriteRawDescriptorAsync("broken", "{ not valid json }");
         await WriteDescriptorAsync("reviewer", new InsightaSubagentDefinition { Id = "reviewer", Name = "Reviewer" });
-        var catalog = new LocalSubagentCatalog(_rootDirectory);
+        var catalog = new LocalSubagentDefinitionStore(_rootDirectory);
 
         var ids = new List<string>();
         await foreach (var definition in catalog.ListAsync())
@@ -88,13 +88,39 @@ public sealed class LocalSubagentCatalogTests : IDisposable
     [Fact]
     public async Task ListAsync_MissingRoot_ReturnsNoDescriptors()
     {
-        var catalog = new LocalSubagentCatalog(_rootDirectory);
+        var catalog = new LocalSubagentDefinitionStore(_rootDirectory);
         var ids = new List<string>();
 
         await foreach (var definition in catalog.ListAsync())
             ids.Add(definition.Id);
 
         Assert.Empty(ids);
+    }
+
+    [Fact]
+    public async Task CreateUpdateDeleteAsync_ManagesDefinitionsThroughTheStoreContract()
+    {
+        var store = new LocalSubagentDefinitionStore(_rootDirectory);
+        var created = new InsightaSubagentDefinition
+        {
+            Id = "reviewer",
+            Name = "Reviewer",
+            Description = "Initial description"
+        };
+
+        await store.CreateAsync(created);
+        var loaded = Assert.IsType<InsightaSubagentDefinition>(await store.FindAsync("reviewer"));
+        Assert.Equal("Initial description", loaded.Description);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => store.CreateAsync(created));
+
+        await store.UpdateAsync(created with { Description = "Updated description" });
+        loaded = Assert.IsType<InsightaSubagentDefinition>(await store.FindAsync("reviewer"));
+        Assert.Equal("Updated description", loaded.Description);
+
+        Assert.True(await store.DeleteAsync("reviewer"));
+        Assert.False(await store.DeleteAsync("reviewer"));
+        Assert.Null(await store.FindAsync("reviewer"));
     }
 
     private async Task WriteDescriptorAsync(string id, InsightaSubagentDefinition definition)

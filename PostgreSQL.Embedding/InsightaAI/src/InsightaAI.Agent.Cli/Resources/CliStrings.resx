@@ -643,4 +643,35 @@
   <data name="ChatThinkingProgressFormat" xml:space="preserve">
     <value>Thinking (press esc to interrupt){0}</value>
   </data>
+  <data name="SubagentsDescription" xml:space="preserve"><value>Manage global subagent definitions</value></data>
+  <data name="SubagentsListDescription" xml:space="preserve"><value>List available subagents</value></data>
+  <data name="SubagentsInitDescription" xml:space="preserve"><value>Install built-in subagent templates</value></data>
+  <data name="SubagentsCreateDescription" xml:space="preserve"><value>Create a subagent definition</value></data>
+  <data name="SubagentsRemoveDescription" xml:space="preserve"><value>Remove a subagent definition</value></data>
+  <data name="SubagentsValidateDescription" xml:space="preserve"><value>Validate one or all subagent definitions</value></data>
+  <data name="SubagentsIdArgumentDescription" xml:space="preserve"><value>Subagent ID</value></data>
+  <data name="SubagentsOptionalIdArgumentDescription" xml:space="preserve"><value>Optional subagent ID</value></data>
+  <data name="SubagentsNameOptionDescription" xml:space="preserve"><value>Display name</value></data>
+  <data name="SubagentsDescriptionOptionDescription" xml:space="preserve"><value>Short description</value></data>
+  <data name="SubagentsModelOptionDescription" xml:space="preserve"><value>Model reference (provider/model_key)</value></data>
+  <data name="SubagentsInstructionsOptionDescription" xml:space="preserve"><value>Custom instructions</value></data>
+  <data name="SubagentsToolOptionDescription" xml:space="preserve"><value>Allowed tool name(s)</value></data>
+  <data name="SubagentsYesOptionDescription" xml:space="preserve"><value>Skip the removal confirmation</value></data>
+  <data name="SubagentsListEmpty" xml:space="preserve"><value>No global subagents found</value></data>
+  <data name="SubagentsFieldId" xml:space="preserve"><value>ID</value></data>
+  <data name="SubagentsFieldName" xml:space="preserve"><value>Name</value></data>
+  <data name="SubagentsFieldModel" xml:space="preserve"><value>Model</value></data>
+  <data name="SubagentsFieldTools" xml:space="preserve"><value>Tools</value></data>
+  <data name="SubagentsFieldDescription" xml:space="preserve"><value>Description</value></data>
+  <data name="SubagentsTemplatesMissing" xml:space="preserve"><value>Built-in subagent templates were not found in this installation.</value></data>
+  <data name="SubagentsInitSkippedFormat" xml:space="preserve"><value>Skipped existing subagent '{0}'</value></data>
+  <data name="SubagentsInitInstalledFormat" xml:space="preserve"><value>Installed subagent '{0}'</value></data>
+  <data name="SubagentsCreatedFormat" xml:space="preserve"><value>Created subagent '{0}'</value></data>
+  <data name="SubagentsRemoveConfirmFormat" xml:space="preserve"><value>Remove subagent '{0}'?</value></data>
+  <data name="SubagentsNotFoundFormat" xml:space="preserve"><value>Subagent not found: {0}</value></data>
+  <data name="SubagentsRemovedFormat" xml:space="preserve"><value>Removed subagent '{0}'</value></data>
+  <data name="SubagentsValidationPassed" xml:space="preserve"><value>valid</value></data>
+  <data name="SubagentsModelNotConfiguredFormat" xml:space="preserve"><value>Model '{0}' is not configured.</value></data>
+  <data name="SubagentsUnsupportedDefinition" xml:space="preserve"><value>unsupported definition type</value></data>
+  <data name="SubagentsInvalidToolNames" xml:space="preserve"><value>tool names cannot be empty</value></data>
 </root>

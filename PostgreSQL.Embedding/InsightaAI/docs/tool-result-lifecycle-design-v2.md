@@ -252,6 +252,7 @@ public sealed record ToolResultRetentionPolicy
 {
     public bool CanReplay { get; init; }
     public bool HasSideEffects { get; init; }
+    public bool PreferPersistence { get; init; }
     public ToolResultRetentionLevel MinimumLevel { get; init; }
         = ToolResultRetentionLevel.Placeholder;
 }
@@ -312,6 +313,7 @@ public sealed record ProcessedToolResult
 初始建议：
 
 - 大于 30 KiB：优先落盘；
+- `PreferPersistence = true`：只要结果非空即落盘；
 - 落盘后生成 Preview；
 - 阈值可配置，工具策略可提出偏好，但最终由 Runtime 决定。
 

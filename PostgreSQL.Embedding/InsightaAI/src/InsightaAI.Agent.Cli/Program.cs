@@ -3,6 +3,7 @@ using InsightaAI.Agent.Cli.Localization;
 using InsightaAI.Agent.Cli.Models;
 using InsightaAI.Agent.Cli.Services;
 using InsightaAI.Agent.Storage;
+using InsightaAI.Agents.Subagents.Catalog;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -39,6 +40,8 @@ public class Program
         hostBuilder.Services.AddScoped<IAgentFactory, AgentFactory>();
         hostBuilder.Services.AddScoped<IChatApplication, ChatApplication>();
         hostBuilder.Services.AddScoped<SessionsCommand>();
+        hostBuilder.Services.AddSingleton<ISubagentDefinitionStore, LocalSubagentDefinitionStore>();
+        hostBuilder.Services.AddSingleton<SubagentsCommand>();
 
         using var host = hostBuilder.Build();
         var scopeFactory = host.Services.GetRequiredService<IServiceScopeFactory>();
@@ -51,6 +54,7 @@ public class Program
         rootCommand.AddCommand(SessionsCommand.Create(scopeFactory));
         rootCommand.AddCommand(new SkillsCommand().Create());
         rootCommand.AddCommand(new McpCommand().Create());
+        rootCommand.AddCommand(host.Services.GetRequiredService<SubagentsCommand>().Create());
 
         // 如果第一个参数是选项（以 - 开头），自动补上 chat 子命令
         // 这样 insighta -c 等价于 insighta chat -c

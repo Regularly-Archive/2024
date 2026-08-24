@@ -23,19 +23,9 @@ public sealed record AgentDelegationRequest
 /// <summary>
 /// 委托工具 - 将任务委托给其他 Agent
 /// </summary>
-public class DelegateTool : ITool
+public class DelegateTool : ITool, IToolResultProjector
 {
     private readonly IAgentDelegationHandler _delegateHandler;
-
-    /// <summary>
-    /// 创建委托工具
-    /// </summary>
-    /// <param name="delegateHandler">委托处理函数 (agentId, task) => result</param>
-    public DelegateTool(Func<string, string, Task<string>> delegateHandler)
-    {
-        ArgumentNullException.ThrowIfNull(delegateHandler);
-        _delegateHandler = new LegacyDelegationHandler(delegateHandler);
-    }
 
     /// <summary>Creates a DelegateTool backed by a context-aware host handler.</summary>
     public DelegateTool(IAgentDelegationHandler delegateHandler)
@@ -45,6 +35,17 @@ public class DelegateTool : ITool
     }
 
     public string Name => "delegate";
+
+    /// <summary>
+    /// A subagent's final response is a reusable work product. Persist it even when it is small,
+    /// so the parent can inspect the full, redacted artifact after context projection.
+    /// </summary>
+    public ToolResultRetentionPolicy RetentionPolicy { get; } = new()
+    {
+        HasSideEffects = true,
+        PreferPersistence = true,
+        MinimumLevel = ToolResultRetentionLevel.Placeholder
+    };
 
     public ToolDefinition Definition => new()
     {
@@ -91,13 +92,10 @@ public class DelegateTool : ITool
         }
     }
 
-    private sealed class LegacyDelegationHandler(Func<string, string, Task<string>> handler) : IAgentDelegationHandler
-    {
-        public async Task<ToolResult> DelegateAsync(AgentDelegationRequest request, CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var result = await handler(request.AgentId, request.Task);
-            return ToolResult.FromText($"[Delegated to {request.AgentId}] {result}");
-        }
-    }
+    public ToolResultProjection CreatePreview(ToolResult result, ToolResultProjectionContext context) =>
+        DefaultToolResultProjector.Instance.CreatePreview(result, context);
+
+    public ToolResultProjection CreatePlaceholder(ToolResultProjectionContext context) =>
+        DefaultToolResultProjector.Instance.CreatePlaceholder(context);
+
 }

@@ -242,8 +242,8 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 ### Agent Invocation 与受限 Subagent（2026-08-21）
 
 - `InsightaAI.Agents.Subagents` 提供不依赖 CLI、Agent 或 Orchestrator 的公共契约：`SubagentDefinition`、Catalog、Adapter、Dispatcher 以及 invocation context / request / result；命名 Definition 可来自本地文件、数据库或服务端，临时 Definition 可由编排直接构造。
-- CLI 的 `LocalSubagentCatalog` 从全局 `~/.insighta/subagents/{id}/subagent.json` 加载定义；Subagent 是可独立完成工作、跨项目复用的流程，不绑定工作区。仓库内预置 reviewer、explorer、planner 模板，尚需安装/初始化流程提供到全局目录。`CliInsightaSubagentAdapter` 复用 `AgentFactory` 创建独立子会话，并将 user、父 session 和父 tool call 写入存储关联。
-- 核心只有一个 `DelegateTool`（参数为 `agent_id`、`task`）；宿主以 `IAgentDelegationHandler` 实现 Definition 查找、Dispatcher 调用和输出边界。CLI 不再维护平行的 `subagent` 工具协议，模型切换后会以当前运行时模板重建该处理器。
+- CLI 的 `LocalSubagentDefinitionStore` 从全局 `~/.insighta/subagents/{id}/subagent.json` 读取和管理定义；它实现宿主无关的 `ISubagentDefinitionStore` CRUD 契约，未来可由数据库或远程实现替换。`insighta subagents init` 非覆盖式安装 reviewer、explorer、planner 模板；Subagent 是可独立完成工作、跨项目复用的流程，不绑定工作区。`CliInsightaSubagentAdapter` 复用 `AgentFactory` 创建独立子会话，并将 user、父 session 和父 tool call 写入存储关联。
+- 核心只有一个 `DelegateTool`（参数为 `agent_id`、`task`）；宿主以 `IAgentDelegationHandler` 实现 Definition 查找、Dispatcher 调用和输出边界。它声明 `PreferPersistence`，因此完整子代理结果经统一脱敏后始终保存为父会话 artifact，主 Agent 只接收 preview 与可回查引用。CLI 不再维护平行的 `subagent` 工具协议，模型切换后会以当前运行时模板重建该处理器。
 - `AgentConfig.ExcludedToolNames` 通过 `ToolRegistry.Exclude()` 统一收紧能力：被排除工具既不暴露给 LLM，也不能被查找或执行；后续 `Register()` 不会绕过该策略。子 Agent 是静态预授权：不注册交互式 `ToolPermissionHook`，但保留 `SecurityPolicyHook`；Definition 只能收紧宿主工具与 Skills / MCP / Memory / AGENTS.md 能力。CLI 子 Agent Profile 以此排除 `delegate`，当前强制最大委派深度为 1。子 Agent 输出回到父工具结果处理链，先脱敏再进入父上下文。
 - CLI 始终将 SkillRegistry、McpRegistry 与 `IMemoryManager` 注入 Agent 私有 Provider，并保留自动记忆快照、`SessionMemoryHook` 与项目级 Memory Index。子 Agent 对 Skill、MCP、Memory 的限制仅通过工具排除名单实现；因此没有相应工具时不能主动操作这些基础设施，但仍保有宿主提供的运行时上下文。
 - 子 Agent 的 Layer 3 不只包含 descriptor `instructions`：CLI 会根据最终 `ExcludedToolNames` 追加 Runtime constraints，说明无法委派、以及 Skill / MCP / Memory 工具是否不可用。它解决 Layer 1 通用工具指引与受限工具集的冲突；descriptor 无需重复硬编码这些宿主计算出的事实。

@@ -54,15 +54,17 @@ CLI / Desktop / Web / Server     组合根与宿主 adapter
 
 Subagent 使用静态预授权，而不是交互式确认：Definition 的工具白名单先与宿主允许范围、再与调用级限制求交集，未注册的工具不可调用。`CliInsightaSubagentAdapter` 创建 Agent 时显式关闭 `ToolPermissionHook`；这表示子 Agent 没有确认能力，不表示它获得自动同意或无限权限。
 
-主 Agent 通过核心 `delegate` 工具调用宿主提供的 `IAgentDelegationHandler`。CLI handler 将 `agent_id` 和有界 `task` 解析到本地 Catalog，并由宿主填充 user ID、父 session 和父 tool-call ID；子 Agent 工具白名单不含 `delegate`，因此第一期最大委派深度为 1。返回文本继续经过父 Agent 的 `ToolResultProcessor` 脱敏和上下文投影，且宿主最多向父 Agent 暴露 12,000 个字符。
+主 Agent 通过核心 `delegate` 工具调用宿主提供的 `IAgentDelegationHandler`。CLI handler 将 `agent_id` 和有界 `task` 解析到本地 Catalog，并由宿主填充 user ID、父 session 和父 tool-call ID；子 Agent 工具白名单不含 `delegate`，因此第一期最大委派深度为 1。`delegate` 声明 `PreferPersistence`：完整结果先经父 Agent 的 `ToolResultProcessor` 脱敏并作为父会话 artifact 落盘，随后只将 preview 与 artifact 引用投影给主 Agent；不在 host bridge 进行字符截断。
 
 `SecurityPolicyHook` 对主 Agent 和 Subagent 都必须注册。deny list、敏感路径等强制规则仍在每次工具调用前执行，且不能被预授权、AllowAlways 或 Definition 覆盖。高风险工具默认不进入 Subagent 白名单；若未来需要开放，应先提供更细粒度的受限工具或策略，而非继承主 Agent 的完整工具集。
 
 ## Catalog 与本地定义
 
-`ISubagentCatalog` 只提供按 ID 查询和枚举命名 Definition；它不规定存储形式。第一期不急于抽象多个 provider：真正实现本地目录读取时，直接提供 `LocalSubagentCatalog` 即可。等数据库、远程或组合来源同时出现后，再把文件解析提取为 `LocalSubagentDefinitionProvider`。
+`ISubagentCatalog` 只提供按 ID 查询和枚举命名 Definition；`ISubagentDefinitionStore` 在其上提供创建、更新和删除。二者均不规定存储形式。CLI 当前由 `LocalSubagentDefinitionStore` 实现全局 JSON 存储；未来数据库、远程或组合来源可以实现同一 CRUD 契约，命令层不依赖文件系统。
 
-CLI 已提供 `LocalSubagentCatalog`，默认使用全局 `~/.insighta/subagents/{id}/subagent.json`。Subagent 是可复用的独立工作流程，不绑定某一个项目或工作目录。descriptor 的 `id` 必须与目录名一致，避免路径混淆；找不到根目录时视为没有本地定义。仓库内的 `reviewer`、`explorer`、`planner` 是预置模板，安装/初始化流程负责将其提供到全局目录。
+CLI 已提供 `LocalSubagentDefinitionStore`，默认使用全局 `~/.insighta/subagents/{id}/subagent.json`。Subagent 是可复用的独立工作流程，不绑定某一个项目或工作目录。descriptor 的 `id` 必须与目录名一致，避免路径混淆；找不到根目录时视为没有本地定义。仓库内的 `reviewer`、`explorer`、`planner` 是预置模板，安装/初始化流程负责将其提供到全局目录。
+
+`insighta subagents` 是 Store 的首个 CLI 消费方：`list` 枚举全局定义，`init` 非覆盖式地安装预置模板，`create` 创建轻量的本地 Definition，`remove` 在确认后删除，`validate` 校验 Definition 与当前 CLI 模型配置的兼容性。命令层只依赖 `ISubagentDefinitionStore`，不包含 JSON 路径或文件系统操作。
 
 Subagent 契约、dispatcher 与本地 catalog 的单元测试位于独立项目 `tests/InsightaAI.Agents.Subagents.Tests/`；Orchestrator 如何委派 Subagent 的测试仍归属 `InsightaAI.Agents.Orchestrator.Tests`。
 
@@ -74,7 +76,5 @@ Subagent 契约、dispatcher 与本地 catalog 的单元测试位于独立项目
 
 ## 后续顺序
 
-1. 补 CLI adapter 的会话隔离、白名单交集和结果映射测试。
-2. 实现全局 `~/.insighta/subagents/{id}/` 的 `LocalSubagentCatalog` 与 descriptor 格式。
-3. 让 CLI 显式注册 dispatcher，并通过核心 `delegate` 工具提供受限的 named subagent 委派。
-4. 再根据真实的外部 Agent 协议评估 adapter。
+1. 再根据真实的外部 Agent 协议评估 adapter。
+2. 在 Orchestrator 中消费临时 `SubagentDefinition`，验证 DAG 场景无需落盘的边界。

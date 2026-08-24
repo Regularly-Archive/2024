@@ -8,7 +8,6 @@ namespace InsightaAI.Agent.Cli.Services;
 /// <summary>CLI host bridge from DelegateTool to named local Subagent invocations.</summary>
 public sealed class CliSubagentDelegationHandler : IAgentDelegationHandler
 {
-    private const int MaxOutputCharacters = 12_000;
     private readonly ISubagentCatalog _catalog;
     private readonly SubagentDispatcher _dispatcher;
     private readonly string _userId;
@@ -48,10 +47,7 @@ public sealed class CliSubagentDelegationHandler : IAgentDelegationHandler
         if (result.Status != SubagentInvocationStatus.Completed)
             return ToolResult.FromError(result.Error ?? $"Subagent '{definition.Id}' ended with status '{result.Status}'.");
 
-        var output = result.Output ?? string.Empty;
-        if (output.Length > MaxOutputCharacters)
-            output = output[..MaxOutputCharacters] + "\n\n[Subagent output truncated by the host.]";
-        return ToolResult.FromText(output);
+        return ToolResult.FromText(result.Output ?? string.Empty);
     }
 
     private sealed class ParentToolProgressReporter(IToolProgressReporter parentProgress) : ISubagentProgressReporter

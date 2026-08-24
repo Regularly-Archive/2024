@@ -521,7 +521,7 @@ public sealed class ChatApplication : IChatApplication
     {
         var adapter = new CliInsightaSubagentAdapter(_agentFactory, _storage, template);
         var dispatcher = new SubagentDispatcher([adapter]);
-        var catalog = new LocalSubagentCatalog();
+        var catalog = new LocalSubagentDefinitionStore();
         var handler = new CliSubagentDelegationHandler(catalog, dispatcher, template.UserId!);
         toolRegistry.Register(new DelegateTool(handler));
     }

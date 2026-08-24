@@ -66,6 +66,47 @@ public sealed class ToolResultProcessorTests
     }
 
     [Fact]
+    public async Task ProcessAsync_Should_PersistSmallDelegateResultWhenToolPrefersPersistence()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"insighta-test-{Guid.NewGuid():N}");
+        try
+        {
+            var registry = new ToolRegistry();
+            registry.Register(new DelegateTool(new FixedDelegationHandler()));
+            var processor = new ToolResultProcessor(
+                registry, new ToolResultArtifactStore(new LocalFileSystem(), directory));
+
+            var processed = await processor.ProcessAsync(
+                "session-1", CreateToolCall("delegate"), ToolResult.FromText("complete review report"), enabled: true);
+
+            Assert.Equal(ToolResultRetentionLevel.Preview, processed.State.RetentionLevel);
+            Assert.NotNull(processed.State.Artifact);
+            Assert.Equal("complete review report", await File.ReadAllTextAsync(processed.State.Artifact.Path));
+            Assert.Contains("Full output saved as artifact", processed.Result.Content.OfType<TextBlock>().Single().Text);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ProcessAsync_Should_NotPersistPreferredResultWhenPersistenceIsDisabled()
+    {
+        var registry = new ToolRegistry();
+        registry.Register(new DelegateTool(new FixedDelegationHandler()));
+        var processor = new ToolResultProcessor(
+            registry, new ToolResultArtifactStore(new LocalFileSystem(), Path.GetTempPath()));
+
+        var processed = await processor.ProcessAsync(
+            "session-1", CreateToolCall("delegate"), ToolResult.FromText("complete review report"), enabled: false);
+
+        Assert.Equal(ToolResultRetentionLevel.Full, processed.State.RetentionLevel);
+        Assert.Null(processed.State.Artifact);
+    }
+
+    [Fact]
     public async Task ToolEndPreview_Should_UseRedactedResult()
     {
         const string secret = "preview-secret";
@@ -199,4 +240,10 @@ public sealed class ToolResultProcessorTests
         Name = toolName,
         Arguments = JsonDocument.Parse("{}").RootElement.Clone()
     };
+
+    private sealed class FixedDelegationHandler : IAgentDelegationHandler
+    {
+        public Task<ToolResult> DelegateAsync(AgentDelegationRequest request, CancellationToken cancellationToken = default) =>
+            Task.FromResult(ToolResult.FromText("unused"));
+    }
 }

@@ -643,4 +643,35 @@
   <data name="ChatThinkingProgressFormat" xml:space="preserve">
     <value>思考中（按 esc 中断）{0}</value>
   </data>
+  <data name="SubagentsDescription" xml:space="preserve"><value>管理全局子代理定义</value></data>
+  <data name="SubagentsListDescription" xml:space="preserve"><value>列出可用子代理</value></data>
+  <data name="SubagentsInitDescription" xml:space="preserve"><value>安装内置子代理模板</value></data>
+  <data name="SubagentsCreateDescription" xml:space="preserve"><value>创建子代理定义</value></data>
+  <data name="SubagentsRemoveDescription" xml:space="preserve"><value>删除子代理定义</value></data>
+  <data name="SubagentsValidateDescription" xml:space="preserve"><value>校验一个或全部子代理定义</value></data>
+  <data name="SubagentsIdArgumentDescription" xml:space="preserve"><value>子代理 ID</value></data>
+  <data name="SubagentsOptionalIdArgumentDescription" xml:space="preserve"><value>可选的子代理 ID</value></data>
+  <data name="SubagentsNameOptionDescription" xml:space="preserve"><value>显示名称</value></data>
+  <data name="SubagentsDescriptionOptionDescription" xml:space="preserve"><value>简短描述</value></data>
+  <data name="SubagentsModelOptionDescription" xml:space="preserve"><value>模型引用（provider/model_key）</value></data>
+  <data name="SubagentsInstructionsOptionDescription" xml:space="preserve"><value>自定义指令</value></data>
+  <data name="SubagentsToolOptionDescription" xml:space="preserve"><value>允许的工具名称</value></data>
+  <data name="SubagentsYesOptionDescription" xml:space="preserve"><value>跳过删除确认</value></data>
+  <data name="SubagentsListEmpty" xml:space="preserve"><value>未找到全局子代理</value></data>
+  <data name="SubagentsFieldId" xml:space="preserve"><value>ID</value></data>
+  <data name="SubagentsFieldName" xml:space="preserve"><value>名称</value></data>
+  <data name="SubagentsFieldModel" xml:space="preserve"><value>模型</value></data>
+  <data name="SubagentsFieldTools" xml:space="preserve"><value>工具</value></data>
+  <data name="SubagentsFieldDescription" xml:space="preserve"><value>描述</value></data>
+  <data name="SubagentsTemplatesMissing" xml:space="preserve"><value>当前安装中未找到内置子代理模板。</value></data>
+  <data name="SubagentsInitSkippedFormat" xml:space="preserve"><value>已跳过现有子代理“{0}”</value></data>
+  <data name="SubagentsInitInstalledFormat" xml:space="preserve"><value>已安装子代理“{0}”</value></data>
+  <data name="SubagentsCreatedFormat" xml:space="preserve"><value>已创建子代理“{0}”</value></data>
+  <data name="SubagentsRemoveConfirmFormat" xml:space="preserve"><value>删除子代理“{0}”？</value></data>
+  <data name="SubagentsNotFoundFormat" xml:space="preserve"><value>未找到子代理：{0}</value></data>
+  <data name="SubagentsRemovedFormat" xml:space="preserve"><value>已删除子代理“{0}”</value></data>
+  <data name="SubagentsValidationPassed" xml:space="preserve"><value>有效</value></data>
+  <data name="SubagentsModelNotConfiguredFormat" xml:space="preserve"><value>模型“{0}”未配置。</value></data>
+  <data name="SubagentsUnsupportedDefinition" xml:space="preserve"><value>不支持的定义类型</value></data>
+  <data name="SubagentsInvalidToolNames" xml:space="preserve"><value>工具名称不能为空</value></data>
 </root>

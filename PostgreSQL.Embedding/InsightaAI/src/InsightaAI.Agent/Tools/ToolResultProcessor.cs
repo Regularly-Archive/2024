@@ -42,7 +42,8 @@ public sealed class ToolResultProcessor
         var policy = projector?.RetentionPolicy ?? DefaultToolResultProjector.DefaultPolicy;
 
         ToolResultArtifactInfo? artifact = null;
-        var shouldPersist = enabled && Encoding.UTF8.GetByteCount(text) > DefaultPersistenceThresholdBytes;
+        var shouldPersist = enabled && text.Length > 0 &&
+            (policy.PreferPersistence || Encoding.UTF8.GetByteCount(text) > DefaultPersistenceThresholdBytes);
         if (shouldPersist)
             artifact = await _artifactStore.SaveAsync(sessionId, toolCall.Name, toolCall.Id, text, cancellationToken);
 

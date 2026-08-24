@@ -516,10 +516,11 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 - [x] CLI 提供 `CliInsightaSubagentAdapter`；Definition 只能收紧工具、CLI 保留安全配置主导权
 - [x] Subagent 采用静态预授权：不注册交互式 `ToolPermissionHook`，始终保留 `SecurityPolicyHook`
 - [x] 子 Agent 的 Skill、MCP、Memory 工具组统一映射为 `AgentConfig.ExcludedToolNames`；基础设施保留在 DI，项目指令作为独立 Prompt 选项
-- [x] 实现项目级 `LocalSubagentCatalog`，并提供 reviewer / explorer / planner 三个只读定义
+- [x] 实现全局 `LocalSubagentDefinitionStore` 与 `ISubagentDefinitionStore` CRUD 契约；提供 reviewer / explorer / planner 模板
+- [x] CLI 提供 `subagents list/init/create/remove/validate`，只依赖 Store 抽象而不绑定本地文件系统
 - [x] 建立独立 `InsightaAI.Agents.Subagents.Tests` 项目，覆盖 dispatcher 与 local catalog
 - [x] CLI 主 Agent 注册核心 `delegate` 工具，通过本地 Catalog 委派，最大深度为 1
-- [x] 提供最大深度为 1、权限只能收紧、结果先脱敏的核心 `delegate` 工具
+- [x] 提供最大深度为 1、权限只能收紧、结果先脱敏且完整 artifact 落盘的核心 `delegate` 工具
 - [ ] 以工具白名单实现 CLI `Explorer` Profile；不以 Prompt 代替只读约束
 
 **设计文档：** [agent-invocation-design.md](agent-invocation-design.md)
