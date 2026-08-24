@@ -107,7 +107,7 @@ public sealed class SubagentsCommand
 
     private async Task InitializeAsync()
     {
-        var templateRoot = Path.Combine(AppContext.BaseDirectory, "subagent-templates");
+        var templateRoot = Path.Combine(AppContext.BaseDirectory, "Assets", "subagent-templates");
         if (!Directory.Exists(templateRoot))
         {
             AnsiConsole.MarkupLine($"[red]{CliStrings.ErrorPrefix}: {Text("SubagentsTemplatesMissing")}[/]");

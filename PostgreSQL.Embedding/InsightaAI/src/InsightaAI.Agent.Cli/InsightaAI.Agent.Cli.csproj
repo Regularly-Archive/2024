@@ -31,11 +31,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="$(MSBuildProjectDirectory)\..\..\.insighta\subagents\**\*">
-      <Link>subagent-templates\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    <Content Include="$(MSBuildProjectDirectory)\Assets\subagent-templates\**\*">
+      <Link>Assets\subagent-templates\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Pack>true</Pack>
-      <PackagePath>tools\net9.0\any\subagent-templates\%(RecursiveDir)%(Filename)%(Extension)</PackagePath>
+      <PackagePath>tools\net9.0\any\Assets\subagent-templates\%(RecursiveDir)%(Filename)%(Extension)</PackagePath>
     </Content>
   </ItemGroup>
 
