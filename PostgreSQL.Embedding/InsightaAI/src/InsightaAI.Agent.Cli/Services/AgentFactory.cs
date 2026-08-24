@@ -57,6 +57,7 @@ public sealed class AgentFactory : IAgentFactory
             UserId = userId,
             WorkingDirectory = Directory.GetCurrentDirectory(),
             DenyRules = CreateDenyRules(options.Config.Security),
+            ParallelToolExecution = options.Config.ParallelToolExecution
         };
         var agentConfig = options.AgentConfigOverride is { } profile
             ? ApplyProfile(profile, defaultAgentConfig, options)

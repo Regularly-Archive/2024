@@ -35,6 +35,11 @@ public class ToolPermissionHook : IToolHook
         string arguments,
         ToolExecutionContext context)
     {
+        return Task.FromResult(PromptForPermission(toolName, arguments));
+    }
+
+    private static ToolHookResult PromptForPermission(string toolName, string arguments)
+    {
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine($"[yellow]◆[/] {CliStrings.Format("ToolPermissionWantsToUseFormat", $"[cyan]{EscapeMarkup(toolName)}[/]")}");
 
@@ -64,12 +69,13 @@ public class ToolPermissionHook : IToolHook
                     new(ToolPermissionChoice.Reject, CliStrings.ToolPermissionReject)
                 ]));
 
-        return Task.FromResult(choice.Value switch
+
+        return choice.Value switch
         {
             ToolPermissionChoice.Allow => ToolHookResult.Allow,
             ToolPermissionChoice.AllowAlways => ToolHookResult.AllowAlways,
             _ => ToolHookResult.Deny
-        });
+        };
     }
 
     private enum ToolPermissionChoice

@@ -476,6 +476,14 @@ public sealed class ChatApplication : IChatApplication
         // 注册 ask_user 工具
         registry.Register(new AskUserTool(async (question, choices, multipleSelect) =>
         {
+            return PromptForUserAnswer(question, choices, multipleSelect);
+        }));
+
+        return registry;
+    }
+
+    private static string PromptForUserAnswer(string question, string[]? choices, bool multipleSelect)
+    {
             AnsiConsole.WriteLine();
             AnsiConsole.MarkupLine(CliStrings.Format("ChatAskUserPromptFormat", Markup.Escape(question)));
             AnsiConsole.WriteLine();
@@ -507,16 +515,13 @@ public sealed class ChatApplication : IChatApplication
 
                 return selected;
             }
-        }));
-
-        return registry;
     }
 
     private void RegisterDelegationTool(ToolRegistry toolRegistry, AgentCreationOptions template)
     {
         var adapter = new CliInsightaSubagentAdapter(_agentFactory, _storage, template);
         var dispatcher = new SubagentDispatcher([adapter]);
-        var catalog = new LocalSubagentCatalog(Directory.GetCurrentDirectory());
+        var catalog = new LocalSubagentCatalog();
         var handler = new CliSubagentDelegationHandler(catalog, dispatcher, template.UserId!);
         toolRegistry.Register(new DelegateTool(handler));
     }

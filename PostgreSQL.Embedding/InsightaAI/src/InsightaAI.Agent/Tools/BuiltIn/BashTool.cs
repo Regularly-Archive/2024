@@ -70,10 +70,27 @@ public class BashTool : ITool, IToolResultProjector
             }
 
             // 执行命令
-            var result = await _shellExecutor.ExecuteAsync(
-                command,
-                workingDirectory,
-                context.CancellationToken);
+            await context.Progress.ReportAsync(new ToolProgressUpdate
+            {
+                Kind = ToolProgressKind.Status,
+                Message = "Shell command started."
+            }, context.CancellationToken);
+
+            var result = _shellExecutor is IStreamingShellExecutor streamingExecutor
+                ? await streamingExecutor.ExecuteStreamingAsync(
+                    command,
+                    workingDirectory,
+                    (stream, text, cancellationToken) => context.Progress.ReportAsync(new ToolProgressUpdate
+                    {
+                        Kind = ToolProgressKind.Output,
+                        Stream = stream,
+                        Text = text
+                    }, cancellationToken),
+                    context.CancellationToken)
+                : await _shellExecutor.ExecuteAsync(
+                    command,
+                    workingDirectory,
+                    context.CancellationToken);
 
             // 格式化输出
             var sb = new System.Text.StringBuilder();

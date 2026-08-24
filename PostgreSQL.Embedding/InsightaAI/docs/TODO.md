@@ -528,6 +528,23 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 
 ---
 
+### 19. 通用工具进度报告（优先级：中）
+
+**目标：** 为所有长运行工具提供执行期的旁路进度流。工具只报告原始状态或输出增量；Runtime 统一负责脱敏和有界事件分发，前端 `ToolProgressWindow` 统一负责窗口保留、节流和展示。该机制不改变最终 `ToolResult`，也不将过程文本放入 LLM 上下文。
+
+- [x] 定义 `IToolProgressReporter`、`ToolProgressUpdate`、默认空实现与 `AgentToolProgressEvent`
+- [x] 改造工具事件汇流，使 progress events 可从 `RunStreamAsync()` 产出，并在分发前脱敏
+- [x] CLI 实现 `ToolProgressWindow`，按 `ToolCallId` 更新固定进度窗口；非交互式输出保留原有 Tool End 渲染
+- [x] 接入 bash 与 `delegate`
+- [x] 串行 Tool Call 使用逐工具事件 channel；仅在前一 `ToolEnd` 被事件消费者推进后启动下一 Tool Call，避免最终结果与下一工具权限确认交叠
+- [ ] 在真实交互终端回归 `Live` 进度与权限确认：CLI 使用串行工具执行；并行工具与交互 Prompt 的组合仍不受 Spectre.Console 支持
+- [ ] 后续评估 MCP progress notification，并为其他长运行工具补阶段性状态或 Heartbeat
+- [ ] 单独设计 detached/background process 的 Job / Process Handle 模型，不依赖 shell `&`
+
+**设计文档：** [tool-progress-reporting-design.md](tool-progress-reporting-design.md)
+
+---
+
 ## 当前优先级
 
 已完成：Dashboard 拆分与 Anthropic 归一化（#17），以及 MCP Telemetry tag 命名分层与去重（#12）。后续可观测性工作保留 Agent Dashboard 的 Turn 指标、低基数行为指标评估和 Jaeger Trace Drilldown；见 `observability-design.md` §8。

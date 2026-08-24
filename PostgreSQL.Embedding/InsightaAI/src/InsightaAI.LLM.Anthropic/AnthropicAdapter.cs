@@ -43,6 +43,7 @@ public class AnthropicAdapter : IProviderAdapter
         // Anthropic 使用自定义认证头
         httpRequest.Headers.Add("x-api-key", config.ApiKey);
         httpRequest.Headers.Add("anthropic-version", "2023-06-01");
+        httpRequest.Headers.Add("Authorization", $"Bearer {config.ApiKey}");
 
         // 设置自定义头
         if (config.Headers != null)

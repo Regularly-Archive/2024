@@ -267,6 +267,9 @@ public class CliConfig
     [JsonPropertyName("security")]
     public SecurityConfig Security { get; set; } = new();
 
+    [JsonPropertyName("parallel_tool_execution")]
+    public bool ParallelToolExecution { get; set; } = true;
+
     /// <summary>
     /// 解析 primary_model，返回 (ProviderName, ModelKey)
     /// </summary>

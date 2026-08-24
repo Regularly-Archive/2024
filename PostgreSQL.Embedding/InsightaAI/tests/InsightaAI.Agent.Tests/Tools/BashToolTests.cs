@@ -30,6 +30,30 @@ public sealed class BashToolTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ShouldReportStreamingOutputWhenSupported()
+    {
+        var progress = new RecordingProgressReporter();
+        var tool = new BashTool(new StreamingShellExecutor(new ShellResult
+        {
+            Stdout = "stdout line",
+            Stderr = "stderr line"
+        }));
+
+        await tool.ExecuteAsync(
+            new Dictionary<string, object> { ["command"] = "test" },
+            CreateContext() with { Progress = progress });
+
+        Assert.Contains(progress.Updates, update =>
+            update.Kind == ToolProgressKind.Status && update.Message == "Shell command started.");
+        Assert.Contains(progress.Updates, update =>
+            update.Kind == ToolProgressKind.Output &&
+            update.Stream == ToolOutputStream.Stdout && update.Text == "stdout line");
+        Assert.Contains(progress.Updates, update =>
+            update.Kind == ToolProgressKind.Output &&
+            update.Stream == ToolOutputStream.Stderr && update.Text == "stderr line");
+    }
+
+    [Fact]
     public async Task ExecuteAsync_ShouldRejectArgumentsNotDeclaredBySchema()
     {
         var tool = new BashTool(new StubShellExecutor(new ShellResult()));
@@ -94,6 +118,35 @@ public sealed class BashToolTests
             if (_exception != null)
                 return Task.FromException<ShellResult>(_exception);
             return Task.FromResult(_result!);
+        }
+    }
+
+    private sealed class StreamingShellExecutor(ShellResult result) : IStreamingShellExecutor
+    {
+        public Task<ShellResult> ExecuteAsync(
+            string command, string? workingDirectory = null, CancellationToken cancellationToken = default) =>
+            Task.FromResult(result);
+
+        public async Task<ShellResult> ExecuteStreamingAsync(
+            string command,
+            string? workingDirectory,
+            Func<ToolOutputStream, string, CancellationToken, ValueTask> onOutput,
+            CancellationToken cancellationToken = default)
+        {
+            await onOutput(ToolOutputStream.Stdout, result.Stdout, cancellationToken);
+            await onOutput(ToolOutputStream.Stderr, result.Stderr, cancellationToken);
+            return result;
+        }
+    }
+
+    private sealed class RecordingProgressReporter : IToolProgressReporter
+    {
+        public List<ToolProgressUpdate> Updates { get; } = [];
+
+        public ValueTask ReportAsync(ToolProgressUpdate update, CancellationToken cancellationToken = default)
+        {
+            Updates.Add(update);
+            return ValueTask.CompletedTask;
         }
     }
 }

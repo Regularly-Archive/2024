@@ -4,7 +4,7 @@
 
 `Invocation` 表示一次边界明确、可取消、可审计的子 Agent 工作单元。它服务于两类需求：
 
-- 命名的长期 Subagent，例如 Explorer；定义可以来自 `.insighta/subagents/{id}/`，也可以来自数据库或服务端。
+- 命名的长期 Subagent，例如 Explorer；定义可以来自全局 `~/.insighta/subagents/{id}/`，也可以来自数据库或服务端。
 - 临时的 DAG 工作单元；定义由编排计划内联提供，任务完成后不必持久化。
 
 两类需求共享同一份 `SubagentDefinition`。是否持久化是 Definition 的来源和 Catalog 的责任，不是模型类型本身的属性。
@@ -62,7 +62,7 @@ Subagent 使用静态预授权，而不是交互式确认：Definition 的工具
 
 `ISubagentCatalog` 只提供按 ID 查询和枚举命名 Definition；它不规定存储形式。第一期不急于抽象多个 provider：真正实现本地目录读取时，直接提供 `LocalSubagentCatalog` 即可。等数据库、远程或组合来源同时出现后，再把文件解析提取为 `LocalSubagentDefinitionProvider`。
 
-CLI 已提供 `LocalSubagentCatalog`，使用项目工作目录下 `.insighta/subagents/{id}/subagent.json`。descriptor 的 `id` 必须与目录名一致，避免路径混淆；找不到根目录时视为没有本地定义。项目当前包含 `reviewer`、`explorer`、`planner` 三个预授权只读定义。
+CLI 已提供 `LocalSubagentCatalog`，默认使用全局 `~/.insighta/subagents/{id}/subagent.json`。Subagent 是可复用的独立工作流程，不绑定某一个项目或工作目录。descriptor 的 `id` 必须与目录名一致，避免路径混淆；找不到根目录时视为没有本地定义。仓库内的 `reviewer`、`explorer`、`planner` 是预置模板，安装/初始化流程负责将其提供到全局目录。
 
 Subagent 契约、dispatcher 与本地 catalog 的单元测试位于独立项目 `tests/InsightaAI.Agents.Subagents.Tests/`；Orchestrator 如何委派 Subagent 的测试仍归属 `InsightaAI.Agents.Orchestrator.Tests`。
 
@@ -75,6 +75,6 @@ Subagent 契约、dispatcher 与本地 catalog 的单元测试位于独立项目
 ## 后续顺序
 
 1. 补 CLI adapter 的会话隔离、白名单交集和结果映射测试。
-2. 实现 `.insighta/subagents/{id}/` 的 `LocalSubagentCatalog` 与 descriptor 格式。
+2. 实现全局 `~/.insighta/subagents/{id}/` 的 `LocalSubagentCatalog` 与 descriptor 格式。
 3. 让 CLI 显式注册 dispatcher，并通过核心 `delegate` 工具提供受限的 named subagent 委派。
 4. 再根据真实的外部 Agent 协议评估 adapter。

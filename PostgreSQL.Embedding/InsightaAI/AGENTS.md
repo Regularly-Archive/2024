@@ -169,6 +169,13 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 - 并行工具仍在 Start 后同时执行；终端只在对应 ToolEnd 按 `ToolCallId` 一次性渲染 `○` 调用和 `⎿` 结果。工具块按完成顺序追加，消除结果归属歧义；仍需补自动化渲染测试。
 - Chat 输入以单行 `/` 开头时显示本地化命令候选与说明，精确匹配时隐藏；`Tab` 仅补全唯一候选。候选区随 Prompt 重绘清理，不写入聊天历史；`Ctrl+C` 正常退出 chat。
 
+### 工具进度与串行消费边界（2026-08-21）
+
+- `IToolProgressReporter` 让工具以 `Status` / `Output` / `Heartbeat` 报告旁路进度；Runtime 先脱敏，再以 `AgentToolProgressEvent` 从 `RunStreamAsync()` 有界分发。过程文本不进入 LLM 上下文或会话历史；bash 逐行转发 stdout/stderr，`delegate` 转发子 Agent 的文本、round 与子工具状态。
+- CLI 的 `ToolProgressWindow` 是纯呈现状态：按 `ToolCallId` 保留最近 6 行 / 2 KB，交互式终端通过 Spectre `Live` 临时显示，工具完成后仍由普通 `ToolEnd` 块输出权威结果。窗口的增删改和渲染使用同一把锁，防止 Live 刷新与 progress 写入并发修改集合。
+- 串行 `ToolCallExecutor` 不再只等待前一个工具任务结束：每个 Tool Call 有独立 event channel；只有消费端处理完前一个 `ToolEnd` 并继续枚举，才启动下一个工具。CLI 因而能先收束前一最终结果，再显示下一工具的权限确认，避免 ToolEnd 结果混入确认块。并行分支保持原有并发语义。
+- Spectre `Live` 不能与 `SelectionPrompt` / `ask_user` 并行拥有终端。CLI 的交互权限场景应使用串行工具执行；仍需在真实交互终端完成这一组合的回归验证。设计见 `docs/tool-progress-reporting-design.md`。
+
 ### MCP 工具调用元数据管道（2026-07-21）
 
 - `ToolResult` 新增 `Metadata` 属性（`IReadOnlyDictionary<string,object?>?`）
@@ -235,7 +242,7 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 ### Agent Invocation 与受限 Subagent（2026-08-21）
 
 - `InsightaAI.Agents.Subagents` 提供不依赖 CLI、Agent 或 Orchestrator 的公共契约：`SubagentDefinition`、Catalog、Adapter、Dispatcher 以及 invocation context / request / result；命名 Definition 可来自本地文件、数据库或服务端，临时 Definition 可由编排直接构造。
-- CLI 的 `LocalSubagentCatalog` 从 `.insighta/subagents/{id}/subagent.json` 加载定义；当前预置 reviewer、explorer、planner。`CliInsightaSubagentAdapter` 复用 `AgentFactory` 创建独立子会话，并将 user、父 session 和父 tool call 写入存储关联。
+- CLI 的 `LocalSubagentCatalog` 从全局 `~/.insighta/subagents/{id}/subagent.json` 加载定义；Subagent 是可独立完成工作、跨项目复用的流程，不绑定工作区。仓库内预置 reviewer、explorer、planner 模板，尚需安装/初始化流程提供到全局目录。`CliInsightaSubagentAdapter` 复用 `AgentFactory` 创建独立子会话，并将 user、父 session 和父 tool call 写入存储关联。
 - 核心只有一个 `DelegateTool`（参数为 `agent_id`、`task`）；宿主以 `IAgentDelegationHandler` 实现 Definition 查找、Dispatcher 调用和输出边界。CLI 不再维护平行的 `subagent` 工具协议，模型切换后会以当前运行时模板重建该处理器。
 - `AgentConfig.ExcludedToolNames` 通过 `ToolRegistry.Exclude()` 统一收紧能力：被排除工具既不暴露给 LLM，也不能被查找或执行；后续 `Register()` 不会绕过该策略。子 Agent 是静态预授权：不注册交互式 `ToolPermissionHook`，但保留 `SecurityPolicyHook`；Definition 只能收紧宿主工具与 Skills / MCP / Memory / AGENTS.md 能力。CLI 子 Agent Profile 以此排除 `delegate`，当前强制最大委派深度为 1。子 Agent 输出回到父工具结果处理链，先脱敏再进入父上下文。
 - CLI 始终将 SkillRegistry、McpRegistry 与 `IMemoryManager` 注入 Agent 私有 Provider，并保留自动记忆快照、`SessionMemoryHook` 与项目级 Memory Index。子 Agent 对 Skill、MCP、Memory 的限制仅通过工具排除名单实现；因此没有相应工具时不能主动操作这些基础设施，但仍保有宿主提供的运行时上下文。
@@ -261,6 +268,7 @@ Agent 服务生命周期已明确：当前 Agent 私有 Provider 只支持 Singl
 - 2026-08-12：CLI 对话时间线、挂起缩进、交互选项对齐和后台标题生成完成实机验证；完整测试 401 项通过。
 - 2026-08-12：Slash 命令候选完成实机验证：候选筛选、描述对齐与中英文资源、Tab 唯一补全、候选清理和 Ctrl+C 退出均通过；Agent 测试 286 项通过。
 - 2026-08-14：Dashboard 复核通过真实 Prometheus 数据验证全部 PromQL；Anthropic 归一化后完整测试 69 项通过（改动在 `chore/mcp-telemetry-tags` 分支）。
+- 2026-08-21：工具进度与串行消费边界定向测试通过；完整 `InsightaAI.Agent.Tests` 327/327 通过。
 
 ## 愿景与里程碑
 

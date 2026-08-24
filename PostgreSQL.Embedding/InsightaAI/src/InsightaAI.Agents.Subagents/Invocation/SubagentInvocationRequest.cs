@@ -13,4 +13,5 @@ public sealed record SubagentInvocationRequest
     /// external adapters retain ownership of their own tool systems.
     /// </summary>
     public IReadOnlyList<string>? AllowedToolNames { get; init; }
+    public ISubagentProgressReporter? Progress { get; init; }
 }

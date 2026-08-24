@@ -22,7 +22,7 @@ public sealed record ShellCommandLog
 /// 本地 Shell 命令执行器
 /// 支持 Windows (PowerShell) 和 Linux (Bash)
 /// </summary>
-public class LocalShellExecutor : IShellExecutor
+public class LocalShellExecutor : IStreamingShellExecutor
 {
     private readonly bool _isWindows;
 
@@ -41,6 +41,20 @@ public class LocalShellExecutor : IShellExecutor
         string? workingDirectory = null,
         CancellationToken cancellationToken = default)
     {
+        return await ExecuteStreamingAsync(
+            command,
+            workingDirectory,
+            static (_, _, _) => ValueTask.CompletedTask,
+            cancellationToken);
+    }
+
+    public async Task<ShellResult> ExecuteStreamingAsync(
+        string command,
+        string? workingDirectory,
+        Func<ToolOutputStream, string, CancellationToken, ValueTask> onOutput,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(onOutput);
         var stopwatch = Stopwatch.StartNew();
 
         try
@@ -71,37 +85,18 @@ public class LocalShellExecutor : IShellExecutor
 
             var stdoutBuilder = new StringBuilder();
             var stderrBuilder = new StringBuilder();
-            var stdoutTcs = new TaskCompletionSource<bool>();
-            var stderrTcs = new TaskCompletionSource<bool>();
-
-            process.OutputDataReceived += (_, e) =>
-            {
-                if (e.Data == null)
-                    stdoutTcs.TrySetResult(true);
-                else
-                    stdoutBuilder.AppendLine(e.Data);
-            };
-
-            process.ErrorDataReceived += (_, e) =>
-            {
-                if (e.Data == null)
-                    stderrTcs.TrySetResult(true);
-                else
-                    stderrBuilder.AppendLine(e.Data);
-            };
-
             process.Start();
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
+            var stdoutTask = ReadOutputAsync(process.StandardOutput, ToolOutputStream.Stdout, stdoutBuilder, onOutput, cancellationToken);
+            var stderrTask = ReadOutputAsync(process.StandardError, ToolOutputStream.Stderr, stderrBuilder, onOutput, cancellationToken);
 
             // 等待进程完成或取消
-            await using var reg = cancellationToken.Register(() =>
+            using var reg = cancellationToken.Register(() =>
             {
                 try { process.Kill(true); } catch { }
             });
 
             await process.WaitForExitAsync(cancellationToken);
-            await Task.WhenAll(stdoutTcs.Task, stderrTcs.Task);
+            await Task.WhenAll(stdoutTask, stderrTask);
 
             stopwatch.Stop();
 
@@ -128,6 +123,10 @@ public class LocalShellExecutor : IShellExecutor
 
             return result;
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             stopwatch.Stop();
@@ -137,6 +136,20 @@ public class LocalShellExecutor : IShellExecutor
                 Stderr = $"执行命令时出错: {ex.Message}",
                 Duration = stopwatch.Elapsed
             };
+        }
+    }
+
+    private static async Task ReadOutputAsync(
+        StreamReader reader,
+        ToolOutputStream stream,
+        StringBuilder builder,
+        Func<ToolOutputStream, string, CancellationToken, ValueTask> onOutput,
+        CancellationToken cancellationToken)
+    {
+        while (await reader.ReadLineAsync(cancellationToken) is { } line)
+        {
+            builder.AppendLine(line);
+            await onOutput(stream, line, cancellationToken);
         }
     }
 

@@ -175,6 +175,40 @@ public class OpenAIResponseAdapterTests
     }
 
     [Fact]
+    public async Task CreateRequest_Should_Replay_ReasoningBeforeAssistantToolCalls()
+    {
+        var toolCallArgs = JsonSerializer.Deserialize<JsonElement>("{}");
+        var request = new LlmRequest
+        {
+            Model = "deepseek-v4-flash",
+            Messages =
+            [
+                Message.FromUser("Inspect the repository."),
+                new Message
+                {
+                    Role = MessageRole.Assistant,
+                    Content =
+                    [
+                        new ThinkingBlock { Thinking = "I should inspect the files first." },
+                        new ToolCallBlock { Id = "call_123", Name = "read_file", Arguments = toolCallArgs }
+                    ]
+                },
+                Message.FromToolResult("call_123", "read_file", [new TextBlock { Text = "contents" }])
+            ]
+        };
+
+        var body = await GetRequestBodyAsync(request, stream: false);
+        var input = body.GetProperty("input");
+
+        Assert.Equal("reasoning", input[1].GetProperty("type").GetString());
+        var reasoningText = input[1].GetProperty("content")[0];
+        Assert.Equal("reasoning_text", reasoningText.GetProperty("type").GetString());
+        Assert.Equal("I should inspect the files first.", reasoningText.GetProperty("text").GetString());
+        Assert.Equal("function_call", input[2].GetProperty("type").GetString());
+        Assert.Equal("function_call_output", input[3].GetProperty("type").GetString());
+    }
+
+    [Fact]
     public async Task CreateRequest_Should_Convert_Tools()
     {
         var request = new LlmRequest

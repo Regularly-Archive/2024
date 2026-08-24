@@ -227,6 +227,14 @@ public class OpenAIResponseAdapter : IProviderAdapter
                     break;
 
                 case MessageRole.Assistant:
+                    foreach (var thinking in msg.Content.OfType<ThinkingBlock>())
+                    {
+                        items.Add(new ResponseReasoningItem
+                        {
+                            Content = [new ResponseReasoningText { Text = thinking.Thinking }]
+                        });
+                    }
+
                     // 文本内容
                     var text = msg.GetTextContent();
                     if (!string.IsNullOrEmpty(text))

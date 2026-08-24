@@ -110,6 +110,24 @@ internal class ResponseOutputText
     public required string Text { get; set; }
 }
 
+internal class ResponseReasoningItem
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "reasoning";
+
+    [JsonPropertyName("content")]
+    public required object[] Content { get; set; }
+}
+
+internal class ResponseReasoningText
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "reasoning_text";
+
+    [JsonPropertyName("text")]
+    public required string Text { get; set; }
+}
+
 /// <summary>
 /// Responses API 函数调用 item（type: "function_call"）
 /// </summary>

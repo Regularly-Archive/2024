@@ -41,7 +41,8 @@ public sealed class CliSubagentDelegationHandler : IAgentDelegationHandler
                 UserId = _userId,
                 ParentSessionId = request.ParentContext.SessionId,
                 ParentInvocationId = request.ParentContext.ToolCallId
-            }
+            },
+            Progress = new ParentToolProgressReporter(request.ParentContext.Progress)
         }, cancellationToken);
 
         if (result.Status != SubagentInvocationStatus.Completed)
@@ -51,5 +52,29 @@ public sealed class CliSubagentDelegationHandler : IAgentDelegationHandler
         if (output.Length > MaxOutputCharacters)
             output = output[..MaxOutputCharacters] + "\n\n[Subagent output truncated by the host.]";
         return ToolResult.FromText(output);
+    }
+
+    private sealed class ParentToolProgressReporter(IToolProgressReporter parentProgress) : ISubagentProgressReporter
+    {
+        public ValueTask ReportAsync(SubagentProgressUpdate update, CancellationToken cancellationToken = default)
+        {
+            var progress = update.Kind == SubagentProgressKind.Output
+                ? new ToolProgressUpdate
+                {
+                    Kind = ToolProgressKind.Output,
+                    Text = update.Text,
+                    Stream = update.Stream switch
+                    {
+                        SubagentOutputStream.Stderr => ToolOutputStream.Stderr,
+                        _ => ToolOutputStream.Stdout
+                    }
+                }
+                : new ToolProgressUpdate
+                {
+                    Kind = ToolProgressKind.Status,
+                    Message = update.Message
+                };
+            return parentProgress.ReportAsync(progress, cancellationToken);
+        }
     }
 }

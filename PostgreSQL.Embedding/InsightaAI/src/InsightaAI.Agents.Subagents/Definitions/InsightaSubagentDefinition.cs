@@ -9,6 +9,10 @@ public sealed record InsightaSubagentDefinition : SubagentDefinition
     public const string Adapter = "insighta";
 
     public override string AdapterKey => Adapter;
+    /// <summary>
+    /// Optional CLI model reference in <c>provider/model_key</c> form. When omitted, the host
+    /// runs this subagent with its configured primary model.
+    /// </summary>
     public string? Model { get; init; }
     public string Instructions { get; init; } = string.Empty;
     public int? MaxTokens { get; init; }

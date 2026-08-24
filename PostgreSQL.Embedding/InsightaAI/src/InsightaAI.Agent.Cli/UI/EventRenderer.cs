@@ -21,6 +21,11 @@ public class EventRenderer : IDisposable
     private CancellationTokenSource? _thinkingCts;
     private Task _thinkingTask = Task.CompletedTask;
     private readonly Dictionary<string, string> _pendingTools = [];
+    private readonly ToolProgressWindow _toolProgressWindow = new();
+    private LiveDisplayContext? _toolProgressLiveContext;
+    private TaskCompletionSource? _toolProgressLiveCompletion;
+    private Task _toolProgressLiveTask = Task.CompletedTask;
+    private bool _hasReceivedToolProgress;
 
     public EventRenderer(IAnsiConsole? console = null)
     {
@@ -56,8 +61,12 @@ public class EventRenderer : IDisposable
                 await HandleToolStartAsync(toolStart);
                 break;
 
+            case AgentToolProgressEvent toolProgress:
+                await HandleToolProgressAsync(toolProgress);
+                break;
+
             case AgentToolEndEvent toolEnd:
-                HandleToolEnd(toolEnd);
+                await HandleToolEndAsync(toolEnd);
                 break;
 
             case AgentTurnEndEvent completeEvent:
@@ -122,10 +131,23 @@ public class EventRenderer : IDisposable
         var toolArgs = toolStart.Arguments.Truncate(50);
         var displayText = $"{toolStart.ToolName}({EscapeMarkup(toolArgs)})";
         _pendingTools[toolStart.ToolCallId] = displayText;
+        _toolProgressWindow.Begin(toolStart.ToolCallId, displayText);
     }
 
-    private void HandleToolEnd(AgentToolEndEvent toolEnd)
+    private async Task HandleToolProgressAsync(AgentToolProgressEvent toolProgress)
     {
+        await StopThinkingAsync();
+        CloseAssistantSegment();
+        _hasReceivedToolProgress = true;
+        _toolProgressWindow.Apply(toolProgress.ToolCallId, toolProgress.Progress);
+        await EnsureToolProgressLiveAsync();
+    }
+
+    private async Task HandleToolEndAsync(AgentToolEndEvent toolEnd)
+    {
+        _toolProgressWindow.Complete(toolEnd.ToolCallId);
+        await StopToolProgressLiveAsync();
+
         var toolDisplay = _pendingTools.TryGetValue(toolEnd.ToolCallId, out var displayText)
             ? displayText
             : EscapeMarkup(toolEnd.ToolName);
@@ -148,6 +170,9 @@ public class EventRenderer : IDisposable
 
         _console.WriteLine();
         _pendingTools.Remove(toolEnd.ToolCallId);
+
+        if (_hasReceivedToolProgress && _toolProgressWindow.HasActiveEntries)
+            await EnsureToolProgressLiveAsync();
     }
 
     private async Task HandleCompleteAsync(AgentTurnEndEvent completeEvent)
@@ -232,6 +257,69 @@ public class EventRenderer : IDisposable
         FullText = "";
         _assistantWriter.Reset();
         _pendingTools.Clear();
+    }
+
+    private async Task EnsureToolProgressLiveAsync()
+    {
+        // StartAsync invokes its callback asynchronously. _toolProgressLiveContext is assigned in
+        // that callback, so it cannot be used as the startup guard: several rapid progress events
+        // could otherwise create multiple Live regions before the first callback runs.
+        if (_toolProgressLiveCompletion is not null ||
+            !_console.Profile.Capabilities.Interactive)
+            return;
+
+        _toolProgressLiveCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _toolProgressLiveTask = _console.Live(_toolProgressWindow.Render())
+            .AutoClear(true)
+            .StartAsync(async context =>
+            {
+                _toolProgressLiveContext = context;
+                while (!_toolProgressLiveCompletion.Task.IsCompleted)
+                {
+                    context.UpdateTarget(_toolProgressWindow.Render());
+                    await Task.WhenAny(
+                        _toolProgressLiveCompletion.Task,
+                        Task.Delay(TimeSpan.FromMilliseconds(200)));
+                }
+            });
+
+        await Task.Yield();
+        if (_toolProgressLiveTask.IsFaulted)
+        {
+            try
+            {
+                await _toolProgressLiveTask;
+            }
+            catch (Exception exception)
+            {
+                Debug.WriteLine($"Tool progress live rendering is unavailable: {exception.Message}");
+                _toolProgressLiveCompletion = null;
+                _toolProgressLiveContext = null;
+                _toolProgressLiveTask = Task.CompletedTask;
+            }
+        }
+    }
+
+    private async Task StopToolProgressLiveAsync()
+    {
+        if (_toolProgressLiveCompletion is null)
+            return;
+
+        try
+        {
+            _toolProgressLiveCompletion.TrySetResult();
+            await _toolProgressLiveTask;
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"Tool progress live rendering stopped unexpectedly: {exception.Message}");
+        }
+        finally
+        {
+            _toolProgressLiveCompletion = null;
+            _toolProgressLiveContext = null;
+            _toolProgressLiveTask = Task.CompletedTask;
+        }
     }
 
     private void CloseAssistantSegment()
@@ -325,6 +413,7 @@ public class EventRenderer : IDisposable
 
     public void Dispose()
     {
+        _toolProgressLiveCompletion?.TrySetResult();
         _thinkingCts?.Dispose();
         GC.SuppressFinalize(this);
     }

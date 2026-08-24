@@ -20,6 +20,12 @@ public sealed record ToolExecutionContext
     public CancellationToken CancellationToken { get; init; }
 
     /// <summary>
+    /// Best-effort progress reporter for this tool call. Progress is visible to event consumers
+    /// only; it is not added to the LLM conversation or the final tool result.
+    /// </summary>
+    public IToolProgressReporter Progress { get; init; } = NullToolProgressReporter.Instance;
+
+    /// <summary>
     /// 服务提供者（可选，Tool/ToolHook 可按需解析 Agent 级扩展服务）。
     /// 该 Provider 不提供 Scoped 生命周期语义；仅应解析 Singleton 或 Transient 服务。
     /// </summary>

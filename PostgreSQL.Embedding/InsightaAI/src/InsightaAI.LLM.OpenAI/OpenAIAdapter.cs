@@ -299,6 +299,10 @@ public class OpenAIAdapter : IProviderAdapter
             }
         };
 
+        var reasoning = string.Concat(msg.Content.OfType<ThinkingBlock>().Select(block => block.Thinking));
+        if (!string.IsNullOrEmpty(reasoning))
+            message.ReasoningContent = reasoning;
+
         if (msg.Role == MessageRole.ToolResult)
         {
             message.ToolCallId = msg.ToolCallId;

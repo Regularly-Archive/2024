@@ -1,3 +1,116 @@
+## [ERR-20260821-011] tool-progress-live-start-race
+
+**Logged**: 2026-08-21T00:00:00+08:00
+**Priority**: high
+**Status**: resolved
+**Area**: cli
+
+### Summary
+Tool progress could create duplicate terminal Live regions when multiple progress updates arrived before the first `StartAsync` callback set its display context.
+
+### Suggested Fix
+Use a synchronously assigned lifecycle marker before starting `Live`, rather than a callback-assigned context field, as the single-start guard.
+
+### Resolution
+- **Resolved**: 2026-08-21T00:00:00+08:00
+- **Notes**: `EventRenderer.EnsureToolProgressLiveAsync()` now uses `_toolProgressLiveCompletion`, which is assigned before `StartAsync`, as its guard.
+
+---
+
+## [ERR-20260824-001] apply-patch-encoded-document-anchor
+
+**Logged**: 2026-08-24T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: docs
+
+### Summary
+An aggregate patch could not locate a Chinese design-document line because the file's displayed encoding was not stable for exact matching.
+
+### Suggested Fix
+Patch source and test files separately; update the document with an encoding-stable nearby anchor.
+
+### Metadata
+- Reproducible: yes
+- Related Files: docs/agent-invocation-design.md
+
+### Resolution
+- **Resolved**: 2026-08-24T00:00:00+08:00
+- **Notes**: Split the patch and avoided the unreliable exact text anchor.
+
+---
+
+## [ERR-20260824-002] subagent-model-missing-usings
+
+**Logged**: 2026-08-24T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: backend
+
+### Summary
+The subagent model-resolution record referenced CLI and LLM types without their namespaces.
+
+### Error
+```text
+CS0246: ModelEntry / ILlmClient could not be found
+```
+
+### Resolution
+- **Resolved**: 2026-08-24T00:00:00+08:00
+- **Notes**: Added the explicit CLI Models and LLM Abstractions imports.
+
+---
+
+## [ERR-20260824-003] local-subagent-catalog-ignores-working-directory
+
+**Logged**: 2026-08-24T00:00:00+08:00
+**Priority**: medium
+**Status**: resolved
+**Area**: tests
+
+### Summary
+The full subagent test project fails because LocalSubagentCatalog ignores its workingDirectory argument and always reads the global user subagent directory.
+
+### Error
+```text
+FindAsync_ValidDescriptor_ReturnsDefinition: expected a descriptor, got null
+ListAsync_ReturnsDescriptorsInIdOrder: expected test descriptors, got []
+```
+
+### Suggested Fix
+Decide whether catalog scope is project-local or global, then align the constructor and descriptor-location documentation; current tests and documented behavior expect project-local resolution.
+
+### Metadata
+- Reproducible: yes
+- Related Files: src/InsightaAI.Agent.Cli/Services/LocalSubagentCatalog.cs
+
+### Resolution
+- **Resolved**: 2026-08-24T00:00:00+08:00
+- **Notes**: The global lookup was intentional. The catalog now accepts an explicit isolated root only for tests, and the documentation reflects the global scope.
+
+---
+
+## [ERR-20260824-004] iterator-yield-catch-restriction
+
+**Logged**: 2026-08-24T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: backend
+
+### Summary
+Catalog enumeration attempted to yield from a try block with catch clauses, which C# forbids for iterators.
+
+### Error
+```text
+CS1626: Cannot yield a value in the body of a try block with a catch clause.
+```
+
+### Resolution
+- **Resolved**: 2026-08-24T00:00:00+08:00
+- **Notes**: Moved descriptor exception handling into a nullable helper and yielded only after it returns.
+
+---
+
 ## [ERR-20260804-001] powershell-validation-quoting
 
 **Logged**: 2026-08-04T00:00:00+08:00
@@ -232,6 +345,202 @@ Use the approved elevated Git operation for repository index updates; retain exp
 ### Resolution
 - **Resolved**: 2026-08-20T00:00:00+08:00
 - **Notes**: Retried with elevated repository-index permission.
+
+---
+
+## [ERR-20260821-005] spectre-live-api-type-mismatch
+
+**Logged**: 2026-08-21T00:00:00+08:00
+**Priority**: low
+**Status**: in_progress
+**Area**: frontend
+
+### Summary
+The initial CLI ToolProgressWindow implementation used incorrect Spectre.Console type names for renderables and live-display context.
+
+### Error
+```text
+CS0246: IRenderable and LiveContext could not be found.
+```
+
+### Suggested Fix
+Inspect the installed Spectre.Console XML documentation and use the version-specific rendering namespace and live callback context type.
+
+### Metadata
+- Reproducible: yes
+- Related Files: src/InsightaAI.Agent.Cli/UI/ToolProgressWindow.cs, src/InsightaAI.Agent.Cli/UI/EventRenderer.cs
+
+### Resolution
+- **Resolved**: 2026-08-21T00:00:00+08:00
+- **Notes**: Added `Spectre.Console.Rendering` for `IRenderable` and replaced the obsolete `LiveContext` with `LiveDisplayContext`; the CLI project then built with zero warnings and errors.
+
+---
+
+## [ERR-20260821-006] subagent-adapter-source-path-assumption
+
+**Logged**: 2026-08-21T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: backend
+
+### Summary
+Source inspection assumed the CLI-specific subagent adapter was colocated in the generic Subagents project.
+
+### Error
+```text
+Get-Content: src\\InsightaAI.Agents.Subagents\\Invocation\\CliInsightaSubagentAdapter.cs path was not found
+```
+
+### Suggested Fix
+Use repository text discovery for cross-project integration types before reading a concrete path.
+
+### Metadata
+- Reproducible: yes
+- Related Files: src/InsightaAI.Agent.Cli/Services/CliInsightaSubagentAdapter.cs
+
+### Resolution
+- **Resolved**: 2026-08-21T00:00:00+08:00
+- **Notes**: Located the adapter in the CLI Services directory; no source file was changed by the failed inspection.
+
+---
+
+## [ERR-20260821-007] cli-build-output-locked-by-active-session
+
+**Logged**: 2026-08-21T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: infra
+
+### Summary
+An active Insighta CLI session held the Debug output assemblies while a verification build attempted to copy updated project references into the same directory.
+
+### Error
+```text
+MSB3021: The process cannot access ... InsightaAI.Agent.Cli\\bin\\Debug\\net9.0\\InsightaAI.Agent.dll because it is being used by another process.
+```
+
+### Suggested Fix
+Do not interrupt the active session. Run verification builds with an isolated temporary `BaseOutputPath` and `BaseIntermediateOutputPath`.
+
+### Metadata
+- Reproducible: yes
+- Related Files: src/InsightaAI.Agent.Cli/bin/Debug/net9.0
+
+### Resolution
+- **Resolved**: 2026-08-21T00:00:00+08:00
+- **Notes**: The active CLI session is intentional; validation used an isolated `OutputPath`, which avoids the locked application output while retaining the existing restored assets.
+
+---
+
+## [ERR-20260821-008] isolated-build-intermediate-assets
+
+**Logged**: 2026-08-21T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: infra
+
+### Summary
+Changing `BaseIntermediateOutputPath` for a no-restore verification build moved the expected NuGet assets file away from the restored project intermediates.
+
+### Error
+```text
+NETSDK1004: Assets file ... temp\\obj\\project.assets.json not found.
+```
+
+### Suggested Fix
+For a local build that only needs to avoid locked binaries, redirect `OutputPath` only and retain the normal restored intermediate path.
+
+### Metadata
+- Reproducible: yes
+- Related Files: src/InsightaAI.Agent.Cli/obj/project.assets.json
+
+### Resolution
+- **Resolved**: 2026-08-21T00:00:00+08:00
+- **Notes**: Rebuilt with an isolated `OutputPath`; it completed with 0 errors.
+
+---
+
+## [ERR-20260821-009] reasoning-replay-inspection-safety
+
+**Logged**: 2026-08-21T00:00:00+08:00
+**Priority**: medium
+**Status**: resolved
+**Area**: diagnostics
+
+### Summary
+An attempt to summarize a JSONL session with PowerShell `ConvertFrom-Json` treated line-wrapped records as independent JSON values, failed parsing, and printed raw conversation lines in the error stream.
+
+### Error
+```text
+ConvertFrom-Json: Invalid JSON primitive; expected ':' or '}'.
+```
+
+### Suggested Fix
+Never render raw session records during diagnostics. Use the typed storage API or a parser that preserves record boundaries, and report only structural metadata.
+
+### Metadata
+- Reproducible: yes
+- Related Files: C:\\Users\\Administrator\\.insighta\\sessions\\{sessionId}\\messages.jsonl
+
+### Resolution
+- **Resolved**: 2026-08-21T00:00:00+08:00
+- **Notes**: Subsequent diagnosis relied on adapter code and provider documentation; raw session content is not needed for the fix.
+
+---
+
+## [ERR-20260821-010] reasoning-replay-patch-context
+
+**Logged**: 2026-08-21T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: backend
+
+### Summary
+A combined patch used comments whose encoding did not match the source file and was rejected atomically.
+
+### Error
+```text
+apply_patch verification failed: Failed to find expected lines in OpenAIResponseAdapter.cs
+```
+
+### Suggested Fix
+When files contain localized comments, anchor patches on stable ASCII code lines or apply focused files separately.
+
+### Metadata
+- Reproducible: yes
+- Related Files: src/InsightaAI.LLM.OpenAI/OpenAIResponseAdapter.cs
+
+### Resolution
+- **Resolved**: 2026-08-21T00:00:00+08:00
+- **Notes**: Split the patch around the `MessageRole.Assistant` switch label; the final implementation and 41 adapter tests passed.
+
+---
+
+## [ERR-20260821-004] tool-progress-event-missing-namespace
+
+**Logged**: 2026-08-21T00:00:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: backend
+
+### Summary
+The new Agent progress event referenced `ToolProgressUpdate` without importing the Agent abstractions namespace.
+
+### Error
+```text
+CS0246: The type or namespace name 'ToolProgressUpdate' could not be found.
+```
+
+### Suggested Fix
+Import `InsightaAI.Agent.Abstractions` in AgentEvents.cs.
+
+### Metadata
+- Reproducible: yes
+- Related Files: src/InsightaAI.Agent/Models/AgentEvents.cs
+
+### Resolution
+- **Resolved**: 2026-08-21T00:00:00+08:00
+- **Notes**: Added the explicit namespace import.
 
 ---
 

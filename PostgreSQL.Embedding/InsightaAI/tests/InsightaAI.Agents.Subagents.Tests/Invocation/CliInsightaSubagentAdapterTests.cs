@@ -9,6 +9,7 @@ using InsightaAI.Agent.Skills;
 using InsightaAI.Agent.Storage;
 using InsightaAI.Agents.Subagents.Definitions;
 using InsightaAI.Agents.Subagents.Invocation;
+using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
 using InsightaAI.Tests.Shared;
 
@@ -157,6 +158,120 @@ public sealed class CliInsightaSubagentAdapterTests : IDisposable
             CreateRequest(new InsightaSubagentDefinition { Id = "reviewer", Name = "Reviewer" }), cancellation.Token));
     }
 
+    [Fact]
+    public async Task InvokeAsync_ReportsChildProgressWithoutChangingTheFinalResult()
+    {
+        var progress = new RecordingProgressReporter();
+        var adapter = new CliInsightaSubagentAdapter(
+            new RecordingAgentFactory(), new JsonlMessageStorage(_storagePath), CreateTemplate(new ToolRegistry()));
+
+        var result = await adapter.InvokeAsync(CreateRequest(
+            new InsightaSubagentDefinition { Id = "reviewer", Name = "Reviewer" }) with
+        {
+            Progress = progress
+        });
+
+        Assert.Equal(SubagentInvocationStatus.Completed, result.Status);
+        Assert.Equal("done", result.Output);
+        Assert.Contains(progress.Updates, update => update.Kind == SubagentProgressKind.Started);
+        Assert.Contains(progress.Updates, update =>
+            update.Kind == SubagentProgressKind.Output && update.Text == "done");
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ForwardsChildToolOutputStream()
+    {
+        var toolCall = new ToolCallBlock
+        {
+            Id = "child-tool-call",
+            Name = "report_progress",
+            Arguments = JsonSerializer.SerializeToElement(new { })
+        };
+        var llmClient = new MockLlmClient(
+            firstResponseToolCalls: [toolCall],
+            secondResponse: "done");
+        var factory = new RecordingAgentFactory(llmClient);
+        var progress = new RecordingProgressReporter();
+        var adapter = new CliInsightaSubagentAdapter(
+            factory,
+            new JsonlMessageStorage(_storagePath),
+            CreateTemplate(new ToolRegistry().Register(new ProgressReportingTool())));
+
+        await adapter.InvokeAsync(CreateRequest(new InsightaSubagentDefinition
+        {
+            Id = "reviewer",
+            Name = "Reviewer",
+            ToolNames = ["report_progress"]
+        }) with { Progress = progress });
+
+        Assert.Contains(progress.Updates, update =>
+            update.Kind == SubagentProgressKind.Output &&
+            update.Text == "child stderr" &&
+            update.Stream == SubagentOutputStream.Stderr);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_NullToolNames_TreatsItAsAnEmptyWhitelist()
+    {
+        var factory = new RecordingAgentFactory();
+        var adapter = new CliInsightaSubagentAdapter(
+            factory, new JsonlMessageStorage(_storagePath), CreateTemplate(new ToolRegistry()));
+
+        await adapter.InvokeAsync(CreateRequest(new InsightaSubagentDefinition
+        {
+            Id = "reviewer",
+            Name = "Reviewer",
+            ToolNames = null!
+        }));
+
+        Assert.NotNull(factory.Options);
+        Assert.Empty(factory.Options!.ToolRegistry.GetDefinitions());
+    }
+
+    [Fact]
+    public async Task InvokeAsync_WithoutModel_UsesConfiguredPrimaryModelRatherThanParentSwitchedModel()
+    {
+        var config = CreateConfig();
+        config.Models["test/reviewer"] = new ModelEntry { ModelId = "reviewer-model", MaxTokens = 64, ContextWindow = 2048 };
+        var template = CreateTemplate(new ToolRegistry(), config) with
+        {
+            Model = config.Models["test/reviewer"],
+            LlmClient = new MockLlmClient(response: "parent switched model")
+        };
+        var factory = new RecordingAgentFactory();
+        var adapter = new CliInsightaSubagentAdapter(factory, new JsonlMessageStorage(_storagePath), template);
+
+        await adapter.InvokeAsync(CreateRequest(new InsightaSubagentDefinition { Id = "reviewer", Name = "Reviewer" }));
+
+        Assert.NotNull(factory.Options);
+        Assert.Equal("primary-model", factory.Options!.Model.ModelId);
+        Assert.Equal("primary-model", factory.Options.AgentConfigOverride!.Model);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_WithModelReference_UsesThatConfiguredModel()
+    {
+        var config = CreateConfig();
+        config.Models["test/reviewer"] = new ModelEntry { ModelId = "reviewer-model", MaxTokens = 64, ContextWindow = 2048 };
+        var factory = new RecordingAgentFactory();
+        var storage = new JsonlMessageStorage(_storagePath);
+        var adapter = new CliInsightaSubagentAdapter(factory, storage, CreateTemplate(new ToolRegistry(), config));
+
+        var result = await adapter.InvokeAsync(CreateRequest(new InsightaSubagentDefinition
+        {
+            Id = "reviewer",
+            Name = "Reviewer",
+            Model = "test/reviewer"
+        }));
+
+        Assert.NotNull(factory.Options);
+        Assert.Equal("reviewer-model", factory.Options!.Model.ModelId);
+        Assert.Equal("reviewer-model", factory.Options.AgentConfigOverride!.Model);
+        var session = await storage.GetSessionAsync(result.SessionId!);
+        Assert.Equal("reviewer-model", session!.Model);
+        Assert.Equal("test", session.Provider);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_storagePath))
@@ -176,10 +291,10 @@ public sealed class CliInsightaSubagentAdapterTests : IDisposable
         }
     };
 
-    private static AgentCreationOptions CreateTemplate(ToolRegistry toolRegistry) => new()
+    private static AgentCreationOptions CreateTemplate(ToolRegistry toolRegistry, CliConfig? config = null) => new()
     {
-        Config = new CliConfig { PrimaryModel = "test/model" },
-        Auth = new AuthConfig(),
+        Config = config ?? CreateConfig(),
+        Auth = CreateAuth(),
         LlmClient = new MockLlmClient(response: "done"),
         Model = new ModelEntry { ModelId = "test-model", MaxTokens = 128, ContextWindow = 4096 },
         ToolRegistry = toolRegistry,
@@ -187,7 +302,24 @@ public sealed class CliInsightaSubagentAdapterTests : IDisposable
         SummaryService = new SummaryService(new SummaryOptions { Model = "test/model", ClientFactory = _ => new MockLlmClient() })
     };
 
-    private sealed class RecordingAgentFactory : IAgentFactory
+    private static CliConfig CreateConfig() => new()
+    {
+        PrimaryModel = "test/model",
+        Models = new Dictionary<string, ModelEntry>
+        {
+            ["test/model"] = new() { ModelId = "primary-model", MaxTokens = 128, ContextWindow = 4096 }
+        }
+    };
+
+    private static AuthConfig CreateAuth() => new()
+    {
+        Providers = new Dictionary<string, ProviderEntry>
+        {
+            ["test"] = new() { Adapter = "openai", ApiKey = "test-key" }
+        }
+    };
+
+    private sealed class RecordingAgentFactory(ILlmClient? llmClient = null) : IAgentFactory
     {
         public AgentCreationOptions? Options { get; private set; }
 
@@ -196,7 +328,7 @@ public sealed class CliInsightaSubagentAdapterTests : IDisposable
             Options = options;
             return Task.FromResult(new InsightaAI.Agent.Agent(
                 options.AgentConfigOverride!,
-                new MockLlmClient(response: "done"),
+                llmClient ?? new MockLlmClient(response: "done"),
                 options.ToolRegistry,
                 options.SkillRegistry));
         }
@@ -215,6 +347,39 @@ public sealed class CliInsightaSubagentAdapterTests : IDisposable
         public Task<ToolResult> ExecuteAsync(IDictionary<string, object> args, ToolExecutionContext context)
         {
             return Task.FromResult(ToolResult.FromText("done"));
+        }
+    }
+
+    private sealed class ProgressReportingTool : ITool
+    {
+        public string Name => "report_progress";
+        public ToolDefinition Definition { get; } = new()
+        {
+            Name = "report_progress",
+            Description = "Reports stderr progress.",
+            Schema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { } })
+        };
+
+        public async Task<ToolResult> ExecuteAsync(IDictionary<string, object> args, ToolExecutionContext context)
+        {
+            await context.Progress.ReportAsync(new ToolProgressUpdate
+            {
+                Kind = ToolProgressKind.Output,
+                Text = "child stderr",
+                Stream = ToolOutputStream.Stderr
+            }, context.CancellationToken);
+            return ToolResult.FromText("reported");
+        }
+    }
+
+    private sealed class RecordingProgressReporter : ISubagentProgressReporter
+    {
+        public List<SubagentProgressUpdate> Updates { get; } = [];
+
+        public ValueTask ReportAsync(SubagentProgressUpdate update, CancellationToken cancellationToken = default)
+        {
+            Updates.Add(update);
+            return ValueTask.CompletedTask;
         }
     }
 }

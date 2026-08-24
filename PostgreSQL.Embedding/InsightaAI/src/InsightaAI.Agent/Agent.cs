@@ -580,8 +580,9 @@ public class Agent : IDisposable
         // 每次调用创建 AgentLoop，确保 sessionId 正确
         ToolCallHandler handler = async (request, ct) =>
         {
-            var (allowed, result) = await ExecuteSingleToolAsync(request.ToolCall, request.Arguments, request.SessionId, ct);
-            return new ToolCallReponse(allowed, result);
+            var (allowed, result) = await ExecuteSingleToolAsync(
+                request.ToolCall, request.Arguments, request.SessionId, request.Progress, ct);
+            return new ToolCallResponse(allowed, result);
         };
         if (ToolCallHandlerProxyFactory != null)
             handler = ToolCallHandlerProxyFactory(handler);
@@ -722,6 +723,7 @@ public class Agent : IDisposable
         ToolCallBlock toolCall,
         string arguments,
         string sessionId,
+        IToolProgressReporter progress,
         CancellationToken cancellationToken)
     {
         var toolContext = new ToolExecutionContext
@@ -730,6 +732,7 @@ public class Agent : IDisposable
             ToolCallId = toolCall.Id,
             SessionId = sessionId,
             CancellationToken = cancellationToken,
+            Progress = progress,
             Services = _serviceProvider
         };
 

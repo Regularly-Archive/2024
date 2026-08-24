@@ -75,7 +75,7 @@ public sealed class ToolResultProcessorTests
         var executor = new ToolCallExecutor(
             "agent-1",
             "session-1",
-            (_, _) => Task.FromResult(new ToolCallReponse(true, ToolResult.FromText($"Password={secret}"))),
+            (_, _) => Task.FromResult(new ToolCallResponse(true, ToolResult.FromText($"Password={secret}"))),
             serviceProvider);
 
         var events = new List<AgentEvent>();
@@ -88,6 +88,79 @@ public sealed class ToolResultProcessorTests
         Assert.DoesNotContain(secret, toolEnd.ResultPreview);
         Assert.Contains("[REDACTED]", toolEnd.ResultPreview);
         Assert.DoesNotContain(secret, executor.Results.Single().Result.Content.OfType<TextBlock>().Single().Text);
+    }
+
+    [Fact]
+    public async Task ToolProgress_ShouldBeRedactedBeforeItLeavesTheToolExecutor()
+    {
+        const string secret = "progress-secret";
+        var services = new ServiceCollection();
+        services.AddSingleton(new ToolRegistry());
+        using var serviceProvider = services.BuildServiceProvider();
+        var executor = new ToolCallExecutor(
+            "agent-1",
+            "session-1",
+            async (request, cancellationToken) =>
+            {
+                await request.Progress.ReportAsync(new ToolProgressUpdate
+                {
+                    Kind = ToolProgressKind.Output,
+                    Text = $"Password={secret}"
+                }, cancellationToken);
+                return new ToolCallResponse(true, ToolResult.FromText("done"));
+            },
+            serviceProvider);
+
+        var events = new List<AgentEvent>();
+        await foreach (var @event in executor.ExecuteToolsSequentialAsync([CreateToolCall("bash")], CancellationToken.None))
+            events.Add(@event);
+
+        var progress = Assert.Single(events.OfType<AgentToolProgressEvent>());
+        Assert.DoesNotContain(secret, progress.Progress.Text);
+        Assert.Contains("[REDACTED]", progress.Progress.Text);
+    }
+
+    [Fact]
+    public async Task SequentialExecution_Should_NotStartNextToolUntilConsumerAdvancesPastPreviousToolEnd()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(new ToolRegistry());
+        using var serviceProvider = services.BuildServiceProvider();
+        var secondToolStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var executor = new ToolCallExecutor(
+            "agent-1",
+            "session-1",
+            (request, _) =>
+            {
+                if (request.ToolCall.Name == "second")
+                    secondToolStarted.TrySetResult();
+
+                return Task.FromResult(new ToolCallResponse(true, ToolResult.FromText("done")));
+            },
+            serviceProvider);
+
+        var calls = new[]
+        {
+            CreateToolCall("first", "call-1"),
+            CreateToolCall("second", "call-2")
+        };
+        await using var events = executor.ExecuteToolsSequentialAsync(calls, CancellationToken.None)
+            .GetAsyncEnumerator();
+
+        Assert.True(await events.MoveNextAsync());
+        Assert.IsType<AgentToolStartEvent>(events.Current);
+        Assert.True(await events.MoveNextAsync());
+        Assert.IsType<AgentToolEndEvent>(events.Current);
+
+        Assert.False(secondToolStarted.Task.IsCompleted);
+
+        Assert.True(await events.MoveNextAsync());
+        Assert.IsType<AgentToolStartEvent>(events.Current);
+        await secondToolStarted.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+        while (await events.MoveNextAsync())
+        {
+        }
     }
 
     [Fact]
@@ -120,9 +193,9 @@ public sealed class ToolResultProcessorTests
         Assert.Equal(state, restored.ToolResultState);
     }
 
-    private static ToolCallBlock CreateToolCall(string toolName) => new()
+    private static ToolCallBlock CreateToolCall(string toolName, string id = "call-1") => new()
     {
-        Id = "call-1",
+        Id = id,
         Name = toolName,
         Arguments = JsonDocument.Parse("{}").RootElement.Clone()
     };

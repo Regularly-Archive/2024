@@ -4,17 +4,22 @@ using InsightaAI.Agents.Subagents.Definitions;
 
 namespace InsightaAI.Agent.Cli.Services;
 
-/// <summary>Loads named Insighta subagents from <c>.insighta/subagents/{id}/subagent.json</c>.</summary>
+/// <summary>Loads named Insighta subagents from <c>~/.insighta/subagents/{id}/subagent.json</c>.</summary>
 public sealed class LocalSubagentCatalog : ISubagentCatalog
 {
     private const string DescriptorFileName = "subagent.json";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly string _rootDirectory;
 
-    public LocalSubagentCatalog(string workingDirectory)
+    /// <summary>
+    /// Creates a catalog rooted at the global Insighta subagent directory. Tests may supply an
+    /// isolated root directory without changing the production lookup scope.
+    /// </summary>
+    public LocalSubagentCatalog(string? rootDirectory = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(workingDirectory);
-        _rootDirectory = Path.Combine(Path.GetFullPath(workingDirectory), ".insighta", "subagents");
+        _rootDirectory = rootDirectory is null
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".insighta", "subagents")
+            : Path.GetFullPath(rootDirectory);
     }
 
     public async ValueTask<SubagentDefinition?> FindAsync(string id, CancellationToken cancellationToken = default)
@@ -24,22 +29,66 @@ public sealed class LocalSubagentCatalog : ISubagentCatalog
         if (!File.Exists(path))
             return null;
 
-        return await LoadAsync(path, id, cancellationToken);
+        try
+        {
+            return await LoadAsync(path, id, cancellationToken);
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidOperationException($"Subagent descriptor '{path}' contains invalid JSON.", exception);
+        }
     }
 
     public async IAsyncEnumerable<SubagentDefinition> ListAsync(
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        if (!Directory.Exists(_rootDirectory))
+        string[] directories;
+        try
+        {
+            directories = Directory.GetDirectories(_rootDirectory);
+        }
+        catch (DirectoryNotFoundException)
+        {
             yield break;
+        }
 
-        foreach (var directory in Directory.EnumerateDirectories(_rootDirectory).OrderBy(Path.GetFileName, StringComparer.Ordinal))
+        foreach (var directory in directories.OrderBy(Path.GetFileName, StringComparer.Ordinal))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var id = Path.GetFileName(directory);
             var path = Path.Combine(directory, DescriptorFileName);
             if (File.Exists(path))
-                yield return await LoadAsync(path, id, cancellationToken);
+            {
+                var definition = await TryLoadForListAsync(path, id, cancellationToken);
+                if (definition != null)
+                    yield return definition;
+            }
+        }
+    }
+
+    private static async Task<InsightaSubagentDefinition?> TryLoadForListAsync(
+        string path,
+        string directoryId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await LoadAsync(path, directoryId, cancellationToken);
+        }
+        catch (JsonException)
+        {
+            // A malformed descriptor must not hide the other global subagents.
+            return null;
+        }
+        catch (InvalidOperationException)
+        {
+            // Ignore invalid descriptor metadata while enumerating the catalog.
+            return null;
+        }
+        catch (IOException)
+        {
+            // The descriptor may have been removed or replaced during enumeration.
+            return null;
         }
     }
 

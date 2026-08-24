@@ -1,9 +1,12 @@
 using InsightaAI.Agent.Abstractions;
+using InsightaAI.Agent.Cli.Models;
 using InsightaAI.Agent.Models;
 using InsightaAI.Agent.Storage;
 using InsightaAI.Agents.Subagents.Definitions;
 using InsightaAI.Agents.Subagents.Invocation;
+using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
+using System.Text;
 
 namespace InsightaAI.Agent.Cli.Services;
 
@@ -50,14 +53,17 @@ public sealed class CliInsightaSubagentAdapter : ISubagentAdapter
             throw new InvalidOperationException("CLI subagent invocations require a host-generated invocation ID.");
 
         cancellationToken.ThrowIfCancellationRequested();
-        var profile = CreateProfile(definition);
+        var model = ResolveModel(definition);
+        var profile = CreateProfile(definition, model);
         var tools = CreateRestrictedToolRegistry(definition, request.AllowedToolNames);
-        var session = await GetOrCreateSessionAsync(request, cancellationToken);
+        var session = await GetOrCreateSessionAsync(request, model, cancellationToken);
         var history = (await _storage.GetMessagesAsync(session.Id))
             .Select(record => record.ToLlmMessage())
             .ToList();
         var options = _template with
         {
+            LlmClient = model.Client,
+            Model = model.Entry,
             ToolRegistry = tools,
             SessionId = session.Id,
             UserId = request.Context.UserId,
@@ -66,12 +72,77 @@ public sealed class CliInsightaSubagentAdapter : ISubagentAdapter
         };
 
         using var agent = await _agentFactory.CreateAsync(options, cancellationToken);
-        var result = await agent.RunAsync(request.Input, new AgentContext
+        await ReportProgressAsync(request.Progress, new SubagentProgressUpdate
+        {
+            Kind = SubagentProgressKind.Started,
+            Message = $"{definition.Name} started."
+        }, cancellationToken);
+
+        AgentResult? result = null;
+        var streamedOutput = new StringBuilder();
+        await foreach (var agentEvent in agent.RunStreamAsync(request.Input, new AgentContext
         {
             SessionId = session.Id,
             History = history
-        }, cancellationToken);
+        }, cancellationToken))
+        {
+            switch (agentEvent)
+            {
+                case AgentLlmStreamEvent { StreamEvent: TextDeltaEvent { Delta: { Length: > 0 } text } }:
+                    streamedOutput.Append(text);
+                    await ReportProgressAsync(request.Progress, new SubagentProgressUpdate
+                    {
+                        Kind = SubagentProgressKind.Output,
+                        Text = text
+                    }, cancellationToken);
+                    break;
+
+                case AgentRoundStartEvent round:
+                    await ReportProgressAsync(request.Progress, new SubagentProgressUpdate
+                    {
+                        Kind = SubagentProgressKind.Status,
+                        Message = $"{definition.Name} started round {round.Round}.",
+                        Round = round.Round
+                    }, cancellationToken);
+                    break;
+
+                case AgentToolStartEvent tool:
+                    await ReportProgressAsync(request.Progress, new SubagentProgressUpdate
+                    {
+                        Kind = SubagentProgressKind.Status,
+                        Message = $"{definition.Name} is using {tool.ToolName}.",
+                        ToolName = tool.ToolName
+                    }, cancellationToken);
+                    break;
+
+                case AgentToolProgressEvent toolProgress:
+                    var progress = toolProgress.Progress;
+                    await ReportProgressAsync(request.Progress, new SubagentProgressUpdate
+                    {
+                        Kind = progress.Kind == ToolProgressKind.Output
+                            ? SubagentProgressKind.Output
+                            : SubagentProgressKind.Status,
+                        Message = progress.Message,
+                        Text = progress.Text,
+                        Stream = progress.Stream switch
+                        {
+                            ToolOutputStream.Stdout => SubagentOutputStream.Stdout,
+                            ToolOutputStream.Stderr => SubagentOutputStream.Stderr,
+                            _ => null
+                        }
+                    }, cancellationToken);
+                    break;
+
+                case AgentTurnEndEvent turnEnd:
+                    result = turnEnd.Result;
+                    break;
+            }
+        }
+
+        result ??= new AgentResult { Status = AgentStatus.Failed, Error = "Subagent did not produce a completion event." };
         var output = result.Message?.Content.OfType<TextBlock>().FirstOrDefault()?.Text;
+        if (string.IsNullOrEmpty(output))
+            output = streamedOutput.ToString();
 
         return new SubagentInvocationResult
         {
@@ -87,8 +158,27 @@ public sealed class CliInsightaSubagentAdapter : ISubagentAdapter
         };
     }
 
+    private static async ValueTask ReportProgressAsync(
+        ISubagentProgressReporter? reporter,
+        SubagentProgressUpdate update,
+        CancellationToken cancellationToken)
+    {
+        if (reporter is null)
+            return;
+
+        try
+        {
+            await reporter.ReportAsync(update, cancellationToken);
+        }
+        catch when (!cancellationToken.IsCancellationRequested)
+        {
+            // Progress is an optional observer path and must not fail the invocation.
+        }
+    }
+
     private async Task<SessionRecord> GetOrCreateSessionAsync(
         SubagentInvocationRequest request,
+        ResolvedSubagentModel model,
         CancellationToken cancellationToken)
     {
         if (!string.IsNullOrWhiteSpace(request.Context.SessionId))
@@ -116,9 +206,9 @@ public sealed class CliInsightaSubagentAdapter : ISubagentAdapter
             return existing;
         }
 
-        var provider = Cli.Models.CliConfig.ParseModelReference(_template.Config.PrimaryModel).ProviderName;
+        var provider = Cli.Models.CliConfig.ParseModelReference(model.Reference).ProviderName;
         return await _storage.CreateSessionAsync(
-            _template.Model.ModelId,
+            model.Entry.ModelId,
             provider,
             userId: request.Context.UserId,
             parentSessionId: request.Context.ParentSessionId,
@@ -126,14 +216,25 @@ public sealed class CliInsightaSubagentAdapter : ISubagentAdapter
             invocationId: request.Context.InvocationId);
     }
 
-    private AgentConfig CreateProfile(InsightaSubagentDefinition definition)
+    private ResolvedSubagentModel ResolveModel(InsightaSubagentDefinition definition)
+    {
+        // A missing descriptor value deliberately means the configured primary model, not the
+        // potentially session-switched model held by the parent AgentCreationOptions template.
+        var modelReference = definition.Model ?? _template.Config.PrimaryModel;
+        CliConfig.ParseModelReference(modelReference);
+        var model = _template.Config.GetModel(modelReference);
+        var client = LlmClientFactory.Create(_template.Auth, _template.Config, modelReference);
+        return new ResolvedSubagentModel(modelReference, model, client);
+    }
+
+    private AgentConfig CreateProfile(InsightaSubagentDefinition definition, ResolvedSubagentModel model)
     {
         var excludedToolNames = CreateExcludedToolNames(definition.Capabilities);
         return new AgentConfig
         {
             Id = definition.Id,
             Name = definition.Name,
-            Model = definition.Model ?? _template.Model.ModelId,
+            Model = model.Entry.ModelId,
             CustomInstructions = AppendRuntimeConstraints(definition.Instructions, excludedToolNames),
             MaxTokens = definition.MaxTokens,
             MaxToolRounds = definition.MaxToolRounds ?? 15,
@@ -189,7 +290,7 @@ public sealed class CliInsightaSubagentAdapter : ISubagentAdapter
         InsightaSubagentDefinition definition,
         IReadOnlyList<string>? requestToolNames)
     {
-        var permittedNames = definition.ToolNames.AsEnumerable();
+        var permittedNames = (definition.ToolNames ?? []).AsEnumerable();
         if (requestToolNames is not null)
             permittedNames = permittedNames.Intersect(requestToolNames, StringComparer.Ordinal);
 
@@ -203,4 +304,6 @@ public sealed class CliInsightaSubagentAdapter : ISubagentAdapter
         }
         return registry;
     }
+
+    private sealed record ResolvedSubagentModel(string Reference, ModelEntry Entry, ILlmClient Client);
 }

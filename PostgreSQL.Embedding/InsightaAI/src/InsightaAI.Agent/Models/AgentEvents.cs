@@ -1,3 +1,4 @@
+using InsightaAI.Agent.Abstractions;
 using InsightaAI.LLM.Models;
 
 namespace InsightaAI.Agent.Models;
@@ -21,6 +22,9 @@ public enum AgentEventType
 
     /// <summary>工具开始执行</summary>
     ToolStart,
+
+    /// <summary>Execution-time progress reported by a tool.</summary>
+    ToolProgress,
 
     /// <summary>工具执行完成</summary>
     ToolEnd,
@@ -95,6 +99,18 @@ public sealed record AgentToolStartEvent : AgentEvent
     public required string ToolCallId { get; init; }
     public required string ToolName { get; init; }
     public required string Arguments { get; init; }
+}
+
+/// <summary>
+/// Tool execution progress visible to UI observers only. It is never persisted to conversation
+/// history or written to the Agent event log.
+/// </summary>
+public sealed record AgentToolProgressEvent : AgentEvent
+{
+    public override AgentEventType Type => AgentEventType.ToolProgress;
+    public required string ToolCallId { get; init; }
+    public required string ToolName { get; init; }
+    public required ToolProgressUpdate Progress { get; init; }
 }
 
 /// <summary>

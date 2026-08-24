@@ -19,6 +19,19 @@ public interface IShellExecutor
 }
 
 /// <summary>
+/// Optional shell capability for executors that can forward process output while it is produced.
+/// BashTool continues to support plain IShellExecutor implementations.
+/// </summary>
+public interface IStreamingShellExecutor : IShellExecutor
+{
+    Task<ShellResult> ExecuteStreamingAsync(
+        string command,
+        string? workingDirectory,
+        Func<ToolOutputStream, string, CancellationToken, ValueTask> onOutput,
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>
 /// Shell 命令执行结果
 /// </summary>
 public record ShellResult
