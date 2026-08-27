@@ -547,6 +547,34 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 
 ---
 
+### 20. `insighta run` 非交互入口与外部 CLI Agent 子代理（优先级：中）
+
+**目标：** 让 Insighta 可被非交互调用（互操作入口），并让 Codex / pi / Claude Code 等第三方 agent 通过其 CLI 非交互模式（`codex exec` 等）成为 Insighta 的子代理。两个方向共享同一套进程边界基础设施。
+
+**背景：** 内部 Subagent 链路（会话隔离、静态预授权、脱敏、artifact、并行执行）已于 2026-08-27 真实验证完成，满足 `agent-invocation-design.md` §外部 Agent 边界"先以内部 Subagent 验证"的前置条件。
+
+**`insighta run`（先行）：**
+
+- [ ] 新增 `run` 命令：`insighta run "task"` / stdin 管道；one-shot 默认新会话，`--session <id>` 续接
+- [ ] `--profile <subagent-id>` 复用全局 Subagent Definition（白名单、指令、maxToolRounds）——definition 升格为可独立调用的能力档案，进程内 `delegate` 与进程间 `run` 消费同一份定义；`--allowed-tools` 留作临时任务后门
+- [ ] 输出协议：stdout JSONL 事件流（工具调用、进度、每轮 usage、最终结果），`--pretty` 面向人类；这是相对 `codex exec` 的后发优势
+- [ ] exit code 语义：0 成功 / 1 失败 / 专用码区分预算耗尽与取消
+- [ ] 非交互权限默认值（待拍板，倾向受限）：无 profile 时给保守只读白名单，扩权靠 `--profile` 或显式 flag，不做默认全量 + `--yes` 模式
+- [ ] Definition 增加 `executionMode: in-process | process`；进程内为默认，进程间仅用于故障隔离、模型隔离（父会话临时切换的模型不传递给子 agent）与 L3 并行 DAG 场景
+
+**ExternalCliAgentAdapter（随后）：**
+
+- [ ] 新增 `ExternalCliAgentDefinition`：command / args（如 `codex exec --json --sandbox workspace-write`）/ sessionPolicy（one-shot | resume）/ workspace（isolated | inherit）/ timeoutSeconds / maxOutputBytes
+- [ ] 进程管理：kill 进程树取消、超时硬停、防孤儿进程；stdout 增量经 `IToolProgressReporter` 转发（delegate 已有转发机制）
+- [ ] 结构化输出解析：`codex exec --json`、`claude -p --output-format json` 等各家 schema 由 adapter 分别适配
+- [ ] 会话续接：外部 session ID 存入 invocation 记录，与 ParentSessionId 同级可回查
+- [ ] 结果走 `PreferPersistence`：完整输出 artifact 落盘 + preview 投影 + 脱敏，复用现有边界
+- [ ] 更新 `agent-invocation-design.md` §外部 Agent 边界：明确外部 agent 的信任边界 = 进程边界 + 工作区隔离 + OS 沙箱；Insighta 的 deny list 对外部进程内部行为无效，属已知边界而非缺陷
+
+**设计文档：** [agent-invocation-design.md](architecture/agent-invocation-design.md)
+
+---
+
 ## 当前优先级
 
 已完成：Dashboard 拆分与 Anthropic 归一化（#17），以及 MCP Telemetry tag 命名分层与去重（#12）。后续可观测性工作保留 Agent Dashboard 的 Turn 指标、低基数行为指标评估和 Jaeger Trace Drilldown；见 `observability/observability-design.md` §8。
