@@ -42,6 +42,31 @@ public sealed class LocalSubagentDefinitionStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task ListAsync_TemplateDescriptorWithoutOptionalFields_ReturnsDefinition()
+    {
+        await WriteRawDescriptorAsync("reviewer", """
+        {
+          "id": "reviewer",
+          "name": "Reviewer",
+          "description": "Reviews code.",
+          "instructions": "Review the supplied scope.",
+          "maxToolRounds": 8,
+          "toolNames": ["read_file", "grep", "glob"],
+          "includeProjectInstructions": true
+        }
+        """);
+        var catalog = new LocalSubagentDefinitionStore(_rootDirectory);
+
+        var definitions = new List<SubagentDefinition>();
+        await foreach (var definition in catalog.ListAsync())
+            definitions.Add(definition);
+
+        var reviewer = Assert.IsType<InsightaSubagentDefinition>(Assert.Single(definitions));
+        Assert.Equal("reviewer", reviewer.Id);
+        Assert.Equal(["read_file", "grep", "glob"], reviewer.ToolNames);
+    }
+
+    [Fact]
     public async Task FindAsync_MismatchedDirectoryId_ThrowsClearError()
     {
         await WriteDescriptorAsync("explorer", new InsightaSubagentDefinition { Id = "reviewer", Name = "Reviewer" });
