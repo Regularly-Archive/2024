@@ -521,6 +521,7 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 - [x] 建立独立 `InsightaAI.Agents.Subagents.Tests` 项目，覆盖 dispatcher 与 local catalog
 - [x] CLI 主 Agent 注册核心 `delegate` 工具，通过本地 Catalog 委派，最大深度为 1
 - [x] 提供最大深度为 1、权限只能收紧、结果先脱敏且完整 artifact 落盘的核心 `delegate` 工具
+- [x] 子 Agent 强制并行工具执行：`AgentFactory` 在 `ApplyProfile` 返回后强制 `ParallelToolExecution = true`，不继承主 Agent 的 UI 串行约束；2026-08-27 真实委派验证并发生效
 - [ ] 以工具白名单实现 CLI `Explorer` Profile；不以 Prompt 代替只读约束
 
 **设计文档：** [agent-invocation-design.md](architecture/agent-invocation-design.md)

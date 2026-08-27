@@ -58,6 +58,14 @@ Subagent 使用静态预授权，而不是交互式确认：Definition 的工具
 
 `SecurityPolicyHook` 对主 Agent 和 Subagent 都必须注册。deny list、敏感路径等强制规则仍在每次工具调用前执行，且不能被预授权、AllowAlways 或 Definition 覆盖。高风险工具默认不进入 Subagent 白名单；若未来需要开放，应先提供更细粒度的受限工具或策略，而非继承主 Agent 的完整工具集。
 
+## 工具执行模型
+
+子 Agent 强制使用并行工具执行（`ParallelToolExecution = true`），不继承主 Agent 的串行设置。主 Agent 默认串行是 UI 约束：Spectre `Live` 不能与 `SelectionPrompt` 并行拥有终端，串行消费边界保证权限确认块不被前一个工具的最终结果混入（见 `tools/tool-progress-reporting-design.md`）。子 Agent 没有交互式 UI，不存在该约束；相反，调研类任务一轮内常有多个相互独立的查询，串行执行会白白放大延迟。
+
+实现上，`AgentFactory` 在 `ApplyProfile` 返回后强制写入 `ParallelToolExecution = true`，以 `EnableInteractiveToolPermission == false` 为判断信号——子 Agent 静态预授权（无交互确认）是长期目标而非临时状态，该信号稳定。强制值在 profile 应用之后写入，避免被 `ApplyProfile` 的 `with` 表达式覆盖。该策略在 `AgentConfig` 层生效，`ToolCallExecutor` 的并行分支语义不变。
+
+2026-08-27 以真实委派验证：researcher 子 Agent 在单轮内并发发起 3 个独立 `web_search`，启动间隔 6ms、完成时间错开，确认为并发执行而非配置推断。
+
 ## Catalog 与本地定义
 
 `ISubagentCatalog` 只提供按 ID 查询和枚举命名 Definition；`ISubagentDefinitionStore` 在其上提供创建、更新和删除。二者均不规定存储形式。CLI 当前由 `LocalSubagentDefinitionStore` 实现全局 JSON 存储；未来数据库、远程或组合来源可以实现同一 CRUD 契约，命令层不依赖文件系统。

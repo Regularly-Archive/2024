@@ -249,6 +249,15 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 - 子 Agent 的 Layer 3 不只包含 descriptor `instructions`：CLI 会根据最终 `ExcludedToolNames` 追加 Runtime constraints，说明无法委派、以及 Skill / MCP / Memory 工具是否不可用。它解决 Layer 1 通用工具指引与受限工具集的冲突；descriptor 无需重复硬编码这些宿主计算出的事实。
 - 测试独立置于 `tests/InsightaAI.Agents.Subagents.Tests`，覆盖 Catalog、Dispatcher 与 CLI 的 delegate host bridge；设计见 `docs/architecture/agent-invocation-design.md`。
 
+### 子 Agent 并行执行与运行时验证（2026-08-27）
+
+- `AgentFactory.CreateAsync` 在 `ApplyProfile` 返回后强制 `ParallelToolExecution = true`：主 Agent 的串行设置是 UI 约束（Spectre `Live` 与 `SelectionPrompt` 不能并行拥有终端），子 Agent 静态预授权、无交互 UI，不受此约束；`ApplyProfile` 的 `with` 表达式不处置该字段，强制值最后写入避免被覆盖。修复前子 Agent 继承父配置的串行执行，多工具任务的延迟被白白放大（commit `4592dfd`）。
+- 判断信号为 `EnableInteractiveToolPermission == false`；子 Agent 不做交互确认是长期目标，信号稳定。
+- 真实委派验证：researcher 子 Agent 单轮并发发起 3 个独立 `web_search`，启动间隔 6ms、完成时间错开，并发执行由日志时间戳直接观测确认。
+- 子 Agent 会话行为符合设计：独立 session 存储（messages.jsonl、memories、tool_results artifact）、错误自动恢复（失败端点换格式重试）、MicroCompact 生效（18.5KB 抓取原文降级 Preview + artifact 外置，上下文峰值 12.1K / 128K ≈ 9.5%）。
+- 注意 token 口径：日志 TurnEnd 的 `inputTokens` 是各轮 LLM 输入的**累加值**（每轮重发全部历史），上下文实际大小看同行的 `contextTokens`；用累加值除以轮数估"消耗速度"是错误口径。
+- 全局子 Agent 目录命名统一为动作者名词（`explorer` / `planner` / `reviewer` / `researcher`）；`researcher` 为自定义只读调研模板（web_search、web_fetch、read_file、grep、glob，maxToolRounds 15，不注入项目指令）。2026 年 AI Agent 框架调研报告见 `docs/references/ai-agent-frameworks-2026.md`。
+
 ## 当前问题与改进方向
 
 ### 当前待办
