@@ -193,6 +193,81 @@ public sealed class AgentFactoryTests
     }
 
     [Fact]
+    public async Task CreateAsync_Subagent_ShouldForceParallelToolExecution()
+    {
+        var storage = new JsonlMessageStorage(Path.Combine(Path.GetTempPath(), "insighta-agent-parallel-tests", Guid.NewGuid().ToString("N")));
+        using var loggerFactory = LoggerFactory.Create(_ => { });
+        using var llmClient = new MockLlmClient();
+        var factory = new AgentFactory(storage, loggerFactory);
+
+        using var agent = await factory.CreateAsync(new AgentCreationOptions
+        {
+            Config = new CliConfig { PrimaryModel = "test/model", ParallelToolExecution = false },
+            Auth = new AuthConfig(),
+            LlmClient = llmClient,
+            Model = new ModelEntry { ModelId = "test-model", MaxTokens = 128, ContextWindow = 4096 },
+            ToolRegistry = new ToolRegistry(),
+            SkillRegistry = new SkillRegistry(),
+            SummaryService = new SummaryService(new SummaryOptions { Model = "test/model", ClientFactory = _ => new MockLlmClient() }),
+            EnableInteractiveToolPermission = false
+        });
+
+        Assert.True(agent.Config.ParallelToolExecution);
+    }
+
+    [Fact]
+    public async Task CreateAsync_SubagentWithProfile_ShouldForceParallelToolExecution()
+    {
+        var storage = new JsonlMessageStorage(Path.Combine(Path.GetTempPath(), "insighta-agent-parallel-profile-tests", Guid.NewGuid().ToString("N")));
+        using var loggerFactory = LoggerFactory.Create(_ => { });
+        using var llmClient = new MockLlmClient();
+        var factory = new AgentFactory(storage, loggerFactory);
+
+        using var agent = await factory.CreateAsync(new AgentCreationOptions
+        {
+            Config = new CliConfig { PrimaryModel = "test/model", ParallelToolExecution = false },
+            Auth = new AuthConfig(),
+            LlmClient = llmClient,
+            Model = new ModelEntry { ModelId = "test-model", MaxTokens = 128, ContextWindow = 4096 },
+            ToolRegistry = new ToolRegistry(),
+            SkillRegistry = new SkillRegistry(),
+            SummaryService = new SummaryService(new SummaryOptions { Model = "test/model", ClientFactory = _ => new MockLlmClient() }),
+            EnableInteractiveToolPermission = false,
+            AgentConfigOverride = new AgentConfig
+            {
+                Id = "subagent",
+                Name = "Subagent",
+                Model = "test-model",
+                ParallelToolExecution = false
+            }
+        });
+
+        Assert.True(agent.Config.ParallelToolExecution);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ParentAgent_ShouldRespectConfigParallelToolExecution()
+    {
+        var storage = new JsonlMessageStorage(Path.Combine(Path.GetTempPath(), "insighta-agent-parent-parallel-tests", Guid.NewGuid().ToString("N")));
+        using var loggerFactory = LoggerFactory.Create(_ => { });
+        using var llmClient = new MockLlmClient();
+        var factory = new AgentFactory(storage, loggerFactory);
+
+        using var agent = await factory.CreateAsync(new AgentCreationOptions
+        {
+            Config = new CliConfig { PrimaryModel = "test/model", ParallelToolExecution = false },
+            Auth = new AuthConfig(),
+            LlmClient = llmClient,
+            Model = new ModelEntry { ModelId = "test-model", MaxTokens = 128, ContextWindow = 4096 },
+            ToolRegistry = new ToolRegistry(),
+            SkillRegistry = new SkillRegistry(),
+            SummaryService = new SummaryService(new SummaryOptions { Model = "test/model", ClientFactory = _ => new MockLlmClient() })
+        });
+
+        Assert.False(agent.Config.ParallelToolExecution);
+    }
+
+    [Fact]
     public async Task CreateAsync_ExcludedToolGroups_ShouldKeepServicesButHideTools()
     {
         var storage = new JsonlMessageStorage(Path.Combine(Path.GetTempPath(), "insighta-agent-capability-tests", Guid.NewGuid().ToString("N")));

@@ -57,15 +57,18 @@ public sealed class AgentFactory : IAgentFactory
             UserId = userId,
             WorkingDirectory = Directory.GetCurrentDirectory(),
             DenyRules = CreateDenyRules(options.Config.Security),
-            // Subagents are non-interactive and have no UI rendering constraint, so they
-            // always run tools in parallel regardless of the parent agent's setting.
-            ParallelToolExecution = options.EnableInteractiveToolPermission
-                ? options.Config.ParallelToolExecution
-                : true
+            ParallelToolExecution = options.Config.ParallelToolExecution
         };
         var agentConfig = options.AgentConfigOverride is { } profile
             ? ApplyProfile(profile, defaultAgentConfig, options)
             : defaultAgentConfig;
+
+        // Subagents are non-interactive and have no UI rendering constraint, so they
+        // always run tools in parallel regardless of the parent agent's setting or profile.
+        if (!options.EnableInteractiveToolPermission)
+        {
+            agentConfig = agentConfig with { ParallelToolExecution = true };
+        }
 
         SessionMemoryHook? sessionMemoryHook = null;
         if (!string.IsNullOrEmpty(options.SessionId))
