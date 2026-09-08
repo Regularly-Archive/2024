@@ -251,7 +251,7 @@ public class OpenAIResponseAdapterTests
         {
             Model = "o3-mini",
             Messages = [Message.FromUser("Think step by step.")],
-            Reasoning = new ReasoningConfig { Enabled = true, Effort = ReasoningEffort.High }
+            Reasoning = ReasoningConfig.WithEffort(ReasoningEffortLevel.High)
         };
 
         var body = await GetRequestBodyAsync(request, stream: false);

@@ -72,6 +72,9 @@ public enum ReasoningMode
     /// <summary>DeepSeek reasoning_content 模式</summary>
     ReasoningContent = 4,
 
+    /// <summary>Gemini thinking budget 模式</summary>
+    ThinkingBudget = 8,
+
     /// <summary>所有模式</summary>
-    All = ExtendedThinking | ReasoningEffort | ReasoningContent
+    All = ExtendedThinking | ReasoningEffort | ReasoningContent | ThinkingBudget
 }

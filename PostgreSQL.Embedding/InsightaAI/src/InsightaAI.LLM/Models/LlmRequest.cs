@@ -37,28 +37,83 @@ public sealed record LlmRequest
 }
 
 /// <summary>
-/// 推理配置 - 统一不同模型的推理能力
+/// 推理配置 - 档位表达意图，预算负责落地（详见 docs/architecture/llm-reasoning-control-design.md）
 /// </summary>
 public sealed record ReasoningConfig
 {
-    /// <summary>是否启用推理</summary>
-    public bool Enabled { get; init; }
+    /// <summary>Optional model/deployment-specific Off mapping; null uses conservative adapter defaults.</summary>
+    public ReasoningOffMode? OffMode { get; init; }
 
-    /// <summary>推理预算 token 数 (Claude: thinking budget, DeepSeek: 无显式控制)</summary>
+    /// <summary>控制方式，默认 ProviderDefault（不传思考参数，由供应商默认行为决定）</summary>
+    public ReasoningControl Control { get; init; } = ReasoningControl.ProviderDefault;
+
+    /// <summary>推理档位 (Control=Effort 时必填)</summary>
+    public ReasoningEffortLevel? Effort { get; init; }
+
+    /// <summary>原生预算 token 数 (Control=Budget 时必填；Anthropic budget_tokens / Gemini thinkingBudget)</summary>
     public int? BudgetTokens { get; init; }
 
-    /// <summary>推理努力程度 (OpenAI o1/o3: low/medium/high)</summary>
-    public ReasoningEffort? Effort { get; init; }
+    public static ReasoningConfig Off() => new() { Control = ReasoningControl.Off };
+
+    public static ReasoningConfig WithEffort(ReasoningEffortLevel level) =>
+        new() { Control = ReasoningControl.Effort, Effort = level };
+
+    public static ReasoningConfig WithBudget(int budgetTokens) =>
+        new() { Control = ReasoningControl.Budget, BudgetTokens = budgetTokens };
+
+    /// <summary>校验配置完整性；适配器在翻译前调用，消灭隐式默认</summary>
+    public void Validate()
+    {
+        switch (Control)
+        {
+            case ReasoningControl.Effort when Effort is null:
+                throw new InvalidOperationException("ReasoningControl.Effort requires an Effort level.");
+            case ReasoningControl.Budget when BudgetTokens is not > 0:
+                throw new InvalidOperationException("ReasoningControl.Budget requires positive BudgetTokens.");
+        }
+    }
 }
 
 /// <summary>
-/// 推理努力程度
+/// 推理控制方式
 /// </summary>
-public enum ReasoningEffort
+public enum ReasoningControl
 {
+    /// <summary>明确关闭思考（需要显式传参的模型由适配器传参，如 Gemini thinkingBudget=0）</summary>
+    Off,
+
+    /// <summary>不传任何思考参数，由供应商默认行为决定</summary>
+    ProviderDefault,
+
+    /// <summary>按档位驱动思考强度；预算型模型由适配器映射表翻译为原生预算</summary>
+    Effort,
+
+    /// <summary>按原生预算直通（需精确控制成本的逃生舱场景）</summary>
+    Budget
+}
+
+/// <summary>
+/// 推理档位 - 跨供应商公共子集（none~high，Vercel AI SDK 同款）加扩展档位（xhigh）
+/// </summary>
+public enum ReasoningEffortLevel
+{
+    /// <summary>档位驱动的关闭（OpenAI effort=none；对预算型模型视同 Off）</summary>
+    None,
+
+    /// <summary>比 low 更轻的思考（OpenAI minimal）</summary>
+    Minimal,
+
+    /// <summary>轻量思考</summary>
     Low,
+
+    /// <summary>中等思考</summary>
     Medium,
-    High
+
+    /// <summary>深度思考</summary>
+    High,
+
+    /// <summary>超深度思考（仅部分模型支持；不支持时由能力矩阵降级，M2）</summary>
+    XHigh
 }
 
 /// <summary>

@@ -73,7 +73,7 @@ public sealed class SummaryService : ISummaryService
                     ToolChoice = ToolChoiceMode.None,
                     MaxTokens = maxTokens,
                     Temperature = 0.3,
-                    Reasoning = new ReasoningConfig { Enabled = false, Effort = ReasoningEffort.Low }
+                    Reasoning = ReasoningConfig.Off()
                 }, cancellationToken);
 
                 var title = NormalizeTitle(response.GetTextContent());
@@ -206,7 +206,7 @@ public sealed class SummaryService : ISummaryService
             ToolChoice = ToolChoiceMode.None,
             MaxTokens = _options.MaxTokens,
             Temperature = _options.Temperature,
-            Reasoning = new ReasoningConfig { Enabled = false, Effort = ReasoningEffort.Low }
+            Reasoning = ReasoningConfig.Off()
         };
     }
 

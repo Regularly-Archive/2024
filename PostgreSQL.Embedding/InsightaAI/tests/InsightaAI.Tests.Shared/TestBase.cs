@@ -67,6 +67,16 @@ public abstract class TestBase
     }
 
     /// <summary>
+    /// 创建 GLM 客户端 (使用 Anthropic 适配器 + Anthropic 兼容端点)
+    /// </summary>
+    protected ILlmClient? CreateGlmAnthropicClient()
+    {
+        var config = Config.GetGlmAnthropicConfig();
+        if (config == null) return null;
+        return Factory.Create("anthropic", config);
+    }
+
+    /// <summary>
     /// 创建简单的测试工具定义
     /// </summary>
     protected static ToolDefinition CreateWeatherTool()

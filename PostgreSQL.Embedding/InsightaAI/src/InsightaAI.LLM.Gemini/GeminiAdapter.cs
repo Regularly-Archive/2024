@@ -12,8 +12,8 @@ namespace InsightaAI.LLM.Gemini;
 public class GeminiAdapter : IProviderAdapter
 {
     public string Name => "gemini";
-    public bool SupportsReasoning => false;
-    public ReasoningMode SupportedReasoningModes => ReasoningMode.None;
+    public bool SupportsReasoning => true;
+    public ReasoningMode SupportedReasoningModes => ReasoningMode.ThinkingBudget;
 
     public HttpRequestMessage CreateRequest(LlmRequest request, ProviderConfig config, bool stream)
     {
@@ -43,6 +43,7 @@ public class GeminiAdapter : IProviderAdapter
             }
         }
 
+        ReasoningOffPolicy.Record(httpRequest, "gemini", request);
         return httpRequest;
     }
 
@@ -315,6 +316,12 @@ public class GeminiAdapter : IProviderAdapter
         if (request.Temperature.HasValue)
         {
             generationConfig["temperature"] = request.Temperature.Value;
+        }
+        request.Reasoning?.Validate();
+        if (request.Reasoning?.Control == ReasoningControl.Off && ReasoningOffPolicy.Resolve("gemini", request) == ReasoningOffMode.ThinkingBudgetZero)
+        {
+            // Gemini: 0 is an explicit disable; omitting thinkingConfig keeps the model default.
+            generationConfig["thinkingConfig"] = new { thinkingBudget = 0 };
         }
         if (generationConfig.Count > 0)
         {

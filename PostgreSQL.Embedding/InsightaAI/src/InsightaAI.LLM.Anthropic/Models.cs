@@ -187,5 +187,5 @@ internal class AnthropicThinkingConfig
     public required string Type { get; set; }
 
     [JsonPropertyName("budget_tokens")]
-    public int BudgetTokens { get; set; }
+    public int? BudgetTokens { get; set; }
 }

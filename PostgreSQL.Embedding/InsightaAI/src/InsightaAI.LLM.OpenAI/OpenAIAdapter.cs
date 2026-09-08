@@ -20,6 +20,7 @@ public class OpenAIAdapter : IProviderAdapter
     [
         "o1", "o1-mini", "o1-preview",
         "o3", "o3-mini",
+        "gpt-5",
     ];
 
     // DeepSeek 模型前缀 (使用 reasoning_content)
@@ -27,6 +28,25 @@ public class OpenAIAdapter : IProviderAdapter
     [
         "deepseek-r1", "deepseek-reasoner"
     ];
+
+    private static bool IsOpenAiReasoningModel(string model) =>
+        ReasoningEffortModels.Any(prefix => model.StartsWith(prefix, StringComparison.Ordinal));
+
+    private static bool IsGlmModel(string model) => model.StartsWith("glm", StringComparison.Ordinal);
+
+    private static bool IsDeepSeekReasoningModel(string model) =>
+        DeepSeekModels.Any(prefix => model.StartsWith(prefix, StringComparison.Ordinal));
+
+    // GLM reasoning_effort 的模型侧映射：low/medium 归入 high，xhigh 归入 max。
+    // none/minimal 由模型按无思考语义处理。
+    private static string MapEffortForGlm(ReasoningEffortLevel level) => level switch
+    {
+        ReasoningEffortLevel.None => "none",
+        ReasoningEffortLevel.Minimal => "minimal",
+        ReasoningEffortLevel.Low or ReasoningEffortLevel.Medium or ReasoningEffortLevel.High => "high",
+        ReasoningEffortLevel.XHigh => "max",
+        _ => "low"
+    };
 
     public HttpRequestMessage CreateRequest(LlmRequest request, ProviderConfig config, bool stream)
     {
@@ -57,6 +77,7 @@ public class OpenAIAdapter : IProviderAdapter
             }
         }
 
+        ReasoningOffPolicy.Record(httpRequest, "openai", request);
         return httpRequest;
     }
 
@@ -258,19 +279,34 @@ public class OpenAIAdapter : IProviderAdapter
         }
 
         // 处理推理配置
-        if (request.Reasoning?.Enabled == true)
+        if (request.Reasoning is { } reasoning)
         {
+            reasoning.Validate();
             var modelLower = request.Model.ToLowerInvariant();
 
-            // 检查是否是需要 reasoning_effort 的模型
-            if (ReasoningEffortModels.Any(m => modelLower.StartsWith(m)))
+            if (reasoning.Control == ReasoningControl.Off)
             {
-                body.ReasoningEffort = request.Reasoning.Effort?.ToString().ToLowerInvariant() ?? "medium";
+                ApplyReasoningOff(body, ReasoningOffPolicy.Resolve("openai", request));
             }
-            // DeepSeek 模型使用 temperature=0 来启用推理
-            else if (DeepSeekModels.Any(m => modelLower.Contains(m)))
+
+            // Budget 模式对 OpenAI 兼容端点无原生参数，忽略（不发即不会出错）
+            else if (reasoning.Control == ReasoningControl.Effort)
             {
-                body.Temperature = 0;
+                // 检查是否是需要 reasoning_effort 的模型
+                if (IsOpenAiReasoningModel(modelLower))
+                {
+                    // Effort passthrough remains caller-controlled; supported levels vary by model.
+                    body.ReasoningEffort = reasoning.Effort!.ToString().ToLowerInvariant();
+                }
+                else if (IsGlmModel(modelLower))
+                {
+                    body.ReasoningEffort = MapEffortForGlm(reasoning.Effort!.Value);
+                }
+                // DeepSeek 模型使用 temperature=0 来启用推理（档位驱动意图的落地实现）
+                else if (reasoning.Effort != ReasoningEffortLevel.None && IsDeepSeekReasoningModel(modelLower))
+                {
+                    body.Temperature = 0;
+                }
             }
         }
 
@@ -283,6 +319,23 @@ public class OpenAIAdapter : IProviderAdapter
         }
 
         return body;
+    }
+
+    private static void ApplyReasoningOff(OpenAIRequest body, ReasoningOffMode mode)
+    {
+        // Only resolved model/deployment capabilities authorize a wire field.
+        if (mode == ReasoningOffMode.EffortNone)
+        {
+            body.ReasoningEffort = "none";
+        }
+        else if (mode == ReasoningOffMode.ThinkingDisabled)
+        {
+            body.Thinking = new { type = "disabled" };
+        }
+        else if (mode == ReasoningOffMode.EnableThinkingFalse)
+        {
+            body.EnableThinking = false;
+        }
     }
 
     private static OpenAIMessage ConvertMessage(Message msg)

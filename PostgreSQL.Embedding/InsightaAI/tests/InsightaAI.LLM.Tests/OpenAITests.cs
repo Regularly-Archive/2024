@@ -98,7 +98,7 @@ public class OpenAITests : TestBase
         {
             Model = Config.DeepSeekModel,
             Messages = [Message.FromUser("What is 2+5? Think step by step.")],
-            Reasoning = new ReasoningConfig { Enabled = true },
+            Reasoning = ReasoningConfig.WithEffort(ReasoningEffortLevel.Medium),
             MaxTokens = 500
         };
 

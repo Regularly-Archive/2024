@@ -16,4 +16,6 @@
 | [references/](references/) | 外部研究、竞品与参考资料 |
 | [archives/](archives/) | 已替代的历史设计 |
 
+当前 LLM 思考控制工作可从 [交接手册](architecture/llm-reasoning-control-handoff.md) 开始；它记录未提交实现、测试状态和接手顺序。
+
 文档重组优先保留原文件名和 Git 历史。内容合并、命名精简与 TODO 瘦身作为后续独立工作，避免目录迁移与大规模内容重写混在同一变更中。

@@ -85,6 +85,22 @@ public class TestConfig
     public bool HasGemini => !string.IsNullOrEmpty(GeminiApiKey);
 
     // ============================================================
+    // GLM (Anthropic 兼容端点) 配置
+    // ============================================================
+
+    /// <summary>GLM API Key (经 Anthropic 兼容端点接入)</summary>
+    public string? GlmAnthropicApiKey => _configuration["GLM_ANTHROPIC_API_KEY"];
+
+    /// <summary>GLM Anthropic 兼容端点</summary>
+    public string? GlmAnthropicBaseUrl => _configuration["GLM_ANTHROPIC_BASE_URL"] ?? "https://open.bigmodel.cn/api/anthropic";
+
+    /// <summary>GLM 模型 ID</summary>
+    public string GlmAnthropicModel => _configuration["GLM_ANTHROPIC_MODEL"] ?? "glm-5.3";
+
+    /// <summary>GLM Anthropic 是否配置完整</summary>
+    public bool HasGlmAnthropic => !string.IsNullOrEmpty(GlmAnthropicApiKey);
+
+    // ============================================================
     // 通用配置
     // ============================================================
 
@@ -147,6 +163,19 @@ public class TestConfig
         {
             ApiKey = GeminiApiKey!,
             BaseUrl = GeminiBaseUrl
+        };
+    }
+
+    /// <summary>
+    /// 获取 GLM ProviderConfig (使用 Anthropic 适配器 + Anthropic 兼容端点)
+    /// </summary>
+    public ProviderConfig? GetGlmAnthropicConfig()
+    {
+        if (!HasGlmAnthropic) return null;
+        return new ProviderConfig
+        {
+            ApiKey = GlmAnthropicApiKey!,
+            BaseUrl = GlmAnthropicBaseUrl
         };
     }
 }

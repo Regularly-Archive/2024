@@ -46,6 +46,7 @@ public class OpenAIResponseAdapter : IProviderAdapter
             }
         }
 
+        ReasoningOffPolicy.Record(httpRequest, "openai-response", request);
         return httpRequest;
     }
 
@@ -185,13 +186,21 @@ public class OpenAIResponseAdapter : IProviderAdapter
             };
         }
 
-        // 推理
-        if (request.Reasoning?.Enabled == true)
+        // Off uses verified model capabilities; Effort is caller-controlled passthrough.
+        if (request.Reasoning is { } reasoning)
         {
-            body.Reasoning = new ResponseReasoning
+            reasoning.Validate();
+            if (reasoning.Control == ReasoningControl.Off && ReasoningOffPolicy.Resolve("openai-response", request) == ReasoningOffMode.EffortNone)
             {
-                Effort = request.Reasoning.Effort?.ToString().ToLowerInvariant() ?? "medium"
-            };
+                body.Reasoning = new ResponseReasoning { Effort = "none" };
+            }
+            else if (reasoning.Control == ReasoningControl.Effort)
+            {
+                body.Reasoning = new ResponseReasoning
+                {
+                    Effort = reasoning.Effort!.ToString().ToLowerInvariant()
+                };
+            }
         }
 
         return body;

@@ -98,11 +98,7 @@ public class AnthropicTests : TestBase
         {
             Model = Config.AnthropicModel,
             Messages = [Message.FromUser("What is 15 * 17? Think step by step.")],
-            Reasoning = new ReasoningConfig
-            {
-                Enabled = true,
-                BudgetTokens = 5000
-            },
+            Reasoning = ReasoningConfig.WithBudget(5000),
             MaxTokens = 500
         };
 
