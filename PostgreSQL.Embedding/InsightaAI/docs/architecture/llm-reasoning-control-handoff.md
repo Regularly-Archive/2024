@@ -2,6 +2,8 @@
 
 > **2026-09-08 收尾修订（优先于下文 8 月记录）**：此前“所有 o 系列可发送 none”“所有 Gemini 可发送 budget=0”及按 GLM/Qwen 等家族前缀推断 Off 的结论不成立。当前使用 `ReasoningOffPolicy` 精确模型表：GPT-5.1/5.2 基础模型（含表内快照）使用 none；Gemini 2.5 Flash/Flash-Lite 使用预算 0；表内 Claude Sonnet 使用显式 disabled。o3-mini/GPT-5 等标记 Unsupported，其余未核对版本为 Unknown，均不发送关闭字段。兼容端点必须由调用方在确认协议后设置 `ReasoningConfig.OffMode`，例如 `ReasoningConfig.Off() with { OffMode = ReasoningOffMode.ThinkingDisabled }`。这是请求级能力覆盖，尚未接入 CLI 模型配置。解析结果记录在 `HttpRequestMessage.Options[ReasoningOffPolicy.ResolutionKey]` 与当前 Activity 的 `insighta.reasoning.off_resolution`，不代表服务端实测成功。
 >
+> **下一步架构决策（2026-09-08）**：面向用户的固定偏好改为 `default`、`fast`、`off`、`balance`、`deep`；其中 `default` 表示省略控制字段，`balance` 是显式均衡偏好，二者不可混同。能力、产品档位到原生参数的映射应下沉到内置模型能力目录，并允许 `CliConfig.models` 对自定义模型进行覆盖；Adapter 只序列化已解析的原生设置。能力未知时仅允许 `default`，其它偏好必须显式提示不支持，不能静默降级或按模型名前缀猜测。
+>
 > Effort/Budget 基础保留，尚未保证逐模型兼容性。Anthropic 预算与 max_tokens 的 P1 保留 TODO #21，等待用户决策。GLM 额度未恢复，本轮以 SKIP_REAL_API=true 验证，不作在线通过声明。
 >
 > 协议依据：[GPT-5.1](https://developers.openai.com/api/docs/models/gpt-5.1)、[GPT-5.2](https://developers.openai.com/api/docs/models/gpt-5.2)、[Gemini thinking](https://ai.google.dev/gemini-api/docs/thinking)。能力默认表有意保持小范围，后续扩展前应核对具体 API 与模型版本。

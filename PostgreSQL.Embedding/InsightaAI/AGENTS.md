@@ -263,6 +263,7 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 - `ReasoningConfig` 已演进为 `Off` / `ProviderDefault` / `Effort` / `Budget` 四种意图；`Off` 与不传参数严格区分。当前仅优先实现“模型已知支持时的 Off”，没有 CLI 运行时切换功能。
 - Off 使用 `ReasoningOffPolicy` 精确模型表，禁止按家族前缀推断关闭能力；兼容端点经 `ReasoningConfig.OffMode` 请求级覆盖选择协议。Unknown/Unsupported 均不发送字段，解析结果通过 HTTP request Options 与当前 Activity tag 暴露。GPT-5.1/5.2 基础模型发送 none，Gemini 2.5 Flash/Flash-Lite 发送预算 0，表内 Claude Sonnet 发送 disabled。其它版本需验证后扩展。
 - `SummaryService` 的标题和摘要辅助请求明确使用 `ReasoningConfig.Off()`，降低辅助任务的额外推理消耗。
+- 下一轮重构的产品层固定为 `default` / `fast` / `off` / `balance` / `deep`：`default` 表示不干预，`balance` 是显式均衡偏好；模型能力目录和 `CliConfig.models` 覆盖负责将其解析为供应商原生设置，Adapter 仅序列化。能力未知时只允许 `default`，禁止按模型名前缀猜测或静默降级。
 - Anthropic `budget_tokens < max_tokens` 的 P1 尚未决策（TODO #21）；GLM-5.3 的真实验证因账户额度耗尽未执行。完整接手状态见 `docs/architecture/llm-reasoning-control-handoff.md`。
 
 ## 当前问题与改进方向

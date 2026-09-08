@@ -577,7 +577,7 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 
 ### 21. Anthropic thinking budget 与 `max_tokens` 协调（待决）
 
-2026-09-08：Off 已改为精确模型默认表与请求级 OffMode 覆盖，并记录解析结果；下一步为 CLI 模型配置接入能力声明、Effort/Budget 逐模型校验。当前仍保留下述预算 P1，不能因离线序列化测试通过而宣称已修复。详见 `architecture/llm-reasoning-control-handoff.md` 顶部修订。
+2026-09-08：Off 已改为精确模型默认表与请求级 OffMode 覆盖，并记录解析结果；下一步为内置模型能力目录与 `CliConfig.models` 覆盖接入能力声明，将产品偏好固定为 `default` / `fast` / `off` / `balance` / `deep`，再进行原生 Effort/Budget 的逐模型校验。当前仍保留下述预算 P1，不能因离线序列化测试通过而宣称已修复。详见 `architecture/llm-reasoning-control-handoff.md` 顶部修订。
 
 **背景：** LLM 思维控制的 `ReasoningControl.Effort` 会在 Anthropic 适配器中映射为 `thinking.budget_tokens`。Anthropic 要求该预算严格小于请求的 `max_tokens`，而当前默认 `max_tokens=4096`；因此 `Low`（4096）及更高档位会生成必然被 API 拒绝的请求。
 
