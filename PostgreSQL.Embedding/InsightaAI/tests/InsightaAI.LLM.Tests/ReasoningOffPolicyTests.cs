@@ -10,18 +10,17 @@ namespace InsightaAI.LLM.Tests;
 public class ReasoningOffPolicyTests
 {
     [Theory]
-    [InlineData("o3-mini", ReasoningOffMode.Unsupported)]
-    [InlineData("gpt-5", ReasoningOffMode.Unsupported)]
-    [InlineData("gpt-5.2-pro", ReasoningOffMode.Unknown)]
-    [InlineData("gpt-5.2-custom", ReasoningOffMode.Unknown)]
-    [InlineData("ep-custom", ReasoningOffMode.Unknown)]
-    public async Task UnsupportedOrUnknown_DoesNotEmitNone(string model, ReasoningOffMode expected)
+    [InlineData("o3-mini")]
+    [InlineData("gpt-5")]
+    [InlineData("gpt-5.2")]
+    [InlineData("ep-custom")]
+    public async Task Unresolved_Off_DoesNotEmitControlFields(string model)
     {
         foreach (IProviderAdapter adapter in new IProviderAdapter[] { new OpenAIAdapter(), new OpenAIResponseAdapter() })
         {
             using var http = adapter.CreateRequest(Request(model), new ProviderConfig { ApiKey = "test" }, false);
             Assert.True(http.Options.TryGetValue(ReasoningOffPolicy.ResolutionKey, out var mode));
-            Assert.Equal(expected, mode);
+            Assert.Equal(ReasoningOffMode.Unknown, mode);
             var body = JsonSerializer.Deserialize<JsonElement>(await http.Content!.ReadAsStringAsync());
             Assert.False(body.TryGetProperty("reasoning", out _));
             Assert.False(body.TryGetProperty("reasoning_effort", out _));

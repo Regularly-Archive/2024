@@ -103,7 +103,8 @@ public sealed class AgentLoop
                 Messages = requestMessages,
                 Tools = _toolRegistry.GetDefinitions(),
                 Temperature = _config.Temperature,
-                MaxTokens = _config.MaxTokens
+                MaxTokens = _config.MaxTokens,
+                ReasoningPreference = _config.ReasoningPreference
             };
 
             // 调用 LLM 并转发流事件
@@ -258,7 +259,8 @@ public sealed class AgentLoop
             Tools = [],
             Temperature = 0,
             MaxTokens = _config.MaxTokens,
-            ToolChoice = ToolChoiceMode.None
+            ToolChoice = ToolChoiceMode.None,
+            ReasoningPreference = _config.ReasoningPreference
         };
 
         var finalStream = _llmClient.Streaming(finalRequest);

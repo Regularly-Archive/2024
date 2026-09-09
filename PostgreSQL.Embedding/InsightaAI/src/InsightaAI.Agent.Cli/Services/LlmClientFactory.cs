@@ -44,6 +44,10 @@ public static class LlmClientFactory
             Headers = provider.Headers
         };
 
-        return factory.Create(provider.Adapter, providerConfig);
+        var client = factory.Create(provider.Adapter, providerConfig);
+        var model = config.GetModel(modelRef);
+        var catalog = ModelReasoningCapabilityCatalog.LoadDefault();
+        var resolver = new ModelReasoningResolver(modelRef, provider.Adapter, model, catalog);
+        return new ModelConfiguredLlmClient(client, resolver);
     }
 }

@@ -577,7 +577,7 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 
 ### 21. Anthropic thinking budget 与 `max_tokens` 协调（待决）
 
-2026-09-08：Off 已改为精确模型默认表与请求级 OffMode 覆盖，并记录解析结果；下一步为内置模型能力目录与 `CliConfig.models` 覆盖接入能力声明，将产品偏好固定为 `default` / `fast` / `off` / `balance` / `deep`，再进行原生 Effort/Budget 的逐模型校验。当前仍保留下述预算 P1，不能因离线序列化测试通过而宣称已修复。详见 `architecture/llm-reasoning-control-handoff.md` 顶部修订。
+2026-09-08：已完成产品层 `default` / `fast` / `off` / `balance` / `deep`、打包模型能力目录、`CliConfig.models.*.reasoning` 完整部署覆盖与 CLI 请求解析。Adapter 不再按模型名推断关闭协议；未知模型仅允许 `default`。当前仍保留下述 Anthropic 预算 P1，不能因离线序列化测试通过而宣称已修复。详见 `architecture/llm-reasoning-control-handoff.md` 顶部修订。
 
 **背景：** LLM 思维控制的 `ReasoningControl.Effort` 会在 Anthropic 适配器中映射为 `thinking.budget_tokens`。Anthropic 要求该预算严格小于请求的 `max_tokens`，而当前默认 `max_tokens=4096`；因此 `Low`（4096）及更高档位会生成必然被 API 拒绝的请求。
 
@@ -586,7 +586,8 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 - [ ] 调用方未显式指定 `MaxTokens` 时，是否由 Anthropic 适配器根据 thinking budget 自动提高 `max_tokens`。
 - [ ] 若自动提高，确定余量策略。候选方案为保守的固定余量：`max(defaultMaxTokens, budgetTokens + 1024)`；不采用尚无数据依据的固定百分比。
 - [ ] 调用方显式指定 `MaxTokens` 且 `MaxTokens <= budgetTokens` 时，发请求前抛出清晰异常，不静默改写用户的成本上限。
-- [ ] 收窄当前阶段目标：暂不提供 CLI 思维档位切换；优先保证 `ProviderDefault` 与“模型支持时的 `Off`”语义正确。对于不支持关闭的模型，记录明确的降级诊断，不能将供应商默认行为伪称为关闭。
+- [x] 收窄当前阶段目标：暂不提供 CLI 思维档位切换；产品偏好已按模型能力解析，未知模型不猜测或静默降级。内部摘要辅助请求可安全回退 `default`，不等同于用户请求降级。
+- [ ] 收紧 `LlmRequest.Reasoning`：移除公开 setter，仅允许模型能力解析器写入已解析原生配置；同步禁止以 `ProviderOptions` / `Custom` 旁路 reasoning 控制。
 
 **相关文件：** `src/InsightaAI.LLM.Anthropic/AnthropicAdapter.cs`、`docs/architecture/llm-reasoning-control-design.md`
 

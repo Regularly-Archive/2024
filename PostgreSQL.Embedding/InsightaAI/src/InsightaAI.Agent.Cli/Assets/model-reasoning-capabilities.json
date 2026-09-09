@@ -1,0 +1,94 @@
+[
+  {
+    "adapter": "openai",
+    "model_id": "gpt-5.1",
+    "capability": {
+      "supported": ["default", "fast", "off", "balance", "deep"],
+      "mappings": {
+        "fast": { "control": "effort", "effort": "minimal" },
+        "off": { "control": "off", "offMode": "effortNone" },
+        "balance": { "control": "effort", "effort": "medium" },
+        "deep": { "control": "effort", "effort": "xHigh" }
+      }
+    }
+  },
+  {
+    "adapter": "openai",
+    "model_id": "gpt-5.2",
+    "capability": {
+      "supported": ["default", "fast", "off", "balance", "deep"],
+      "mappings": {
+        "fast": { "control": "effort", "effort": "minimal" },
+        "off": { "control": "off", "offMode": "effortNone" },
+        "balance": { "control": "effort", "effort": "medium" },
+        "deep": { "control": "effort", "effort": "xHigh" }
+      }
+    }
+  },
+  {
+    "adapter": "openai-response",
+    "model_id": "gpt-5.1",
+    "capability": {
+      "supported": ["default", "fast", "off", "balance", "deep"],
+      "mappings": {
+        "fast": { "control": "effort", "effort": "minimal" },
+        "off": { "control": "off", "offMode": "effortNone" },
+        "balance": { "control": "effort", "effort": "medium" },
+        "deep": { "control": "effort", "effort": "xHigh" }
+      }
+    }
+  },
+  {
+    "adapter": "openai-response",
+    "model_id": "gpt-5.2",
+    "capability": {
+      "supported": ["default", "fast", "off", "balance", "deep"],
+      "mappings": {
+        "fast": { "control": "effort", "effort": "minimal" },
+        "off": { "control": "off", "offMode": "effortNone" },
+        "balance": { "control": "effort", "effort": "medium" },
+        "deep": { "control": "effort", "effort": "xHigh" }
+      }
+    }
+  },
+  {
+    "adapter": "gemini",
+    "model_id": "gemini-2.5-flash",
+    "capability": {
+      "supported": ["default", "off"],
+      "mappings": {
+        "off": { "control": "off", "offMode": "thinkingBudgetZero" }
+      }
+    }
+  },
+  {
+    "adapter": "gemini",
+    "model_id": "gemini-2.5-flash-lite",
+    "capability": {
+      "supported": ["default", "off"],
+      "mappings": {
+        "off": { "control": "off", "offMode": "thinkingBudgetZero" }
+      }
+    }
+  },
+  {
+    "adapter": "anthropic",
+    "model_id": "claude-sonnet-4-5",
+    "capability": {
+      "supported": ["default", "off"],
+      "mappings": {
+        "off": { "control": "off", "offMode": "thinkingDisabled" }
+      }
+    }
+  },
+  {
+    "adapter": "anthropic",
+    "model_id": "claude-sonnet-4-20250514",
+    "capability": {
+      "supported": ["default", "off"],
+      "mappings": {
+        "off": { "control": "off", "offMode": "thinkingDisabled" }
+      }
+    }
+  }
+]

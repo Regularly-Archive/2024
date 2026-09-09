@@ -258,12 +258,11 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 - 注意 token 口径：日志 TurnEnd 的 `inputTokens` 是各轮 LLM 输入的**累加值**（每轮重发全部历史），上下文实际大小看同行的 `contextTokens`；用累加值除以轮数估"消耗速度"是错误口径。
 - 全局子 Agent 目录命名统一为动作者名词（`explorer` / `planner` / `reviewer` / `researcher`）；`researcher` 为自定义只读调研模板（web_search、web_fetch、read_file、grep、glob，maxToolRounds 15，不注入项目指令）。2026 年 AI Agent 框架调研报告见 `docs/references/ai-agent-frameworks-2026.md`。
 
-### LLM 思考控制（2026-09-08，Off 收尾）
+### LLM 思考控制（2026-09-08）
 
-- `ReasoningConfig` 已演进为 `Off` / `ProviderDefault` / `Effort` / `Budget` 四种意图；`Off` 与不传参数严格区分。当前仅优先实现“模型已知支持时的 Off”，没有 CLI 运行时切换功能。
-- Off 使用 `ReasoningOffPolicy` 精确模型表，禁止按家族前缀推断关闭能力；兼容端点经 `ReasoningConfig.OffMode` 请求级覆盖选择协议。Unknown/Unsupported 均不发送字段，解析结果通过 HTTP request Options 与当前 Activity tag 暴露。GPT-5.1/5.2 基础模型发送 none，Gemini 2.5 Flash/Flash-Lite 发送预算 0，表内 Claude Sonnet 发送 disabled。其它版本需验证后扩展。
-- `SummaryService` 的标题和摘要辅助请求明确使用 `ReasoningConfig.Off()`，降低辅助任务的额外推理消耗。
-- 下一轮重构的产品层固定为 `default` / `fast` / `off` / `balance` / `deep`：`default` 表示不干预，`balance` 是显式均衡偏好；模型能力目录和 `CliConfig.models` 覆盖负责将其解析为供应商原生设置，Adapter 仅序列化。能力未知时只允许 `default`，禁止按模型名前缀猜测或静默降级。
+- 产品层固定为 `default` / `fast` / `off` / `balance` / `deep`；`default` 表示不干预，`balance` 是显式均衡偏好。供应商原生 effort、budget 和关闭字段不暴露给普通配置。
+- CLI 以打包的 `Assets/model-reasoning-capabilities.json` 和 `CliConfig.models.*.reasoning` 完整部署覆盖解析产品偏好；Adapter 不再按模型名推断 Off 协议。未知模型仅支持 `default`，显式非 default 请求报错且不静默降级。
+- `ReasoningConfig` 是解析后的原生控制，下一步需移除 `LlmRequest.Reasoning` 的公开 setter；`ProviderOptions` 是非推理的供应商扩展，不能传递 reasoning 字段。`SummaryService` 通过产品层 `off` 优先关闭思考，但允许能力未知时安全回退 `default`，避免摘要与压缩失效。
 - Anthropic `budget_tokens < max_tokens` 的 P1 尚未决策（TODO #21）；GLM-5.3 的真实验证因账户额度耗尽未执行。完整接手状态见 `docs/architecture/llm-reasoning-control-handoff.md`。
 
 ## 当前问题与改进方向

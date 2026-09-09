@@ -29,6 +29,19 @@ public sealed record LlmRequest
     /// <summary>推理配置 (用于 Claude extended thinking / DeepSeek reasoning)</summary>
     public ReasoningConfig? Reasoning { get; init; }
 
+    /// <summary>
+    /// 产品层推理偏好。宿主应在发送请求前按具体模型能力将其解析为 <see cref="Reasoning"/>；
+    /// Adapter 不推断模型是否支持某个偏好。
+    /// </summary>
+    public ReasoningPreference? ReasoningPreference { get; init; }
+
+    /// <summary>
+    /// Allows an internal auxiliary request to fall back to <see cref="Models.ReasoningPreference.Default"/>
+    /// when the selected model has no mapping for <see cref="ReasoningPreference"/>.
+    /// User- and Agent-requested preferences must leave this false.
+    /// </summary>
+    public bool AllowReasoningFallbackToDefault { get; init; }
+
     /// <summary>停止序列</summary>
     public string[]? StopSequences { get; init; }
 
@@ -72,6 +85,28 @@ public sealed record ReasoningConfig
                 throw new InvalidOperationException("ReasoningControl.Budget requires positive BudgetTokens.");
         }
     }
+}
+
+/// <summary>
+/// 面向用户和 Agent 配置的稳定推理偏好。
+/// 原生 effort、budget 和关闭协议仅存在于模型能力映射中。
+/// </summary>
+public enum ReasoningPreference
+{
+    /// <summary>不发送控制字段，遵循模型或供应商默认行为。</summary>
+    Default,
+
+    /// <summary>偏好较低延迟和推理开销。</summary>
+    Fast,
+
+    /// <summary>明确要求关闭思考。</summary>
+    Off,
+
+    /// <summary>偏好质量、延迟与成本之间的均衡。</summary>
+    Balance,
+
+    /// <summary>偏好更充分的推理和质量。</summary>
+    Deep
 }
 
 /// <summary>

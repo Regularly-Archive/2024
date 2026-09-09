@@ -52,6 +52,9 @@ public sealed record AgentConfig
     /// <summary>最大 token 数</summary>
     public int? MaxTokens { get; init; }
 
+    /// <summary>当前任务的产品层推理偏好，默认不干预模型行为。</summary>
+    public ReasoningPreference ReasoningPreference { get; init; } = ReasoningPreference.Default;
+
     /// <summary>最大工具调用轮次 (防止无限循环)，默认 15</summary>
     public int MaxToolRounds { get; init; } = 15;
 

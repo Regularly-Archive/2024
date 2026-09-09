@@ -73,7 +73,8 @@ public sealed class SummaryService : ISummaryService
                     ToolChoice = ToolChoiceMode.None,
                     MaxTokens = maxTokens,
                     Temperature = 0.3,
-                    Reasoning = ReasoningConfig.Off()
+                    ReasoningPreference = ReasoningPreference.Off,
+                    AllowReasoningFallbackToDefault = true
                 }, cancellationToken);
 
                 var title = NormalizeTitle(response.GetTextContent());
@@ -206,7 +207,8 @@ public sealed class SummaryService : ISummaryService
             ToolChoice = ToolChoiceMode.None,
             MaxTokens = _options.MaxTokens,
             Temperature = _options.Temperature,
-            Reasoning = ReasoningConfig.Off()
+            ReasoningPreference = ReasoningPreference.Off,
+            AllowReasoningFallbackToDefault = true
         };
     }
 

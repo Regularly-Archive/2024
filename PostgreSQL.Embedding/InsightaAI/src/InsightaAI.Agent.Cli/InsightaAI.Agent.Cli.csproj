@@ -37,6 +37,12 @@
       <Pack>true</Pack>
       <PackagePath>tools\net9.0\any\Assets\subagent-templates\%(RecursiveDir)%(Filename)%(Extension)</PackagePath>
     </Content>
+    <Content Include="$(MSBuildProjectDirectory)\Assets\model-reasoning-capabilities.json">
+      <Link>Assets\model-reasoning-capabilities.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>true</Pack>
+      <PackagePath>tools\net9.0\any\Assets\model-reasoning-capabilities.json</PackagePath>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

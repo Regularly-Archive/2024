@@ -90,7 +90,7 @@ public class ReasoningControlTests
     public async Task Anthropic_Off_And_ProviderDefault_Omit_Thinking()
     {
         var adapter = new AnthropicAdapter();
-        var off = await GetBodyAsync(adapter, Request(reasoning: ReasoningConfig.Off()));
+        var off = await GetBodyAsync(adapter, Request(reasoning: ReasoningConfig.Off() with { OffMode = ReasoningOffMode.ThinkingDisabled }));
         var @default = await GetBodyAsync(adapter, Request(reasoning: new ReasoningConfig()));
         Assert.Equal("disabled", off.GetProperty("thinking").GetProperty("type").GetString());
         Assert.False(@default.TryGetProperty("thinking", out _));
@@ -123,7 +123,7 @@ public class ReasoningControlTests
     public async Task OpenAI_Off_Sends_None_While_ProviderDefault_Omits_ReasoningEffort()
     {
         var adapter = new OpenAIAdapter();
-        var off = await GetBodyAsync(adapter, Request(model: "gpt-5.2", reasoning: ReasoningConfig.Off()));
+        var off = await GetBodyAsync(adapter, Request(model: "gpt-5.2", reasoning: ReasoningConfig.Off() with { OffMode = ReasoningOffMode.EffortNone }));
         var @default = await GetBodyAsync(adapter, Request(model: "gpt-5.2", reasoning: new ReasoningConfig()));
         Assert.Equal("none", off.GetProperty("reasoning_effort").GetString());
         Assert.False(@default.TryGetProperty("reasoning_effort", out _));
@@ -172,7 +172,7 @@ public class ReasoningControlTests
     public async Task Responses_Off_Sends_None_While_ProviderDefault_Omits_Reasoning()
     {
         var adapter = new OpenAIResponseAdapter();
-        var off = await GetBodyAsync(adapter, Request(model: "gpt-5.2", reasoning: ReasoningConfig.Off()));
+        var off = await GetBodyAsync(adapter, Request(model: "gpt-5.2", reasoning: ReasoningConfig.Off() with { OffMode = ReasoningOffMode.EffortNone }));
         var @default = await GetBodyAsync(adapter, Request(model: "gpt-5.2", reasoning: new ReasoningConfig()));
         Assert.Equal("none", off.GetProperty("reasoning").GetProperty("effort").GetString());
         Assert.False(@default.TryGetProperty("reasoning", out _));
@@ -231,7 +231,7 @@ public class ReasoningControlTests
     public async Task Gemini_Off_Sends_Zero_ThinkingBudget_While_ProviderDefault_Omits_It()
     {
         var adapter = new GeminiAdapter();
-        var off = await GetBodyAsync(adapter, Request(model: "gemini-2.5-flash", reasoning: ReasoningConfig.Off()));
+        var off = await GetBodyAsync(adapter, Request(model: "gemini-2.5-flash", reasoning: ReasoningConfig.Off() with { OffMode = ReasoningOffMode.ThinkingBudgetZero }));
         var @default = await GetBodyAsync(adapter, Request(model: "gemini-2.5-flash", reasoning: new ReasoningConfig()));
         Assert.Equal(0, off.GetProperty("generationConfig").GetProperty("thinkingConfig").GetProperty("thinkingBudget").GetInt32());
         Assert.False(@default.TryGetProperty("generationConfig", out _));

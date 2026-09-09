@@ -18,7 +18,7 @@ Insighta 对用户、Agent 配置和未来 CLI 控制面只暴露五个稳定档
 
 `default` 与 `balance` 不可互换：前者是“不干预”，后者是明确的中等强度偏好。`standard` 不再作为产品层术语，避免与 `default` 混淆。
 
-供应商原生的 `none`、`minimal`、`low`、`medium`、`high`、`xhigh`、`max` 和 token budget 都不是用户配置项；它们只存在于模型能力映射或适配器序列化中。原生预算仍可作为未来专家级 ProviderOptions 的逃生舱，但不进入常规 CLI/Agent 配置。
+供应商原生的 `none`、`minimal`、`low`、`medium`、`high`、`xhigh`、`max` 和 token budget 都不是用户配置项；它们只存在于模型能力映射或适配器序列化中。`ProviderOptions` 不能承载任何 reasoning 字段；它只保留给与推理无关的供应商扩展。
 
 后续重构必须遵循下列解析链，而不是在通用 LLM 层按模型名硬编码协议差异：
 
@@ -31,6 +31,31 @@ Insighta 对用户、Agent 配置和未来 CLI 控制面只暴露五个稳定档
 ```
 
 能力未知时只允许 `default`；请求 `off`、`fast`、`balance` 或 `deep` 必须明确报告未配置或不支持，绝不猜测协议，也不静默降级到“最近”的档位。一个模型可以显式把多个产品档位映射到同一原生值，但该映射必须出现在能力定义中。
+
+### 第一阶段实现约定
+
+`LlmRequest.ReasoningPreference` 保存产品层偏好；`ReasoningConfig` 是已解析的原生控制，不是普通调用方的公开入口。CLI 在 `LlmClientFactory` 外包一层模型配置客户端：它先以 `adapter + model_id` 查找打包的 `Assets/model-reasoning-capabilities.json`，再优先使用 `CliConfig.models.*.reasoning` 的完整部署覆盖，最后才调用 Adapter。
+
+```json
+"models": {
+  "zhipu/glm-5.3": {
+    "model_id": "glm-5.3",
+    "reasoning": {
+      "supported": ["default", "fast", "off", "balance", "deep"],
+      "mappings": {
+        "off": { "control": "off", "offMode": "thinkingDisabled" },
+        "fast": { "control": "effort", "effort": "minimal" },
+        "balance": { "control": "effort", "effort": "high" },
+        "deep": { "control": "effort", "effort": "xHigh" }
+      }
+    }
+  }
+}
+```
+
+这里的覆盖是该**部署的完整定义**，不是与内置条目逐字段合并；这让自定义兼容网关可以明确声明自己的协议，且不会因为目录更新而悄悄改变其行为。每个非 `default` 的 `supported` 项必须有映射，`default` 不得映射，`off` 必须映射到原生 `Off`。
+
+正常用户和 Agent 请求某个未知的非 `default` 档位会失败并说明未配置。标题、摘要等内部辅助请求允许在没有 `off` 映射时回退至 `default`，以保证上下文压缩和会话标题不会因能力目录尚未覆盖某模型而失效；这不是用户偏好的静默降级。
 
 ## 1. 背景
 
@@ -165,9 +190,9 @@ public sealed record ReasoningConfig
 
 **位置**：初版为适配器内 `private static` 表；M2 下沉到 Model 元数据并允许配置覆盖（如自定义 "High=24000"）。
 
-### 5.3 ProviderOptions 逃生舱
+### 5.3 ProviderOptions 边界（取代早期逃生舱方案）
 
-需要精确控制成本的用户（如"跑批任务最多想 3000 token"）直接在 `AnthropicOptions` / Gemini options 传原生预算，绕过档位。统一层不感知。
+`ProviderOptions` 类似 `extra_body`，用于统一抽象尚未覆盖的**非推理**供应商参数（如 OpenAI service tier、Anthropic top-p）。它不得传递 `thinking`、`reasoning_effort`、`budget_tokens` 或等价字段，也不得绕过模型能力校验。精确预算如未来确有必要，应作为能力定义或单独、显式标记的高级推理 API 设计，不能藏在 ProviderOptions。
 
 ### 5.4 适配器行为矩阵
 
@@ -198,9 +223,9 @@ public sealed record ReasoningConfig
 
 | 阶段 | 内容 | 备注 |
 |------|------|------|
-| **M1** 语义模型重构 | `ReasoningConfig` v2、枚举扩展、各适配器迁移到新模型、消灭隐式默认 | 不改外部行为，只改表达 |
-| **M2** 能力矩阵下沉 | 内置模型能力目录 + `CliConfig.models` 覆盖，携带产品档位集合、原生映射、预算边界和默认行为；替代适配器内前缀数组 | 能力未知时只暴露 `default` |
-| **M3** 运行时控制面 | `AgentConfig.Reasoning` 默认值 → 每轮可覆盖接口（预留给未来动态调节）→ CLI `/thinking` 命令 | 档位为会话级，不做自动调节 |
+| **M1** 语义模型重构 | 已完成：`ReasoningPreference` 五档位、`ReasoningConfig` 作为解析后原生状态、Adapter 不再推断模型能力 | 下一步收紧 `LlmRequest.Reasoning` 公开 setter |
+| **M2** 能力矩阵下沉 | 已完成：内置模型能力目录 + `CliConfig.models` 完整覆盖，携带产品档位集合与原生映射 | 能力未知时只暴露 `default` |
+| **M3** 运行时控制面 | `AgentConfig.ReasoningPreference` 默认值 → 每轮可覆盖接口（预留给未来动态调节）→ CLI `/thinking` 命令 | 档位为会话级，不做自动调节 |
 | **M4** 计量与压缩联动 | `TokenUsage.ReasoningTokens` 拆分（`usage.thinking_tokens` / reasoning tokens / `thoughtsTokenCount`）进 Dashboard；MicroCompact 对 `ThinkingBlock` 优先降级 | |
 
 Gemini thinking 接入（`thinkingBudget` + `includeThoughts`）安排在 M2–M3 之间。

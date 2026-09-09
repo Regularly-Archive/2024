@@ -1,5 +1,7 @@
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Text.Json.Serialization;
+using InsightaAI.LLM.Models;
 
 namespace InsightaAI.Agent.Cli.Models;
 
@@ -57,6 +59,26 @@ public class ModelEntry
     [JsonPropertyName("context_window")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? ContextWindow { get; set; }
+
+    /// <summary>
+    /// 此部署的推理能力覆盖。配置后完整替代内置目录中同一 adapter/model 的记录，
+    /// 适用于兼容网关或自定义模型；未配置时使用内置目录。
+    /// </summary>
+    [JsonPropertyName("reasoning")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ModelReasoningCapability? Reasoning { get; set; }
+}
+
+/// <summary>
+/// 一个具体模型或部署支持的产品层推理偏好及其原生映射。
+/// </summary>
+public sealed class ModelReasoningCapability
+{
+    [JsonPropertyName("supported")]
+    public HashSet<ReasoningPreference> Supported { get; set; } = [ReasoningPreference.Default];
+
+    [JsonPropertyName("mappings")]
+    public Dictionary<ReasoningPreference, ReasoningConfig> Mappings { get; set; } = [];
 }
 
 /// <summary>工具安全策略配置</summary>
@@ -331,7 +353,7 @@ public class CliConfig
         if (File.Exists(ConfigPath))
         {
             var json = File.ReadAllText(ConfigPath);
-            return System.Text.Json.JsonSerializer.Deserialize<CliConfig>(json) ?? new CliConfig();
+            return JsonSerializer.Deserialize<CliConfig>(json, CreateJsonOptions()) ?? new CliConfig();
         }
         return new CliConfig();
     }
@@ -347,11 +369,19 @@ public class CliConfig
             Directory.CreateDirectory(dir);
         }
 
-        var json = System.Text.Json.JsonSerializer.Serialize(this, new System.Text.Json.JsonSerializerOptions
-        {
-            WriteIndented = true
-        });
+        var json = JsonSerializer.Serialize(this, CreateJsonOptions());
         File.WriteAllText(ConfigPath, json);
+    }
+
+    private static JsonSerializerOptions CreateJsonOptions()
+    {
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNameCaseInsensitive = true
+        };
+        options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+        return options;
     }
 
     /// <summary>
