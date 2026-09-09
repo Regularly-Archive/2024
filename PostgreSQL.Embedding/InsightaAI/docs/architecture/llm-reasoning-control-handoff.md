@@ -1,10 +1,10 @@
 # LLM 思考控制交接手册
 
-> **当前实现修订（2026-09-08，优先于本文全部历史记录）**：第一阶段重构已完成。产品调用方只能表达 `LlmRequest.ReasoningPreference`：`default` / `fast` / `off` / `balance` / `deep`。CLI 使用打包的 `Assets/model-reasoning-capabilities.json`，或 `CliConfig.models.*.reasoning` 的完整部署覆盖，将偏好解析为原生 `ReasoningConfig`；Adapter 只验证并序列化解析结果，已不再依据模型名内置关闭能力。
+> **当前实现修订（2026-09-09，优先于本文全部历史记录）**：第一阶段重构已完成。产品调用方只能表达 `LlmRequest.ReasoningPreference`：`default` / `fast` / `off` / `balance` / `deep`。CLI 使用打包的 `Assets/model-reasoning-capabilities.json`，或 `CliConfig.models.*.reasoning` 的完整部署覆盖，将偏好解析为原生 `ReasoningConfig`；Adapter 只验证并序列化解析结果，已不再依据模型名内置关闭能力。
 >
 > `LlmRequest.Reasoning` 是 Adapter 可读的**已解析内部状态**，已设为 `private init`，只能通过 `LlmRequest.WithResolvedReasoning()` 写入。`DefaultLlmClient` 在 Adapter 前顺序执行 LLM 抽象层的 `ILlmRequestMiddleware`；CLI 的 `ModelReasoningMiddleware` 调用 `ModelReasoningResolver`，前者负责请求转换，后者只负责能力目录查询与解析。普通调用方不得直接构造 `Effort` / `Budget` / `OffMode` 绕过能力目录。`ProviderOptions` 是 `extra_body` 风格的非推理供应商扩展（例如 service tier、top-p），不是第二条 reasoning 通道；Adapter 会拒绝 `ProviderOptions.Custom` 顶层的 `thinking`、`reasoning_effort`、`budget_tokens` 等控制字段。
 >
-> 未知模型只有 `default`。用户或 Agent 显式请求其它档位必须失败，不能猜测协议或静默降级。仅标题与摘要等内部辅助请求可以在 `off` 无映射时回退到 `default`，以避免上下文压缩失效；它不代表用户偏好的降级。CLI 尚未提供 `/thinking` 或运行时切换界面。
+> 未知模型只有 `default`。用户或 Agent 显式请求其它档位必须失败，不能猜测协议或静默降级。会话标题与完整/增量摘要直接请求 `off`，但允许在无映射时回退 `default`，以避免上下文压缩失效；它不代表用户偏好的降级。当前仅有这两处，允许重复配置，不另设策略抽象。主 Agent Loop、子 Agent 和 Orchestrator `TaskPlanner` 会直接影响用户任务质量，保持模型默认行为。CLI 尚未提供 `/thinking` 或运行时切换界面。
 >
 > 验证状态：`InsightaAI.Agent.Cli.Tests` 7/7、`InsightaAI.LLM.Tests` 128/128 通过；`dotnet build InsightaAI.sln --no-restore` 成功。Anthropic `budget_tokens < max_tokens` 仍为 TODO #21 的未决 P1；GLM 在线验证继续因额度不足而搁置。
 
@@ -12,7 +12,7 @@
 >
 > **下一步架构决策（2026-09-08）**：面向用户的固定偏好改为 `default`、`fast`、`off`、`balance`、`deep`；其中 `default` 表示省略控制字段，`balance` 是显式均衡偏好，二者不可混同。能力、产品档位到原生参数的映射应下沉到内置模型能力目录，并允许 `CliConfig.models` 对自定义模型进行覆盖；Adapter 只序列化已解析的原生设置。能力未知时仅允许 `default`，其它偏好必须显式提示不支持，不能静默降级或按模型名前缀猜测。
 >
-> Effort/Budget 基础保留，尚未保证逐模型兼容性。Anthropic 预算与 max_tokens 的 P1 保留 TODO #21，等待用户决策。GLM 额度未恢复，本轮以 SKIP_REAL_API=true 验证，不作在线通过声明。
+> `ReasoningEffortLevel` 是 Adapter 可消费的原生过渡表示，不是产品档位。Anthropic 与兼容厂商可能随模型/API 版本在 manual budget、原生 effort 与 adaptive thinking 间切换；预算与 effort 在支持的模型上可组合，adaptive 是 thinking mode 而非 effort 值。能力目录应明确 protocol、mode 和允许字段组合，Adapter 不得把 `Effort` 擅自折算为预算。`max_tokens > budget_tokens` 只适用于 manual、非 interleaved 的具体请求形态；TODO #21 需先按模型确认协议，再分别实现和验证。GLM 额度未恢复，本轮以 SKIP_REAL_API=true 验证，不作在线通过声明。
 >
 > 协议依据：[GPT-5.1](https://developers.openai.com/api/docs/models/gpt-5.1)、[GPT-5.2](https://developers.openai.com/api/docs/models/gpt-5.2)、[Gemini thinking](https://ai.google.dev/gemini-api/docs/thinking)。能力默认表有意保持小范围，后续扩展前应核对具体 API 与模型版本。
 
@@ -62,7 +62,7 @@ OpenAI 兼容请求模型 `OpenAIRequest` 新增了 `thinking` 和 `enable_think
 
 ### 2.3 框架内实际使用点
 
-`src/InsightaAI.Agent/Context/Summary/SummaryService.cs` 的两类辅助请求已显式使用产品层 `ReasoningPreference.Off`（仅在能力未知时允许回退 `default`）：
+`src/InsightaAI.Agent/Context/Summary/SummaryService.cs` 的辅助请求直接使用产品层 `ReasoningPreference.Off`（仅在能力未知时允许回退 `default`）：
 
 - 会话标题生成；
 - 上下文摘要生成。
@@ -73,13 +73,14 @@ OpenAI 兼容请求模型 `OpenAIRequest` 新增了 `thinking` 和 `enable_think
 
 ### 3.1 P1：Anthropic `budget_tokens` 与 `max_tokens`
 
-`AnthropicAdapter` 当前默认 `max_tokens = 4096`，而 effort 映射为：Minimal=1024、Low=4096、Medium=10000、High=16000、XHigh=32000。Anthropic 要求普通 extended-thinking 请求的 `budget_tokens < max_tokens`，因此 Low 及以上在调用方未指定更大 `MaxTokens` 时会被 API 拒绝。
+`AnthropicAdapter` 当前将旧 `Effort` 映射为预算，这是不能继续扩展的过渡实现。Anthropic 与兼容端点并非始终使用预算制：模型/API 版本可能使用 manual budget、manual budget + effort，或 adaptive thinking。产品档位必须由能力目录解析到准确的 protocol、thinking mode 与字段组合，不能由 Adapter 依据通用枚举或模型名猜测。`budget_tokens < max_tokens` 仅适用于 manual、非 interleaved 请求；不能写成所有 Budget 字段的全局约束。
 
-这项已记录为 [TODO #21](../TODO.md)。用户尚未决定策略，**本轮不要自行修复或静默扩大用户显式指定的 MaxTokens**。待决建议：
+这项已记录为 [TODO #21](../TODO.md)。用户尚未决定策略，**本轮不要自行修复或静默扩大用户显式指定的 MaxTokens**。接手时先确认目标模型的原生协议，再处理对应分支：
 
-1. 未显式设置 `MaxTokens` 时，使用 `max(defaultMaxTokens, budget + 1024)`；
-2. 显式 `MaxTokens <= budget` 时，抛出清晰异常；
-3. 为该规则补序列化测试。
+1. 先依 protocol / capability 判定是否适用 `budget_tokens < max_tokens`；interleaved 例外不做错误拒绝；
+2. 只在适用该约束且未显式设置 `MaxTokens` 时，再评估 `max(defaultMaxTokens, budget + 1024)`；
+3. 显式上限冲突时抛出清晰异常，不静默扩大；
+4. 覆盖 manual、manual + effort、adaptive 与 interleaved 边界的序列化测试。
 
 ### 3.2 能力识别仍是临时前缀判断
 

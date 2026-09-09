@@ -36,6 +36,45 @@ Insighta 对用户、Agent 配置和未来 CLI 控制面只暴露五个稳定档
 
 `LlmRequest.ReasoningPreference` 保存产品层偏好；`ReasoningConfig` 是已解析的原生控制，不是普通调用方的公开入口。CLI 创建 `ModelReasoningResolver`，它先以 `adapter + model_id` 查找打包的 `Assets/model-reasoning-capabilities.json`，再优先使用 `CliConfig.models.*.reasoning` 的完整部署覆盖；随后以 `ModelReasoningMiddleware` 将解析结果应用到请求。`DefaultLlmClient` 在调用 Adapter 前执行该 middleware，而非由 CLI 包装另一层 LLM Client。
 
+### 下一步：模型推理策略（设计中）
+
+当前不把供应商的所有组合能力抽象进框架。每个精确模型或部署在能力目录中只选择一种推理策略：
+
+```csharp
+public enum ReasoningStrategy
+{
+    None,   // 不提供可调强度；仍可单独声明 off 的关闭映射
+    Effort, // 产品档位映射为供应商原生强度
+    Budget  // 产品档位映射为固定 thinking token 预算
+}
+```
+
+解析链保持简单：
+
+```text
+ReasoningPreference (default / fast / off / balance / deep)
+  → ModelReasoningCapability（strategy + 显式映射）
+    → 现有 ReasoningConfig（Effort 或 Budget，二选一）
+      → Adapter 序列化
+```
+
+`ReasoningStrategy` 不是用户配置，也不取代 Adapter。它只是能力目录对解析器的约束：`Effort` 只能产出 `ReasoningControl.Effort`，`Budget` 只能产出 `ReasoningControl.Budget`，`None` 不允许 `fast` / `balance` / `deep`。`off` 是独立的关闭映射，不属于三种强度策略。
+
+Anthropic 即使在少数模型上允许同时传 effort 与 `budget_tokens`，当前也**不表达该组合**：模型只能选择 `Budget` 或 `Effort` 之一。这样既不改造现有 `ReasoningConfig` 的互斥结构，也避免为尚未接入的模型提前增加复杂度。若未来确有模型从组合能力获得明确收益，再以新的策略类型和真实回归单独讨论。
+
+Gemini 3 / 2.5 当前主接口使用 `thinking_level`，因此新接入模型优先选择 `Effort`；只有目标 API 明确要求 `thinkingBudget` 时才选择 `Budget`。OpenAI 的推理模型选择 `Effort`。每个条目仍必须按精确模型/API 版本核实，Adapter 不得凭 Provider 或模型名前缀猜测。
+
+规则：
+
+- `Budget` 才处理 `budget_tokens` 与 `max_tokens` 的协议约束；不要把该校验施加给 `Effort`。
+- `Effort` 只序列化供应商对应的强度字段；adaptive 等供应商内部模式不成为 Insighta 的第四种策略。
+- 一个 deployment 可将多个产品偏好映射到同一原生值，但映射必须显式出现。
+- `default` 始终省略 reasoning 字段；未知模型仍只允许 `default`。
+
+实施顺序：先为能力目录增加 `strategy`，并在 resolver 校验 strategy 与映射类型一致；再为 Anthropic Budget、Anthropic Effort 与 Gemini Effort 分别补 Adapter 序列化测试；最后才添加经官方文档与真实回归确认的模型目录条目。现有已验证的 Off 映射不在本轮重构中改变。
+
+协议资料依据：[Anthropic extended thinking](https://platform.claude.com/docs/en/build-with-claude/extended-thinking)、[Anthropic effort](https://platform.claude.com/docs/en/build-with-claude/effort) 与 [Gemini thinking](https://ai.google.dev/gemini-api/docs/thinking)。
+
 ```json
 "models": {
   "zhipu/glm-5.3": {
@@ -245,9 +284,11 @@ Gemini thinking 接入（`thinkingBudget` + `includeThoughts`）安排在 M2–M
 | 2026-09-08 | 产品层固定为 `default/fast/off/balance/deep` | `balance` 表达明确的均衡偏好，避免 `standard` 与 `default` 的语义歧义。 |
 | 2026-09-08 | 能力与映射归属模型，Adapter 只做序列化 | 同一供应商可共享凭据与协议，却可有不同模型能力；兼容网关尤其不能由 Adapter 猜测。 |
 | 2026-09-08 | 不支持时显式拒绝，不做最近档位降级 | 成本、延迟与关闭语义都不能由框架擅自改写。 |
+| 2026-09-09 | Wire protocol 与 reasoning 字段组合分离 | Anthropic 的 manual thinking 可在支持的模型上同时携带预算和 effort；adaptive 是 thinking mode，不能把 Budget / Effort 建成全局互斥分支。 |
+| 2026-09-09 | `max_tokens` 由具体 protocol 验证 | Anthropic interleaved thinking 是 `budget_tokens < max_tokens` 的例外，不能按 `BudgetTokens` 属性全局拒绝请求。 |
 
 ## 8. 开放问题
 
-1. Anthropic adaptive 模式（Opus 4.7+ `output_config.effort`）的接入时点——倾向 M2/M3，接入时仅为 `AnthropicAdapter` 增加一个分支（档位直传，无需映射表）。
+1. Anthropic 精确模型/API 版本的 protocol 表：manual、manual + effort、adaptive 及 interleaved 支持范围必须先逐项核对，再写入能力目录。
 2. 模型能力目录的发布、版本化和 `CliConfig.models` 覆盖格式；覆盖只能补充或收紧，不能让未知模型自动获得协议映射。
 3. `ThinkingBlock` 在 MicroCompact 中的降级优先级与 Anthropic 回传连续性的冲突——压缩丢弃 thinking block 是否影响后续轮次推理质量，需实测。

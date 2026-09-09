@@ -579,13 +579,14 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 
 2026-09-08：已完成产品层 `default` / `fast` / `off` / `balance` / `deep`、打包模型能力目录、`CliConfig.models.*.reasoning` 完整部署覆盖与 CLI 请求解析。Adapter 不再按模型名推断关闭协议；未知模型仅允许 `default`。当前仍保留下述 Anthropic 预算 P1，不能因离线序列化测试通过而宣称已修复。详见 `architecture/llm-reasoning-control-handoff.md` 顶部修订。
 
-**背景：** LLM 思维控制的 `ReasoningControl.Effort` 会在 Anthropic 适配器中映射为 `thinking.budget_tokens`。Anthropic 要求该预算严格小于请求的 `max_tokens`，而当前默认 `max_tokens=4096`；因此 `Low`（4096）及更高档位会生成必然被 API 拒绝的请求。
+**背景：** Anthropic 及其兼容厂商会随模型和 API 版本在 manual `budget_tokens`、原生档位与 adaptive thinking 间切换，且部分模型允许 `budget_tokens` 与 effort 同时存在。产品层仍固定为 `default` / `fast` / `off` / `balance` / `deep`；模型能力定义必须选择该模型实际使用的 wire protocol 和字段组合，Adapter 不得把通用 `Effort` 擅自折算为预算，也不得把二者错误视作必然互斥。
 
 **待决策略：**
 
-- [ ] 调用方未显式指定 `MaxTokens` 时，是否由 Anthropic 适配器根据 thinking budget 自动提高 `max_tokens`。
-- [ ] 若自动提高，确定余量策略。候选方案为保守的固定余量：`max(defaultMaxTokens, budgetTokens + 1024)`；不采用尚无数据依据的固定百分比。
-- [ ] 调用方显式指定 `MaxTokens` 且 `MaxTokens <= budgetTokens` 时，发请求前抛出清晰异常，不静默改写用户的成本上限。
+- [ ] 先按 Anthropic 官方文档和真实请求确认每个目标模型/API 版本使用 manual、manual + effort 或 adaptive，以及对应请求体 schema；能力目录记录解析后的 protocol、thinking mode 与允许字段，而不是由 Adapter 猜测模型名。
+- [ ] 将 `max_tokens` 协调做成 protocol / capability 验证：manual 且非 interleaved 的预算请求才处理 `budget_tokens < max_tokens`；interleaved 例外不能被全局 Budget 校验误拒绝。调用方未显式设置上限时再评估余量策略；显式限制不静默扩大。
+- [ ] 将 `ReasoningConfig` 从互斥的 `ReasoningControl` 演进为 protocol + activation + 可选 effort / budget，允许能力目录声明合法组合；原生 effort / adaptive 按协议序列化，不附带无关预算校验。
+- [ ] 为 manual budget、manual + effort、adaptive、interleaved 边界和不支持模型分别补请求序列化与验证测试；GLM 额度恢复后补 Anthropic 兼容端点真实回归。
 - [x] 收窄当前阶段目标：暂不提供 CLI 思维档位切换；产品偏好已按模型能力解析，未知模型不猜测或静默降级。内部摘要辅助请求可安全回退 `default`，不等同于用户请求降级。
 - [x] 收紧 `LlmRequest.Reasoning`：已设为 `private init`，通过 `LlmRequest.WithResolvedReasoning()` 与 Adapter 前的 `ILlmRequestMiddleware` 受控写入已解析原生配置；Adapter 入口拒绝未解析的非 `default` 偏好，`ProviderOptions.Custom` 顶层禁止 reasoning 控制字段。
 
@@ -599,9 +600,9 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 
 **边界：** 仅内部辅助任务可在模型能力未知时从 `off` 回退 `default`，主 Agent 和未来用户显式偏好仍须在不支持时明确失败，不能静默降级。
 
-- [ ] 盘点所有 LLM 调用点，区分主任务、用户可见子任务和内部辅助任务；标题与上下文摘要已完成，先确认记忆提取、会话维护、分类/标签等候选场景是否存在且确属非核心。
-- [ ] 定义轻量的辅助请求策略入口，避免每个服务重复手写 `ReasoningPreference.Off` 与 `AllowReasoningFallbackToDefault = true`；策略只表达请求意图，不绕过 `ILlmRequestMiddleware` 或模型能力目录。
-- [ ] 为每个纳入场景补测试：已知支持模型发送显式关闭参数；未知模型仅对内部请求回退 `default`；主任务不得共享该降级语义。
+- [x] 盘点所有 LLM 调用点：主 Agent Loop 与子 Agent / Orchestrator `TaskPlanner` 都直接影响用户任务质量，保持模型默认行为；仅 `SummaryService` 的会话标题、完整摘要与增量摘要属于内部辅助任务。当前未发现独立的记忆提取、会话维护、分类或标签 LLM 调用点。
+- [x] `SummaryService` 的标题与完整/增量摘要直接使用 `ReasoningPreference.Off`，并显式允许内部请求在能力未知时回退 `default`；当前只有两处，允许重复，不另引入策略抽象。
+- [x] 现有 middleware 测试覆盖未知模型仅对内部请求回退 `default`，以及显式请求不共享该降级语义；SummaryService 测试覆盖标题和两类摘要请求。
 - [ ] 评估低基数诊断：记录 `applied` / `fallback` / `unsupported`，不把 model、prompt、session 或 user 写入 Prometheus label；未确认收益前不新增仪表盘。
 - [ ] GLM 额度恢复后，执行真实 Anthropic 兼容端点的辅助请求回归，验证关闭映射与流式结果。
 
