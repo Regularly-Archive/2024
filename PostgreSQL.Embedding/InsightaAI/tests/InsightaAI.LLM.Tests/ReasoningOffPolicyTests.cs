@@ -38,18 +38,20 @@ public class ReasoningOffPolicyTests
     [Fact]
     public void OverrideRejectsIncompatibleProtocol()
     {
-        var request = Request("deployment") with { Reasoning = ReasoningConfig.Off() with { OffMode = ReasoningOffMode.EffortNone } };
+        var request = LlmRequest.WithResolvedReasoning(Request("deployment"), ReasoningConfig.Off() with { OffMode = ReasoningOffMode.EffortNone });
         Assert.Throws<InvalidOperationException>(() => new GeminiAdapter().CreateRequest(request, new ProviderConfig { ApiKey = "test" }, false));
     }
 
     [Fact]
     public async Task DeploymentOverride_EmitsExplicitField()
     {
-        var request = Request("ep-custom") with { Reasoning = ReasoningConfig.Off() with { OffMode = ReasoningOffMode.ThinkingDisabled } };
+        var request = LlmRequest.WithResolvedReasoning(Request("ep-custom"), ReasoningConfig.Off() with { OffMode = ReasoningOffMode.ThinkingDisabled });
         using var http = new OpenAIAdapter().CreateRequest(request, new ProviderConfig { ApiKey = "test" }, true);
         var body = JsonSerializer.Deserialize<JsonElement>(await http.Content!.ReadAsStringAsync());
         Assert.Equal("disabled", body.GetProperty("thinking").GetProperty("type").GetString());
     }
 
-    private static LlmRequest Request(string model) => new() { Model = model, Messages = [Message.FromUser("test")], Reasoning = ReasoningConfig.Off() };
+    private static LlmRequest Request(string model) => LlmRequest.WithResolvedReasoning(
+        new LlmRequest { Model = model, Messages = [Message.FromUser("test")] },
+        ReasoningConfig.Off());
 }

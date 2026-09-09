@@ -587,9 +587,30 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 - [ ] 若自动提高，确定余量策略。候选方案为保守的固定余量：`max(defaultMaxTokens, budgetTokens + 1024)`；不采用尚无数据依据的固定百分比。
 - [ ] 调用方显式指定 `MaxTokens` 且 `MaxTokens <= budgetTokens` 时，发请求前抛出清晰异常，不静默改写用户的成本上限。
 - [x] 收窄当前阶段目标：暂不提供 CLI 思维档位切换；产品偏好已按模型能力解析，未知模型不猜测或静默降级。内部摘要辅助请求可安全回退 `default`，不等同于用户请求降级。
-- [ ] 收紧 `LlmRequest.Reasoning`：移除公开 setter，仅允许模型能力解析器写入已解析原生配置；同步禁止以 `ProviderOptions` / `Custom` 旁路 reasoning 控制。
+- [x] 收紧 `LlmRequest.Reasoning`：已设为 `private init`，通过 `LlmRequest.WithResolvedReasoning()` 与 Adapter 前的 `ILlmRequestMiddleware` 受控写入已解析原生配置；Adapter 入口拒绝未解析的非 `default` 偏好，`ProviderOptions.Custom` 顶层禁止 reasoning 控制字段。
 
 **相关文件：** `src/InsightaAI.LLM.Anthropic/AnthropicAdapter.cs`、`docs/architecture/llm-reasoning-control-design.md`
+
+---
+
+### 22. 辅助任务推理成本控制（下一阶段）
+
+**目标：** 保持主 Agent 使用模型默认推理行为；为不直接决定用户任务质量的内部辅助任务优先请求 `off`，减少不必要的推理 token 和延迟。当前不增加用户配置、`/thinking` 命令或运行时切换入口。
+
+**边界：** 仅内部辅助任务可在模型能力未知时从 `off` 回退 `default`，主 Agent 和未来用户显式偏好仍须在不支持时明确失败，不能静默降级。
+
+- [ ] 盘点所有 LLM 调用点，区分主任务、用户可见子任务和内部辅助任务；标题与上下文摘要已完成，先确认记忆提取、会话维护、分类/标签等候选场景是否存在且确属非核心。
+- [ ] 定义轻量的辅助请求策略入口，避免每个服务重复手写 `ReasoningPreference.Off` 与 `AllowReasoningFallbackToDefault = true`；策略只表达请求意图，不绕过 `ILlmRequestMiddleware` 或模型能力目录。
+- [ ] 为每个纳入场景补测试：已知支持模型发送显式关闭参数；未知模型仅对内部请求回退 `default`；主任务不得共享该降级语义。
+- [ ] 评估低基数诊断：记录 `applied` / `fallback` / `unsupported`，不把 model、prompt、session 或 user 写入 Prometheus label；未确认收益前不新增仪表盘。
+- [ ] GLM 额度恢复后，执行真实 Anthropic 兼容端点的辅助请求回归，验证关闭映射与流式结果。
+
+**后续阶段：**
+
+- [ ] 提供用户级 `reasoning_preference` 配置，并将其映射到主 Agent 的 `AgentConfig.ReasoningPreference`；默认仍为 `default`。
+- [ ] 提供 CLI `/thinking`，支持查看当前偏好并在会话内显式切换 `default` / `fast` / `off` / `balance` / `deep`；不支持时给出能力目录中的明确原因。
+- [ ] 研究自动按任务难度选择档位的策略与可解释性；在没有可观测性数据和用户可控覆盖前，不自动启用。
+- [ ] 按供应商文档和真实请求逐模型扩大能力目录，保持未知模型只允许 `default` 的安全默认值。
 
 ---
 

@@ -247,12 +247,11 @@ public class OpenAIResponseAdapterTests
     [Fact]
     public async Task CreateRequest_Should_Set_Reasoning_Config()
     {
-        var request = new LlmRequest
+        var request = LlmRequest.WithResolvedReasoning(new LlmRequest
         {
             Model = "o3-mini",
-            Messages = [Message.FromUser("Think step by step.")],
-            Reasoning = ReasoningConfig.WithEffort(ReasoningEffortLevel.High)
-        };
+            Messages = [Message.FromUser("Think step by step.")]
+        }, ReasoningConfig.WithEffort(ReasoningEffortLevel.High));
 
         var body = await GetRequestBodyAsync(request, stream: false);
 

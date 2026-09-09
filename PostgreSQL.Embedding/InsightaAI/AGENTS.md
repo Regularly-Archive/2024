@@ -262,8 +262,9 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 
 - 产品层固定为 `default` / `fast` / `off` / `balance` / `deep`；`default` 表示不干预，`balance` 是显式均衡偏好。供应商原生 effort、budget 和关闭字段不暴露给普通配置。
 - CLI 以打包的 `Assets/model-reasoning-capabilities.json` 和 `CliConfig.models.*.reasoning` 完整部署覆盖解析产品偏好；Adapter 不再按模型名推断 Off 协议。未知模型仅支持 `default`，显式非 default 请求报错且不静默降级。
-- `ReasoningConfig` 是解析后的原生控制，下一步需移除 `LlmRequest.Reasoning` 的公开 setter；`ProviderOptions` 是非推理的供应商扩展，不能传递 reasoning 字段。`SummaryService` 通过产品层 `off` 优先关闭思考，但允许能力未知时安全回退 `default`，避免摘要与压缩失效。
+- `ReasoningConfig` 是解析后的原生控制；`LlmRequest.Reasoning` 为 `private init`，只能通过 `LlmRequest.WithResolvedReasoning()` 写入。`DefaultLlmClient` 在 Adapter 前顺序执行 `ILlmRequestMiddleware`；CLI 的 `ModelReasoningMiddleware` 将目录解析结果应用到请求，`ModelReasoningResolver` 只负责能力查询与解析。`ProviderOptions` 是非推理的供应商扩展，`Custom` 顶层禁止传递 reasoning 字段。`SummaryService` 通过产品层 `off` 优先关闭思考，但允许能力未知时安全回退 `default`，避免摘要与压缩失效。
 - Anthropic `budget_tokens < max_tokens` 的 P1 尚未决策（TODO #21）；GLM-5.3 的真实验证因账户额度耗尽未执行。完整接手状态见 `docs/architecture/llm-reasoning-control-handoff.md`。
+- 下一阶段先处理辅助任务推理成本控制：主 Agent 暂保持 `default`；审计标题、摘要以外的非核心 LLM 请求，并通过统一策略显式使用 `off`、能力未知时仅允许内部任务回退 `default`。完成场景盘点、测试与诊断决策后，再推进用户级配置、CLI `/thinking` 和自动选档。
 
 ## 当前问题与改进方向
 

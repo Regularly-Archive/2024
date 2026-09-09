@@ -38,13 +38,12 @@ public class GlmAnthropicTests : TestBase
 
         var client = CreateGlmAnthropicClient()!;
         // Effort=Low 经映射表落为 budget_tokens=4096；Anthropic 协议要求 budget < max_tokens
-        var request = new LlmRequest
+        var request = LlmRequest.WithResolvedReasoning(new LlmRequest
         {
             Model = Config.GlmAnthropicModel,
             Messages = [Message.FromUser("What is 27 * 43? Think step by step.")],
-            Reasoning = ReasoningConfig.WithEffort(ReasoningEffortLevel.Low),
             MaxTokens = 8192
-        };
+        }, ReasoningConfig.WithEffort(ReasoningEffortLevel.Low));
 
         var stream = client.Streaming(request);
         var response = await PrintStreamAsync(stream);
@@ -64,13 +63,12 @@ public class GlmAnthropicTests : TestBase
         if (!Config.HasGlmAnthropic || Config.SkipRealApiCalls) return;
 
         var client = CreateGlmAnthropicClient()!;
-        var request = new LlmRequest
+        var request = LlmRequest.WithResolvedReasoning(new LlmRequest
         {
             Model = Config.GlmAnthropicModel,
             Messages = [Message.FromUser("What is 15 * 17? Think step by step.")],
-            Reasoning = ReasoningConfig.WithBudget(2048),
             MaxTokens = 4096
-        };
+        }, ReasoningConfig.WithBudget(2048));
 
         var stream = client.Streaming(request);
         var response = await PrintStreamAsync(stream);

@@ -94,13 +94,12 @@ public class AnthropicTests : TestBase
         }
 
         var client = CreateAnthropicClient()!;
-        var request = new LlmRequest
+        var request = LlmRequest.WithResolvedReasoning(new LlmRequest
         {
             Model = Config.AnthropicModel,
             Messages = [Message.FromUser("What is 15 * 17? Think step by step.")],
-            Reasoning = ReasoningConfig.WithBudget(5000),
             MaxTokens = 500
-        };
+        }, ReasoningConfig.WithBudget(5000));
 
         var stream = client.Streaming(request);
         var response = await PrintStreamAsync(stream);

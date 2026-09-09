@@ -92,9 +92,7 @@ public class ModelReasoningResolverTests
     [Fact]
     public async Task Internal_Auxiliary_Request_Can_Fall_Back_But_Explicit_Request_Cannot()
     {
-        var inner = new RecordingClient();
-        using var client = new ModelConfiguredLlmClient(
-            inner,
+        var middleware = new ModelReasoningMiddleware(
             new ModelReasoningResolver("provider/custom", capability: null));
         var request = new LlmRequest
         {
@@ -104,37 +102,14 @@ public class ModelReasoningResolverTests
             AllowReasoningFallbackToDefault = true
         };
 
-        await client.CompleteAsync(request);
+        var resolved = middleware.Invoke(request);
 
-        Assert.NotNull(inner.LastRequest);
-        Assert.Null(inner.LastRequest.ReasoningPreference);
-        Assert.Null(inner.LastRequest.Reasoning);
-        Assert.False(inner.LastRequest.AllowReasoningFallbackToDefault);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => client.CompleteAsync(request with
+        Assert.Null(resolved.ReasoningPreference);
+        Assert.Null(resolved.Reasoning);
+        Assert.False(resolved.AllowReasoningFallbackToDefault);
+        Assert.Throws<InvalidOperationException>(() => middleware.Invoke(request with
         {
             AllowReasoningFallbackToDefault = false
         }));
-    }
-
-    private sealed class RecordingClient : ILlmClient
-    {
-        public LlmRequest? LastRequest { get; private set; }
-        public string AdapterName => "test";
-        public bool SupportsReasoning => true;
-
-        public LlmStream Streaming(LlmRequest request) => throw new NotSupportedException();
-
-        public Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken cancellationToken = default)
-        {
-            LastRequest = request;
-            return Task.FromResult(new LlmResponse
-            {
-                Model = request.Model,
-                Content = [],
-                FinishReason = DoneReason.Complete
-            });
-        }
-
-        public void Dispose() { }
     }
 }

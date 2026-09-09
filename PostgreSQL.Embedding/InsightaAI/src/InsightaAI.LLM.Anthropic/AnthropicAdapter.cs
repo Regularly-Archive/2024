@@ -40,6 +40,7 @@ public class AnthropicAdapter : IProviderAdapter
 
     public HttpRequestMessage CreateRequest(LlmRequest request, ProviderConfig config, bool stream)
     {
+        request.ValidateForAdapter();
         var baseUrl = config.BaseUrl ?? "https://api.anthropic.com";
         var endpoint = $"{baseUrl.TrimEnd('/')}/v1/messages";
 

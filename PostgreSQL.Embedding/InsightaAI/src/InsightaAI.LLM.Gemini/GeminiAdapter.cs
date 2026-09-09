@@ -17,6 +17,7 @@ public class GeminiAdapter : IProviderAdapter
 
     public HttpRequestMessage CreateRequest(LlmRequest request, ProviderConfig config, bool stream)
     {
+        request.ValidateForAdapter();
         var baseUrl = config.BaseUrl ?? "https://generativelanguage.googleapis.com/v1beta";
         var endpoint = stream
             ? $"{baseUrl.TrimEnd('/')}/models/{request.Model}:streamGenerateContent?alt=sse&key={config.ApiKey}"

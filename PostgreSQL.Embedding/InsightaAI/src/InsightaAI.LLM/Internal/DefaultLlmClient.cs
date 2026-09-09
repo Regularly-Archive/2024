@@ -12,6 +12,7 @@ internal class DefaultLlmClient : ILlmClient
 {
     private readonly IProviderAdapter _adapter;
     private readonly ProviderConfig _config;
+    private readonly IReadOnlyList<ILlmRequestMiddleware> _requestMiddlewares;
     private readonly HttpClient _httpClient;
     private readonly bool _ownsHttpClient;
     private bool _disposed;
@@ -19,10 +20,15 @@ internal class DefaultLlmClient : ILlmClient
     public string AdapterName => _adapter.Name;
     public bool SupportsReasoning => _adapter.SupportsReasoning;
 
-    public DefaultLlmClient(IProviderAdapter adapter, ProviderConfig config, HttpClient? httpClient = null)
+    public DefaultLlmClient(
+        IProviderAdapter adapter,
+        ProviderConfig config,
+        HttpClient? httpClient = null,
+        IEnumerable<ILlmRequestMiddleware>? requestMiddlewares = null)
     {
         _adapter = adapter ?? throw new ArgumentNullException(nameof(adapter));
         _config = config ?? throw new ArgumentNullException(nameof(config));
+        _requestMiddlewares = requestMiddlewares?.ToArray() ?? [];
         _ownsHttpClient = httpClient == null;
         _httpClient = httpClient ?? new HttpClient();
     }
@@ -35,6 +41,7 @@ internal class DefaultLlmClient : ILlmClient
 
     public async Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken cancellationToken = default)
     {
+        request = ProcessRequest(request);
         var httpRequest = _adapter.CreateRequest(request, _config, stream: false);
 
         using var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
@@ -50,6 +57,7 @@ internal class DefaultLlmClient : ILlmClient
         LlmRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        request = ProcessRequest(request);
         // 创建 HTTP 请求
         var httpRequest = _adapter.CreateRequest(request, _config, stream: request.Stream);
 
@@ -202,6 +210,15 @@ internal class DefaultLlmClient : ILlmClient
 
         // 如果循环正常结束但没有 DoneEvent
         yield return new DoneEvent { Reason = DoneReason.Complete };
+    }
+
+    private LlmRequest ProcessRequest(LlmRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        foreach (var middleware in _requestMiddlewares)
+            request = middleware.Invoke(request) ?? throw new InvalidOperationException($"{middleware.GetType().Name} returned a null LLM request.");
+
+        return request;
     }
 
     public void Dispose()

@@ -50,6 +50,7 @@ public class OpenAIAdapter : IProviderAdapter
 
     public HttpRequestMessage CreateRequest(LlmRequest request, ProviderConfig config, bool stream)
     {
+        request.ValidateForAdapter();
         var baseUrl = config.BaseUrl ?? "https://api.openai.com/v1";
         var endpoint = $"{baseUrl.TrimEnd('/')}/chat/completions";
 

@@ -2,11 +2,11 @@
 
 > **当前实现修订（2026-09-08，优先于本文全部历史记录）**：第一阶段重构已完成。产品调用方只能表达 `LlmRequest.ReasoningPreference`：`default` / `fast` / `off` / `balance` / `deep`。CLI 使用打包的 `Assets/model-reasoning-capabilities.json`，或 `CliConfig.models.*.reasoning` 的完整部署覆盖，将偏好解析为原生 `ReasoningConfig`；Adapter 只验证并序列化解析结果，已不再依据模型名内置关闭能力。
 >
-> `LlmRequest.Reasoning` 是 Adapter 可读的**已解析内部状态**，下一步应移除其公开 setter，改由受控的解析入口写入；普通调用方不得直接构造 `Effort` / `Budget` / `OffMode` 绕过能力目录。`ProviderOptions` 是 `extra_body` 风格的非推理供应商扩展（例如 service tier、top-p），不是第二条 reasoning 通道；不得通过 `ProviderOptions.Custom` 传递 `thinking`、`reasoning_effort`、`budget_tokens` 等控制字段。
+> `LlmRequest.Reasoning` 是 Adapter 可读的**已解析内部状态**，已设为 `private init`，只能通过 `LlmRequest.WithResolvedReasoning()` 写入。`DefaultLlmClient` 在 Adapter 前顺序执行 LLM 抽象层的 `ILlmRequestMiddleware`；CLI 的 `ModelReasoningMiddleware` 调用 `ModelReasoningResolver`，前者负责请求转换，后者只负责能力目录查询与解析。普通调用方不得直接构造 `Effort` / `Budget` / `OffMode` 绕过能力目录。`ProviderOptions` 是 `extra_body` 风格的非推理供应商扩展（例如 service tier、top-p），不是第二条 reasoning 通道；Adapter 会拒绝 `ProviderOptions.Custom` 顶层的 `thinking`、`reasoning_effort`、`budget_tokens` 等控制字段。
 >
 > 未知模型只有 `default`。用户或 Agent 显式请求其它档位必须失败，不能猜测协议或静默降级。仅标题与摘要等内部辅助请求可以在 `off` 无映射时回退到 `default`，以避免上下文压缩失效；它不代表用户偏好的降级。CLI 尚未提供 `/thinking` 或运行时切换界面。
 >
-> 验证状态：`InsightaAI.Agent.Cli.Tests` 7/7、`InsightaAI.LLM.Tests` 121/121 通过；`dotnet build InsightaAI.sln --no-restore` 成功。Anthropic `budget_tokens < max_tokens` 仍为 TODO #21 的未决 P1；GLM 在线验证继续因额度不足而搁置。
+> 验证状态：`InsightaAI.Agent.Cli.Tests` 7/7、`InsightaAI.LLM.Tests` 128/128 通过；`dotnet build InsightaAI.sln --no-restore` 成功。Anthropic `budget_tokens < max_tokens` 仍为 TODO #21 的未决 P1；GLM 在线验证继续因额度不足而搁置。
 
 > **2026-09-08 收尾修订（优先于下文 8 月记录）**：此前“所有 o 系列可发送 none”“所有 Gemini 可发送 budget=0”及按 GLM/Qwen 等家族前缀推断 Off 的结论不成立。当前使用 `ReasoningOffPolicy` 精确模型表：GPT-5.1/5.2 基础模型（含表内快照）使用 none；Gemini 2.5 Flash/Flash-Lite 使用预算 0；表内 Claude Sonnet 使用显式 disabled。o3-mini/GPT-5 等标记 Unsupported，其余未核对版本为 Unknown，均不发送关闭字段。兼容端点必须由调用方在确认协议后设置 `ReasoningConfig.OffMode`，例如 `ReasoningConfig.Off() with { OffMode = ReasoningOffMode.ThinkingDisabled }`。这是请求级能力覆盖，尚未接入 CLI 模型配置。解析结果记录在 `HttpRequestMessage.Options[ReasoningOffPolicy.ResolutionKey]` 与当前 Activity 的 `insighta.reasoning.off_resolution`，不代表服务端实测成功。
 >
@@ -62,7 +62,7 @@ OpenAI 兼容请求模型 `OpenAIRequest` 新增了 `thinking` 和 `enable_think
 
 ### 2.3 框架内实际使用点
 
-`src/InsightaAI.Agent/Context/Summary/SummaryService.cs` 的两类辅助请求已显式使用 `ReasoningConfig.Off()`：
+`src/InsightaAI.Agent/Context/Summary/SummaryService.cs` 的两类辅助请求已显式使用产品层 `ReasoningPreference.Off`（仅在能力未知时允许回退 `default`）：
 
 - 会话标题生成；
 - 上下文摘要生成。

@@ -34,7 +34,7 @@ Insighta 对用户、Agent 配置和未来 CLI 控制面只暴露五个稳定档
 
 ### 第一阶段实现约定
 
-`LlmRequest.ReasoningPreference` 保存产品层偏好；`ReasoningConfig` 是已解析的原生控制，不是普通调用方的公开入口。CLI 在 `LlmClientFactory` 外包一层模型配置客户端：它先以 `adapter + model_id` 查找打包的 `Assets/model-reasoning-capabilities.json`，再优先使用 `CliConfig.models.*.reasoning` 的完整部署覆盖，最后才调用 Adapter。
+`LlmRequest.ReasoningPreference` 保存产品层偏好；`ReasoningConfig` 是已解析的原生控制，不是普通调用方的公开入口。CLI 创建 `ModelReasoningResolver`，它先以 `adapter + model_id` 查找打包的 `Assets/model-reasoning-capabilities.json`，再优先使用 `CliConfig.models.*.reasoning` 的完整部署覆盖；随后以 `ModelReasoningMiddleware` 将解析结果应用到请求。`DefaultLlmClient` 在调用 Adapter 前执行该 middleware，而非由 CLI 包装另一层 LLM Client。
 
 ```json
 "models": {
@@ -192,7 +192,7 @@ public sealed record ReasoningConfig
 
 ### 5.3 ProviderOptions 边界（取代早期逃生舱方案）
 
-`ProviderOptions` 类似 `extra_body`，用于统一抽象尚未覆盖的**非推理**供应商参数（如 OpenAI service tier、Anthropic top-p）。它不得传递 `thinking`、`reasoning_effort`、`budget_tokens` 或等价字段，也不得绕过模型能力校验。精确预算如未来确有必要，应作为能力定义或单独、显式标记的高级推理 API 设计，不能藏在 ProviderOptions。
+`ProviderOptions` 类似 `extra_body`，用于统一抽象尚未覆盖的**非推理**供应商参数（如 OpenAI service tier、Anthropic top-p）。它不得传递 `thinking`、`reasoning_effort`、`budget_tokens` 或等价字段，也不得绕过模型能力校验。Adapter 入口会校验 `ProviderOptions.Custom` 的顶层键并拒绝这些旁路字段。精确预算如未来确有必要，应作为能力定义或单独、显式标记的高级推理 API 设计，不能藏在 ProviderOptions。
 
 ### 5.4 适配器行为矩阵
 
@@ -223,7 +223,9 @@ public sealed record ReasoningConfig
 
 | 阶段 | 内容 | 备注 |
 |------|------|------|
-| **M1** 语义模型重构 | 已完成：`ReasoningPreference` 五档位、`ReasoningConfig` 作为解析后原生状态、Adapter 不再推断模型能力 | 下一步收紧 `LlmRequest.Reasoning` 公开 setter |
+| **M1** 语义模型重构 | 已完成：`ReasoningPreference` 五档位、`ReasoningConfig` 作为解析后原生状态、Adapter 不再推断模型能力；`LlmRequest.Reasoning` 为 `private init`，仅 `WithResolvedReasoning()` 可写入 | 保持边界，不新增旁路 |
+
+`DefaultLlmClient` 在 Adapter 之前按注册顺序执行 `ILlmRequestMiddleware`。该抽象只负责请求的同步转换或校验，不执行网络 I/O；CLI 的 `ModelReasoningMiddleware` 是首个实现，它把 `ModelReasoningResolver` 的目录解析结果应用到 `LlmRequest`，不让 Resolver 同时承担请求管道职责。
 | **M2** 能力矩阵下沉 | 已完成：内置模型能力目录 + `CliConfig.models` 完整覆盖，携带产品档位集合与原生映射 | 能力未知时只暴露 `default` |
 | **M3** 运行时控制面 | `AgentConfig.ReasoningPreference` 默认值 → 每轮可覆盖接口（预留给未来动态调节）→ CLI `/thinking` 命令 | 档位为会话级，不做自动调节 |
 | **M4** 计量与压缩联动 | `TokenUsage.ReasoningTokens` 拆分（`usage.thinking_tokens` / reasoning tokens / `thoughtsTokenCount`）进 Dashboard；MicroCompact 对 `ThinkingBlock` 优先降级 | |

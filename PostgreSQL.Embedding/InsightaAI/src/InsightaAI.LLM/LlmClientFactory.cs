@@ -34,7 +34,10 @@ public class LlmClientFactory
     /// <summary>
     /// 根据 Provider 名称创建客户端
     /// </summary>
-    public ILlmClient Create(string provider, ProviderConfig config)
+    public ILlmClient Create(
+        string provider,
+        ProviderConfig config,
+        IEnumerable<ILlmRequestMiddleware>? requestMiddlewares = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(provider);
         ArgumentNullException.ThrowIfNull(config);
@@ -46,7 +49,7 @@ public class LlmClientFactory
                 $"Provider '{provider}' not registered. Available providers: {string.Join(", ", _adapters.Keys)}");
         }
 
-        return new DefaultLlmClient(adapter, config, _sharedHttpClient);
+        return new DefaultLlmClient(adapter, config, _sharedHttpClient, requestMiddlewares);
     }
 
     /// <summary>

@@ -94,13 +94,12 @@ public class OpenAITests : TestBase
         }
 
         var client = CreateDeepSeekClient()!;
-        var request = new LlmRequest
+        var request = LlmRequest.WithResolvedReasoning(new LlmRequest
         {
             Model = Config.DeepSeekModel,
             Messages = [Message.FromUser("What is 2+5? Think step by step.")],
-            Reasoning = ReasoningConfig.WithEffort(ReasoningEffortLevel.Medium),
             MaxTokens = 500
-        };
+        }, ReasoningConfig.WithEffort(ReasoningEffortLevel.Medium));
 
         var stream = client.Streaming(request);
         var response = await PrintStreamAsync(stream);

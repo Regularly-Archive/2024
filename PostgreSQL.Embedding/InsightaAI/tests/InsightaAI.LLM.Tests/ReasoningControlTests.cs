@@ -242,10 +242,11 @@ public class ReasoningControlTests
     private static LlmRequest Request(
         string model = "claude-sonnet-4-5",
         ReasoningConfig? reasoning = null,
-        ReasoningEffortLevel? level = null) => new()
-    {
-        Model = model,
-        Messages = [Message.FromUser("Think step by step.")],
-        Reasoning = reasoning ?? (level is { } l ? ReasoningConfig.WithEffort(l) : null)
-    };
+        ReasoningEffortLevel? level = null) => LlmRequest.WithResolvedReasoning(
+            new LlmRequest
+            {
+                Model = model,
+                Messages = [Message.FromUser("Think step by step.")]
+            },
+            reasoning ?? (level is { } l ? ReasoningConfig.WithEffort(l) : null));
 }

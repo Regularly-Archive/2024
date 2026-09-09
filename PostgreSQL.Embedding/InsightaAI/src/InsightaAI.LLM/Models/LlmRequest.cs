@@ -26,8 +26,8 @@ public sealed record LlmRequest
     /// <summary>是否启用流式输出</summary>
     public bool Stream { get; init; } = true;
 
-    /// <summary>推理配置 (用于 Claude extended thinking / DeepSeek reasoning)</summary>
-    public ReasoningConfig? Reasoning { get; init; }
+    /// <summary>已解析的原生推理配置，仅供 Adapter 读取。</summary>
+    public ReasoningConfig? Reasoning { get; private init; }
 
     /// <summary>
     /// 产品层推理偏好。宿主应在发送请求前按具体模型能力将其解析为 <see cref="Reasoning"/>；
@@ -47,6 +47,30 @@ public sealed record LlmRequest
 
     /// <summary>Provider 特定配置</summary>
     public ProviderOptions? ProviderOptions { get; init; }
+
+    /// <summary>
+    /// Applies a model-capability resolver result. This is the only supported path that writes
+    /// the native reasoning configuration; callers must not combine it with a product preference.
+    /// </summary>
+    public static LlmRequest WithResolvedReasoning(LlmRequest request, ReasoningConfig? reasoning) =>
+        request with
+        {
+            ReasoningPreference = null,
+            Reasoning = reasoning,
+            AllowReasoningFallbackToDefault = false
+        };
+
+    /// <summary>Ensures an adapter receives only an already resolved request.</summary>
+    public void ValidateForAdapter()
+    {
+        if (ReasoningPreference is { } preference && preference != global::InsightaAI.LLM.Models.ReasoningPreference.Default)
+        {
+            throw new InvalidOperationException(
+                $"Reasoning preference '{preference}' must be resolved by the model capability layer before an adapter is called.");
+        }
+
+        ProviderOptions?.Validate();
+    }
 }
 
 /// <summary>
@@ -54,7 +78,7 @@ public sealed record LlmRequest
 /// </summary>
 public sealed record ReasoningConfig
 {
-    /// <summary>Optional model/deployment-specific Off mapping; null uses conservative adapter defaults.</summary>
+    /// <summary>Optional model/deployment-specific Off mapping; null sends no explicit wire-level off control.</summary>
     public ReasoningOffMode? OffMode { get; init; }
 
     /// <summary>控制方式，默认 ProviderDefault（不传思考参数，由供应商默认行为决定）</summary>
@@ -164,6 +188,23 @@ public sealed record ProviderOptions
 
     /// <summary>自定义选项</summary>
     public Dictionary<string, object>? Custom { get; init; }
+
+    /// <summary>Prevents extra-body options from bypassing the reasoning capability boundary.</summary>
+    public void Validate()
+    {
+        if (Custom == null)
+            return;
+
+        foreach (var key in Custom.Keys)
+        {
+            var normalized = key.Replace("_", "", StringComparison.Ordinal).ToLowerInvariant();
+            if (normalized is "thinking" or "reasoning" or "reasoningeffort" or "budgettokens" or "thinkingbudget" or "enablethinking" or "includethoughts")
+            {
+                throw new InvalidOperationException(
+                    $"ProviderOptions.Custom key '{key}' controls reasoning and must be configured through model capabilities.");
+            }
+        }
+    }
 }
 
 /// <summary>
