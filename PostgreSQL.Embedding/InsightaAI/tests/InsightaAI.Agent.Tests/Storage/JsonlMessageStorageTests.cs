@@ -1,4 +1,5 @@
 using InsightaAI.Agent.Storage;
+using InsightaAI.LLM.Models;
 
 namespace InsightaAI.Agent.Tests.Storage;
 
@@ -99,5 +100,63 @@ public sealed class JsonlMessageStorageTests : IDisposable
 
         Assert.Null(await _storage.GetSessionAsync(session.Id));
         Assert.False(Directory.Exists(Path.Combine(_tempDir, session.Id)));
+    }
+
+    [Fact]
+    public async Task GetMessagesAsync_Should_Read_Legacy_PascalCase_ToolResultState()
+    {
+        var session = await _storage.CreateSessionAsync("model", "provider");
+        var legacyMessage = """
+            {"id":"legacy-state","role":"tool","content":[],"tool_result_state":{"RetentionLevel":1,"Artifact":{"Id":"artifact-1","Path":"tool_results/artifact.txt","ContentType":"text/plain","ByteSize":42,"CreatedAt":"2026-09-10T00:00:00+00:00"},"OriginalLength":100,"CanReplay":true,"HasSideEffects":false,"MinimumLevel":2},"created_at":"2026-09-10T00:00:00Z"}
+            """;
+        await File.WriteAllTextAsync(Path.Combine(_tempDir, session.Id, "messages.jsonl"), legacyMessage);
+
+        var message = Assert.Single(await _storage.GetMessagesAsync(session.Id));
+        var state = Assert.IsType<ToolResultState>(message.ToolResultState);
+
+        Assert.Equal(ToolResultRetentionLevel.Preview, state.RetentionLevel);
+        Assert.Equal(100, state.OriginalLength);
+        Assert.True(state.CanReplay);
+        Assert.NotNull(state.Artifact);
+        Assert.Equal("artifact-1", state.Artifact!.Id);
+        Assert.Equal(42, state.Artifact.ByteSize);
+    }
+
+    [Fact]
+    public async Task AddMessageAsync_Should_Write_CamelCase_ToolResultState()
+    {
+        var session = await _storage.CreateSessionAsync("model", "provider");
+        await _storage.AddMessageAsync(session.Id, new MessageRecord
+        {
+            Role = "tool",
+            ToolResultState = new ToolResultState
+            {
+                RetentionLevel = ToolResultRetentionLevel.Preview,
+                Artifact = new ToolResultArtifactInfo
+                {
+                    Id = "artifact-1",
+                    Path = "tool_results/artifact.txt",
+                    ByteSize = 42
+                },
+                OriginalLength = 100,
+                CanReplay = true,
+                MinimumLevel = ToolResultRetentionLevel.Placeholder
+            }
+        });
+
+        var json = await File.ReadAllTextAsync(Path.Combine(_tempDir, session.Id, "messages.jsonl"));
+        using var document = System.Text.Json.JsonDocument.Parse(json);
+        var state = document.RootElement.GetProperty("tool_result_state");
+        var artifact = state.GetProperty("artifact");
+
+        Assert.True(state.TryGetProperty("retentionLevel", out _));
+        Assert.True(state.TryGetProperty("originalLength", out _));
+        Assert.True(state.TryGetProperty("canReplay", out _));
+        Assert.True(state.TryGetProperty("hasSideEffects", out _));
+        Assert.True(state.TryGetProperty("minimumLevel", out _));
+        Assert.True(artifact.TryGetProperty("contentType", out _));
+        Assert.True(artifact.TryGetProperty("byteSize", out _));
+        Assert.False(state.TryGetProperty("RetentionLevel", out _));
+        Assert.False(artifact.TryGetProperty("ByteSize", out _));
     }
 }

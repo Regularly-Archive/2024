@@ -99,6 +99,8 @@ AvailableInputTokens = MaxContextTokens - ReservedForOutput
 
 模型的 `context_window` 表示完整上下文窗口，`max_tokens` 同时作为输出上限和默认输出预留；未配置 `max_tokens` 时预留 16,384 tokens。
 
+模型部署的 reasoning capability 覆盖、当前内置支持矩阵和 JSON 字段命名见[模型推理能力配置](docs/model-reasoning-configuration.md)。
+
 ## 开发与验证
 
 ```powershell

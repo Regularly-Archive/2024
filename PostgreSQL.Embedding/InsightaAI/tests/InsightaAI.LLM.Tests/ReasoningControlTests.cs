@@ -55,6 +55,25 @@ public class ReasoningControlTests
         ReasoningConfig.WithBudget(5000).Validate();
     }
 
+    [Fact]
+    public void ReasoningConfig_Serializes_Canonical_Json_Names()
+    {
+        var options = new JsonSerializerOptions();
+        options.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+
+        var json = JsonSerializer.Serialize(
+            ReasoningConfig.WithBudget(4096) with { OffMode = ReasoningOffMode.ThinkingDisabled },
+            options);
+        var body = JsonSerializer.Deserialize<JsonElement>(json);
+
+        Assert.True(body.TryGetProperty("control", out _));
+        Assert.True(body.TryGetProperty("budgetTokens", out _));
+        Assert.True(body.TryGetProperty("offMode", out _));
+        Assert.False(body.TryGetProperty("Control", out _));
+        Assert.False(body.TryGetProperty("BudgetTokens", out _));
+        Assert.False(body.TryGetProperty("OffMode", out _));
+    }
+
     // ── Anthropic：仅 Budget 策略 ──
 
     [Theory]

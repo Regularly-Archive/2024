@@ -19,6 +19,7 @@ public class JsonlMessageStorage : IMessageStorage
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = false,
+        PropertyNameCaseInsensitive = true,
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
@@ -205,7 +206,7 @@ public class JsonlMessageStorage : IMessageStorage
         var lines = await File.ReadAllLinesAsync(messagesFile);
         var messages = lines
             .Where(l => !string.IsNullOrWhiteSpace(l))
-            .Select(l => JsonSerializer.Deserialize<MessageRecord>(l)!)
+            .Select(l => JsonSerializer.Deserialize<MessageRecord>(l, JsonOptions)!)
             .ToList();
 
         if (limit.HasValue)
@@ -251,7 +252,7 @@ public class JsonlMessageStorage : IMessageStorage
         var lines = await File.ReadAllLinesAsync(sessionsFile);
         return lines
             .Where(l => !string.IsNullOrWhiteSpace(l))
-            .Select(l => JsonSerializer.Deserialize<SessionRecord>(l)!)
+            .Select(l => JsonSerializer.Deserialize<SessionRecord>(l, JsonOptions)!)
             .ToList();
     }
 

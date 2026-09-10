@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace InsightaAI.LLM.Models;
 
 /// <summary>
@@ -79,15 +81,19 @@ public sealed record LlmRequest
 public sealed record ReasoningConfig
 {
     /// <summary>Optional model/deployment-specific Off mapping; null sends no explicit wire-level off control.</summary>
+    [JsonPropertyName("offMode")]
     public ReasoningOffMode? OffMode { get; init; }
 
     /// <summary>控制方式，默认 ProviderDefault（不传思考参数，由供应商默认行为决定）</summary>
+    [JsonPropertyName("control")]
     public ReasoningControl Control { get; init; } = ReasoningControl.ProviderDefault;
 
     /// <summary>推理档位 (Control=Effort 时必填)</summary>
+    [JsonPropertyName("effort")]
     public ReasoningEffortLevel? Effort { get; init; }
 
     /// <summary>原生预算 token 数 (Control=Budget 时必填；Anthropic budget_tokens / Gemini thinkingBudget)</summary>
+    [JsonPropertyName("budgetTokens")]
     public int? BudgetTokens { get; init; }
 
     public static ReasoningConfig Off() => new() { Control = ReasoningControl.Off };

@@ -589,7 +589,7 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 - [ ] 为 Anthropic Budget、Anthropic Effort、Gemini Effort 和不支持模型分别补请求序列化与验证测试；GLM 额度恢复后补 Anthropic 兼容端点真实回归。
 - [ ] GLM 加入能力目录前，先确认其 native effort 值域（包括 `max`）；当前通用 `ReasoningEffortLevel` 不应通过模型名推断或隐式映射来伪造这一档。
 - [ ] `CliConfig` 配置写回会静默丢失无法解析的 reasoning 字段（如 `off-mode` 连字符写法被忽略，下次 `Save()` 永久抹掉）；`CreateJsonOptions()` 需校验式反序列化或保存前字段比对告警（源自 2026-09-08 review P1-4）。
-- [ ] 能力目录需向用户显式标注「fast/balance/deep 仅 OpenAI 系可用」：Claude/Gemini 当前仅声明 `off`，用户配置中间档位会收到「模型不支持」（源自 review P2-6）。
+- [x] 能力目录已向用户显式标注「fast/balance/deep 仅 OpenAI 系可用」：见 [model-reasoning-configuration.md](model-reasoning-configuration.md) 的内置支持矩阵与覆盖语义。
 - [ ] `LlmClientFactory.Create()` 每次调用都 `LoadDefault()` 读盘反序列化目录；子 Agent / 多 provider 场景应使用工厂级 `Lazy<T>` 缓存（源自 review P3-7）。
 - [ ] `ReasoningOffPolicy.ResolutionKey` 只写不读（真正消费方是 `Activity` tag）；确认为预留则注释用途，否则删除（源自 review P3-8）。
 - [ ] 产品层定夺档位语义：`fast`/`balance`/`deep` 是「用户意图表达」（接受供应商间实现差异）还是「跨供应商等价质量档」；当前映射在不同供应商下语义不等价。

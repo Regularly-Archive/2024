@@ -6,6 +6,7 @@
 | --- | --- |
 | [VISION.md](VISION.md) | 项目愿景与阶段里程碑 |
 | [TODO.md](TODO.md) | 当前工作队列与历史摘要 |
+| [model-reasoning-configuration.md](model-reasoning-configuration.md) | 模型推理能力配置 schema 与内置支持矩阵 |
 | [architecture/](architecture/) | Agent 架构、依赖注入、生命周期与 Invocation |
 | [security/](security/) | 安全策略与调查记录 |
 | [prompts/](prompts/) | Core Instructions 与 System Prompt 设计 |
