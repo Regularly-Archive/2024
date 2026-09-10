@@ -6,7 +6,7 @@ namespace InsightaAI.LLM.Tests;
 
 /// <summary>
 /// GLM-5.3 经 Anthropic 兼容端点的集成测试。
-/// 验证推理强度控制（档位→预算映射、Budget 直通）经 GLM Anthropic 兼容层的真实行为。
+/// 验证 Budget 推理控制经 GLM Anthropic 兼容层的真实行为。
 /// 环境变量：GLM_ANTHROPIC_API_KEY（必需）、GLM_ANTHROPIC_BASE_URL（默认 https://open.bigmodel.cn/api/anthropic）、GLM_ANTHROPIC_MODEL（默认 glm-5.3）
 /// </summary>
 public class GlmAnthropicTests : TestBase
@@ -29,32 +29,6 @@ public class GlmAnthropicTests : TestBase
 
         var realClient = CreateGlmAnthropicClient();
         Assert.NotNull(realClient);
-    }
-
-    [Fact]
-    public async Task Glm_Effort_Should_Stream_Thinking_Content()
-    {
-        if (!Config.HasGlmAnthropic || Config.SkipRealApiCalls) return;
-
-        var client = CreateGlmAnthropicClient()!;
-        // Effort=Low 经映射表落为 budget_tokens=4096；Anthropic 协议要求 budget < max_tokens
-        var request = LlmRequest.WithResolvedReasoning(new LlmRequest
-        {
-            Model = Config.GlmAnthropicModel,
-            Messages = [Message.FromUser("What is 27 * 43? Think step by step.")],
-            MaxTokens = 8192
-        }, ReasoningConfig.WithEffort(ReasoningEffortLevel.Low));
-
-        var stream = client.Streaming(request);
-        var response = await PrintStreamAsync(stream);
-
-        Assert.NotNull(response);
-        Assert.NotEmpty(response.Content);
-
-        // 档位驱动的思考应产出思考内容；GLM 兼容层若不兑现 budget_tokens 此处会红
-        var thinking = response.GetThinkingContent();
-        Assert.False(string.IsNullOrEmpty(thinking),
-            $"GLM Anthropic 兼容层未返回思考内容 (Effort=Low → budget 4096)。响应 blocks: {response.Content.Length}");
     }
 
     [Fact]

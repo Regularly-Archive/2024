@@ -318,11 +318,31 @@ public class GeminiAdapter : IProviderAdapter
         {
             generationConfig["temperature"] = request.Temperature.Value;
         }
-        request.Reasoning?.Validate();
-        if (request.Reasoning?.Control == ReasoningControl.Off && ReasoningOffPolicy.Resolve("gemini", request) == ReasoningOffMode.ThinkingBudgetZero)
+        if (request.Reasoning is { } reasoning)
         {
-            // Gemini: 0 is an explicit disable; omitting thinkingConfig keeps the model default.
-            generationConfig["thinkingConfig"] = new { thinkingBudget = 0 };
+            reasoning.Validate();
+            switch (reasoning.Control)
+            {
+                case ReasoningControl.Off when ReasoningOffPolicy.Resolve("gemini", request) == ReasoningOffMode.ThinkingBudgetZero:
+                    // Gemini: 0 is an explicit disable; omitting thinkingConfig keeps the model default.
+                    generationConfig["thinkingConfig"] = new { thinkingBudget = 0 };
+                    break;
+                case ReasoningControl.Effort when reasoning.Effort == ReasoningEffortLevel.None:
+                    throw new NotSupportedException(
+                        "GeminiAdapter does not map ReasoningControl.Effort.None. Use an explicit Off mapping instead.");
+                case ReasoningControl.Effort:
+                    generationConfig["thinkingConfig"] = new
+                    {
+                        thinkingLevel = reasoning.Effort!.ToString().ToLowerInvariant()
+                    };
+                    break;
+                case ReasoningControl.Budget:
+                    generationConfig["thinkingConfig"] = new
+                    {
+                        thinkingBudget = reasoning.BudgetTokens!.Value
+                    };
+                    break;
+            }
         }
         if (generationConfig.Count > 0)
         {

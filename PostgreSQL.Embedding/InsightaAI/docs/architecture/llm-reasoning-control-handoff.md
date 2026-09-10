@@ -12,7 +12,7 @@
 >
 > **下一步架构决策（2026-09-08）**：面向用户的固定偏好改为 `default`、`fast`、`off`、`balance`、`deep`；其中 `default` 表示省略控制字段，`balance` 是显式均衡偏好，二者不可混同。能力、产品档位到原生参数的映射应下沉到内置模型能力目录，并允许 `CliConfig.models` 对自定义模型进行覆盖；Adapter 只序列化已解析的原生设置。能力未知时仅允许 `default`，其它偏好必须显式提示不支持，不能静默降级或按模型名前缀猜测。
 >
-> `ReasoningEffortLevel` 是 Adapter 可消费的原生过渡表示，不是产品档位。Anthropic 与兼容厂商可能随模型/API 版本在 manual budget、原生 effort 与 adaptive thinking 间切换；预算与 effort 在支持的模型上可组合，adaptive 是 thinking mode 而非 effort 值。能力目录应明确 protocol、mode 和允许字段组合，Adapter 不得把 `Effort` 擅自折算为预算。`max_tokens > budget_tokens` 只适用于 manual、非 interleaved 的具体请求形态；TODO #21 需先按模型确认协议，再分别实现和验证。GLM 额度未恢复，本轮以 SKIP_REAL_API=true 验证，不作在线通过声明。
+> `ReasoningEffortLevel` 是 Adapter 可消费的原生过渡表示，不是产品档位。Anthropic 与兼容厂商可能随模型/API 版本在 manual budget、原生 effort 与 adaptive thinking 间切换；遵循 KISS，每个精确模型或部署只选择 `none`、`effort` 或 `budget` 一种策略，不表达预算与 effort 的组合能力。能力目录应声明该单一策略及映射，Adapter 不得把 `Effort` 擅自折算为预算。`max_tokens > budget_tokens` 只在采用 Budget 且目标 API 有该约束时验证；TODO #21 需先按模型确认，再分别实现和验证。
 >
 > 协议依据：[GPT-5.1](https://developers.openai.com/api/docs/models/gpt-5.1)、[GPT-5.2](https://developers.openai.com/api/docs/models/gpt-5.2)、[Gemini thinking](https://ai.google.dev/gemini-api/docs/thinking)。能力默认表有意保持小范围，后续扩展前应核对具体 API 与模型版本。
 
@@ -73,14 +73,14 @@ OpenAI 兼容请求模型 `OpenAIRequest` 新增了 `thinking` 和 `enable_think
 
 ### 3.1 P1：Anthropic `budget_tokens` 与 `max_tokens`
 
-`AnthropicAdapter` 当前将旧 `Effort` 映射为预算，这是不能继续扩展的过渡实现。Anthropic 与兼容端点并非始终使用预算制：模型/API 版本可能使用 manual budget、manual budget + effort，或 adaptive thinking。产品档位必须由能力目录解析到准确的 protocol、thinking mode 与字段组合，不能由 Adapter 依据通用枚举或模型名猜测。`budget_tokens < max_tokens` 仅适用于 manual、非 interleaved 请求；不能写成所有 Budget 字段的全局约束。
+`AnthropicAdapter` 当前只序列化 Budget，并会明确拒绝 `Effort`，不再将后者隐式折算为预算。Anthropic 与兼容端点并非始终使用预算制：模型/API 版本可能使用 manual budget、原生 effort 或 adaptive thinking。产品档位必须由能力目录解析到准确的单一策略，不能由 Adapter 依据通用枚举或模型名猜测。当前不支持 manual budget + effort 的组合。`budget_tokens < max_tokens` 仅在选择 Budget 且目标 API 要求时验证；不能写成所有 Budget 字段的全局约束。
 
 这项已记录为 [TODO #21](../TODO.md)。用户尚未决定策略，**本轮不要自行修复或静默扩大用户显式指定的 MaxTokens**。接手时先确认目标模型的原生协议，再处理对应分支：
 
-1. 先依 protocol / capability 判定是否适用 `budget_tokens < max_tokens`；interleaved 例外不做错误拒绝；
+1. 先依 strategy / capability 判定是否需要 `budget_tokens < max_tokens`；
 2. 只在适用该约束且未显式设置 `MaxTokens` 时，再评估 `max(defaultMaxTokens, budget + 1024)`；
 3. 显式上限冲突时抛出清晰异常，不静默扩大；
-4. 覆盖 manual、manual + effort、adaptive 与 interleaved 边界的序列化测试。
+4. 覆盖 Budget、Effort 与不支持模型的序列化测试。
 
 ### 3.2 能力识别仍是临时前缀判断
 
@@ -108,7 +108,7 @@ OpenAI 兼容请求模型 `OpenAIRequest` 新增了 `thinking` 和 `enable_think
 
 ## 4. 测试状态与命令
 
-本轮离线序列化测试覆盖：配置校验、Anthropic 映射、OpenAI Chat / Responses 的 `Off` 与 `ProviderDefault` 区分、GLM/Qwen/豆包/DeepSeek/MiniMax M3 的请求字段、未知模型降级，以及 Gemini `thinkingBudget: 0`。
+本轮离线序列化测试覆盖：配置校验、Anthropic Budget 与 Effort 拒绝、OpenAI Chat / Responses 的 `Off` 与 `ProviderDefault` 区分、OpenAI Effort 直传、Gemini `thinkingLevel` / `thinkingBudget` 与关闭字段，以及未知模型降级。
 
 最后一次结果：**110/110 通过**（排除需要真实 GLM 额度的测试）。
 

@@ -90,6 +90,36 @@ public sealed class ModelReasoningResolver
                 throw new InvalidOperationException($"Model '{modelReference}' must not map an explicit preference to ProviderDefault.");
             if (preference == ReasoningPreference.Off && adapter != null)
                 ReasoningOffPolicy.ValidateCompatibility(adapter, mapping.OffMode ?? ReasoningOffMode.Unknown);
+            if (preference != ReasoningPreference.Off)
+                ValidateStrategy(capability.Strategy, mapping.Control, modelReference, preference);
+        }
+    }
+
+    private static void ValidateStrategy(
+        ReasoningStrategy strategy,
+        ReasoningControl control,
+        string modelReference,
+        ReasoningPreference preference)
+    {
+        var expectedControl = strategy switch
+        {
+            ReasoningStrategy.Effort => ReasoningControl.Effort,
+            ReasoningStrategy.Budget => ReasoningControl.Budget,
+            ReasoningStrategy.None => (ReasoningControl?)null,
+            _ => throw new InvalidOperationException($"Model '{modelReference}' declares an unknown reasoning strategy '{strategy}'.")
+        };
+
+        if (expectedControl is null)
+        {
+            throw new InvalidOperationException(
+                $"Model '{modelReference}' uses reasoning strategy 'none' and must not map '{preference}'.");
+        }
+
+        if (control != expectedControl)
+        {
+            throw new InvalidOperationException(
+                $"Model '{modelReference}' uses reasoning strategy '{strategy.ToString().ToLowerInvariant()}', " +
+                $"but maps '{preference}' to '{control}'.");
         }
     }
 }

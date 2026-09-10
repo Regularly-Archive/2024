@@ -74,11 +74,30 @@ public class ModelEntry
 /// </summary>
 public sealed class ModelReasoningCapability
 {
+    /// <summary>
+    /// 此模型或部署用于强度控制的唯一原生策略。Off 是独立关闭映射，不属于该策略。
+    /// </summary>
+    [JsonPropertyName("strategy")]
+    public ReasoningStrategy Strategy { get; set; }
+
     [JsonPropertyName("supported")]
     public HashSet<ReasoningPreference> Supported { get; set; } = [ReasoningPreference.Default];
 
     [JsonPropertyName("mappings")]
     public Dictionary<ReasoningPreference, ReasoningConfig> Mappings { get; set; } = [];
+}
+
+/// <summary>模型能力目录允许的推理强度映射策略。</summary>
+public enum ReasoningStrategy
+{
+    /// <summary>不提供可调强度；模型仍可独立声明 Off 映射。</summary>
+    None,
+
+    /// <summary>产品档位映射为供应商原生 effort。</summary>
+    Effort,
+
+    /// <summary>产品档位映射为固定 thinking token 预算。</summary>
+    Budget
 }
 
 /// <summary>工具安全策略配置</summary>

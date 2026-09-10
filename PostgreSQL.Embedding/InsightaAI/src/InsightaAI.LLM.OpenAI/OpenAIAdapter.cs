@@ -283,31 +283,21 @@ public class OpenAIAdapter : IProviderAdapter
         if (request.Reasoning is { } reasoning)
         {
             reasoning.Validate();
-            var modelLower = request.Model.ToLowerInvariant();
 
             if (reasoning.Control == ReasoningControl.Off)
             {
                 ApplyReasoningOff(body, ReasoningOffPolicy.Resolve("openai", request));
             }
-
-            // Budget 模式对 OpenAI 兼容端点无原生参数，忽略（不发即不会出错）
             else if (reasoning.Control == ReasoningControl.Effort)
             {
-                // 检查是否是需要 reasoning_effort 的模型
-                if (IsOpenAiReasoningModel(modelLower))
-                {
-                    // Effort passthrough remains caller-controlled; supported levels vary by model.
-                    body.ReasoningEffort = reasoning.Effort!.ToString().ToLowerInvariant();
-                }
-                else if (IsGlmModel(modelLower))
-                {
-                    body.ReasoningEffort = MapEffortForGlm(reasoning.Effort!.Value);
-                }
-                // DeepSeek 模型使用 temperature=0 来启用推理（档位驱动意图的落地实现）
-                else if (reasoning.Effort != ReasoningEffortLevel.None && IsDeepSeekReasoningModel(modelLower))
-                {
-                    body.Temperature = 0;
-                }
+                // A capability record has already established that this exact deployment accepts effort.
+                body.ReasoningEffort = reasoning.Effort!.ToString().ToLowerInvariant();
+            }
+            else if (reasoning.Control == ReasoningControl.Budget)
+            {
+                throw new NotSupportedException(
+                    "OpenAIAdapter does not serialize ReasoningControl.Budget. " +
+                    "Configure this deployment with the Effort strategy or add a verified budget serializer.");
             }
         }
 

@@ -96,6 +96,8 @@ Gemini 3 / 2.5 当前主接口使用 `thinking_level`，因此新接入模型优
 
 正常用户和 Agent 请求某个未知的非 `default` 档位会失败并说明未配置。标题、摘要等内部辅助请求允许在没有 `off` 映射时回退至 `default`，以保证上下文压缩和会话标题不会因能力目录尚未覆盖某模型而失效；这不是用户偏好的静默降级。
 
+> 以下第 1–8 节保留 2026-08 的调研与演进记录。其中的供应商机制、预算映射表和阶段编号不是当前实现契约；遇到冲突时，以本文开头的“当前产品层决策”和“模型推理策略”两节为准。
+
 ## 1. 背景
 
 主流 LLM API 均已提供"思考强度"控制，但形态互不相同且仍在快速演进：OpenAI 赌档位（`reasoning.effort`），Anthropic 从预算（`budget_tokens`）转向自适应档位（Opus 4.7+ `adaptive effort`），Google 坚持预算（`thinkingBudget`，`0=关闭 / -1=动态 / 正数=固定`）。本设计为 InsightaAI 的 LLM 抽象层提供统一的思考强度控制语义。
@@ -284,11 +286,11 @@ Gemini thinking 接入（`thinkingBudget` + `includeThoughts`）安排在 M2–M
 | 2026-09-08 | 产品层固定为 `default/fast/off/balance/deep` | `balance` 表达明确的均衡偏好，避免 `standard` 与 `default` 的语义歧义。 |
 | 2026-09-08 | 能力与映射归属模型，Adapter 只做序列化 | 同一供应商可共享凭据与协议，却可有不同模型能力；兼容网关尤其不能由 Adapter 猜测。 |
 | 2026-09-08 | 不支持时显式拒绝，不做最近档位降级 | 成本、延迟与关闭语义都不能由框架擅自改写。 |
-| 2026-09-09 | Wire protocol 与 reasoning 字段组合分离 | Anthropic 的 manual thinking 可在支持的模型上同时携带预算和 effort；adaptive 是 thinking mode，不能把 Budget / Effort 建成全局互斥分支。 |
-| 2026-09-09 | `max_tokens` 由具体 protocol 验证 | Anthropic interleaved thinking 是 `budget_tokens < max_tokens` 的例外，不能按 `BudgetTokens` 属性全局拒绝请求。 |
+| 2026-09-10 | 每模型只选择一种推理策略 | 遵循 KISS：能力目录仅使用 `none` / `effort` / `budget`，不为供应商可能支持的组合能力提前扩展 `ReasoningConfig`。 |
+| 2026-09-10 | `max_tokens` 仅由 Budget 策略验证 | 预算上限是特定 API 的约束，不能施加给 Effort；具体 API 的例外在接入该 Budget 模型时再确认。 |
 
 ## 8. 开放问题
 
-1. Anthropic 精确模型/API 版本的 protocol 表：manual、manual + effort、adaptive 及 interleaved 支持范围必须先逐项核对，再写入能力目录。
+1. Anthropic 与 Gemini 精确模型/API 版本的策略表：每个条目只选择 `none`、`effort` 或 `budget`，经真实请求确认后再写入能力目录。
 2. 模型能力目录的发布、版本化和 `CliConfig.models` 覆盖格式；覆盖只能补充或收紧，不能让未知模型自动获得协议映射。
 3. `ThinkingBlock` 在 MicroCompact 中的降级优先级与 Anthropic 回传连续性的冲突——压缩丢弃 thinking block 是否影响后续轮次推理质量，需实测。

@@ -9,7 +9,7 @@ using Xunit;
 namespace InsightaAI.LLM.Tests;
 
 /// <summary>
-/// 推理强度控制 M1 测试：语义模型校验、档位→预算映射、clamp、Off/ProviderDefault 语义位。
+/// 推理强度控制测试：语义模型校验、单一策略序列化、Budget 边界与 Off/ProviderDefault 语义位。
 /// 设计见 docs/architecture/llm-reasoning-control-design.md
 /// </summary>
 public class ReasoningControlTests
@@ -55,20 +55,18 @@ public class ReasoningControlTests
         ReasoningConfig.WithBudget(5000).Validate();
     }
 
-    // ── Anthropic：档位 → 预算映射表 ──
+    // ── Anthropic：仅 Budget 策略 ──
 
     [Theory]
-    [InlineData(ReasoningEffortLevel.Minimal, 1024)]
-    [InlineData(ReasoningEffortLevel.Low, 4096)]
-    [InlineData(ReasoningEffortLevel.Medium, 10000)]
-    [InlineData(ReasoningEffortLevel.High, 16000)]
-    [InlineData(ReasoningEffortLevel.XHigh, 32000)]
-    public async Task Anthropic_Effort_Maps_To_Budget(ReasoningEffortLevel level, int expectedBudget)
+    [InlineData(ReasoningEffortLevel.Minimal)]
+    [InlineData(ReasoningEffortLevel.Low)]
+    [InlineData(ReasoningEffortLevel.Medium)]
+    [InlineData(ReasoningEffortLevel.High)]
+    [InlineData(ReasoningEffortLevel.XHigh)]
+    public void Anthropic_Effort_Is_Rejected_Instead_Of_Being_Mapped_To_Budget(ReasoningEffortLevel level)
     {
-        var body = await GetBodyAsync(new AnthropicAdapter(), Request(level: level));
-        Assert.True(body.TryGetProperty("thinking", out var thinking));
-        Assert.Equal("enabled", thinking.GetProperty("type").GetString());
-        Assert.Equal(expectedBudget, thinking.GetProperty("budget_tokens").GetInt32());
+        Assert.Throws<NotSupportedException>(() =>
+            new AnthropicAdapter().CreateRequest(Request(level: level), TestConfig, stream: true));
     }
 
     [Fact]
@@ -94,14 +92,6 @@ public class ReasoningControlTests
         var @default = await GetBodyAsync(adapter, Request(reasoning: new ReasoningConfig()));
         Assert.Equal("disabled", off.GetProperty("thinking").GetProperty("type").GetString());
         Assert.False(@default.TryGetProperty("thinking", out _));
-    }
-
-    [Fact]
-    public async Task Anthropic_EffortNone_Omits_Thinking()
-    {
-        // Anthropic 无 effort=none 概念，档位驱动的关闭视同 Off
-        var body = await GetBodyAsync(new AnthropicAdapter(), Request(level: ReasoningEffortLevel.None));
-        Assert.False(body.TryGetProperty("thinking", out _));
     }
 
     // ── OpenAI Chat Completions：档位直传 ──
@@ -130,25 +120,20 @@ public class ReasoningControlTests
     }
 
     [Fact]
-    public async Task OpenAI_DeepSeek_Effort_Sets_Temperature_Zero()
+    public async Task OpenAI_Effort_Does_Not_Inspect_The_Model_Name()
     {
-        var body = await GetBodyAsync(new OpenAIAdapter(), Request(model: "deepseek-reasoner", level: ReasoningEffortLevel.Medium));
-        Assert.Equal(0, body.GetProperty("temperature").GetDouble());
+        var body = await GetBodyAsync(new OpenAIAdapter(), Request(model: "custom-deployment", level: ReasoningEffortLevel.Medium));
+        Assert.Equal("medium", body.GetProperty("reasoning_effort").GetString());
     }
 
     [Fact]
-    public async Task OpenAI_DeepSeek_EffortNone_Does_Not_Set_Temperature()
+    public void OpenAI_Budget_Is_Explicitly_Rejected()
     {
-        var body = await GetBodyAsync(new OpenAIAdapter(), Request(model: "deepseek-reasoner", level: ReasoningEffortLevel.None));
-        Assert.False(body.TryGetProperty("temperature", out _));
-    }
-
-    [Fact]
-    public async Task OpenAI_Budget_Is_Ignored()
-    {
-        // OpenAI 无原生预算参数，Budget 模式不发参数（不会触发 API 400）
-        var body = await GetBodyAsync(new OpenAIAdapter(), Request(model: "gpt-5.2", reasoning: ReasoningConfig.WithBudget(5000)));
-        Assert.False(body.TryGetProperty("reasoning_effort", out _));
+        Assert.Throws<NotSupportedException>(() =>
+            new OpenAIAdapter().CreateRequest(
+                Request(model: "custom-deployment", reasoning: ReasoningConfig.WithBudget(5000)),
+                TestConfig,
+                stream: true));
     }
 
     // ── OpenAI Responses API ──
@@ -178,20 +163,7 @@ public class ReasoningControlTests
         Assert.False(@default.TryGetProperty("reasoning", out _));
     }
 
-    // ── GLM-5.3（OpenAI 兼容端点；档位集与统一集合不同）──
-
-    [Theory]
-    [InlineData(ReasoningEffortLevel.None, "none")]
-    [InlineData(ReasoningEffortLevel.Minimal, "minimal")]
-    [InlineData(ReasoningEffortLevel.Low, "high")]
-    [InlineData(ReasoningEffortLevel.Medium, "high")]   // GLM 无 medium 档，向上靠齐
-    [InlineData(ReasoningEffortLevel.High, "high")]
-    [InlineData(ReasoningEffortLevel.XHigh, "max")]
-    public async Task OpenAI_Glm_Effort_Maps_To_Glm_Levels(ReasoningEffortLevel level, string expected)
-    {
-        var body = await GetBodyAsync(new OpenAIAdapter(), Request(model: "glm-5.3", level: level));
-        Assert.Equal(expected, body.GetProperty("reasoning_effort").GetString());
-    }
+    // ── OpenAI-compatible endpoints：Off 由精确配置映射 ──
 
     [Fact]
     public async Task OpenAI_Glm_Off_Sends_ThinkingDisabled()
@@ -235,6 +207,22 @@ public class ReasoningControlTests
         var @default = await GetBodyAsync(adapter, Request(model: "gemini-2.5-flash", reasoning: new ReasoningConfig()));
         Assert.Equal(0, off.GetProperty("generationConfig").GetProperty("thinkingConfig").GetProperty("thinkingBudget").GetInt32());
         Assert.False(@default.TryGetProperty("generationConfig", out _));
+    }
+
+    [Fact]
+    public async Task Gemini_Effort_Sends_ThinkingLevel()
+    {
+        var body = await GetBodyAsync(new GeminiAdapter(), Request(model: "gemini-custom", level: ReasoningEffortLevel.Low));
+
+        Assert.Equal("low", body.GetProperty("generationConfig").GetProperty("thinkingConfig").GetProperty("thinkingLevel").GetString());
+    }
+
+    [Fact]
+    public async Task Gemini_Budget_Sends_ThinkingBudget()
+    {
+        var body = await GetBodyAsync(new GeminiAdapter(), Request(model: "gemini-legacy", reasoning: ReasoningConfig.WithBudget(1024)));
+
+        Assert.Equal(1024, body.GetProperty("generationConfig").GetProperty("thinkingConfig").GetProperty("thinkingBudget").GetInt32());
     }
 
     // ── 辅助 ──

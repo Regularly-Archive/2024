@@ -74,7 +74,7 @@ public sealed record LlmRequest
 }
 
 /// <summary>
-/// 推理配置 - 档位表达意图，预算负责落地（详见 docs/architecture/llm-reasoning-control-design.md）
+/// 已解析的原生推理控制（Effort 与 Budget 互斥；详见 docs/architecture/llm-reasoning-control-design.md）
 /// </summary>
 public sealed record ReasoningConfig
 {

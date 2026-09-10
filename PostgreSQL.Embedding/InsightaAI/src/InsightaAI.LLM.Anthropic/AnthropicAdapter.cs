@@ -16,27 +16,8 @@ public class AnthropicAdapter : IProviderAdapter
     public bool SupportsReasoning => true;
     public ReasoningMode SupportedReasoningModes => ReasoningMode.ExtendedThinking;
 
-    // 支持 extended thinking 的模型（glm-* 经 Anthropic 兼容端点接入，预算语义由集成测试验证）
-    private static readonly string[] ThinkingCapableModels =
-    [
-        "claude-sonnet-4", "claude-opus-4",
-        "claude-3-5-sonnet", "claude-3-opus",
-        "glm",
-    ];
-
     /// <summary>API 允许的最小 thinking 预算（budget_tokens 下限）</summary>
     private const int MinThinkingBudget = 1024;
-
-    // 档位 → 预算映射表（依据 Anthropic 官方建议：简单任务 1024 起步，复杂任务 16000+）
-    private static int MapEffortToBudget(ReasoningEffortLevel level) => level switch
-    {
-        ReasoningEffortLevel.Minimal => 1024,
-        ReasoningEffortLevel.Low => 4096,
-        ReasoningEffortLevel.Medium => 10000,
-        ReasoningEffortLevel.High => 16000,
-        ReasoningEffortLevel.XHigh => 32000,
-        _ => 10000
-    };
 
     public HttpRequestMessage CreateRequest(LlmRequest request, ProviderConfig config, bool stream)
     {
@@ -244,22 +225,26 @@ public class AnthropicAdapter : IProviderAdapter
         if (request.Reasoning?.Control == ReasoningControl.Off && ReasoningOffPolicy.Resolve("anthropic", request) == ReasoningOffMode.ThinkingDisabled)
             body.Thinking = new AnthropicThinkingConfig { Type = "disabled" };
 
+        if (request.Reasoning is { Control: ReasoningControl.Effort })
+        {
+            throw new NotSupportedException(
+                "AnthropicAdapter does not serialize ReasoningControl.Effort. " +
+                "Configure this deployment with the Budget strategy or add a verified Anthropic effort serializer.");
+        }
+
         // 处理推理配置 (Extended Thinking)
-        if (request.Reasoning is { } reasoning && reasoning.Control is ReasoningControl.Effort or ReasoningControl.Budget)
+        if (request.Reasoning is { Control: ReasoningControl.Budget } reasoning)
         {
             reasoning.Validate();
 
-            var modelLower = request.Model.ToLowerInvariant();
-            var supportsThinking = ThinkingCapableModels.Any(m => modelLower.Contains(m.ToLowerInvariant()));
-
-            if (supportsThinking)
+            if (reasoning.Control == ReasoningControl.Budget)
             {
                 var budgetTokens = reasoning.Control switch
                 {
                     ReasoningControl.Budget => reasoning.BudgetTokens!.Value,
                     // Effort=None 视同关闭，不传 thinking；其余档位查映射表
                     ReasoningControl.Effort when reasoning.Effort == ReasoningEffortLevel.None => 0,
-                    _ => MapEffortToBudget(reasoning.Effort!.Value)
+                    _ => throw new InvalidOperationException("Anthropic effort must be rejected before budget serialization.")
                 };
 
                 if (budgetTokens > 0)

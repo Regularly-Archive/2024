@@ -579,14 +579,14 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 
 2026-09-08：已完成产品层 `default` / `fast` / `off` / `balance` / `deep`、打包模型能力目录、`CliConfig.models.*.reasoning` 完整部署覆盖与 CLI 请求解析。Adapter 不再按模型名推断关闭协议；未知模型仅允许 `default`。当前仍保留下述 Anthropic 预算 P1，不能因离线序列化测试通过而宣称已修复。详见 `architecture/llm-reasoning-control-handoff.md` 顶部修订。
 
-**背景：** Anthropic 及其兼容厂商会随模型和 API 版本在 manual `budget_tokens`、原生档位与 adaptive thinking 间切换，且部分模型允许 `budget_tokens` 与 effort 同时存在。产品层仍固定为 `default` / `fast` / `off` / `balance` / `deep`；模型能力定义必须选择该模型实际使用的 wire protocol 和字段组合，Adapter 不得把通用 `Effort` 擅自折算为预算，也不得把二者错误视作必然互斥。
+**背景：** Anthropic 及其兼容厂商会随模型和 API 版本在 manual `budget_tokens`、原生档位与 adaptive thinking 间切换。产品层仍固定为 `default` / `fast` / `off` / `balance` / `deep`；遵循 KISS，每个精确模型或部署在能力目录中只选择 `none`、`effort` 或 `budget` 一种策略。即使供应商允许预算与档位组合，当前也不表达或序列化该组合。
 
 **待决策略：**
 
-- [ ] 先按 Anthropic 官方文档和真实请求确认每个目标模型/API 版本使用 manual、manual + effort 或 adaptive，以及对应请求体 schema；能力目录记录解析后的 protocol、thinking mode 与允许字段，而不是由 Adapter 猜测模型名。
-- [ ] 将 `max_tokens` 协调做成 protocol / capability 验证：manual 且非 interleaved 的预算请求才处理 `budget_tokens < max_tokens`；interleaved 例外不能被全局 Budget 校验误拒绝。调用方未显式设置上限时再评估余量策略；显式限制不静默扩大。
-- [ ] 将 `ReasoningConfig` 从互斥的 `ReasoningControl` 演进为 protocol + activation + 可选 effort / budget，允许能力目录声明合法组合；原生 effort / adaptive 按协议序列化，不附带无关预算校验。
-- [ ] 为 manual budget、manual + effort、adaptive、interleaved 边界和不支持模型分别补请求序列化与验证测试；GLM 额度恢复后补 Anthropic 兼容端点真实回归。
+- [ ] 先按官方文档和真实请求确认每个目标模型/API 版本选用 `none`、`effort` 或 `budget`，以及对应请求体 schema；能力目录记录单一策略和显式映射，Adapter 不得猜测模型名。
+- [ ] `Budget` 才协调 `max_tokens`：仅在该策略所用 API 要求 `budget_tokens < max_tokens` 时验证；调用方未显式设置上限时再评估余量策略，显式限制不静默扩大。
+- [x] 保持 `ReasoningConfig` 的 `Effort` / `Budget` 互斥结构；能力目录已增加 `strategy`，Resolver 已校验 strategy 与映射类型一致。
+- [ ] 为 Anthropic Budget、Anthropic Effort、Gemini Effort 和不支持模型分别补请求序列化与验证测试；GLM 额度恢复后补 Anthropic 兼容端点真实回归。
 - [x] 收窄当前阶段目标：暂不提供 CLI 思维档位切换；产品偏好已按模型能力解析，未知模型不猜测或静默降级。内部摘要辅助请求可安全回退 `default`，不等同于用户请求降级。
 - [x] 收紧 `LlmRequest.Reasoning`：已设为 `private init`，通过 `LlmRequest.WithResolvedReasoning()` 与 Adapter 前的 `ILlmRequestMiddleware` 受控写入已解析原生配置；Adapter 入口拒绝未解析的非 `default` 偏好，`ProviderOptions.Custom` 顶层禁止 reasoning 控制字段。
 

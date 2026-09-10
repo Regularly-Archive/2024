@@ -12,10 +12,13 @@ public class ModelReasoningResolverTests
     {
         var catalog = ModelReasoningCapabilityCatalog.LoadDefault();
         var model = new ModelEntry { ModelId = "gpt-5.2" };
+        var capability = catalog.Find("openai", model.ModelId);
         var resolver = new ModelReasoningResolver("openai/gpt-5.2", "openai", model, catalog);
 
         var result = resolver.Resolve(ReasoningPreference.Off);
 
+        Assert.NotNull(capability);
+        Assert.Equal(ReasoningStrategy.Effort, capability.Strategy);
         Assert.NotNull(result);
         Assert.Equal(ReasoningOffMode.EffortNone, result.OffMode);
     }
@@ -66,6 +69,56 @@ public class ModelReasoningResolverTests
         };
 
         Assert.Throws<InvalidOperationException>(() => new ModelReasoningResolver("provider/model", capability));
+    }
+
+    [Theory]
+    [InlineData(ReasoningStrategy.Effort, ReasoningControl.Effort)]
+    [InlineData(ReasoningStrategy.Budget, ReasoningControl.Budget)]
+    public void Declared_Strategy_Allows_Its_Mapping(ReasoningStrategy strategy, ReasoningControl control)
+    {
+        var mapping = control == ReasoningControl.Effort
+            ? ReasoningConfig.WithEffort(ReasoningEffortLevel.Low)
+            : ReasoningConfig.WithBudget(1024);
+        var capability = new ModelReasoningCapability
+        {
+            Strategy = strategy,
+            Supported = [ReasoningPreference.Default, ReasoningPreference.Fast],
+            Mappings = { [ReasoningPreference.Fast] = mapping }
+        };
+
+        var resolver = new ModelReasoningResolver("provider/model", capability);
+
+        Assert.Equal(control, resolver.Resolve(ReasoningPreference.Fast)!.Control);
+    }
+
+    [Fact]
+    public void Strategy_Rejects_A_Different_Native_Control()
+    {
+        var capability = new ModelReasoningCapability
+        {
+            Strategy = ReasoningStrategy.Effort,
+            Supported = [ReasoningPreference.Default, ReasoningPreference.Deep],
+            Mappings = { [ReasoningPreference.Deep] = ReasoningConfig.WithBudget(1024) }
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() => new ModelReasoningResolver("provider/model", capability));
+
+        Assert.Contains("strategy 'effort'", exception.Message);
+    }
+
+    [Fact]
+    public void None_Strategy_Rejects_A_Thinking_Intensity_Mapping()
+    {
+        var capability = new ModelReasoningCapability
+        {
+            Strategy = ReasoningStrategy.None,
+            Supported = [ReasoningPreference.Default, ReasoningPreference.Fast],
+            Mappings = { [ReasoningPreference.Fast] = ReasoningConfig.WithEffort(ReasoningEffortLevel.Low) }
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() => new ModelReasoningResolver("provider/model", capability));
+
+        Assert.Contains("strategy 'none'", exception.Message);
     }
 
     [Fact]
