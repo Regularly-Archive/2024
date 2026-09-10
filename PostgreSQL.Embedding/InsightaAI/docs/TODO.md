@@ -247,11 +247,12 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
   - `/compact auto` 按优先级逐个尝试，跳过无收益策略
   - 45% / 65% / 80% 阈值，压缩后级联到 L2/L3
   - 压缩阈值与 CLI Usage 统一使用可用输入预算
+- [x] 事件与日志透出：`AgentToolEndEvent.Artifact` 携带 `ToolResultArtifactInfo`，ToolEnd 日志记录 artifact id；CLI 渲染暂不消费
 
 **待优化：**
 - [ ] Phase 4: Testing & Polish
   - [x] 单元测试：原始结果落盘、状态推进、消息配对删除、存储恢复
-  - [ ] 集成测试：大文件读取 → 持久化 → 重新读取
+  - [x] 集成测试：大文件读取 → 持久化 → 重新读取（`AgentArtifactRoundTripTests`）
   - [ ] CLI 显示截断/持久化状态
   - [ ] 监控指标：截断频率、持久化频率
 - [ ] Phase 5: Cleanup & Documentation

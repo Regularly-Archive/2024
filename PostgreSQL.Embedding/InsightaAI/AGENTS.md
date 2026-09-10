@@ -266,6 +266,13 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 - Anthropic 推理策略仍在设计：遵循 KISS，每个精确模型或部署在能力目录中只选择 `none`、`effort` 或 `budget` 一种策略；不表达供应商可能支持的 budget + effort 组合。`budget_tokens < max_tokens` 仅在选择 Budget 且目标 API 要求时验证（TODO #21）。完整接手状态见 `docs/architecture/llm-reasoning-control-handoff.md`。
 - 辅助任务推理成本控制已完成首轮盘点：当前无其他可安全纳入的 LLM 调用点。后续新增长期运行的内部辅助服务时，先验证其不直接影响用户任务质量，再直接声明 `off` 及内部请求的回退语义；之后再推进用户级配置、CLI `/thinking` 和自动选档。
 
+### 工具结果 Artifact 事件与日志透出（2026-09-10）
+
+- 问题：`AgentToolEndEvent` 原先只有 100 字符 `ResultPreview`，而 artifact 脚注拼接在投影预览尾部——落盘触发（>30KB 或 `PreferPersistence`）时脚注必被截断，事件消费者（CLI、Hook、日志）完全无法感知 artifact 的存在。
+- 修复：`AgentToolEndEvent` 新增 `ToolResultArtifactInfo? Artifact`，由 `ToolCallExecutor` 从 `processed.State.Artifact` 填充；`Agent` 的 ToolEnd 日志追加 artifact id。模型侧回查链路（预览脚注 + MicroCompact placeholder）原本即通，本次补齐的是事件与日志层。CLI `EventRenderer` 渲染明确保持不动，消费能力留待后续。
+- 新增集成测试 `tests/InsightaAI.Agent.Tests/AgentArtifactRoundTripTests.cs`：真实 Agent 读取 ~100KB 文件 → `JsonlMessageStorage` 持久化 → `ToLlmMessage` 恢复 tool 消息 → 凭 artifact 引用回查，定向测试 29/29 通过。
+- 实机验证：会话内 `read_file` 读取 284KB `messages.jsonl` 触发落盘，模型侧收到行号化预览 + `[Full output saved as artifact ...]` 脚注；历史会话 25 条 artifact 引用与 `tool_results\` 落盘文件一一对应，链路闭合。
+
 ## 当前问题与改进方向
 
 ### 当前待办
@@ -286,6 +293,7 @@ Agent 服务生命周期已明确：当前 Agent 私有 Provider 只支持 Singl
 - 2026-08-12：Slash 命令候选完成实机验证：候选筛选、描述对齐与中英文资源、Tab 唯一补全、候选清理和 Ctrl+C 退出均通过；Agent 测试 286 项通过。
 - 2026-08-14：Dashboard 复核通过真实 Prometheus 数据验证全部 PromQL；Anthropic 归一化后完整测试 69 项通过（改动在 `chore/mcp-telemetry-tags` 分支）。
 - 2026-08-21：工具进度与串行消费边界定向测试通过；完整 `InsightaAI.Agent.Tests` 327/327 通过。
+- 2026-09-10：工具结果 Artifact 事件/日志透出实机验证：会话内读取大会话文件触发落盘，预览含 artifact 脚注；历史会话 25 条 artifact 引用与落盘文件一一对应。`AgentArtifactRoundTripTests` 等 29/29 通过。
 
 ## 愿景与里程碑
 

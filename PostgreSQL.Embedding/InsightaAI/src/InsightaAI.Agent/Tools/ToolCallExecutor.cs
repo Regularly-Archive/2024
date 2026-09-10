@@ -168,7 +168,8 @@ public class ToolCallExecutor
             ToolCallId = toolCall.Id,
             ToolName = toolCall.Name,
             IsError = processed.Result.IsError,
-            ResultPreview = resultText?.Length > 100 ? resultText[..100] + "..." : resultText
+            ResultPreview = resultText?.Length > 100 ? resultText[..100] + "..." : resultText,
+            Artifact = processed.State.Artifact
         }, cancellationToken);
 
         toolResults[toolCall.Id] = new ToolExecutionResult(toolCall, processed.Result, processed.State);

@@ -472,8 +472,8 @@ public class Agent : IDisposable
 
             case AgentToolEndEvent toolEnd:
                 _logger.LogInformation(
-                    "[{SessionId}] Tool {ToolName} completed — isError={IsError}, callId={CallId}",
-                    sessionId, toolEnd.ToolName, toolEnd.IsError, toolEnd.ToolCallId);
+                    "[{SessionId}] Tool {ToolName} completed — isError={IsError}, callId={CallId}, artifact={ArtifactId}",
+                    sessionId, toolEnd.ToolName, toolEnd.IsError, toolEnd.ToolCallId, toolEnd.Artifact?.Id);
                 break;
 
             case AgentRoundEndEvent roundEnd:

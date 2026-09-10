@@ -118,7 +118,7 @@ ToolResultProcessor.ProcessAsync()
   └─ 返回 ProcessedToolResult
   ↓
 AgentLoop
-  ├─ 发出工具完成事件
+  ├─ 发出工具完成事件（AgentToolEndEvent 携带 Artifact 元数据）
   └─ 将 ProcessedToolResult 转换为 ToolResult Message
   ↓
 Message Storage
@@ -143,7 +143,7 @@ ContextManager / MicroCompactStrategy
 - 保持顺序或并行执行工具；
 - 将原始 `ToolResult` 交给 `ToolResultProcessor`；
 - 传递 `ProcessedToolResult`；
-- 发出执行事件。
+- 发出执行事件；`AgentToolEndEvent` 携带 `Artifact` 元数据，事件消费者无需解析 Preview 文本即可感知落盘结果。
 
 不再负责：
 
@@ -520,6 +520,8 @@ public sealed record ToolResultState
 - 不可重放工具保留现有摘要，避免进一步删除。
 
 ## 13. Telemetry 与事件
+
+`AgentToolEndEvent` 携带可选的 `Artifact`（`ToolResultArtifactInfo`：id、路径、字节大小、创建时间）。落盘发生时，CLI、Hook 与日志可直接消费该字段定位原文；日志在 ToolEnd 事件中记录 artifact id。
 
 建议记录：
 

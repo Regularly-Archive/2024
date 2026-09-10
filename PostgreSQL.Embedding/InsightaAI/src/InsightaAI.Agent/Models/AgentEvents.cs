@@ -123,6 +123,9 @@ public sealed record AgentToolEndEvent : AgentEvent
     public required string ToolName { get; init; }
     public bool IsError { get; init; }
     public string? ResultPreview { get; init; }
+
+    /// <summary>完整结果的 artifact 引用（结果过大落盘时非空），供终端展示回查入口。</summary>
+    public ToolResultArtifactInfo? Artifact { get; init; }
 }
 
 /// <summary>
