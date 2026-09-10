@@ -6,7 +6,7 @@
 >
 > 未知模型只有 `default`。用户或 Agent 显式请求其它档位必须失败，不能猜测协议或静默降级。会话标题与完整/增量摘要直接请求 `off`，但允许在无映射时回退 `default`，以避免上下文压缩失效；它不代表用户偏好的降级。当前仅有这两处，允许重复配置，不另设策略抽象。主 Agent Loop、子 Agent 和 Orchestrator `TaskPlanner` 会直接影响用户任务质量，保持模型默认行为。CLI 尚未提供 `/thinking` 或运行时切换界面。
 >
-> 验证状态：`InsightaAI.Agent.Cli.Tests` 7/7、`InsightaAI.LLM.Tests` 128/128 通过；`dotnet build InsightaAI.sln --no-restore` 成功。Anthropic `budget_tokens < max_tokens` 仍为 TODO #21 的未决 P1；GLM 在线验证继续因额度不足而搁置。
+> 验证状态：`InsightaAI.Agent.Cli.Tests` 11/11、`InsightaAI.LLM.Tests` 123/123 通过；`dotnet build InsightaAI.sln --no-restore` 成功。Anthropic `budget_tokens < max_tokens` 仍为 TODO #21 的未决 P1；GLM 在线验证继续因额度不足而搁置。
 
 > **2026-09-08 收尾修订（优先于下文 8 月记录）**：此前“所有 o 系列可发送 none”“所有 Gemini 可发送 budget=0”及按 GLM/Qwen 等家族前缀推断 Off 的结论不成立。当前使用 `ReasoningOffPolicy` 精确模型表：GPT-5.1/5.2 基础模型（含表内快照）使用 none；Gemini 2.5 Flash/Flash-Lite 使用预算 0；表内 Claude Sonnet 使用显式 disabled。o3-mini/GPT-5 等标记 Unsupported，其余未核对版本为 Unknown，均不发送关闭字段。兼容端点必须由调用方在确认协议后设置 `ReasoningConfig.OffMode`，例如 `ReasoningConfig.Off() with { OffMode = ReasoningOffMode.ThinkingDisabled }`。这是请求级能力覆盖，尚未接入 CLI 模型配置。解析结果记录在 `HttpRequestMessage.Options[ReasoningOffPolicy.ResolutionKey]` 与当前 Activity 的 `insighta.reasoning.off_resolution`，不代表服务端实测成功。
 >

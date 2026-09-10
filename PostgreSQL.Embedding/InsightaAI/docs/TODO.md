@@ -587,6 +587,7 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 - [ ] `Budget` 才协调 `max_tokens`：仅在该策略所用 API 要求 `budget_tokens < max_tokens` 时验证；调用方未显式设置上限时再评估余量策略，显式限制不静默扩大。
 - [x] 保持 `ReasoningConfig` 的 `Effort` / `Budget` 互斥结构；能力目录已增加 `strategy`，Resolver 已校验 strategy 与映射类型一致。
 - [ ] 为 Anthropic Budget、Anthropic Effort、Gemini Effort 和不支持模型分别补请求序列化与验证测试；GLM 额度恢复后补 Anthropic 兼容端点真实回归。
+- [ ] GLM 加入能力目录前，先确认其 native effort 值域（包括 `max`）；当前通用 `ReasoningEffortLevel` 不应通过模型名推断或隐式映射来伪造这一档。
 - [x] 收窄当前阶段目标：暂不提供 CLI 思维档位切换；产品偏好已按模型能力解析，未知模型不猜测或静默降级。内部摘要辅助请求可安全回退 `default`，不等同于用户请求降级。
 - [x] 收紧 `LlmRequest.Reasoning`：已设为 `private init`，通过 `LlmRequest.WithResolvedReasoning()` 与 Adapter 前的 `ILlmRequestMiddleware` 受控写入已解析原生配置；Adapter 入口拒绝未解析的非 `default` 偏好，`ProviderOptions.Custom` 顶层禁止 reasoning 控制字段。
 

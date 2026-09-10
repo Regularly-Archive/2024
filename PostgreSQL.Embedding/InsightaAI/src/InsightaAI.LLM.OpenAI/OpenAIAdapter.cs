@@ -15,39 +15,6 @@ public class OpenAIAdapter : IProviderAdapter
     public bool SupportsReasoning => true;
     public ReasoningMode SupportedReasoningModes => ReasoningMode.ReasoningEffort | ReasoningMode.ReasoningContent;
 
-    // 需要使用 reasoning_effort 的模型前缀
-    private static readonly string[] ReasoningEffortModels =
-    [
-        "o1", "o1-mini", "o1-preview",
-        "o3", "o3-mini",
-        "gpt-5",
-    ];
-
-    // DeepSeek 模型前缀 (使用 reasoning_content)
-    private static readonly string[] DeepSeekModels =
-    [
-        "deepseek-r1", "deepseek-reasoner"
-    ];
-
-    private static bool IsOpenAiReasoningModel(string model) =>
-        ReasoningEffortModels.Any(prefix => model.StartsWith(prefix, StringComparison.Ordinal));
-
-    private static bool IsGlmModel(string model) => model.StartsWith("glm", StringComparison.Ordinal);
-
-    private static bool IsDeepSeekReasoningModel(string model) =>
-        DeepSeekModels.Any(prefix => model.StartsWith(prefix, StringComparison.Ordinal));
-
-    // GLM reasoning_effort 的模型侧映射：low/medium 归入 high，xhigh 归入 max。
-    // none/minimal 由模型按无思考语义处理。
-    private static string MapEffortForGlm(ReasoningEffortLevel level) => level switch
-    {
-        ReasoningEffortLevel.None => "none",
-        ReasoningEffortLevel.Minimal => "minimal",
-        ReasoningEffortLevel.Low or ReasoningEffortLevel.Medium or ReasoningEffortLevel.High => "high",
-        ReasoningEffortLevel.XHigh => "max",
-        _ => "low"
-    };
-
     public HttpRequestMessage CreateRequest(LlmRequest request, ProviderConfig config, bool stream)
     {
         request.ValidateForAdapter();

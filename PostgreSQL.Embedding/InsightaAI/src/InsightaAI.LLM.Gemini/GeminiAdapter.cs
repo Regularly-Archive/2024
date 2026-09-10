@@ -333,7 +333,7 @@ public class GeminiAdapter : IProviderAdapter
                 case ReasoningControl.Effort:
                     generationConfig["thinkingConfig"] = new
                     {
-                        thinkingLevel = reasoning.Effort!.ToString().ToLowerInvariant()
+                        thinkingLevel = GetThinkingLevel(reasoning.Effort!.Value)
                     };
                     break;
                 case ReasoningControl.Budget:
@@ -351,6 +351,17 @@ public class GeminiAdapter : IProviderAdapter
 
         return body;
     }
+
+    private static string GetThinkingLevel(ReasoningEffortLevel effort) => effort switch
+    {
+        ReasoningEffortLevel.Minimal => "minimal",
+        ReasoningEffortLevel.Low => "low",
+        ReasoningEffortLevel.Medium => "medium",
+        ReasoningEffortLevel.High => "high",
+        _ => throw new NotSupportedException(
+            $"GeminiAdapter does not support {effort} as a thinking level. " +
+            "Use Minimal, Low, Medium, or High, or configure an explicit Off mapping.")
+    };
 
     private static StreamEvent ParseFunctionCall(JsonElement functionCall)
     {

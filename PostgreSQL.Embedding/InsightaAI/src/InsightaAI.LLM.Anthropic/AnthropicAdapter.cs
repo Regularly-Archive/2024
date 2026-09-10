@@ -236,30 +236,17 @@ public class AnthropicAdapter : IProviderAdapter
         if (request.Reasoning is { Control: ReasoningControl.Budget } reasoning)
         {
             reasoning.Validate();
+            var budgetTokens = reasoning.BudgetTokens!.Value;
 
-            if (reasoning.Control == ReasoningControl.Budget)
+            body.Thinking = new AnthropicThinkingConfig
             {
-                var budgetTokens = reasoning.Control switch
-                {
-                    ReasoningControl.Budget => reasoning.BudgetTokens!.Value,
-                    // Effort=None 视同关闭，不传 thinking；其余档位查映射表
-                    ReasoningControl.Effort when reasoning.Effort == ReasoningEffortLevel.None => 0,
-                    _ => throw new InvalidOperationException("Anthropic effort must be rejected before budget serialization.")
-                };
+                Type = "enabled",
+                // API 下限 1024，低于下限的预算 clamp 到下限
+                BudgetTokens = Math.Max(budgetTokens, MinThinkingBudget)
+            };
 
-                if (budgetTokens > 0)
-                {
-                    body.Thinking = new AnthropicThinkingConfig
-                    {
-                        Type = "enabled",
-                        // API 下限 1024，低于下限的预算 clamp 到下限
-                        BudgetTokens = Math.Max(budgetTokens, MinThinkingBudget)
-                    };
-
-                    // Extended thinking 需要 temperature=1
-                    body.Temperature = 1;
-                }
-            }
+            // Extended thinking 需要 temperature=1
+            body.Temperature = 1;
         }
         else if (request.Temperature.HasValue)
         {

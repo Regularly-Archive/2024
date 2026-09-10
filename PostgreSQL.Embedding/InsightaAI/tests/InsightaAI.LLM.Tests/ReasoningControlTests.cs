@@ -217,6 +217,15 @@ public class ReasoningControlTests
         Assert.Equal("low", body.GetProperty("generationConfig").GetProperty("thinkingConfig").GetProperty("thinkingLevel").GetString());
     }
 
+    [Theory]
+    [InlineData(ReasoningEffortLevel.None)]
+    [InlineData(ReasoningEffortLevel.XHigh)]
+    public void Gemini_Unsupported_Effort_Is_Rejected(ReasoningEffortLevel level)
+    {
+        Assert.Throws<NotSupportedException>(() =>
+            new GeminiAdapter().CreateRequest(Request(model: "gemini-custom", level: level), TestConfig, stream: true));
+    }
+
     [Fact]
     public async Task Gemini_Budget_Sends_ThinkingBudget()
     {
