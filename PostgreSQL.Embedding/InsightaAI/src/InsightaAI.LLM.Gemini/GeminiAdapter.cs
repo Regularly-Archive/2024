@@ -44,7 +44,7 @@ public class GeminiAdapter : IProviderAdapter
             }
         }
 
-        ReasoningOffPolicy.Record(httpRequest, "gemini", request);
+        ReasoningOffPolicy.RecordTelemetry("gemini", request);
         return httpRequest;
     }
 

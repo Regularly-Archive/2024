@@ -51,7 +51,7 @@ public class AnthropicAdapter : IProviderAdapter
             }
         }
 
-        ReasoningOffPolicy.Record(httpRequest, "anthropic", request);
+        ReasoningOffPolicy.RecordTelemetry("anthropic", request);
         return httpRequest;
     }
 

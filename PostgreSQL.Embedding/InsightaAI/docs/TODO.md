@@ -592,8 +592,8 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 - [x] `CliConfig` 的 reasoning 子 schema 已校验式反序列化：`ModelReasoningCapability` 与 `ReasoningConfig` 拒绝未知字段，避免如 `off-mode` 被静默忽略并在下次 `Save()` 时永久丢失；其余 `config.json` 区域仍保持前向兼容（源自 2026-09-08 review P1-4）。
 - [x] 能力目录已向用户显式标注「fast/balance/deep 仅 OpenAI 系可用」：见 [model-reasoning-configuration.md](model-reasoning-configuration.md) 的内置支持矩阵与覆盖语义。
 - [x] `ModelReasoningCapabilityCatalog.LoadDefault()` 使用进程级 `Lazy<T>` 缓存打包目录，主 Agent 与子 Agent 共享同一不可变解析结果（源自 review P3-7）。
-- [ ] `ReasoningOffPolicy.ResolutionKey` 只写不读（真正消费方是 `Activity` tag）；确认为预留则注释用途，否则删除（源自 review P3-8）。
-- [ ] 产品层定夺档位语义：`fast`/`balance`/`deep` 是「用户意图表达」（接受供应商间实现差异）还是「跨供应商等价质量档」；当前映射在不同供应商下语义不等价。
+- [x] 移除无生产消费者的 `ReasoningOffPolicy.ResolutionKey`；`ReasoningOffPolicy.RecordTelemetry()` 只记录当前 `Activity` 的 `insighta.reasoning.off_resolution`，用于诊断请求翻译而非证明服务端行为（源自 review P3-8）。
+- [x] 产品层档位已定为「用户意图表达」：`fast` / `balance` / `deep` 允许供应商间采用不同原生机制，不承诺等价质量、预算或延迟；见 `architecture/llm-reasoning-control-design.md` §4 与 `model-reasoning-configuration.md` 的 Product preferences。
 - [x] 收窄当前阶段目标：暂不提供 CLI 思维档位切换；产品偏好已按模型能力解析，未知模型不猜测或静默降级。内部摘要辅助请求可安全回退 `default`，不等同于用户请求降级。
 - [x] 收紧 `LlmRequest.Reasoning`：已设为 `private init`，通过 `LlmRequest.WithResolvedReasoning()` 与 Adapter 前的 `ILlmRequestMiddleware` 受控写入已解析原生配置；Adapter 入口拒绝未解析的非 `default` 偏好，`ProviderOptions.Custom` 顶层禁止 reasoning 控制字段。
 

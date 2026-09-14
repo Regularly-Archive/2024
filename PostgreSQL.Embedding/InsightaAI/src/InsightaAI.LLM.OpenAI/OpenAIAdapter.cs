@@ -45,7 +45,7 @@ public class OpenAIAdapter : IProviderAdapter
             }
         }
 
-        ReasoningOffPolicy.Record(httpRequest, "openai", request);
+        ReasoningOffPolicy.RecordTelemetry("openai", request);
         return httpRequest;
     }
 

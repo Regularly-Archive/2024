@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
@@ -19,8 +20,6 @@ public class ReasoningOffPolicyTests
         foreach (IProviderAdapter adapter in new IProviderAdapter[] { new OpenAIAdapter(), new OpenAIResponseAdapter() })
         {
             using var http = adapter.CreateRequest(Request(model), new ProviderConfig { ApiKey = "test" }, false);
-            Assert.True(http.Options.TryGetValue(ReasoningOffPolicy.ResolutionKey, out var mode));
-            Assert.Equal(ReasoningOffMode.Unknown, mode);
             var body = JsonSerializer.Deserialize<JsonElement>(await http.Content!.ReadAsStringAsync());
             Assert.False(body.TryGetProperty("reasoning", out _));
             Assert.False(body.TryGetProperty("reasoning_effort", out _));
@@ -49,6 +48,16 @@ public class ReasoningOffPolicyTests
         using var http = new OpenAIAdapter().CreateRequest(request, new ProviderConfig { ApiKey = "test" }, true);
         var body = JsonSerializer.Deserialize<JsonElement>(await http.Content!.ReadAsStringAsync());
         Assert.Equal("disabled", body.GetProperty("thinking").GetProperty("type").GetString());
+    }
+
+    [Fact]
+    public void Resolution_Is_Recorded_On_The_Current_Activity()
+    {
+        using var activity = new Activity("reasoning-off-test").Start();
+
+        ReasoningOffPolicy.RecordTelemetry("openai", Request("custom-model"));
+
+        Assert.Equal("Unknown", activity.GetTagItem("insighta.reasoning.off_resolution"));
     }
 
     private static LlmRequest Request(string model) => LlmRequest.WithResolvedReasoning(

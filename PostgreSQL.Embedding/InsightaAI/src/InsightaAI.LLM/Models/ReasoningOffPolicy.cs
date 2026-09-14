@@ -17,9 +17,6 @@ public enum ReasoningOffMode
 /// </summary>
 public static class ReasoningOffPolicy
 {
-    public static readonly HttpRequestOptionsKey<ReasoningOffMode> ResolutionKey =
-        new("Insighta.ReasoningOffResolution");
-
     public static ReasoningOffMode Resolve(string adapter, LlmRequest request)
     {
         var mode = request.Reasoning?.OffMode ?? ReasoningOffMode.Unknown;
@@ -40,12 +37,12 @@ public static class ReasoningOffPolicy
         if (!valid) throw new InvalidOperationException($"Off mode {mode} is incompatible with adapter {adapter}.");
     }
 
-    public static void Record(HttpRequestMessage httpRequest, string adapter, LlmRequest request)
+    /// <summary>Records the selected translation as trace metadata, not proof of remote model behavior.</summary>
+    public static void RecordTelemetry(string adapter, LlmRequest request)
     {
         if (request.Reasoning?.Control != ReasoningControl.Off) return;
         var mode = Resolve(adapter, request);
-        httpRequest.Options.Set(ResolutionKey, mode);
-        // Records request translation, not proof of remote model behavior. No prompt or secrets.
+        // No prompt or secrets are recorded.
         System.Diagnostics.Activity.Current?.SetTag("insighta.reasoning.off_resolution", mode.ToString());
     }
 }
