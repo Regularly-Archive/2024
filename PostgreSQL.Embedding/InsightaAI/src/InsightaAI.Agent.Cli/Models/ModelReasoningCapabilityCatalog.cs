@@ -7,6 +7,7 @@ namespace InsightaAI.Agent.Cli.Models;
 public sealed class ModelReasoningCapabilityCatalog
 {
     private const string AssetRelativePath = "Assets/model-reasoning-capabilities.json";
+    private static readonly Lazy<ModelReasoningCapabilityCatalog> DefaultCatalog = new(LoadDefaultCore);
     private readonly Dictionary<CapabilityKey, ModelReasoningCapability> _capabilities;
 
     private ModelReasoningCapabilityCatalog(Dictionary<CapabilityKey, ModelReasoningCapability> capabilities)
@@ -19,7 +20,13 @@ public sealed class ModelReasoningCapabilityCatalog
             ? capability
             : null;
 
-    public static ModelReasoningCapabilityCatalog LoadDefault()
+    /// <summary>
+    /// Gets the process-wide packaged catalog. The asset is immutable for a CLI process,
+    /// so it is parsed once and shared by main and subagent LLM clients.
+    /// </summary>
+    public static ModelReasoningCapabilityCatalog LoadDefault() => DefaultCatalog.Value;
+
+    private static ModelReasoningCapabilityCatalog LoadDefaultCore()
     {
         var path = Path.Combine(AppContext.BaseDirectory, AssetRelativePath);
         if (!File.Exists(path))

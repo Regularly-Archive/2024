@@ -78,6 +78,7 @@ public sealed record LlmRequest
 /// <summary>
 /// 已解析的原生推理控制（Effort 与 Budget 互斥；详见 docs/architecture/llm-reasoning-control-design.md）
 /// </summary>
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record ReasoningConfig
 {
     /// <summary>Optional model/deployment-specific Off mapping; null sends no explicit wire-level off control.</summary>

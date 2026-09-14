@@ -72,6 +72,7 @@ public class ModelEntry
 /// <summary>
 /// 一个具体模型或部署支持的产品层推理偏好及其原生映射。
 /// </summary>
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed class ModelReasoningCapability
 {
     /// <summary>
@@ -372,7 +373,17 @@ public class CliConfig
         if (File.Exists(ConfigPath))
         {
             var json = File.ReadAllText(ConfigPath);
-            return JsonSerializer.Deserialize<CliConfig>(json, CreateJsonOptions()) ?? new CliConfig();
+            try
+            {
+                return JsonSerializer.Deserialize<CliConfig>(json, CreateJsonOptions()) ?? new CliConfig();
+            }
+            catch (JsonException exception)
+            {
+                throw new InvalidOperationException(
+                    $"Invalid config file '{ConfigPath}' at '{exception.Path}'. " +
+                    "Check the JSON syntax and documented reasoning capability field names.",
+                    exception);
+            }
         }
         return new CliConfig();
     }

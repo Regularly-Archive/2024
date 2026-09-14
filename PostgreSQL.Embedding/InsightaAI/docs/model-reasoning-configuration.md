@@ -126,9 +126,9 @@ control, effort, budgetTokens, offMode
 
 The current reader accepts case-only variants, but hyphenated or invented names
 such as `off-mode`, `budget-tokens`, or `thinking_level` are not part of this
-schema. Unknown JSON properties are ignored by the current configuration reader
-and can be lost when the CLI later writes `config.json`; do not rely on them for
-reasoning controls.
+schema. Unknown properties inside `reasoning` and its mapping objects are
+rejected while loading `config.json`; the CLI reports the JSON path instead of
+silently ignoring the value and later losing it during `Save()`.
 
 For the surrounding model entry, use the existing names `model_id`,
 `max_tokens`, and `context_window`.
