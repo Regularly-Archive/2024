@@ -1,0 +1,39 @@
+{
+  "id": "replay-context-compaction",
+  "description": "Three large tool results exceed a deliberately small context window; the real MicroCompact strategy degrades older results while the Agent completes.",
+  "prompt": "Collect three reports, then summarise the findings.",
+  "maxContextTokens": 4000,
+  "tools": [
+    {
+      "name": "fetch_report",
+      "result": "deterministic report content line for compaction testing\n",
+      "repeat": 400
+    }
+  ],
+  "steps": [
+    {
+      "toolCalls": [
+        { "id": "call-report-1", "name": "fetch_report", "arguments": {} }
+      ]
+    },
+    {
+      "toolCalls": [
+        { "id": "call-report-2", "name": "fetch_report", "arguments": {} }
+      ]
+    },
+    {
+      "toolCalls": [
+        { "id": "call-report-3", "name": "fetch_report", "arguments": {} }
+      ]
+    },
+    {
+      "text": "All three reports collected and summarised."
+    }
+  ],
+  "assert": {
+    "status": "completed",
+    "toolCalls": ["fetch_report", "fetch_report", "fetch_report"],
+    "finalText": "All three reports collected and summarised.",
+    "compactStrategy": "MicroCompact"
+  }
+}

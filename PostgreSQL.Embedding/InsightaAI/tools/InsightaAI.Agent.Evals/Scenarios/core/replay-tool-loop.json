@@ -1,0 +1,30 @@
+{
+  "id": "replay-tool-loop",
+  "description": "Replays one tool call and verifies that the real Agent Loop consumes its result before completing.",
+  "prompt": "Inspect the evaluation fixture, then report completion.",
+  "tools": [
+    {
+      "name": "inspect_fixture",
+      "result": "fixture inspected"
+    }
+  ],
+  "steps": [
+    {
+      "toolCalls": [
+        {
+          "id": "call-inspect-fixture",
+          "name": "inspect_fixture",
+          "arguments": {}
+        }
+      ]
+    },
+    {
+      "text": "Inspection complete."
+    }
+  ],
+  "assert": {
+    "status": "completed",
+    "toolCalls": ["inspect_fixture"],
+    "finalText": "Inspection complete."
+  }
+}

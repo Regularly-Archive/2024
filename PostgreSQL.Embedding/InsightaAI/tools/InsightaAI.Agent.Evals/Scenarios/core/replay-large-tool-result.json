@@ -1,0 +1,33 @@
+{
+  "id": "replay-large-tool-result",
+  "description": "Persists a large default tool result through the real retention pipeline.",
+  "prompt": "Inspect the generated report and give its conclusion.",
+  "tools": [
+    {
+      "name": "generate_large_report",
+      "result": "deterministic evaluation report line\n",
+      "repeat": 1200
+    }
+  ],
+  "steps": [
+    {
+      "toolCalls": [
+        {
+          "id": "call-large-report",
+          "name": "generate_large_report",
+          "arguments": {}
+        }
+      ]
+    },
+    {
+      "text": "The generated report completed successfully."
+    }
+  ],
+  "assert": {
+    "status": "completed",
+    "toolCalls": ["generate_large_report"],
+    "finalText": "The generated report completed successfully.",
+    "artifactTools": ["generate_large_report"],
+    "requiredArtifactText": ["deterministic evaluation report line"]
+  }
+}

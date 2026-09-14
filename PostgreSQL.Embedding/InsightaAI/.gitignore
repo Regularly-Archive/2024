@@ -50,3 +50,9 @@ bld/
 .env*
 
 PostgreSQL.Embedding/InsightaAI/.artifacts/
+
+## Evaluation artifacts
+artifacts/
+
+## Agent learnings
+.learnings/

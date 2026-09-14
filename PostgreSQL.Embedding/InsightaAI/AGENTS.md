@@ -273,15 +273,23 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 - 新增集成测试 `tests/InsightaAI.Agent.Tests/AgentArtifactRoundTripTests.cs`：真实 Agent 读取 ~100KB 文件 → `JsonlMessageStorage` 持久化 → `ToLlmMessage` 恢复 tool 消息 → 凭 artifact 引用回查，定向测试 29/29 通过。
 - 实机验证：会话内 `read_file` 读取 284KB `messages.jsonl` 触发落盘，模型侧收到行号化预览 + `[Full output saved as artifact ...]` 脚注；历史会话 25 条 artifact 引用与 `tool_results\` 落盘文件一一对应，链路闭合。
 
+### Agent Evaluation Suite（2026-09-14）
+
+- 评测 Runner 位于 `tools/InsightaAI.Agent.Evals`，是独立开发者/CI 控制台项目，不打包进全局 `insighta` CLI，也不向用户命令树暴露 `eval`。
+- 八个 replay 场景由 JSON manifest 提供录制 LLM 决策，但使用真实 `AgentBuilder`、Agent Loop、ToolRegistry、事件流和 ContextManager 执行；它们覆盖工具结果回传后的下一轮收束、脱敏读取后基于原始 read state 编辑非敏感字段、默认大工具结果的 artifact 持久化与存储恢复后引用回查、deny rule 在工具实现前的阻断、allow-always 会话权限不能绕过安全策略、小上下文窗口下 MicroCompact 自动降级旧工具结果，以及 delegate 工具经 PreferPersistence 将子代理结果持久化为 artifact。脱敏场景在临时 fixture 工作区执行，检查公开事件/持久化 artifact 不泄密、原文件密码不被 `[REDACTED]` 污染；所有评测 artifact 都随临时工作区清理。
+- Runner 输出结构化 JSON 报告，当前记录 LLM 请求数、turn、round、工具调用、工具错误、Agent 错误和时长。场景契约失败为硬失败；成本与延迟在有批准 baseline 前仅作为诊断信号。
+- 设计与使用方式见 `docs/testing/agent-evaluation-suite.md`；后续优先补脱敏编辑、Artifact、Security、Context 与 Subagent 场景，Live 模式与可选 Skill 均后置。
+
 ## 当前问题与改进方向
 
 ### 当前待办
 
-1. **Memory 自动注入校准** — 用本地候选筛选日志和真实会话调整初始覆盖门槛。
-2. **Hook 事件契约** — 细化取消/中止场景（`DoneReason.Aborted`、`OperationCanceledException`）。
-3. **Telemetry** — 继续补充 Agent 行为指标（每 Turn 工具链长度、AskUser 频率、context compaction）；MCP tag 命名清理已完成。Dashboard 拆分（Agent/LLM）与 Anthropic 归一化已完成，遗留：Agent Dashboard 补 Turn 指标、Jaeger Trace Drilldown。
-4. **运行时用量** — 区分流式模型未返回 token usage 与真实的 0。
-5. **L3 Orchestrator** — 继续开发编排能力。
+1. **Agent Evaluation Suite** — 核心场景已齐（8 个 replay），后续可接入隔离工作区、真实 Subagent 会话隔离和 Live 评测。
+2. **Memory 自动注入校准** — 用本地候选筛选日志和真实会话调整初始覆盖门槛。
+3. **Hook 事件契约** — 细化取消/中止场景（`DoneReason.Aborted`、`OperationCanceledException`）。
+4. **Telemetry** — 继续补充 Agent 行为指标（每 Turn 工具链长度、AskUser 频率、context compaction）；MCP tag 命名清理已完成。Dashboard 拆分（Agent/LLM）与 Anthropic 归一化已完成，遗留：Agent Dashboard 补 Turn 指标、Jaeger Trace Drilldown。
+5. **运行时用量** — 区分流式模型未返回 token usage 与真实的 0。
+6. **L3 Orchestrator** — 继续开发编排能力。
 
 Agent 服务生命周期已明确：当前 Agent 私有 Provider 只支持 Singleton 和 Transient，不支持 Scoped；约定见 `docs/architecture/agent-service-lifetime.md`。
 
@@ -327,6 +335,7 @@ Agent 服务生命周期已明确：当前 Agent 私有 Provider 只支持 Singl
 | Agent Loop 研究 | `docs/references/agent-loop-research.md` |
 | 可观测性设计 | `docs/observability/observability-design.md` |
 | LLM 思考控制交接 | `docs/architecture/llm-reasoning-control-handoff.md` |
+| Agent 评测套件 | `docs/testing/agent-evaluation-suite.md` |
 | Core Instructions | `src/InsightaAI.Agent/Prompts/core-instructions.txt` |
 | CLI 国际化资源清单 | `docs/i18n/` |
 

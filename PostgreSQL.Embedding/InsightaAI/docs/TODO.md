@@ -622,14 +622,44 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 
 ---
 
+### 23. Vision Tools：图像理解与生成工具系列（优先级：中）
+
+**目标：** 为 Agent 补齐视觉通道的读写两端：`read_image` 让模型「看」图，`generate_image` 让模型「画」图。当前工具链只有文本入口（`read_file` / `web_fetch`），主流模型的多模态输入能力没有工具桥接，图像生成完全缺失。
+
+**背景：** 2026-09-14 真实场景触发——元培的微博以摄影内容为主，要求 Insighta 看图时发现无法把图片送入视觉通道。`LlmRequest` 消息体系已支持图片 content part（上下文压缩中存在 `StripImages`），缺的是工具层入口与结果生命周期处理。
+
+**read_image（先做）：**
+
+- [ ] 工具参数：`file_path` 或 `url` 二选一；格式校验（png / jpg / jpeg / webp / gif），大小上限（超限明确拒绝，防上下文爆炸）
+- [ ] 结果注入：下载/读取 → base64 → image content part 追加到下一条 LLM 消息，工具文本结果只放尺寸、格式与引用元数据
+- [ ] 与 MicroCompact 三级降级集成：图片结果参与 `StripImages` 渐进剥离，占位符保留引用（路径/URL 与尺寸），不静默消失
+- [ ] Token 估算：`TiktokenTokenEstimator` 对图片消息按固定模型估算（按尺寸分档），不按文本处理
+- [ ] 能力检测：目标模型不支持视觉输入时明确报错，不静默注入文本消息（参考 reasoning 能力目录的显式失败原则）
+- [ ] 安全：本地路径走 `SecurityPolicyHook` 敏感路径拦截；URL 下载需 SSRF 防护（禁内网地址）与大小/超时限制
+
+**generate_image（随后）：**
+
+- [ ] 抽象 `IImageGenerationClient`：prompt → 图片文件；首批适配一家供应商即可（GLM CogView 顺理成章），接口预留供应商差异（尺寸、质量、坏词过滤）
+- [ ] 产出落盘到会话 `tool_results/` artifact，工具结果返回路径 + 尺寸预览；CLI 终端无法显示图片，提供路径展示与可选的「系统查看器打开」
+- [ ] 与 Subagent / Orchestrator 的兼容：作为普通工具走 `ToolRegistry`，无需特殊通道
+
+**测试：**
+
+- [ ] 图片消息 JSONL 持久化 → 恢复 → 压缩剥离的 round-trip
+- [ ] read_image 大小/格式超限拒绝、URL SSRF 拦截、敏感路径拦截
+- [ ] 不支持视觉的模型 + `read_image` 组合的显式失败
+
+---
+
 ## 当前优先级
 
 已完成：Dashboard 拆分与 Anthropic 归一化（#17），以及 MCP Telemetry tag 命名分层与去重（#12）。后续可观测性工作保留 Agent Dashboard 的 Turn 指标、低基数行为指标评估和 Jaeger Trace Drilldown；见 `observability/observability-design.md` §8。
 
-1. Agent 安全增强（#14）：优先完成 Phase 2 L1 敏感路径保护——按 `SecurityConfig.SensitivePaths` 拦截 `read_file` / `grep` / `write_file` 等结构化工具；L3 结果脱敏已完成。
-2. 运行时用量：区分流式模型未返回 token usage 与真实的 0，并继续推进 #16 的用户、会话与模型用量审计设计。
-3. 可观测性：补充 Agent Dashboard 的 Turn 指标与 Jaeger Trace Drilldown；context compaction、每 Turn 工具链长度、AskUser 频率仅在确认语义后新增低基数指标。
-4. Memory 自动注入校准：基于已记录的候选与入选/淘汰原因，根据真实会话调整门槛与身份查询兜底策略。
-5. Hook：明确取消/中止场景的 Agent 事件契约。
+1. Agent Evaluation Suite：8 个 replay 场景已覆盖工具 loop、脱敏读取后的非敏感编辑、默认大结果 artifact 持久化与存储恢复回查、deny rule 执行前阻断、allow-always 非绕过、MicroCompact 上下文压缩和 delegate 工具的 PreferPersistence 持久化；后续接入隔离工作区、真实 Subagent 会话隔离和 Live 评测。实现和运行方式见 `testing/agent-evaluation-suite.md`。
+2. Agent 安全增强（#14）：优先完成 Phase 2 L1 敏感路径保护——按 `SecurityConfig.SensitivePaths` 拦截 `read_file` / `grep` / `write_file` 等结构化工具；L3 结果脱敏已完成。
+3. 运行时用量：区分流式模型未返回 token usage 与真实的 0，并继续推进 #16 的用户、会话与模型用量审计设计。
+4. 可观测性：补充 Agent Dashboard 的 Turn 指标与 Jaeger Trace Drilldown；context compaction、每 Turn 工具链长度、AskUser 频率仅在确认语义后新增低基数指标。
+5. Memory 自动注入校准：基于已记录的候选与入选/淘汰原因，根据真实会话调整门槛与身份查询兜底策略。
+6. Hook：明确取消/中止场景的 Agent 事件契约。
 
 Agent 服务生命周期已完成当前阶段决策：私有 Provider 支持 Singleton/Transient，不支持 Scoped；见 `architecture/agent-service-lifetime.md`。

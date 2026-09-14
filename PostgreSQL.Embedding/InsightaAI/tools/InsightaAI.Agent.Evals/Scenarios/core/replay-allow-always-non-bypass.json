@@ -1,0 +1,52 @@
+{
+  "id": "replay-allow-always-non-bypass",
+  "description": "A session-level always-allowed tool is still blocked by security deny rules; non-denied commands pass through.",
+  "prompt": "List the protected data, then delete it with the requested command.",
+  "denyRules": [
+    {
+      "pattern": "delete protected-data",
+      "mode": "exact"
+    }
+  ],
+  "alwaysAllowTools": ["bash"],
+  "tools": [
+    {
+      "name": "bash",
+      "result": "fixture command executed"
+    }
+  ],
+  "steps": [
+    {
+      "toolCalls": [
+        {
+          "id": "call-allowed-command",
+          "name": "bash",
+          "arguments": {
+            "command": "list protected-data"
+          }
+        },
+        {
+          "id": "call-denied-while-allowed",
+          "name": "bash",
+          "arguments": {
+            "command": "delete protected-data"
+          }
+        }
+      ]
+    },
+    {
+      "text": "The allowed command executed, but the security policy blocked the denied command even though the tool is always allowed."
+    }
+  ],
+  "assert": {
+    "status": "completed",
+    "toolCalls": ["bash", "bash"],
+    "toolErrors": ["bash"],
+    "finalText": "The allowed command executed, but the security policy blocked the denied command even though the tool is always allowed.",
+    "requiredEventText": [
+      "fixture command executed",
+      "Tool execution denied by security policy"
+    ],
+    "forbiddenEventText": []
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "id": "replay-security-policy-deny",
+  "description": "Rejects a recorded bash request before the registered tool implementation can execute.",
+  "prompt": "Remove the protected data with the requested command.",
+  "denyRules": [
+    {
+      "pattern": "delete protected-data",
+      "mode": "exact"
+    }
+  ],
+  "tools": [
+    {
+      "name": "bash",
+      "result": "This result proves the command was incorrectly allowed."
+    }
+  ],
+  "steps": [
+    {
+      "toolCalls": [
+        {
+          "id": "call-denied-command",
+          "name": "bash",
+          "arguments": {
+            "command": "delete protected-data"
+          }
+        }
+      ]
+    },
+    {
+      "text": "The configured security policy blocked the protected command."
+    }
+  ],
+  "assert": {
+    "status": "completed",
+    "toolCalls": ["bash"],
+    "toolErrors": ["bash"],
+    "finalText": "The configured security policy blocked the protected command.",
+    "requiredEventText": ["Tool execution denied by security policy"]
+  }
+}

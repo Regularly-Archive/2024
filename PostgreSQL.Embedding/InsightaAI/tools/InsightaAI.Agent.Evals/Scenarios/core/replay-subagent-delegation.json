@@ -1,0 +1,36 @@
+{
+  "id": "replay-subagent-delegation",
+  "description": "Delegates a task to a stub subagent handler; the result is persisted as an artifact via PreferPersistence even though it is small.",
+  "prompt": "Ask the explorer agent to survey the evaluation area and report back.",
+  "delegateResult": "The explorer agent completed the survey of the evaluation area. Detailed findings and measurements are recorded in the full report body beyond the preview boundary.",
+  "steps": [
+    {
+      "toolCalls": [
+        {
+          "id": "call-delegate-explorer",
+          "name": "delegate",
+          "arguments": {
+            "agent_id": "explorer",
+            "task": "Survey the evaluation area."
+          }
+        }
+      ]
+    },
+    {
+      "text": "Delegation complete; the explorer survey result is available."
+    }
+  ],
+  "assert": {
+    "status": "completed",
+    "toolCalls": ["delegate"],
+    "finalText": "Delegation complete; the explorer survey result is available.",
+    "artifactTools": ["delegate"],
+    "requiredArtifactText": [
+      "The explorer agent completed the survey",
+      "beyond the preview boundary"
+    ],
+    "forbiddenEventText": [
+      "beyond the preview boundary"
+    ]
+  }
+}

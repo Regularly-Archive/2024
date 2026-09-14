@@ -1,0 +1,37 @@
+{
+  "id": "replay-artifact-rehydration",
+  "description": "Persists a large tool result through message storage, then reads the artifact back from the restored session reference.",
+  "prompt": "Generate the evaluation report and summarise its conclusion.",
+  "useMessageStorage": true,
+  "tools": [
+    {
+      "name": "generate_large_report",
+      "result": "deterministic evaluation report line\n",
+      "repeat": 1200
+    }
+  ],
+  "steps": [
+    {
+      "toolCalls": [
+        {
+          "id": "call-large-report",
+          "name": "generate_large_report",
+          "arguments": {}
+        }
+      ]
+    },
+    {
+      "text": "The generated report completed successfully."
+    }
+  ],
+  "assert": {
+    "status": "completed",
+    "toolCalls": ["generate_large_report"],
+    "finalText": "The generated report completed successfully.",
+    "artifactTools": ["generate_large_report"],
+    "restoredArtifact": {
+      "contains": ["deterministic evaluation report line"],
+      "notContains": []
+    }
+  }
+}
