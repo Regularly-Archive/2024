@@ -1,6 +1,7 @@
 using InsightaAI.Agent.Cli.Commands;
 using InsightaAI.Agent.Cli.Localization;
 using InsightaAI.Agent.Cli.Models;
+using InsightaAI.Agent.Cli.Run;
 using InsightaAI.Agent.Cli.Services;
 using InsightaAI.Agent.Storage;
 using InsightaAI.Agents.Subagents.Catalog;
@@ -39,6 +40,7 @@ public class Program
         hostBuilder.Services.AddSingleton<IMessageStorage, JsonlMessageStorage>();
         hostBuilder.Services.AddScoped<IAgentFactory, AgentFactory>();
         hostBuilder.Services.AddScoped<IChatApplication, ChatApplication>();
+        hostBuilder.Services.AddScoped<RunApplication>();
         hostBuilder.Services.AddScoped<SessionsCommand>();
         hostBuilder.Services.AddSingleton<ISubagentDefinitionStore, LocalSubagentDefinitionStore>();
         hostBuilder.Services.AddSingleton<SubagentsCommand>();
@@ -51,6 +53,7 @@ public class Program
         // 注册命令
         rootCommand.AddCommand(new ConfigCommand().Create());
         rootCommand.AddCommand(ChatCommand.Create(scopeFactory));
+        rootCommand.AddCommand(RunCommand.Create(scopeFactory));
         rootCommand.AddCommand(SessionsCommand.Create(scopeFactory));
         rootCommand.AddCommand(new SkillsCommand().Create());
         rootCommand.AddCommand(new McpCommand().Create());

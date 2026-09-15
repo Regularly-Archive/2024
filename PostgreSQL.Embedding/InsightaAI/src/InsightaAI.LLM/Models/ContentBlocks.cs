@@ -1,10 +1,17 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace InsightaAI.LLM.Models;
 
 /// <summary>
 /// 内容块基类
 /// </summary>
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
+[JsonDerivedType(typeof(TextBlock), "text")]
+[JsonDerivedType(typeof(ToolCallBlock), "toolCall")]
+[JsonDerivedType(typeof(ThinkingBlock), "thinking")]
+[JsonDerivedType(typeof(ImageBlock), "image")]
+[JsonDerivedType(typeof(ToolResultBlock), "toolResult")]
 public abstract record ContentBlock
 {
     public abstract string Type { get; }

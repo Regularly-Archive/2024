@@ -1,8 +1,23 @@
+using System.Text.Json.Serialization;
+
 namespace InsightaAI.LLM.Models;
 
 /// <summary>
 /// 流式事件基类
 /// </summary>
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
+[JsonDerivedType(typeof(StreamStartEvent), "streamStart")]
+[JsonDerivedType(typeof(TextStartEvent), "textStart")]
+[JsonDerivedType(typeof(TextDeltaEvent), "textDelta")]
+[JsonDerivedType(typeof(TextEndEvent), "textEnd")]
+[JsonDerivedType(typeof(ThinkingStartEvent), "thinkingStart")]
+[JsonDerivedType(typeof(ThinkingDeltaEvent), "thinkingDelta")]
+[JsonDerivedType(typeof(ThinkingEndEvent), "thinkingEnd")]
+[JsonDerivedType(typeof(ToolCallStartEvent), "toolCallStart")]
+[JsonDerivedType(typeof(ToolCallDeltaEvent), "toolCallDelta")]
+[JsonDerivedType(typeof(ToolCallEndEvent), "toolCallEnd")]
+[JsonDerivedType(typeof(DoneEvent), "done")]
+[JsonDerivedType(typeof(ErrorEvent), "error")]
 public abstract record StreamEvent
 {
     public abstract string Type { get; }

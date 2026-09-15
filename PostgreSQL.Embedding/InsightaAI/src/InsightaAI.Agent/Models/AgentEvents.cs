@@ -1,5 +1,6 @@
 using InsightaAI.Agent.Abstractions;
 using InsightaAI.LLM.Models;
+using System.Text.Json.Serialization;
 
 namespace InsightaAI.Agent.Models;
 
@@ -45,6 +46,18 @@ public enum AgentEventType
 /// <summary>
 /// Agent 事件基类
 /// </summary>
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
+[JsonDerivedType(typeof(AgentUserPromptEvent), "agentUserPrompt")]
+[JsonDerivedType(typeof(AgentTurnStartEvent), "agentTurnStart")]
+[JsonDerivedType(typeof(AgentRoundStartEvent), "agentRoundStart")]
+[JsonDerivedType(typeof(AgentLlmStreamEvent), "agentLlmStream")]
+[JsonDerivedType(typeof(AgentToolStartEvent), "agentToolStart")]
+[JsonDerivedType(typeof(AgentToolProgressEvent), "agentToolProgress")]
+[JsonDerivedType(typeof(AgentToolEndEvent), "agentToolEnd")]
+[JsonDerivedType(typeof(AgentRoundEndEvent), "agentRoundEnd")]
+[JsonDerivedType(typeof(AgentTurnEndEvent), "agentTurnEnd")]
+[JsonDerivedType(typeof(AgentErrorEvent), "agentError")]
+[JsonDerivedType(typeof(AgentContextCompactedEvent), "agentContextCompacted")]
 public abstract record AgentEvent
 {
     public abstract AgentEventType Type { get; }
