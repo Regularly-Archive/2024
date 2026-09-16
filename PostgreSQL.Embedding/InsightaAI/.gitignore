@@ -50,3 +50,7 @@ bld/
 .env*
 
 PostgreSQL.Embedding/InsightaAI/.artifacts/
+
+# Insighta runtime outputs (agent learnings, eval/tool artifacts)
+.learnings/
+artifacts/
