@@ -18,11 +18,8 @@ public static class RunCommand
         };
         var sessionOption = new Option<string?>("--session", "Resume this main session.");
         var profileOption = new Option<string?>("--profile", "Use a global Insighta subagent profile.");
-        var allowedToolsOption = new Option<string[]?>("--allowed-tools", "Narrow the profile tool set.")
-        {
-            Arity = ArgumentArity.ZeroOrMore,
-            AllowMultipleArgumentsPerToken = true
-        };
+        var allowedToolsOption = new Option<string?>("--allowed-tools",
+            "Comma-separated tool names to retain from the selected profile.");
 
         command.AddArgument(taskArgument);
         command.AddOption(sessionOption);
@@ -30,7 +27,7 @@ public static class RunCommand
         command.AddOption(allowedToolsOption);
         command.SetHandler(
             (task, sessionId, profileId, allowedTools) => ExecuteAsync(
-                scopeFactory, task, sessionId, profileId, allowedTools),
+                scopeFactory, task, sessionId, profileId, ParseAllowedTools(allowedTools)),
             taskArgument,
             sessionOption,
             profileOption,
@@ -44,17 +41,17 @@ public static class RunCommand
         string? task,
         string? sessionId,
         string? profileId,
-        string[]? allowedTools)
+        IReadOnlyList<string>? allowedTools)
     {
         if (string.IsNullOrWhiteSpace(task))
         {
             if (!Console.IsInputRedirected)
-                return 2;
+                return await WriteUsageFailureAsync("Task text is required. Provide <task> or pipe it through standard input.");
             task = await Console.In.ReadToEndAsync();
         }
 
         if (string.IsNullOrWhiteSpace(task))
-            return 2;
+            return await WriteUsageFailureAsync("Task text read from standard input is empty.");
 
         await using var scope = scopeFactory.CreateAsyncScope();
         var application = scope.ServiceProvider.GetRequiredService<RunApplication>();
@@ -66,5 +63,21 @@ public static class RunCommand
             AllowedToolNames = allowedTools
         }, Console.Out);
         return result.ExitCode;
+    }
+
+    private static IReadOnlyList<string>? ParseAllowedTools(string? allowedTools)
+    {
+        if (allowedTools is null)
+            return null;
+
+        var names = allowedTools.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        return names.Length > 0 ? names : [];
+    }
+
+    private static async Task<int> WriteUsageFailureAsync(string message)
+    {
+        await new RunJsonlWriter(Console.Out)
+            .RunFailedAsync(null, message, exitCode: 2, CancellationToken.None);
+        return 2;
     }
 }

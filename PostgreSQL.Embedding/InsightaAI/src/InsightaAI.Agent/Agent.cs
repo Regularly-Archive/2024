@@ -424,16 +424,20 @@ public class Agent : IDisposable
     /// <summary>
     /// 安全地 fire-and-forget 调用 Hook，异常仅记录日志
     /// </summary>
-    private Task SafeInvokeHookAsync(Func<Task> hookAction, string hookLabel)
+    private async Task SafeInvokeHookAsync(Func<Task> hookAction, string hookLabel)
     {
-        return hookAction().ContinueWith(t =>
+        try
         {
-            if (t.IsFaulted && t.Exception != null)
-            {
-                var ex = t.Exception.InnerException ?? t.Exception;
-                _logger.LogWarning("[AgentHook] {HookLabel} failed: {Message}", hookLabel, ex.Message);
-            }
-        }, TaskContinuationOptions.ExecuteSynchronously);
+            await hookAction().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Observer cancellation does not cancel the Agent turn.
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[AgentHook] {HookLabel} failed: {Message}", hookLabel, ex.Message);
+        }
     }
 
     /// <summary>

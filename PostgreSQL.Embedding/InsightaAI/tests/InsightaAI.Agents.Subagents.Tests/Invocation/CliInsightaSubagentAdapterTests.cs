@@ -102,6 +102,27 @@ public sealed class CliInsightaSubagentAdapterTests : IDisposable
     }
 
     [Fact]
+    public async Task InvokeAsync_Rejects_Requested_Tool_Outside_Definition()
+    {
+        var storage = new JsonlMessageStorage(_storagePath);
+        var adapter = new CliInsightaSubagentAdapter(
+            new RecordingAgentFactory(), storage,
+            CreateTemplate(new ToolRegistry().Register(new NamedTool("read_file"))));
+        var request = CreateRequest(new InsightaSubagentDefinition
+        {
+            Id = "explorer",
+            Name = "Explorer",
+            ToolNames = ["read_file"]
+        }) with { AllowedToolNames = ["grep"] };
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => adapter.InvokeAsync(request));
+
+        Assert.Contains("explorer", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("grep", exception.Message, StringComparison.Ordinal);
+        Assert.Empty(await storage.GetSessionsAsync());
+    }
+
+    [Fact]
     public async Task InvokeAsync_EnabledSkillCapability_ExposesSkillTools()
     {
         var hostTools = new ToolRegistry()

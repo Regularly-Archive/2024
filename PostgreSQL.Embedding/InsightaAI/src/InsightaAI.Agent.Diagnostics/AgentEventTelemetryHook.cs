@@ -109,13 +109,14 @@ public sealed class AgentEventTelemetryHook : IAgentEventHook
         using var turnActivity = TelemetryConstants.ActivitySource.StartActivity(
             "insighta.agent.turn_end", ActivityKind.Internal, parentContext: _turnActivityContext);
 
-        turnActivity.SetTag("session.id", _sessionId);
-        turnActivity.SetTag("turn.total_rounds", _currentRound);
+        var turnEndEvt = context.GetEvent<AgentTurnEndEvent>();
+        // No listener or a sampling decision may leave this activity null.
+        // Round context cleanup must still run in that case.
+        turnActivity?.SetTag("session.id", _sessionId);
+        turnActivity?.SetTag("turn.total_rounds", _currentRound);
+        turnActivity?.SetTag("turn.duration_ms", turnEndEvt.Result.DurationMs);
 
-        var turnEndEvt = context.Event as AgentTurnEndEvent;
-        turnActivity.SetTag("turn.duration_ms", turnEndEvt.Result.DurationMs);
-
-        turnActivity.SetStatus(ActivityStatusCode.Ok);
+        turnActivity?.SetStatus(ActivityStatusCode.Ok);
 
         if (_agentId != null)
         {

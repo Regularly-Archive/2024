@@ -292,7 +292,18 @@ public sealed class CliInsightaSubagentAdapter : ISubagentAdapter
     {
         var permittedNames = (definition.ToolNames ?? []).AsEnumerable();
         if (requestToolNames is not null)
-            permittedNames = permittedNames.Intersect(requestToolNames, StringComparer.Ordinal);
+        {
+            var requestedNames = requestToolNames.Distinct(StringComparer.Ordinal).ToArray();
+            var unknownNames = requestedNames.Except(definition.ToolNames ?? [], StringComparer.Ordinal).ToArray();
+            if (unknownNames.Length > 0)
+            {
+                throw new InvalidOperationException(
+                    $"Subagent definition '{definition.Id}' does not allow requested tool(s): " +
+                    string.Join(", ", unknownNames.Select(name => $"'{name}'")));
+            }
+
+            permittedNames = permittedNames.Where(requestedNames.Contains);
+        }
 
         var registry = new ToolRegistry();
         foreach (var toolName in permittedNames.Distinct(StringComparer.Ordinal))

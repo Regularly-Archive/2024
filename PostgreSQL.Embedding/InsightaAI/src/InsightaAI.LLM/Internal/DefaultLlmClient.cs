@@ -196,7 +196,12 @@ internal class DefaultLlmClient : ILlmClient
 
                 if (parsedEvent != null)
                 {
-                    yield return parsedEvent;
+                    // The client owns the protocol-level start event emitted after the HTTP
+                    // response succeeds. Some providers also expose a provider-specific start
+                    // frame (Anthropic message_start, Responses response.created); forwarding
+                    // both produces duplicate StreamStartEvents for one request.
+                    if (parsedEvent is not StreamStartEvent)
+                        yield return parsedEvent;
 
                     if (parsedEvent is DoneEvent)
                     {

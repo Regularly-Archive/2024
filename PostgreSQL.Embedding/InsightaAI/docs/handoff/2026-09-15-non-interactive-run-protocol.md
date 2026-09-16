@@ -1,5 +1,13 @@
 # 交接：`insighta run` 非交互协议
 
+## 2026-09-15：Turn 结束时空引用修复
+
+- 实机输出 `run_protocol.txt` 中，会话 `1d970555a290` 完成两轮调用与最终回答后，在 `agentRoundEnd` 后直接输出 `run.failed`；对应日志已记录 `Turn ended — status=Completed`，最终助手消息也已持久化，故失败发生在 TurnEnd 的消费边界。
+- `AgentEventTelemetryHook.OnAgentTurnEndedAsync` 未处理 `StartActivity()` 返回 null。`run` 当前没有初始化 TracerProvider，但配置开启遥测时仍会注册 Hook；无监听器或未采样时可能同步抛出空引用。现已使用空值安全访问，仍执行 round context 清理。
+- `Agent.SafeInvokeHookAsync` 原实现先调用 `hookAction()` 再注册 continuation，遗漏同步异常。现将调用和 await 一起放进 try/catch，同步或异步 Hook 故障仅记录日志及堆栈，不阻断 Agent 结束事件和后续 Hook；观察者取消保持不影响主 Turn。
+- 回归覆盖：无监听器、未采样、正常采样；同步/异步 TurnEnd Hook 故障；`whereami` 两轮 run 最终产生 `agentTurnEnd` 与 `run.completed`。全部使用离线模型，未重新调用真实供应商。
+- 以下 MVP 状态及未完成事项为此前交接记录；本修复未引入 run 的遥测 Provider 生命周期，也未更新全局工具安装。
+
 - 日期：2026-09-15
 - 分支：`feat/non-interactive-run-protocol`
 - 来源分支：`feature/llm-abstraction-layer`
@@ -34,7 +42,7 @@ dotnet run --project src/InsightaAI.Agent.Cli -- run "next" --session <id>
 
 # profile
 dotnet run --project src/InsightaAI.Agent.Cli -- run "task" --profile <subagent-id>
-dotnet run --project src/InsightaAI.Agent.Cli -- run "task" --profile runner --allowed-tools read_file grep
+dotnet run --project src/InsightaAI.Agent.Cli -- run "task" --profile runner --allowed-tools read_file,grep
 ```
 
 关键文件：
@@ -112,7 +120,7 @@ stdout 每行一个 JSON 对象，stderr 不作为协议通道。不要解析 Sp
 
 1. 通过 `LocalSubagentDefinitionStore` 读取全局 profile。
 2. `ToolRegistry` 只注册 `definition.ToolNames`。
-3. `--allowed-tools` 只能继续收紧 profile，不能扩权。
+3. `--allowed-tools` 接受一个逗号分隔的工具名列表，只能继续收紧 profile，不能扩权；未指定 `--profile` 或给出 profile 未允许的工具名时，输出 `run.failed` 并失败，不会静默运行空工具集。
 4. `Capabilities` 决定 Skill / MCP / Memory 工具组是否排除。
 5. `definition.Model` 可覆盖主模型；未指定时使用 `PrimaryModel`。
 6. System prompt 追加 runtime constraints：非交互、不可委派、不可使用被排除基础设施。

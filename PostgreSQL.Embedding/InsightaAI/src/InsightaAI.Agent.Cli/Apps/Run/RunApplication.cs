@@ -82,6 +82,7 @@ public sealed class RunApplication
 
         try
         {
+            ValidateRequest(request);
             ValidateConfig();
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -280,8 +281,19 @@ public sealed class RunApplication
         IReadOnlyList<string>? allowedToolNames)
     {
         var permitted = definition.ToolNames.AsEnumerable();
-        if (allowedToolNames is { Count: > 0 })
-            permitted = permitted.Intersect(allowedToolNames, StringComparer.Ordinal);
+        if (allowedToolNames is not null)
+        {
+            var allowed = allowedToolNames.Distinct(StringComparer.Ordinal).ToArray();
+            var unknown = allowed.Except(definition.ToolNames, StringComparer.Ordinal).ToArray();
+            if (unknown.Length > 0)
+            {
+                throw new InvalidOperationException(
+                    $"--allowed-tools includes {string.Join(", ", unknown.Select(name => $"'{name}'"))}, " +
+                    $"but profile '{definition.Id}' does not allow it.");
+            }
+
+            permitted = permitted.Where(allowed.Contains);
+        }
 
         var registry = new ToolRegistry();
         foreach (var toolName in permitted.Distinct(StringComparer.Ordinal))
@@ -407,6 +419,17 @@ public sealed class RunApplication
             throw new InvalidOperationException($"Provider '{providerName}' is not configured in auth.json.");
         if (!_config.Models.ContainsKey(_config.PrimaryModel))
             throw new InvalidOperationException($"Model '{_config.PrimaryModel}' is not configured.");
+    }
+
+    private static void ValidateRequest(RunRequest request)
+    {
+        if (request.AllowedToolNames is not null && string.IsNullOrWhiteSpace(request.ProfileId))
+        {
+            throw new InvalidOperationException("--allowed-tools requires --profile.");
+        }
+
+        if (request.AllowedToolNames is { Count: 0 })
+            throw new InvalidOperationException("--allowed-tools requires at least one tool name.");
     }
 
     private sealed record ResolvedProfile(ILlmClient Client, AgentCreationOptions Options);

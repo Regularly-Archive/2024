@@ -6,11 +6,13 @@ using InsightaAI.Agent.Storage;
 using InsightaAI.Agents.Subagents.Definitions;
 using InsightaAI.LLM.Models;
 using InsightaAI.Tests.Shared;
+using InsightaAI.Agent.Diagnostics;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
 namespace InsightaAI.Agent.Cli.Tests;
 
+[Collection("Run telemetry")]
 public sealed class RunProtocolTests
 {
     [Fact]
@@ -59,13 +61,18 @@ public sealed class RunProtocolTests
         Assert.Equal("completed", completed.GetProperty("result").GetProperty("status").GetString());
     }
 
-    [Fact]
-    public async Task RunApplication_Should_Run_One_Turn_And_Emit_Existing_AgentEvents()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunApplication_Should_Run_One_Turn_And_Emit_Existing_AgentEvents(bool useToolAndTelemetry)
     {
         var root = Path.Combine(Path.GetTempPath(), "insighta-run-protocol-tests", Guid.NewGuid().ToString("N"));
         var storage = new JsonlMessageStorage(root);
         using var loggerFactory = LoggerFactory.Create(_ => { });
-        using var llm = new MockLlmClient(response: "run completed");
+        using var llm = new MockLlmClient(response: "run completed",
+            firstResponseToolCalls: useToolAndTelemetry
+                ? [new ToolCallBlock { Id = "clock-call", Name = "whereami", Arguments = JsonSerializer.SerializeToElement(new { }) }]
+                : null);
         var agentFactory = new AgentFactory(storage, loggerFactory);
         var config = new CliConfig
         {
@@ -83,7 +90,7 @@ public sealed class RunProtocolTests
 
         var application = new RunApplication(
             storage,
-            agentFactory,
+            useToolAndTelemetry ? new TelemetryAgentFactory(agentFactory) : agentFactory,
             config,
             auth,
             (_, _) => llm);
@@ -108,7 +115,16 @@ public sealed class RunProtocolTests
         Assert.Contains("agentLlmStream", agentPayloads);
         Assert.Contains("agentRoundEnd", agentPayloads);
         Assert.Contains("agentTurnEnd", agentPayloads);
-        Assert.DoesNotContain("agentToolStart", agentPayloads);
+        if (useToolAndTelemetry)
+        {
+            Assert.Contains("agentToolStart", agentPayloads);
+            Assert.Contains("agentToolEnd", agentPayloads);
+            Assert.Equal(2, agentPayloads.Count(type => type == "agentRoundStart"));
+            Assert.Equal(2, JsonDocument.Parse(lines[^1]).RootElement
+                .GetProperty("result").GetProperty("rounds").GetInt32());
+        }
+        else
+            Assert.DoesNotContain("agentToolStart", agentPayloads);
 
         await storage.DeleteSessionAsync(result.SessionId!);
     }
@@ -151,7 +167,12 @@ public sealed class RunProtocolTests
                 string.Equals(profileId, "runner") ? profile : null));
         using var output = new StringWriter();
 
-        var result = await application.ExecuteAsync(new RunRequest { Input = "run profile" }, output);
+        var result = await application.ExecuteAsync(new RunRequest
+        {
+            Input = "run profile",
+            ProfileId = "runner",
+            AllowedToolNames = ["read_file"]
+        }, output);
 
         Assert.Equal(ExitCodes.Success, result.ExitCode);
         var agentRequest = Assert.Single(llm.StreamingRequests);
@@ -160,6 +181,80 @@ public sealed class RunProtocolTests
         Assert.DoesNotContain("delegate", toolNames);
         Assert.DoesNotContain("bash", toolNames);
         await storage.DeleteSessionAsync(result.SessionId!);
+    }
+
+    [Fact]
+    public async Task RunApplication_Should_Reject_AllowedTools_Without_Profile()
+    {
+        var storage = new JsonlMessageStorage(Path.Combine(Path.GetTempPath(), "insighta-run-tests", Guid.NewGuid().ToString("N")));
+        using var loggerFactory = LoggerFactory.Create(_ => { });
+        using var llm = new MockLlmClient();
+        var application = new RunApplication(storage, new AgentFactory(storage, loggerFactory), CreateConfig(), CreateAuth(), (_, _) => llm);
+        using var output = new StringWriter();
+
+        var result = await application.ExecuteAsync(new RunRequest
+        {
+            Input = "run",
+            AllowedToolNames = ["read_file"]
+        }, output);
+
+        Assert.Equal(ExitCodes.Failed, result.ExitCode);
+        var failed = JsonDocument.Parse(output.ToString()).RootElement;
+        Assert.Equal("run.failed", failed.GetProperty("type").GetString());
+        Assert.Equal("--allowed-tools requires --profile.", failed.GetProperty("error").GetString());
+        Assert.Empty(await storage.GetSessionsAsync());
+    }
+
+    [Fact]
+    public async Task RunApplication_Should_Reject_Tools_Not_Allowed_By_Profile()
+    {
+        var storage = new JsonlMessageStorage(Path.Combine(Path.GetTempPath(), "insighta-run-tests", Guid.NewGuid().ToString("N")));
+        using var loggerFactory = LoggerFactory.Create(_ => { });
+        using var llm = new MockLlmClient();
+        var profile = new InsightaSubagentDefinition { Id = "runner", Name = "Runner", ToolNames = ["read_file"] };
+        var application = new RunApplication(
+            storage, new AgentFactory(storage, loggerFactory), CreateConfig(), CreateAuth(), (_, _) => llm,
+            (profileId, _) => ValueTask.FromResult<SubagentDefinition?>(profileId == "runner" ? profile : null));
+        using var output = new StringWriter();
+
+        var result = await application.ExecuteAsync(new RunRequest
+        {
+            Input = "run",
+            ProfileId = "runner",
+            AllowedToolNames = ["grep"]
+        }, output);
+
+        Assert.Equal(ExitCodes.Failed, result.ExitCode);
+        var failed = JsonDocument.Parse(output.ToString()).RootElement;
+        Assert.Equal("run.failed", failed.GetProperty("type").GetString());
+        Assert.Contains("'grep'", failed.GetProperty("error").GetString());
+        Assert.Empty(await storage.GetSessionsAsync());
+    }
+
+    private static CliConfig CreateConfig()
+    {
+        var config = new CliConfig { PrimaryModel = "mock/test-model", ParallelToolExecution = false };
+        config.Models["mock/test-model"] = new ModelEntry { ModelId = "test-model", MaxTokens = 128, ContextWindow = 4096 };
+        return config;
+    }
+
+    private static AuthConfig CreateAuth()
+    {
+        var auth = new AuthConfig();
+        auth.Providers["mock"] = new ProviderEntry();
+        return auth;
+    }
+
+    private sealed class TelemetryAgentFactory(IAgentFactory inner) : IAgentFactory
+    {
+        public async Task<Agent> CreateAsync(AgentCreationOptions options, CancellationToken cancellationToken = default)
+        {
+            var agent = await inner.CreateAsync(options, cancellationToken);
+            var hook = new AgentEventTelemetryHook();
+            hook.SetSessionContext("cli-agent", "test", options.Model.ModelId, options.SessionId!);
+            agent.AddAgentHook(hook);
+            return agent;
+        }
     }
 
     private sealed class RecordingLlmClient : InsightaAI.LLM.Abstractions.ILlmClient
