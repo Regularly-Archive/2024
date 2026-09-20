@@ -399,6 +399,24 @@ public class ConfigCommand
                 Markup.Escape(summaryModel));
             AnsiConsole.MarkupLine($"[green]✓[/] {secondarySet}");
         }
+
+        // 可选设置视觉模型（read_image 等视觉工具使用）
+        if (AnsiConsole.Confirm(CliStrings.ConfigConfigureVisionModelPrompt, false))
+        {
+            var visionModel = PromptSelection(
+                CliStrings.ConfigSelectVisionModel,
+                config.Models.Keys);
+            if (visionModel == null)
+            {
+                return;
+            }
+
+            config.VisionModel = visionModel;
+            var visionSet = CliStrings.Format(
+                "ConfigVisionModelSetFormat",
+                Markup.Escape(visionModel));
+            AnsiConsole.MarkupLine($"[green]✓[/] {visionSet}");
+        }
     }
 
     private static TAction PromptMenu<TAction>(

@@ -74,9 +74,13 @@ internal class OpenAIMessage
     [JsonPropertyName("role")]
     public required string Role { get; set; }
 
+    /// <summary>
+    /// 消息内容。纯文本时为 string（兼容不支持 parts 数组的端点），
+    /// 含图片时为 <see cref="OpenAIContentPart"/> 数组（多模态格式）。
+    /// </summary>
     [JsonPropertyName("content")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? Content { get; set; }
+    public object? Content { get; set; }
 
     [JsonPropertyName("tool_calls")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -89,6 +93,37 @@ internal class OpenAIMessage
     [JsonPropertyName("reasoning_content")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ReasoningContent { get; set; }
+}
+
+/// <summary>
+/// OpenAI 多模态内容 part（Chat Completions 格式）。
+/// type = "text" 时使用 <see cref="Text"/>；type = "image_url" 时使用 <see cref="ImageUrl"/>。
+/// </summary>
+internal class OpenAIContentPart
+{
+    [JsonPropertyName("type")]
+    public required string Type { get; set; }
+
+    [JsonPropertyName("text")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Text { get; set; }
+
+    [JsonPropertyName("image_url")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OpenAIImageUrl? ImageUrl { get; set; }
+}
+
+/// <summary>
+/// OpenAI 图片引用：支持 https URL 或 base64 data URI，detail 控制预处理精度。
+/// </summary>
+internal class OpenAIImageUrl
+{
+    [JsonPropertyName("url")]
+    public required string Url { get; set; }
+
+    [JsonPropertyName("detail")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Detail { get; set; }
 }
 
 /// <summary>

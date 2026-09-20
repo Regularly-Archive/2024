@@ -13,6 +13,11 @@ public interface IFileSystem
     Task<string> ReadFileAsync(string path, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 读取文件全部字节（用于图片等二进制文件）
+    /// </summary>
+    Task<byte[]> ReadFileBytesAsync(string path, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 按行读取文件内容
     /// </summary>
     /// <param name="path">文件路径</param>

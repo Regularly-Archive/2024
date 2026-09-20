@@ -112,6 +112,9 @@ public static class CliStrings
     public static string ConfigNoModels => Get(nameof(ConfigNoModels));
     public static string ConfigConfigureSecondaryModelPrompt => Get(nameof(ConfigConfigureSecondaryModelPrompt));
     public static string ConfigSelectSecondaryModel => Get(nameof(ConfigSelectSecondaryModel));
+    public static string ConfigConfigureVisionModelPrompt => Get(nameof(ConfigConfigureVisionModelPrompt));
+    public static string ConfigSelectVisionModel => Get(nameof(ConfigSelectVisionModel));
+    public static string ConfigVisionModelSetFormat => Get(nameof(ConfigVisionModelSetFormat));
 
     // Chat Command
     public static string ChatDescription => Get(nameof(ChatDescription));

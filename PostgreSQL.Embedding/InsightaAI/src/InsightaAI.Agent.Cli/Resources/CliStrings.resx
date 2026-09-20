@@ -486,6 +486,15 @@
   <data name="ConfigSecondaryModelSetFormat" xml:space="preserve">
     <value>Secondary model set to '{0}'</value>
   </data>
+  <data name="ConfigConfigureVisionModelPrompt" xml:space="preserve">
+    <value>Configure a vision model for image analysis tools (read_image)?</value>
+  </data>
+  <data name="ConfigSelectVisionModel" xml:space="preserve">
+    <value>Select the vision model:</value>
+  </data>
+  <data name="ConfigVisionModelSetFormat" xml:space="preserve">
+    <value>Vision model set to '{0}'</value>
+  </data>
   <!-- Chat Command -->
   <data name="ChatDescription" xml:space="preserve">
     <value>Start conversation</value>

@@ -18,6 +18,12 @@ public class LocalFileSystem : IFileSystem
         return await File.ReadAllTextAsync(fullPath, encoding, cancellationToken);
     }
 
+    public async Task<byte[]> ReadFileBytesAsync(string path, CancellationToken cancellationToken = default)
+    {
+        var fullPath = Path.GetFullPath(path);
+        return await File.ReadAllBytesAsync(fullPath, cancellationToken);
+    }
+
     public async Task<FileContent> ReadFileLinesAsync(
         string path,
         int? offset = null,

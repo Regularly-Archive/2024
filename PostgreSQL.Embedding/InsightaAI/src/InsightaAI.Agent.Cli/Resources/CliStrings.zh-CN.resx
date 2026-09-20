@@ -486,6 +486,15 @@
   <data name="ConfigSecondaryModelSetFormat" xml:space="preserve">
     <value>副模型已设为“{0}”</value>
   </data>
+  <data name="ConfigConfigureVisionModelPrompt" xml:space="preserve">
+    <value>配置用于图像分析的视觉模型（read_image 工具）吗？</value>
+  </data>
+  <data name="ConfigSelectVisionModel" xml:space="preserve">
+    <value>选择视觉模型：</value>
+  </data>
+  <data name="ConfigVisionModelSetFormat" xml:space="preserve">
+    <value>视觉模型已设为“{0}”</value>
+  </data>
   <!-- Chat Command -->
   <data name="ChatDescription" xml:space="preserve">
     <value>开始对话</value>

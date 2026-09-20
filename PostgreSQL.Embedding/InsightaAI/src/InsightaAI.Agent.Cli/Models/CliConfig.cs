@@ -282,6 +282,12 @@ public class CliConfig
     public string? SecondaryModel { get; set; }
 
     /// <summary>
+    /// 视觉模型（可选，格式为 "provider/model_key"，用于 read_image 等视觉工具）
+    /// </summary>
+    [JsonPropertyName("vision_model")]
+    public string? VisionModel { get; set; }
+
+    /// <summary>
     /// 用户自定义指令（作为动态 System Prompt 的 Layer 3）
     /// </summary>
     [JsonPropertyName("custom_instructions")]

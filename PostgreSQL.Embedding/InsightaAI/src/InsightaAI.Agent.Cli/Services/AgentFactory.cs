@@ -15,6 +15,8 @@ using InsightaAI.Agent.Mcp.Local;
 using InsightaAI.Agent.Skills;
 using InsightaAI.Agent.Storage;
 using InsightaAI.Agent.Security;
+using InsightaAI.Agent.Extensions;
+using InsightaAI.Agent.Vision;
 using InsightaAI.LLM.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -103,6 +105,17 @@ public sealed class AgentFactory : IAgentFactory
             .ConfigureServices(services =>
             {
                 services.AddSingleton<IEnvironmentVariableReader>(environment);
+                // 注册内置工具的容器服务（IFileSystem/IVisionService 等），供工具经 context.Services 解析
+                services.AddBuiltInToolServices();
+                if (!string.IsNullOrWhiteSpace(options.Config.VisionModel))
+                {
+                    // 视觉模型显式配置后才注册；未注册时 read_image 工具报"未配置"，不静默降级到主模型
+                    services.AddSingleton(new VisionOptions
+                    {
+                        Model = options.Config.VisionModel,
+                        ClientFactory = modelRef => LlmClientFactory.Create(options.Auth, options.Config, modelRef)
+                    });
+                }
             })
             .Build();
 

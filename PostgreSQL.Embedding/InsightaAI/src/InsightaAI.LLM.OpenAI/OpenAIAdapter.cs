@@ -336,10 +336,43 @@ public class OpenAIAdapter : IProviderAdapter
         }
         else
         {
-            message.Content = msg.GetTextContent();
+            message.Content = BuildContent(msg);
         }
 
         return message;
+    }
+
+    /// <summary>
+    /// 构建消息内容：无图片时返回纯文本字符串（保持对严格端点的兼容），
+    /// 含图片时返回 OpenAI 多模态 parts 数组（text / image_url）。
+    /// </summary>
+    private static object? BuildContent(Message msg)
+    {
+        if (!msg.Content.Any(static b => b is ImageBlock))
+            return msg.GetTextContent();
+
+        var parts = new List<OpenAIContentPart>();
+        foreach (var block in msg.Content)
+        {
+            switch (block)
+            {
+                case TextBlock text when !string.IsNullOrEmpty(text.Text):
+                    parts.Add(new OpenAIContentPart { Type = "text", Text = text.Text });
+                    break;
+                case ImageBlock image:
+                    parts.Add(new OpenAIContentPart
+                    {
+                        Type = "image_url",
+                        ImageUrl = new OpenAIImageUrl
+                        {
+                            Url = $"data:{image.Source.MediaType};base64,{image.Source.Data}"
+                        }
+                    });
+                    break;
+            }
+        }
+
+        return parts.ToArray();
     }
 
     /// <summary>

@@ -2,6 +2,7 @@ using InsightaAI.Agent.Models;
 using InsightaAI.Agent.Tools.BuiltIn;
 using InsightaAI.Agent.Abstractions;
 using InsightaAI.Agent.Harness.Local;
+using InsightaAI.Agent.Vision;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace InsightaAI.Agent.Extensions;
@@ -20,6 +21,7 @@ public static class BuiltInToolsExtensions
         services.TryAddSingleton<IShellExecutor, LocalShellExecutor>();
         services.TryAddSingleton<IFileSystem, LocalFileSystem>();
         services.TryAddSingleton<IPathValidator, LocalPathValidator>();
+        services.TryAddSingleton<IVisionService, VisionService>();
 
         return services;
     }
@@ -55,6 +57,7 @@ public static class BuiltInToolsExtensions
         registry.Register(new WhereAmITool());
         registry.Register(new WebFetchTool());
         registry.Register(new WebSearchTool());
+        registry.Register(new VisionTool());
 
         // 注册 Attribute 模式的工具（扫描当前程序集）
         // 注意：WebFetchTool 和 WebSearchTool 已改为 IToolExecutor 模式，不再使用 Attribute
