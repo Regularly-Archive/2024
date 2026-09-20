@@ -273,6 +273,15 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 - 新增集成测试 `tests/InsightaAI.Agent.Tests/AgentArtifactRoundTripTests.cs`：真实 Agent 读取 ~100KB 文件 → `JsonlMessageStorage` 持久化 → `ToLlmMessage` 恢复 tool 消息 → 凭 artifact 引用回查，定向测试 29/29 通过。
 - 实机验证：会话内 `read_file` 读取 284KB `messages.jsonl` 触发落盘，模型侧收到行号化预览 + `[Full output saved as artifact ...]` 脚注；历史会话 25 条 artifact 引用与 `tool_results\` 落盘文件一一对应，链路闭合。
 
+### 视觉工具 read_image（2026-09-20）
+
+- 协议层：OpenAI Chat Completions 适配器将含 `ImageBlock` 的 user 消息序列化为 content parts 数组（`{type:"text"}` / `{type:"image_url",image_url:{url:"data:<media>;base64,..."}}`）；纯文本消息保持字符串 content，严格端点兼容不受影响。
+- 领域层：`Agent/Vision/` 提供 `VisionOptions` / `IVisionService` / `VisionService`——本地文件与 http(s) URL 加载、扩展名优先 + Content-Type 回退的媒体类型判定、20MB 大小守卫、一次性视觉请求；`VisionOptions.HttpClientOverride` 仅供测试注入。
+- 工具层：`Tools/BuiltIn/VisionTool.cs` 对外名 `read_image`（参数 `source` + 可选 `prompt`，默认英文详述）；视觉服务未注册时显式报"未配置"，不静默降级到主模型。
+- 装配：`AgentFactory.ConfigureServices` 统一调用 `AddBuiltInToolServices()` 注册容器服务（IFileSystem/IVisionService 等），并仅在 `CliConfig.VisionModel` 显式配置时注册 `VisionOptions`。注意：工具实例注册（`AddBuiltInTools`）与容器服务注册（`AddBuiltInToolServices`）是两条链，缺一会出现"工具可调用但服务解析为 null"——此类装配缺口单测测不出，需实弹验证。
+- 配置：`CliConfig.VisionModel` + `config` 向导步骤 + CliStrings 双语资源；V2 候选（prompt 中文化、HEIC、大图降采样）见 `docs/TODO.md` #23。
+- 验证：glm-5.3-flash 实测接受图片输入；本地路径 + URL + 中文 prompt 透传全部通过；新增 30 项单测，全量 598 通过。
+
 ## 当前问题与改进方向
 
 ### 当前待办
@@ -294,6 +303,7 @@ Agent 服务生命周期已明确：当前 Agent 私有 Provider 只支持 Singl
 - 2026-08-14：Dashboard 复核通过真实 Prometheus 数据验证全部 PromQL；Anthropic 归一化后完整测试 69 项通过（改动在 `chore/mcp-telemetry-tags` 分支）。
 - 2026-08-21：工具进度与串行消费边界定向测试通过；完整 `InsightaAI.Agent.Tests` 327/327 通过。
 - 2026-09-10：工具结果 Artifact 事件/日志透出实机验证：会话内读取大会话文件触发落盘，预览含 artifact 脚注；历史会话 25 条 artifact 引用与落盘文件一一对应。`AgentArtifactRoundTripTests` 等 29/29 通过。
+- 2026-09-20：read_image 视觉工具实机验证：本地路径 + sinaimg URL + 中文 prompt 透传 + 未配置错误分支全部通过；glm-5.3-flash 实测收图。完整测试 598 项通过（新增 30 项）。
 
 ## 愿景与里程碑
 

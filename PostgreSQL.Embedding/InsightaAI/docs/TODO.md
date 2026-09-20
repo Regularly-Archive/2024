@@ -622,6 +622,35 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 
 ---
 
+### 23. 视觉工具 read_image（V1 已完成，2026-09-20）
+
+**目标：** 让 Agent 具备图像理解能力：主模型可调用 `read_image` 分析本地或网络图片，由独立的视觉模型完成多模态推理。
+
+**V1 已完成：**
+
+- [x] OpenAI Chat Completions 适配器多模态序列化：user 消息含 `ImageBlock` 时 content 为 parts 数组（`text` / `image_url` data URI）；纯文本保持字符串，不破坏严格端点兼容
+- [x] `Agent/Vision/`：`VisionOptions`（模型引用 + ClientFactory + 20MB 上限 + 测试用 HttpClientOverride）、`IVisionService`、`VisionService`（本地/URL 加载、扩展名优先 + Content-Type 回退的媒体类型判定）
+- [x] `Tools/BuiltIn/VisionTool.cs`：`read_image` 工具（`source` + 可选 `prompt`），未配置视觉模型时显式报错，不静默降级到主模型
+- [x] `IFileSystem.ReadFileBytesAsync` 二进制读取
+- [x] 装配：`AgentFactory.ConfigureServices` 调用 `AddBuiltInToolServices()` 注册容器服务，并按 `CliConfig.VisionModel` 条件注册 `VisionOptions`（Chat/Run 共享装配点）。教训：工具实例注册（`AddBuiltInTools`）与 DI 服务注册（`AddBuiltInToolServices`）是两条链，必须都接；此类装配缺口单测测不出，只能实弹暴露
+- [x] `CliConfig.VisionModel` + `config` 向导视觉模型步骤 + CliStrings 双语资源
+- [x] 单测 +30（协议线格式契约 / VisionService 分支 / VisionTool 行为），全量 598 通过
+- [x] 实机验证：本地路径、sinaimg URL、中文 prompt 透传、未配置错误分支全部通过；glm-5.3-flash 实测接受图片输入
+
+**V2 候选（待议）：**
+
+- [ ] 默认 prompt 中文化（当前默认输出英文）
+- [ ] HEIC/HEIF 支持（iPhone 默认格式，需先确认视觉端点支持）
+- [ ] 发送前大图降采样（如长边 2048px，需引入 ImageSharp）
+
+**明确不做：**
+
+- `detail` 参数（`OpenAIImageUrl.Detail` 字段已预留，走 auto）
+- 一次多图调用
+- URL SSRF 防护（本地 CLI 场景风险低，与 web_fetch 口径一致）
+
+---
+
 ## 当前优先级
 
 已完成：Dashboard 拆分与 Anthropic 归一化（#17），以及 MCP Telemetry tag 命名分层与去重（#12）。后续可观测性工作保留 Agent Dashboard 的 Turn 指标、低基数行为指标评估和 Jaeger Trace Drilldown；见 `observability/observability-design.md` §8。
