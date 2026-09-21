@@ -55,7 +55,8 @@ public class VisionTool : ITool
 
         var prompt = args.TryGetValue("prompt", out var p) && !string.IsNullOrWhiteSpace(p?.ToString())
             ? p!.ToString()!
-            : "Describe this image in as much detail as possible.";
+            // 默认 prompt 使用中文，使视觉模型默认输出中文（TODO #23 V2）
+            : "请用中文尽可能详细地描述这张图片。";
 
         var vision = context.Services?.GetService<IVisionService>();
         if (vision is null)

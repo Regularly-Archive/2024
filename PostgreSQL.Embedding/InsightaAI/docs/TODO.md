@@ -639,7 +639,7 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 
 **V2 候选（待议）：**
 
-- [ ] 默认 prompt 中文化（当前默认输出英文）
+- [x] 默认 prompt 中文化（2026-09-21：默认 prompt 改为中文并显式要求中文输出，`VisionTool` 内置默认值）
 - [ ] HEIC/HEIF 支持（iPhone 默认格式，需先确认视觉端点支持）
 - [ ] 发送前大图降采样（如长边 2048px，需引入 ImageSharp）
 

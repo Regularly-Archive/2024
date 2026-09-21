@@ -69,7 +69,7 @@ public sealed class VisionToolTests
         Assert.False(result.IsError);
         Assert.Equal("a red apple on a wooden table", GetText(result));
         Assert.Equal("cat.png", fake.Source);
-        Assert.Equal("Describe this image in as much detail as possible.", fake.Prompt); // 默认 prompt
+        Assert.Equal("请用中文尽可能详细地描述这张图片。", fake.Prompt); // 默认 prompt
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public sealed class VisionToolTests
             new Dictionary<string, object> { ["source"] = "cat.png", ["prompt"] = "   " },
             CreateContext(services));
 
-        Assert.Equal("Describe this image in as much detail as possible.", fake.Prompt);
+        Assert.Equal("请用中文尽可能详细地描述这张图片。", fake.Prompt);
     }
 
     [Fact]
