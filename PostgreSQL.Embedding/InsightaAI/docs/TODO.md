@@ -253,7 +253,7 @@ OpenTelemetry 插桩代码存在防御性不足和指标维度不一致问题。
 - [ ] Phase 4: Testing & Polish
   - [x] 单元测试：原始结果落盘、状态推进、消息配对删除、存储恢复
   - [x] 集成测试：大文件读取 → 持久化 → 重新读取（`AgentArtifactRoundTripTests`）
-  - [ ] CLI 显示截断/持久化状态
+  - [x] CLI 显示截断/持久化状态——决定不实现（2026-09-21）：交互终端保持结果区简洁，不渲染截断提示；`AgentToolEndEvent.Artifact` 字段保留，供 `insighta run` JSONL 等非交互消费者使用，需要完整结果时直接读取 artifact 文件
   - [ ] 监控指标：截断频率、持久化频率
 - [ ] Phase 5: Cleanup & Documentation
   - [ ] Tool Result Artifact 生命周期清理（正常退出 + 异常退出）
