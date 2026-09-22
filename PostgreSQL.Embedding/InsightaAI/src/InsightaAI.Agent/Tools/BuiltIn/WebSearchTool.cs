@@ -14,7 +14,17 @@ namespace InsightaAI.Agent.Tools.BuiltIn;
 /// </summary>
 public class WebSearchTool : ITool, IToolResultProjector
 {
-    private static readonly HttpClient _httpClient = new();
+    private static readonly HttpClient DefaultHttpClient = new();
+    private readonly HttpClient _httpClient;
+
+    public WebSearchTool() : this(DefaultHttpClient)
+    {
+    }
+
+    /// <summary>
+    /// 仅供测试注入 HttpClient（沿用 BashTool 执行器注入先例）；生产路径使用无参构造。
+    /// </summary>
+    public WebSearchTool(HttpClient httpClient) => _httpClient = httpClient;
 
     public string Name => "web_search";
 
@@ -118,6 +128,12 @@ public class WebSearchTool : ITool, IToolResultProjector
                     .ToList();
             }
 
+            await context.Progress.ReportAsync(new ToolProgressUpdate
+            {
+                Kind = ToolProgressKind.Status,
+                Message = $"Searching: \"{query}\" · depth={searchDepth} · max_results={request.MaxResults} · topic={topic}"
+            }, context.CancellationToken);
+
             var requestMessage = new HttpRequestMessage(HttpMethod.Post, "https://api.tavily.com/search")
             {
                 Content = JsonContent.Create(request, options: new JsonSerializerOptions
@@ -141,6 +157,17 @@ public class WebSearchTool : ITool, IToolResultProjector
 
             if (result == null)
                 return ToolResult.FromError("Failed to parse search results.");
+
+            var results = result.Results ?? [];
+            for (var i = 0; i < results.Count; i++)
+            {
+                var item = results[i];
+                await context.Progress.ReportAsync(new ToolProgressUpdate
+                {
+                    Kind = ToolProgressKind.Output,
+                    Text = $"{i + 1}. {item.Title} — {item.Url}"
+                }, context.CancellationToken);
+            }
 
             return ToolResult.From(result);
         }

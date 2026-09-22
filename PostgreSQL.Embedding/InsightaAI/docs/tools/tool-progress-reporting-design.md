@@ -161,6 +161,12 @@ child tool started     → Status (tool name only)
 
 adapter 不持有独立环形缓冲、不做节流，也不决定保留行数；所有事件作为父 Tool Call 的 progress event 交给前端 `ToolProgressWindow`。默认不转发子工具参数或子工具结果，避免噪音及敏感数据扩散。
 
+### Web search
+
+- 发起 Tavily 请求前报告 `Status`（query、depth、max_results、topic）。
+- 响应解析后逐条报告 `Output`（编号 + 标题 + URL）。
+- 新增 `HttpClient` 注入构造函数供测试使用（沿用 BashTool 执行器注入先例），生产路径无参构造不变。
+
 ### MCP 与其他工具
 
 支持 streaming/progress notification 的 MCP transport 可映射到 `Output` 或 `Status`。没有过程通知的工具无需改动。Web 抓取、批处理等工具也可在合理阶段报告状态。
@@ -182,6 +188,16 @@ CLI 的 `ToolProgressWindow` 将运行中窗口作为临时区域，而不是不
 
 并行工具各自拥有独立窗口。终端渲染需要支持按 `ToolCallId` 更新活动区域，不能将 progress 当成普通聊天行追加。Spectre.Console 的 `Live` 与 `SelectionPrompt` 等交互组件不能并行使用；CLI 启用交互权限时应采用串行工具执行，避免一个仍在刷新的工具窗口与下一工具的确认界面争用终端。
 
+## 短工具的渲染边界
+
+进度窗口只存在于工具运行期间：`HandleToolEndAsync` 在收到 `ToolEnd` 时立即拆除 `Live` 区域（`EventRenderer.cs` 的 `Complete` + `StopToolProgressLiveAsync`）。因此**在单次请求完成后集中上报的 `Output` 在机制上不可见**——`web_search` 的结果行在工具返回前一刻连发，`Live` 来不及渲染任何一帧；bash / delegate 可见是因为过程输出随执行持续产生，每行都有存留时间。
+
+指导原则：
+
+- 短工具（单次 HTTP 调用、无中间阶段）的进度价值集中在 `Status`，逐条 `Output` 只在结果随时间增量到达时才有意义。
+- 结果清单类信息应由 Tool End 预览承载（时序无关、必然可见），例如将 `CreatePreview` 从原始 JSON 改为编号列表；web_search 已评估该方向（暂缓），并否决了"返回前人为延迟"的做法。
+- 工具不应为渲染效果引入 sleep；呈现时序是前端关注点。
+
 ## 安全、资源与可观测性
 
 - Progress 文本必须在进入窗口前经过与 Tool Result 一致的 `ISecretRedactor`；不得绕过工具结果脱敏边界。
@@ -200,7 +216,7 @@ CLI 的 `ToolProgressWindow` 将运行中窗口作为临时区域，而不是不
 1. [x] 定义 `IToolProgressReporter`、`ToolProgressUpdate`、默认空实现与 `AgentToolProgressEvent`。
 2. [x] 改造工具事件汇流，使执行中的 progress event 可从 `RunStreamAsync()` 产出；使用有界 channel，并在分发前脱敏。
 3. [x] 在 CLI renderer 实现 `ToolProgressWindow`：按 `ToolCallId` 分组，最多保留 6 行 / 2 KB，并由交互式终端的 Live 区域每 200ms 刷新。非交互式输出保持原有 Tool End 渲染。
-4. [x] 接入 bash 与 `delegate`；Subagent adapter 只做事件翻译。
+4. [x] 接入 bash、`delegate` 与 `web_search`；Subagent adapter 只做事件翻译。
 5. [x] 串行工具执行以 `ToolEnd` 的事件消费为边界；下一 Tool Call 只在前一 ToolEnd 被消费端推进后启动。
 6. [ ] 评估 MCP progress notification 与独立 background Job 模型；为其他长运行工具补阶段性状态或 Heartbeat。
 

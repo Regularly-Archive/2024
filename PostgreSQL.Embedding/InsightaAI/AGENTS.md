@@ -176,6 +176,12 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 - 串行 `ToolCallExecutor` 不再只等待前一个工具任务结束：每个 Tool Call 有独立 event channel；只有消费端处理完前一个 `ToolEnd` 并继续枚举，才启动下一个工具。CLI 因而能先收束前一最终结果，再显示下一工具的权限确认，避免 ToolEnd 结果混入确认块。并行分支保持原有并发语义。
 - Spectre `Live` 不能与 `SelectionPrompt` / `ask_user` 并行拥有终端。CLI 的交互权限场景应使用串行工具执行；仍需在真实交互终端完成这一组合的回归验证。设计见 `docs/tools/tool-progress-reporting-design.md`。
 
+### web_search 进度接入与短工具渲染边界（2026-09-22）
+
+- `WebSearchTool` 接入 `IToolProgressReporter`：请求前上报 `Status`（query/depth/max_results/topic），响应后逐条上报 `Output`（编号 + 标题 + URL）；新增 `HttpClient` 注入构造函数供测试使用（沿用 BashTool 执行器注入先例），生产路径无参构造不变。3 项单测覆盖上报序列。
+- 实机验证发现短工具渲染边界：单次请求的工具在返回前一刻才集中上报结果行，`HandleToolEndAsync` 立即拆除 `Live` 窗口，`Output` 行机制上不可见；bash / delegate 可见是因为输出随执行持续产生。结论已写入设计文档"短工具的渲染边界"：短工具进度价值集中在 `Status`，结果清单应由 Tool End 预览承载，工具不得为渲染引入 sleep。
+- 后续候选（暂缓）：`CreatePreview` 从透传 JSON 改为编号列表（同时改善 MicroCompact Preview 级 LLM 视图）；`web_fetch` 未接入进度。
+
 ### MCP 工具调用元数据管道（2026-07-21）
 
 - `ToolResult` 新增 `Metadata` 属性（`IReadOnlyDictionary<string,object?>?`）
