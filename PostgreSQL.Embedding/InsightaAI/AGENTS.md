@@ -178,7 +178,7 @@ Layer 4: Dynamic Context          Skills / MCP / Memory（每轮重建）
 
 ### web_search 进度接入与短工具渲染边界（2026-09-22）
 
-- `WebSearchTool` 接入 `IToolProgressReporter`：请求前上报 `Status`（query/depth/max_results/topic），响应后逐条上报 `Output`（编号 + 标题 + URL）；新增 `HttpClient` 注入构造函数供测试使用（沿用 BashTool 执行器注入先例），生产路径无参构造不变。3 项单测覆盖上报序列。
+- `WebSearchTool` 接入 `IToolProgressReporter`：请求前上报 `Status`（query/depth/max_results/topic），响应后逐条上报 `Output`（编号 + 标题 + URL）；`HttpClient` 走标准构造注入（当前工具未走容器装配，生产路径无参构造共享静态实例）。3 项单测覆盖上报序列。
 - 实机验证发现短工具渲染边界：单次请求的工具在返回前一刻才集中上报结果行，`HandleToolEndAsync` 立即拆除 `Live` 窗口，`Output` 行机制上不可见；bash / delegate 可见是因为输出随执行持续产生。结论已写入设计文档"短工具的渲染边界"：短工具进度价值集中在 `Status`，结果清单应由 Tool End 预览承载，工具不得为渲染引入 sleep。
 - 后续候选（暂缓）：`CreatePreview` 从透传 JSON 改为编号列表（同时改善 MicroCompact Preview 级 LLM 视图）；`web_fetch` 未接入进度。
 
@@ -282,7 +282,7 @@ Runtime 配置   → AgentFactory / ChatApplication 创建 Agent 和运行时服
 ### 视觉工具 read_image（2026-09-20）
 
 - 协议层：OpenAI Chat Completions 适配器将含 `ImageBlock` 的 user 消息序列化为 content parts 数组（`{type:"text"}` / `{type:"image_url",image_url:{url:"data:<media>;base64,..."}}`）；纯文本消息保持字符串 content，严格端点兼容不受影响。
-- 领域层：`Agent/Vision/` 提供 `VisionOptions` / `IVisionService` / `VisionService`——本地文件与 http(s) URL 加载、扩展名优先 + Content-Type 回退的媒体类型判定、20MB 大小守卫、一次性视觉请求；`VisionOptions.HttpClientOverride` 仅供测试注入。
+- 领域层：`Agent/Vision/` 提供 `VisionOptions` / `IVisionService` / `VisionService`——本地文件与 http(s) URL 加载、扩展名优先 + Content-Type 回退的媒体类型判定、20MB 大小守卫、一次性视觉请求；`HttpClient` 走标准构造注入（可选参数，未提供时共享静态实例）。（2026-09-22 更新：移除 `HttpClientOverride` 测试后门属性）
 - 工具层：`Tools/BuiltIn/VisionTool.cs` 对外名 `read_image`（参数 `source` + 可选 `prompt`，默认英文详述）；视觉服务未注册时显式报"未配置"，不静默降级到主模型。
 - 装配：`AgentFactory.ConfigureServices` 统一调用 `AddBuiltInToolServices()` 注册容器服务（IFileSystem/IVisionService 等），并仅在 `CliConfig.VisionModel` 显式配置时注册 `VisionOptions`。注意：工具实例注册（`AddBuiltInTools`）与容器服务注册（`AddBuiltInToolServices`）是两条链，缺一会出现"工具可调用但服务解析为 null"——此类装配缺口单测测不出，需实弹验证。
 - 配置：`CliConfig.VisionModel` + `config` 向导步骤 + CliStrings 双语资源；V2 候选（prompt 中文化、HEIC、大图降采样）见 `docs/TODO.md` #23。

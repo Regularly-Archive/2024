@@ -19,7 +19,4 @@ public sealed class VisionOptions
 
     /// <summary>采样温度。</summary>
     public double Temperature { get; init; } = 0.3;
-
-    /// <summary>HttpClient 覆盖（测试注入用）；null 时使用服务内共享实例。</summary>
-    public HttpClient? HttpClientOverride { get; init; }
 }

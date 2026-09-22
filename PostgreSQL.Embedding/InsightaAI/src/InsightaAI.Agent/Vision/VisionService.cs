@@ -27,8 +27,12 @@ public sealed class VisionService : IVisionService
 
     private readonly VisionOptions _options;
     private readonly IFileSystem _fileSystem;
+    private readonly HttpClient _httpClient;
 
-    public VisionService(VisionOptions options, IFileSystem fileSystem)
+    /// <summary>
+    /// 标准的构造注入形式；未提供 HttpClient 时使用服务内共享实例。
+    /// </summary>
+    public VisionService(VisionOptions options, IFileSystem fileSystem, HttpClient? httpClient = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(fileSystem);
@@ -37,6 +41,7 @@ public sealed class VisionService : IVisionService
 
         _options = options;
         _fileSystem = fileSystem;
+        _httpClient = httpClient ?? HttpClient;
     }
 
     /// <inheritdoc />
@@ -83,7 +88,7 @@ public sealed class VisionService : IVisionService
         if (Uri.TryCreate(source, UriKind.Absolute, out var uri)
             && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
         {
-            using var response = await (_options.HttpClientOverride ?? HttpClient).GetAsync(uri, ct);
+            using var response = await _httpClient.GetAsync(uri, ct);
             response.EnsureSuccessStatusCode();
 
             var bytes = await response.Content.ReadAsByteArrayAsync(ct);

@@ -165,7 +165,7 @@ adapter 不持有独立环形缓冲、不做节流，也不决定保留行数；
 
 - 发起 Tavily 请求前报告 `Status`（query、depth、max_results、topic）。
 - 响应解析后逐条报告 `Output`（编号 + 标题 + URL）。
-- 新增 `HttpClient` 注入构造函数供测试使用（沿用 BashTool 执行器注入先例），生产路径无参构造不变。
+- 构造注入 `HttpClient`（标准的依赖注入形式）；当前工具未走容器装配，生产路径无参构造共享静态实例。
 
 ### MCP 与其他工具
 

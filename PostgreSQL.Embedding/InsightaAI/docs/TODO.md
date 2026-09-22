@@ -629,7 +629,7 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 **V1 已完成：**
 
 - [x] OpenAI Chat Completions 适配器多模态序列化：user 消息含 `ImageBlock` 时 content 为 parts 数组（`text` / `image_url` data URI）；纯文本保持字符串，不破坏严格端点兼容
-- [x] `Agent/Vision/`：`VisionOptions`（模型引用 + ClientFactory + 20MB 上限 + 测试用 HttpClientOverride）、`IVisionService`、`VisionService`（本地/URL 加载、扩展名优先 + Content-Type 回退的媒体类型判定）
+- [x] `Agent/Vision/`：`VisionOptions`（模型引用 + ClientFactory + 20MB 上限）、`IVisionService`、`VisionService`（本地/URL 加载、扩展名优先 + Content-Type 回退的媒体类型判定；HttpClient 标准构造注入）
 - [x] `Tools/BuiltIn/VisionTool.cs`：`read_image` 工具（`source` + 可选 `prompt`），未配置视觉模型时显式报错，不静默降级到主模型
 - [x] `IFileSystem.ReadFileBytesAsync` 二进制读取
 - [x] 装配：`AgentFactory.ConfigureServices` 调用 `AddBuiltInToolServices()` 注册容器服务，并按 `CliConfig.VisionModel` 条件注册 `VisionOptions`（Chat/Run 共享装配点）。教训：工具实例注册（`AddBuiltInTools`）与 DI 服务注册（`AddBuiltInToolServices`）是两条链，必须都接；此类装配缺口单测测不出，只能实弹暴露

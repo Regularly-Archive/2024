@@ -98,17 +98,17 @@ public sealed class VisionServiceTests
 
     #endregion
 
-    private static VisionOptions CreateOptions(FakeVisionClient client, HttpClient? http = null) => new()
+    private static VisionOptions CreateOptions(FakeVisionClient client) => new()
     {
         Model = "zhipu/glm-4.5v",
-        ClientFactory = _ => client,
-        HttpClientOverride = http
+        ClientFactory = _ => client
     };
 
     private static VisionService CreateService(
         FakeFileSystem fileSystem,
-        FakeVisionClient client) =>
-        new(CreateOptions(client), fileSystem);
+        FakeVisionClient client,
+        HttpClient? httpClient = null) =>
+        new(CreateOptions(client), fileSystem, httpClient);
 
     private static FakeVisionClient CreateClient() => new(new LlmResponse
     {
@@ -232,7 +232,7 @@ public sealed class VisionServiceTests
         var fs = new FakeFileSystem();
         var client = CreateClient();
         using var http = new HttpClient(new StaticBytesHandler(TinyPng, "image/jpeg"));
-        var service = new VisionService(CreateOptions(client, http), fs);
+        var service = new VisionService(CreateOptions(client), fs, http);
 
         await service.AnalyzeAsync("https://example.test/remote/pic.png", "describe");
 
@@ -247,7 +247,7 @@ public sealed class VisionServiceTests
         var fs = new FakeFileSystem();
         var client = CreateClient();
         using var http = new HttpClient(new StaticBytesHandler(TinyPng, "text/html"));
-        var service = new VisionService(CreateOptions(client, http), fs);
+        var service = new VisionService(CreateOptions(client), fs, http);
 
         await service.AnalyzeAsync("https://example.test/remote/pic.png", "describe");
 
@@ -261,7 +261,7 @@ public sealed class VisionServiceTests
     {
         var fs = new FakeFileSystem();
         using var http = new HttpClient(new StaticBytesHandler(TinyPng, "text/html"));
-        var service = new VisionService(CreateOptions(CreateClient(), http), fs);
+        var service = new VisionService(CreateOptions(CreateClient()), fs, http);
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(
             () => service.AnalyzeAsync("https://example.test/remote/pic", "describe"));
@@ -273,7 +273,7 @@ public sealed class VisionServiceTests
     {
         var fs = new FakeFileSystem();
         using var http = new HttpClient(new StaticBytesHandler([], "image/png", HttpStatusCode.NotFound));
-        var service = new VisionService(CreateOptions(CreateClient(), http), fs);
+        var service = new VisionService(CreateOptions(CreateClient()), fs, http);
 
         await Assert.ThrowsAsync<HttpRequestException>(
             () => service.AnalyzeAsync("https://example.test/missing.png", "describe"));

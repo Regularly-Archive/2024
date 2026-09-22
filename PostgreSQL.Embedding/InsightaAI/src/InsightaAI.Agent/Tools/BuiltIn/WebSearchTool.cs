@@ -22,7 +22,7 @@ public class WebSearchTool : ITool, IToolResultProjector
     }
 
     /// <summary>
-    /// 仅供测试注入 HttpClient（沿用 BashTool 执行器注入先例）；生产路径使用无参构造。
+    /// 标准的构造注入形式；当前工具未走容器装配，生产路径默认共享静态实例（无参构造）。
     /// </summary>
     public WebSearchTool(HttpClient httpClient) => _httpClient = httpClient;
 
