@@ -25,7 +25,7 @@ public sealed class CliInsightaSubagentAdapterTests : IDisposable
         var parentTools = new ToolRegistry().Register(new NamedTool("delegate"));
         var storage = new JsonlMessageStorage(_storagePath);
         var factory = new RecordingAgentFactory();
-        var adapter = new CliInsightaSubagentAdapter(factory, storage, new InsightaAI.LLM.LlmClientFactory(), CreateTemplate(parentTools));
+        var adapter = new CliInsightaSubagentAdapter(factory, storage, CreateLlmFactory(), CreateTemplate(parentTools));
 
         var result = await adapter.InvokeAsync(CreateRequest(
             new InsightaSubagentDefinition { Id = "reviewer", Name = "Reviewer", ToolNames = ["delegate"] }));
@@ -46,7 +46,7 @@ public sealed class CliInsightaSubagentAdapterTests : IDisposable
     {
         var storage = new JsonlMessageStorage(_storagePath);
         var parent = await storage.CreateSessionAsync("test-model", "test-provider", userId: "host-user");
-        var adapter = new CliInsightaSubagentAdapter(new RecordingAgentFactory(), storage, new InsightaAI.LLM.LlmClientFactory(), CreateTemplate(new ToolRegistry()));
+        var adapter = new CliInsightaSubagentAdapter(new RecordingAgentFactory(), storage, CreateLlmFactory(), CreateTemplate(new ToolRegistry()));
         var request = CreateRequest(new InsightaSubagentDefinition { Id = "reviewer", Name = "Reviewer" }) with
         {
             Context = new SubagentInvocationContext
@@ -86,7 +86,7 @@ public sealed class CliInsightaSubagentAdapterTests : IDisposable
             .Register(new NamedTool("read_file"))
             .Register(new NamedTool("grep"));
         var factory = new RecordingAgentFactory();
-        var adapter = new CliInsightaSubagentAdapter(factory, new JsonlMessageStorage(_storagePath), new InsightaAI.LLM.LlmClientFactory(), CreateTemplate(parentTools));
+        var adapter = new CliInsightaSubagentAdapter(factory, new JsonlMessageStorage(_storagePath), CreateLlmFactory(), CreateTemplate(parentTools));
         var request = CreateRequest(new InsightaSubagentDefinition
         {
             Id = "explorer",
@@ -107,7 +107,7 @@ public sealed class CliInsightaSubagentAdapterTests : IDisposable
         var storage = new JsonlMessageStorage(_storagePath);
         var adapter = new CliInsightaSubagentAdapter(
             new RecordingAgentFactory(), storage,
-            new InsightaAI.LLM.LlmClientFactory(), CreateTemplate(new ToolRegistry().Register(new NamedTool("read_file"))));
+            CreateLlmFactory(), CreateTemplate(new ToolRegistry().Register(new NamedTool("read_file"))));
         var request = CreateRequest(new InsightaSubagentDefinition
         {
             Id = "explorer",
@@ -129,7 +129,7 @@ public sealed class CliInsightaSubagentAdapterTests : IDisposable
             .Register(new NamedTool("activate_skill"))
             .Register(new NamedTool("list_skills"));
         var factory = new RecordingAgentFactory();
-        var adapter = new CliInsightaSubagentAdapter(factory, new JsonlMessageStorage(_storagePath), new InsightaAI.LLM.LlmClientFactory(), CreateTemplate(hostTools));
+        var adapter = new CliInsightaSubagentAdapter(factory, new JsonlMessageStorage(_storagePath), CreateLlmFactory(), CreateTemplate(hostTools));
         var definition = new InsightaSubagentDefinition
         {
             Id = "reviewer",
@@ -151,7 +151,7 @@ public sealed class CliInsightaSubagentAdapterTests : IDisposable
     {
         var storage = new JsonlMessageStorage(_storagePath);
         var adapter = new CliInsightaSubagentAdapter(
-            new RecordingAgentFactory(), storage, new InsightaAI.LLM.LlmClientFactory(), CreateTemplate(new ToolRegistry()));
+            new RecordingAgentFactory(), storage, CreateLlmFactory(), CreateTemplate(new ToolRegistry()));
         var definition = new InsightaSubagentDefinition
         {
             Id = "reviewer",
@@ -173,7 +173,7 @@ public sealed class CliInsightaSubagentAdapterTests : IDisposable
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         var adapter = new CliInsightaSubagentAdapter(
-            new RecordingAgentFactory(), new JsonlMessageStorage(_storagePath), new InsightaAI.LLM.LlmClientFactory(), CreateTemplate(new ToolRegistry()));
+            new RecordingAgentFactory(), new JsonlMessageStorage(_storagePath), CreateLlmFactory(), CreateTemplate(new ToolRegistry()));
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => adapter.InvokeAsync(
             CreateRequest(new InsightaSubagentDefinition { Id = "reviewer", Name = "Reviewer" }), cancellation.Token));
@@ -184,7 +184,7 @@ public sealed class CliInsightaSubagentAdapterTests : IDisposable
     {
         var progress = new RecordingProgressReporter();
         var adapter = new CliInsightaSubagentAdapter(
-            new RecordingAgentFactory(), new JsonlMessageStorage(_storagePath), new InsightaAI.LLM.LlmClientFactory(), CreateTemplate(new ToolRegistry()));
+            new RecordingAgentFactory(), new JsonlMessageStorage(_storagePath), CreateLlmFactory(), CreateTemplate(new ToolRegistry()));
 
         var result = await adapter.InvokeAsync(CreateRequest(
             new InsightaSubagentDefinition { Id = "reviewer", Name = "Reviewer" }) with
@@ -216,7 +216,7 @@ public sealed class CliInsightaSubagentAdapterTests : IDisposable
         var adapter = new CliInsightaSubagentAdapter(
             factory,
             new JsonlMessageStorage(_storagePath),
-            new InsightaAI.LLM.LlmClientFactory(), CreateTemplate(new ToolRegistry().Register(new ProgressReportingTool())));
+            CreateLlmFactory(), CreateTemplate(new ToolRegistry().Register(new ProgressReportingTool())));
 
         await adapter.InvokeAsync(CreateRequest(new InsightaSubagentDefinition
         {
@@ -236,7 +236,7 @@ public sealed class CliInsightaSubagentAdapterTests : IDisposable
     {
         var factory = new RecordingAgentFactory();
         var adapter = new CliInsightaSubagentAdapter(
-            factory, new JsonlMessageStorage(_storagePath), new InsightaAI.LLM.LlmClientFactory(), CreateTemplate(new ToolRegistry()));
+            factory, new JsonlMessageStorage(_storagePath), CreateLlmFactory(), CreateTemplate(new ToolRegistry()));
 
         await adapter.InvokeAsync(CreateRequest(new InsightaSubagentDefinition
         {
@@ -260,7 +260,7 @@ public sealed class CliInsightaSubagentAdapterTests : IDisposable
             LlmClient = new MockLlmClient(response: "parent switched model")
         };
         var factory = new RecordingAgentFactory();
-        var adapter = new CliInsightaSubagentAdapter(factory, new JsonlMessageStorage(_storagePath), new InsightaAI.LLM.LlmClientFactory(), template);
+        var adapter = new CliInsightaSubagentAdapter(factory, new JsonlMessageStorage(_storagePath), CreateLlmFactory(), template);
 
         await adapter.InvokeAsync(CreateRequest(new InsightaSubagentDefinition { Id = "reviewer", Name = "Reviewer" }));
 
@@ -276,7 +276,7 @@ public sealed class CliInsightaSubagentAdapterTests : IDisposable
         config.Models["test/reviewer"] = new ModelEntry { ModelId = "reviewer-model", MaxTokens = 64, ContextWindow = 2048 };
         var factory = new RecordingAgentFactory();
         var storage = new JsonlMessageStorage(_storagePath);
-        var adapter = new CliInsightaSubagentAdapter(factory, storage, new InsightaAI.LLM.LlmClientFactory(), CreateTemplate(new ToolRegistry(), config));
+        var adapter = new CliInsightaSubagentAdapter(factory, storage, CreateLlmFactory(), CreateTemplate(new ToolRegistry(), config));
 
         var result = await adapter.InvokeAsync(CreateRequest(new InsightaSubagentDefinition
         {
@@ -311,6 +311,16 @@ public sealed class CliInsightaSubagentAdapterTests : IDisposable
             ParentInvocationId = "parent-call"
         }
     };
+
+    private static InsightaAI.LLM.LlmClientFactory CreateLlmFactory()
+    {
+        var factory = new InsightaAI.LLM.LlmClientFactory();
+        factory.RegisterAdapter(new InsightaAI.LLM.OpenAI.OpenAIAdapter());
+        factory.RegisterAdapter(new InsightaAI.LLM.OpenAI.OpenAIResponseAdapter());
+        factory.RegisterAdapter(new InsightaAI.LLM.Anthropic.AnthropicAdapter());
+        factory.RegisterAdapter(new InsightaAI.LLM.Gemini.GeminiAdapter());
+        return factory;
+    }
 
     private static AgentCreationOptions CreateTemplate(ToolRegistry toolRegistry, CliConfig? config = null) => new()
     {
