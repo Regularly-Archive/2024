@@ -73,6 +73,7 @@ public class ToolRegistry
         return _executors.Values
             .Where(executor => !IsExcluded(executor.Name))
             .Select(e => e.Definition)
+            .OrderBy(e=> e.Name)
             .ToArray();
     }
 

@@ -73,7 +73,7 @@ public sealed class RunProtocolTests
             firstResponseToolCalls: useToolAndTelemetry
                 ? [new ToolCallBlock { Id = "clock-call", Name = "whereami", Arguments = JsonSerializer.SerializeToElement(new { }) }]
                 : null);
-        var agentFactory = new AgentFactory(storage, loggerFactory);
+        var agentFactory = new AgentFactory(storage, loggerFactory, new InsightaAI.LLM.LlmClientFactory());
         var config = new CliConfig
         {
             PrimaryModel = "mock/test-model",
@@ -91,6 +91,7 @@ public sealed class RunProtocolTests
         var application = new RunApplication(
             storage,
             useToolAndTelemetry ? new TelemetryAgentFactory(agentFactory) : agentFactory,
+            new InsightaAI.LLM.LlmClientFactory(),
             config,
             auth,
             (_, _) => llm);
@@ -136,7 +137,7 @@ public sealed class RunProtocolTests
         var storage = new JsonlMessageStorage(root);
         using var loggerFactory = LoggerFactory.Create(_ => { });
         using var llm = new RecordingLlmClient();
-        var agentFactory = new AgentFactory(storage, loggerFactory);
+        var agentFactory = new AgentFactory(storage, loggerFactory, new InsightaAI.LLM.LlmClientFactory());
         var config = new CliConfig
         {
             PrimaryModel = "mock/test-model",
@@ -160,6 +161,7 @@ public sealed class RunProtocolTests
         var application = new RunApplication(
             storage,
             agentFactory,
+            new InsightaAI.LLM.LlmClientFactory(),
             config,
             auth,
             (_, _) => llm,
@@ -189,7 +191,7 @@ public sealed class RunProtocolTests
         var storage = new JsonlMessageStorage(Path.Combine(Path.GetTempPath(), "insighta-run-tests", Guid.NewGuid().ToString("N")));
         using var loggerFactory = LoggerFactory.Create(_ => { });
         using var llm = new MockLlmClient();
-        var application = new RunApplication(storage, new AgentFactory(storage, loggerFactory), CreateConfig(), CreateAuth(), (_, _) => llm);
+        var application = new RunApplication(storage, new AgentFactory(storage, loggerFactory, new InsightaAI.LLM.LlmClientFactory()), new InsightaAI.LLM.LlmClientFactory(), CreateConfig(), CreateAuth(), (_, _) => llm);
         using var output = new StringWriter();
 
         var result = await application.ExecuteAsync(new RunRequest
@@ -213,7 +215,7 @@ public sealed class RunProtocolTests
         using var llm = new MockLlmClient();
         var profile = new InsightaSubagentDefinition { Id = "runner", Name = "Runner", ToolNames = ["read_file"] };
         var application = new RunApplication(
-            storage, new AgentFactory(storage, loggerFactory), CreateConfig(), CreateAuth(), (_, _) => llm,
+            storage, new AgentFactory(storage, loggerFactory, new InsightaAI.LLM.LlmClientFactory()), new InsightaAI.LLM.LlmClientFactory(), CreateConfig(), CreateAuth(), (_, _) => llm,
             (profileId, _) => ValueTask.FromResult<SubagentDefinition?>(profileId == "runner" ? profile : null));
         using var output = new StringWriter();
 

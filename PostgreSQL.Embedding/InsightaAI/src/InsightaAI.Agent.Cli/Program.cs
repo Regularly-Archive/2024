@@ -5,6 +5,10 @@ using InsightaAI.Agent.Cli.Run;
 using InsightaAI.Agent.Cli.Services;
 using InsightaAI.Agent.Storage;
 using InsightaAI.Agents.Subagents.Catalog;
+using InsightaAI.LLM.Anthropic;
+using InsightaAI.LLM.Extensions;
+using InsightaAI.LLM.Gemini;
+using InsightaAI.LLM.OpenAI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -44,6 +48,18 @@ public class Program
         hostBuilder.Services.AddScoped<SessionsCommand>();
         hostBuilder.Services.AddSingleton<ISubagentDefinitionStore, LocalSubagentDefinitionStore>();
         hostBuilder.Services.AddSingleton<SubagentsCommand>();
+
+        // LLM 客户端工厂：带标准 resilience 管道（重试/断路器）的命名 HttpClient，
+        // 所有 LLM 调用共享。重试日志仅写入文件（见 InitLogger），终端 UI 无感。
+        var fileLoggerFactory = LoggerFactory.Create(builder =>
+            builder.AddSerilog(Log.Logger, dispose: false));
+        hostBuilder.Services.AddLlmClientFactory(factory =>
+        {
+            factory.RegisterAdapter(new OpenAIAdapter());
+            factory.RegisterAdapter(new OpenAIResponseAdapter());
+            factory.RegisterAdapter(new AnthropicAdapter());
+            factory.RegisterAdapter(new GeminiAdapter());
+        }, retryLogger: fileLoggerFactory.CreateLogger("InsightaAI.LLM.Resilience"));
 
         using var host = hostBuilder.Build();
         var scopeFactory = host.Services.GetRequiredService<IServiceScopeFactory>();

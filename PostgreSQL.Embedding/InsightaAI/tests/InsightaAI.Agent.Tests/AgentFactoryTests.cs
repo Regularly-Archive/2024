@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json;
 using InsightaAI.Agent.Abstractions;
@@ -101,7 +101,7 @@ public sealed class AgentFactoryTests
             ClientFactory = _ => new MockLlmClient()
         });
         using var loggerFactory = LoggerFactory.Create(_ => { });
-        var factory = new AgentFactory(storage, loggerFactory);
+        var factory = new AgentFactory(storage, loggerFactory, new InsightaAI.LLM.LlmClientFactory());
 
         using var agent = await factory.CreateAsync(new AgentCreationOptions
         {
@@ -135,7 +135,7 @@ public sealed class AgentFactoryTests
         var storage = new JsonlMessageStorage(Path.Combine(Path.GetTempPath(), "insighta-agent-profile-tests", Guid.NewGuid().ToString("N")));
         using var loggerFactory = LoggerFactory.Create(_ => { });
         using var llmClient = new MockLlmClient();
-        var factory = new AgentFactory(storage, loggerFactory);
+        var factory = new AgentFactory(storage, loggerFactory, new InsightaAI.LLM.LlmClientFactory());
         var profile = new AgentConfig
         {
             Id = "explorer",
@@ -172,7 +172,7 @@ public sealed class AgentFactoryTests
         var storage = new JsonlMessageStorage(Path.Combine(Path.GetTempPath(), "insighta-agent-permission-tests", Guid.NewGuid().ToString("N")));
         using var loggerFactory = LoggerFactory.Create(_ => { });
         using var llmClient = new MockLlmClient();
-        var factory = new AgentFactory(storage, loggerFactory);
+        var factory = new AgentFactory(storage, loggerFactory, new InsightaAI.LLM.LlmClientFactory());
 
         using var agent = await factory.CreateAsync(new AgentCreationOptions
         {
@@ -198,7 +198,7 @@ public sealed class AgentFactoryTests
         var storage = new JsonlMessageStorage(Path.Combine(Path.GetTempPath(), "insighta-agent-parallel-tests", Guid.NewGuid().ToString("N")));
         using var loggerFactory = LoggerFactory.Create(_ => { });
         using var llmClient = new MockLlmClient();
-        var factory = new AgentFactory(storage, loggerFactory);
+        var factory = new AgentFactory(storage, loggerFactory, new InsightaAI.LLM.LlmClientFactory());
 
         using var agent = await factory.CreateAsync(new AgentCreationOptions
         {
@@ -221,7 +221,7 @@ public sealed class AgentFactoryTests
         var storage = new JsonlMessageStorage(Path.Combine(Path.GetTempPath(), "insighta-agent-parallel-profile-tests", Guid.NewGuid().ToString("N")));
         using var loggerFactory = LoggerFactory.Create(_ => { });
         using var llmClient = new MockLlmClient();
-        var factory = new AgentFactory(storage, loggerFactory);
+        var factory = new AgentFactory(storage, loggerFactory, new InsightaAI.LLM.LlmClientFactory());
 
         using var agent = await factory.CreateAsync(new AgentCreationOptions
         {
@@ -251,7 +251,7 @@ public sealed class AgentFactoryTests
         var storage = new JsonlMessageStorage(Path.Combine(Path.GetTempPath(), "insighta-agent-parent-parallel-tests", Guid.NewGuid().ToString("N")));
         using var loggerFactory = LoggerFactory.Create(_ => { });
         using var llmClient = new MockLlmClient();
-        var factory = new AgentFactory(storage, loggerFactory);
+        var factory = new AgentFactory(storage, loggerFactory, new InsightaAI.LLM.LlmClientFactory());
 
         using var agent = await factory.CreateAsync(new AgentCreationOptions
         {
@@ -273,7 +273,7 @@ public sealed class AgentFactoryTests
         var storage = new JsonlMessageStorage(Path.Combine(Path.GetTempPath(), "insighta-agent-capability-tests", Guid.NewGuid().ToString("N")));
         using var loggerFactory = LoggerFactory.Create(_ => { });
         using var llmClient = new MockLlmClient();
-        var factory = new AgentFactory(storage, loggerFactory);
+        var factory = new AgentFactory(storage, loggerFactory, new InsightaAI.LLM.LlmClientFactory());
         var tools = new ToolRegistry();
 
         using var agent = await factory.CreateAsync(new AgentCreationOptions

@@ -24,17 +24,21 @@ public sealed class CliInsightaSubagentAdapter : ISubagentAdapter
     private readonly IAgentFactory _agentFactory;
     private readonly IMessageStorage _storage;
     private readonly AgentCreationOptions _template;
+    private readonly InsightaAI.LLM.LlmClientFactory _llmClientFactory;
 
     public CliInsightaSubagentAdapter(
         IAgentFactory agentFactory,
         IMessageStorage storage,
+        InsightaAI.LLM.LlmClientFactory llmClientFactory,
         AgentCreationOptions template)
     {
         ArgumentNullException.ThrowIfNull(agentFactory);
         ArgumentNullException.ThrowIfNull(storage);
+        ArgumentNullException.ThrowIfNull(llmClientFactory);
         ArgumentNullException.ThrowIfNull(template);
         _agentFactory = agentFactory;
         _storage = storage;
+        _llmClientFactory = llmClientFactory;
         _template = template;
     }
 
@@ -223,7 +227,7 @@ public sealed class CliInsightaSubagentAdapter : ISubagentAdapter
         var modelReference = definition.Model ?? _template.Config.PrimaryModel;
         CliConfig.ParseModelReference(modelReference);
         var model = _template.Config.GetModel(modelReference);
-        var client = LlmClientFactory.Create(_template.Auth, _template.Config, modelReference);
+        var client = LlmClientFactory.Create(_llmClientFactory, _template.Auth, _template.Config, modelReference);
         return new ResolvedSubagentModel(modelReference, model, client);
     }
 

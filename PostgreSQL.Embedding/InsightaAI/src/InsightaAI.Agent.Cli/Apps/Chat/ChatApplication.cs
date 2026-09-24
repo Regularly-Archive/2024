@@ -49,6 +49,7 @@ public sealed class ChatApplication : IChatApplication
 
     private readonly IMessageStorage _storage;
     private readonly IAgentFactory _agentFactory;
+    private readonly InsightaAI.LLM.LlmClientFactory _llmClientFactory;
     private readonly CliConfig _config;
     private readonly CliBootstrap _bootstrap;
     private readonly ChatRenderer _renderer = new();
@@ -56,11 +57,13 @@ public sealed class ChatApplication : IChatApplication
     public ChatApplication(
         IMessageStorage storage,
         IAgentFactory agentFactory,
+        InsightaAI.LLM.LlmClientFactory llmClientFactory,
         CliConfig config,
         CliBootstrap bootstrap)
     {
         _storage = storage;
         _agentFactory = agentFactory;
+        _llmClientFactory = llmClientFactory;
         _config = config;
         _bootstrap = bootstrap;
     }
@@ -91,7 +94,7 @@ public sealed class ChatApplication : IChatApplication
         ILlmClient llmClient;
         try
         {
-            llmClient = LlmClientFactory.Create(auth, config);
+            llmClient = LlmClientFactory.Create(_llmClientFactory, auth, config);
         }
         catch (Exception ex)
         {
@@ -113,7 +116,7 @@ public sealed class ChatApplication : IChatApplication
         var session = await GetOrCreateSessionAsync(sessionId, continueLast, config, providerName);
         if (session == null) return 1;
 
-        var summaryService = CreateSummaryService(config, auth);
+        var summaryService = CreateSummaryService(config, auth, _llmClientFactory);
         var userId = AgentFactory.GetOrCreateUserId();
 
         // 创建 Agent（传入 sessionId 以注册会话记忆钩子）
@@ -345,7 +348,7 @@ public sealed class ChatApplication : IChatApplication
         ILlmClient newLlmClient;
         try
         {
-            newLlmClient = LlmClientFactory.Create(auth, config, modelRef);
+            newLlmClient = LlmClientFactory.Create(_llmClientFactory, auth, config, modelRef);
         }
         catch (Exception ex)
         {
@@ -519,16 +522,19 @@ public sealed class ChatApplication : IChatApplication
 
     private void RegisterDelegationTool(ToolRegistry toolRegistry, AgentCreationOptions template)
     {
-        var adapter = new CliInsightaSubagentAdapter(_agentFactory, _storage, template);
+        var adapter = new CliInsightaSubagentAdapter(_agentFactory, _storage, _llmClientFactory, template);
         var dispatcher = new SubagentDispatcher([adapter]);
         var catalog = new LocalSubagentDefinitionStore();
         var handler = new CliSubagentDelegationHandler(catalog, dispatcher, template.UserId!);
         toolRegistry.Register(new DelegateTool(handler));
     }
 
-    private static ISummaryService CreateSummaryService(CliConfig config, AuthConfig auth)
+    private static ISummaryService CreateSummaryService(
+        CliConfig config,
+        AuthConfig auth,
+        InsightaAI.LLM.LlmClientFactory llmClientFactory)
     {
-        Func<string, ILlmClient> clientFactory = modelRef => LlmClientFactory.Create(auth, config, modelRef);
+        Func<string, ILlmClient> clientFactory = modelRef => LlmClientFactory.Create(llmClientFactory, auth, config, modelRef);
         return new SummaryService(new SummaryOptions
         {
             Model = config.SecondaryModel ?? config.PrimaryModel,

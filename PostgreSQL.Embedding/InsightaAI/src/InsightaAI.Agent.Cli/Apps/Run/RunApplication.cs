@@ -47,6 +47,7 @@ public sealed class RunApplication
     public RunApplication(
         IMessageStorage storage,
         IAgentFactory agentFactory,
+        InsightaAI.LLM.LlmClientFactory llmClientFactory,
         CliConfig config,
         AuthConfig? auth = null,
         Func<AuthConfig, string?, ILlmClient>? clientFactory = null,
@@ -54,14 +55,15 @@ public sealed class RunApplication
     {
         ArgumentNullException.ThrowIfNull(storage);
         ArgumentNullException.ThrowIfNull(agentFactory);
+        ArgumentNullException.ThrowIfNull(llmClientFactory);
         ArgumentNullException.ThrowIfNull(config);
         _storage = storage;
         _agentFactory = agentFactory;
         _config = config;
         _auth = auth ?? AuthConfig.Load();
         _clientFactory = clientFactory ?? ((credentials, modelReference) => modelReference is null
-            ? LlmClientFactory.Create(credentials, _config)
-            : LlmClientFactory.Create(credentials, _config, modelReference));
+            ? LlmClientFactory.Create(llmClientFactory, credentials, _config)
+            : LlmClientFactory.Create(llmClientFactory, credentials, _config, modelReference));
         _profileResolver = profileResolver ?? ((profileId, cancellationToken) =>
             new LocalSubagentDefinitionStore().FindAsync(profileId, cancellationToken));
     }

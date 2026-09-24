@@ -31,13 +31,19 @@ public sealed class AgentFactory : IAgentFactory
 {
     private readonly IMessageStorage _messageStorage;
     private readonly ILoggerFactory _loggerFactory;
+    private readonly InsightaAI.LLM.LlmClientFactory _llmClientFactory;
 
-    public AgentFactory(IMessageStorage messageStorage, ILoggerFactory loggerFactory)
+    public AgentFactory(
+        IMessageStorage messageStorage,
+        ILoggerFactory loggerFactory,
+        InsightaAI.LLM.LlmClientFactory llmClientFactory)
     {
         ArgumentNullException.ThrowIfNull(messageStorage);
         ArgumentNullException.ThrowIfNull(loggerFactory);
+        ArgumentNullException.ThrowIfNull(llmClientFactory);
         _messageStorage = messageStorage;
         _loggerFactory = loggerFactory;
+        _llmClientFactory = llmClientFactory;
     }
 
     public async Task<Agent> CreateAsync(
@@ -113,7 +119,7 @@ public sealed class AgentFactory : IAgentFactory
                     services.AddSingleton(new VisionOptions
                     {
                         Model = options.Config.VisionModel,
-                        ClientFactory = modelRef => LlmClientFactory.Create(options.Auth, options.Config, modelRef)
+                        ClientFactory = modelRef => LlmClientFactory.Create(_llmClientFactory, options.Auth, options.Config, modelRef)
                     });
                 }
             })

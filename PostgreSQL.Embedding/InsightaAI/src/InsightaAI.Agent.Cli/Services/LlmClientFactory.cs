@@ -8,32 +8,29 @@ using InsightaAI.LLM.OpenAI;
 namespace InsightaAI.Agent.Cli.Services;
 
 /// <summary>
-/// LLM 客户端工厂
+/// LLM 客户端工厂（编排层）
 /// </summary>
+/// <remarks>
+/// <see cref="InsightaAI.LLM.LlmClientFactory"/> 实例由 Host 容器提供（AddLlmClientFactory 注册，
+/// 共享带 resilience 管道的命名 HttpClient），本静态类只负责 model 引用解析与 provider 配置组装。
+/// </remarks>
 public static class LlmClientFactory
 {
     /// <summary>
     /// 根据配置创建 LLM 客户端（使用 primary_model）
     /// </summary>
-    public static ILlmClient Create(AuthConfig auth, CliConfig config)
+    public static ILlmClient Create(InsightaAI.LLM.LlmClientFactory factory, AuthConfig auth, CliConfig config)
     {
-        var (providerName, _) = config.ParsePrimaryModel();
-        return Create(auth, config, config.PrimaryModel);
+        return Create(factory, auth, config, config.PrimaryModel);
     }
 
     /// <summary>
     /// 根据指定 model 引用创建 LLM 客户端（支持会话内切换模型）
     /// </summary>
-    public static ILlmClient Create(AuthConfig auth, CliConfig config, string modelRef)
+    public static ILlmClient Create(InsightaAI.LLM.LlmClientFactory factory, AuthConfig auth, CliConfig config, string modelRef)
     {
         var (providerName, _) = CliConfig.ParseModelReference(modelRef);
         var provider = config.GetProvider(auth, providerName);
-
-        var factory = new InsightaAI.LLM.LlmClientFactory();
-        factory.RegisterAdapter(new OpenAIAdapter());
-        factory.RegisterAdapter(new OpenAIResponseAdapter());
-        factory.RegisterAdapter(new AnthropicAdapter());
-        factory.RegisterAdapter(new GeminiAdapter());
 
         var providerConfig = new ProviderConfig
         {
