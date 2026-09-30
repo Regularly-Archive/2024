@@ -593,7 +593,7 @@ public class Agent : IDisposable
         var toolCallExecutor = new ToolCallExecutor(_config.Id, sessionId, handler, _serviceProvider);
         var llmClient = LlmClientProxyFactory != null ? LlmClientProxyFactory(_llmClient) : _llmClient;
         var agentLoop = new AgentLoop(_config, llmClient, _toolRegistry, toolCallExecutor,
-            cancellationToken => BuildSystemPromptAsync(memorySnapshot, cancellationToken));
+            cancellationToken => BuildSystemPromptAsync(memorySnapshot, cancellationToken), _logger);
 
         // 构建 LoopContext（System Prompt + History + User Input）
         var loopContext = new LoopContext(sessionId, _config.Id, _contextManager);

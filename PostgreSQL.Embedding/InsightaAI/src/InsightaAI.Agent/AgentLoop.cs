@@ -6,6 +6,7 @@ using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.Logging;
 
 namespace InsightaAI.Agent;
 
@@ -20,13 +21,15 @@ public sealed class AgentLoop
     private readonly ToolRegistry _toolRegistry;
     private readonly ToolCallExecutor _toolCallExecutor;
     private readonly Func<CancellationToken, Task<string>> _systemPromptBuilder;
+    private readonly ILogger? _logger;
 
     public AgentLoop(
         AgentConfig config,
         ILlmClient llmClient,
         ToolRegistry toolRegistry,
         ToolCallExecutor toolCallExecutor,
-        Func<CancellationToken, Task<string>> buildSystemPrompt)
+        Func<CancellationToken, Task<string>> buildSystemPrompt,
+        ILogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(llmClient);
@@ -39,6 +42,7 @@ public sealed class AgentLoop
         _toolRegistry = toolRegistry;
         _toolCallExecutor = toolCallExecutor;
         _systemPromptBuilder = buildSystemPrompt;
+        _logger = logger;
     }
 
     /// <summary>
@@ -164,6 +168,34 @@ public sealed class AgentLoop
             var toolCalls = DeduplicateToolCalls(response.GetToolCalls());
             if (toolCalls.Length == 0)
             {
+                // 空文本守卫：模型可能以纯 thinking（或空内容）结束回复——典型原因是推理
+                // 阶段耗尽输出预算被截断。此时不宣告完成：还有剩余轮次就继续循环让模型
+                // 补写正文；已到最大轮次则落入 HandleMaxRoundsExceededAsync 强制收尾。
+                // 仅记 Warning 日志，不向用户报错。
+                if (!HasVisibleText(response.Content))
+                {
+                    _logger?.LogWarning(
+                        "Round {Round} of agent {AgentId} ended without visible text (thinking-only response, possible output truncation). {Action}",
+                        round, _config.Id,
+                        round < _config.MaxToolRounds
+                            ? "Continuing with next round."
+                            : "Falling back to max-rounds final answer.");
+
+                    yield return new AgentRoundEndEvent
+                    {
+                        AgentId = _config.Id,
+                        Round = round,
+                        HasToolCalls = false
+                    };
+
+                    if (round < _config.MaxToolRounds)
+                    {
+                        continue;
+                    }
+
+                    break;
+                }
+
                 // 无工具调用，Agent 完成
                 stopwatch.Stop();
 
@@ -385,4 +417,8 @@ public sealed class AgentLoop
 
         return result.Count == toolCalls.Length ? toolCalls : result.ToArray();
     }
+
+    /// <summary>判断响应是否包含非空白正文文本（thinking 与工具调用不算正文）。</summary>
+    private static bool HasVisibleText(IEnumerable<ContentBlock> content) =>
+        content.OfType<TextBlock>().Any(b => !string.IsNullOrWhiteSpace(b.Text));
 }
