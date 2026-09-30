@@ -129,7 +129,7 @@ public class LlmResilienceTests
         Assert.Equal(2, options.Retry.MaxRetryAttempts); // 3 attempts total
         Assert.Equal(DelayBackoffType.Exponential, options.Retry.BackoffType);
         Assert.True(options.Retry.UseJitter);
-        Assert.Equal(TimeSpan.FromSeconds(1), options.Retry.Delay);
+        Assert.Equal(TimeSpan.FromSeconds(5), options.Retry.Delay);
         Assert.Equal(TimeSpan.FromSeconds(30), options.Retry.MaxDelay);
         Assert.True(options.Retry.ShouldRetryAfterHeader == false);
         Assert.NotNull(options.Retry.DelayGenerator);

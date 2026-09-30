@@ -68,7 +68,7 @@ public static class ServiceCollectionExtensions
         retry.MaxRetryAttempts = 2; // 3 attempts total
         retry.BackoffType = DelayBackoffType.Exponential;
         retry.UseJitter = true;
-        retry.Delay = TimeSpan.FromSeconds(1);
+        retry.Delay = TimeSpan.FromSeconds(5);
         retry.MaxDelay = TimeSpan.FromSeconds(30);
         retry.ShouldHandle = new PredicateBuilder<HttpResponseMessage>()
             .Handle<HttpRequestException>()
