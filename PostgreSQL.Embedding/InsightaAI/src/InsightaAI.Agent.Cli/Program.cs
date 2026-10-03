@@ -102,6 +102,10 @@ public class Program
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Information()
             .MinimumLevel.Override("InsightaAI.Agent.Memory.MemoryManager", LogEventLevel.Debug)
+            // LLM HTTP 常规请求噪音（Start/Sending/Received/End 与 Polly 成功 attempt）全部静默；
+            // 重试仍可见：Polly v8 重试事件为 Warning，业务侧重试日志走 InsightaAI.LLM.Resilience(Warning)。
+            .MinimumLevel.Override("System.Net.Http.HttpClient.LlmClient", LogEventLevel.Warning)
+            .MinimumLevel.Override("Polly", LogEventLevel.Warning)
             .WriteTo.File(
                 Path.Combine(logDir, ".log"),
                 rollingInterval: RollingInterval.Day,
