@@ -61,6 +61,13 @@ public sealed record AgentConfig
     /// <summary>是否并行执行同一轮中的多个工具调用，默认 true</summary>
     public bool ParallelToolExecution { get; init; } = true;
 
+    /// <summary>
+    /// 文本收尾管线开关：开启后主循环在入历史前处理截断续写与空文本响应
+    /// （指令重试 + 零增长止损，均不消耗工具轮次）。默认关闭，保持既有行为
+    /// （截断仅标记 WasTruncated、空文本消耗轮次继续循环）。
+    /// </summary>
+    public bool EnableOutputContinuation { get; init; } = false;
+
     /// <summary>用户 ID（用于记忆系统）</summary>
     public string? UserId { get; init; }
 
@@ -113,6 +120,9 @@ public sealed record AgentResult
 
     /// <summary>扣除输出预留后的可用输入预算</summary>
     public int AvailableInputTokens { get; init; }
+
+    /// <summary>最终输出是否因达到模型输出上限而不完整（续写次数耗尽或收尾轮截断）。</summary>
+    public bool WasTruncated { get; init; }
 }
 
 /// <summary>

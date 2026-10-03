@@ -651,6 +651,24 @@ CliConfig (config.json) ←最终配置链路─ AgentFactory 映射 → AgentCo
 
 ---
 
+### 24. 输出收尾管线与 WasTruncated 消费缺口（已实装，消费者待接）
+
+**已实现（2026-10-03，环境变量 `INSIGHTA_OUTPUT_CONTINUATION=1` 启用，默认关闭）：**
+
+- [x] `FinalizeTextResponseAsync` 统一收尾管线：截断续写（上限 16 轮）与空文本指令重试（`continue-after-empty.txt`）共享同一循环；草稿只存在于请求级投影，最终合并为一条助手消息，不消耗工具循环轮次
+- [x] 统一 no-progress 止损：连续 2 轮无可见正文增量即放弃；空文本不是独立"重试"概念，归入 no-progress 判定
+- [x] `AgentConfig.EnableOutputContinuation`（init，默认 false = 既有行为）；CLI 经 `INSIGHTA_OUTPUT_CONTINUATION` 环境变量接线（进程 env > CliConfig.Envs）
+- [x] 开关关闭时空文本保持既有行为（continue / max-rounds 兜底）；止损收束仅开关打开时生效
+- [x] 单测 6 项（续写收敛 / 耗尽标记 / 空文本恢复 / no-progress 止损 / 续写空转止损 / 开关关回归），全量 616 通过
+- [x] 实机验证：researcher 子 Agent 空文本（thinking 截断）→ 指令重试 ×2 → 续写 ×2 → 收敛，全链路通过；历史无空消息污染，用量跨迭代累计正确
+- [x] WasTruncated 语义 = **交付物完整性**：续写收敛后为 false，仅最终响应仍被截断时为 true；空文本止损不算截断（测试锁定）
+
+**待处理：**
+
+- [ ] **`AgentResult.WasTruncated` 当前无任何框架内消费者**——生产方为 AgentLoop 三条路径（正常完成 / 收尾终结 / max-rounds 兜底），消费方仅测试断言。候选消费者：① CLI EventRenderer 在 TurnEnd 渲染"输出被截断"提示；② Telemetry 增加 `insighta.turn.truncated` 指标。若需区分"过程发生过截断/续写"与"交付完整性"，另加过程性字段（如 `FinalizationRounds`，已评估暂不加）
+
+---
+
 ## 当前优先级
 
 已完成：Dashboard 拆分与 Anthropic 归一化（#17），以及 MCP Telemetry tag 命名分层与去重（#12）。后续可观测性工作保留 Agent Dashboard 的 Turn 指标、低基数行为指标评估和 Jaeger Trace Drilldown；见 `observability/observability-design.md` §8。

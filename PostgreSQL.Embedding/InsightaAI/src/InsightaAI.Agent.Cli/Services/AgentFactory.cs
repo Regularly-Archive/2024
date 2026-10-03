@@ -67,6 +67,8 @@ public sealed class AgentFactory : IAgentFactory
             DenyRules = CreateDenyRules(options.Config.Security),
             ParallelToolExecution = options.Config.ParallelToolExecution
         };
+        // Output finalization pipeline is opt-in via environment variable.
+        var environment = new CliEnvironment(options.Config.Envs);
         var agentConfig = options.AgentConfigOverride is { } profile
             ? ApplyProfile(profile, defaultAgentConfig, options)
             : defaultAgentConfig;
@@ -77,6 +79,11 @@ public sealed class AgentFactory : IAgentFactory
         {
             agentConfig = agentConfig with { ParallelToolExecution = true };
         }
+
+        agentConfig = agentConfig with
+        {
+            EnableOutputContinuation = environment.Get("INSIGHTA_OUTPUT_CONTINUATION") == "1"
+        };
 
         SessionMemoryHook? sessionMemoryHook = null;
         if (!string.IsNullOrEmpty(options.SessionId))
@@ -98,7 +105,6 @@ public sealed class AgentFactory : IAgentFactory
         // Memory storage is an Agent service. Tool exclusions constrain access without
         // removing the service from an isolated subagent's DI container.
         var memoryManager = CreateMemoryManager();
-        var environment = new CliEnvironment(options.Config.Envs);
         var agent = new AgentBuilder(agentConfig)
             .WithLlm(options.LlmClient)
             .WithToolRegistry(options.ToolRegistry)

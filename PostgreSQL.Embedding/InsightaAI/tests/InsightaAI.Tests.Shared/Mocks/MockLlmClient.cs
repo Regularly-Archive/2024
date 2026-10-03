@@ -43,26 +43,31 @@ public class MockLlmClient : ILlmClient
     public LlmStream Streaming(LlmRequest request)
     {
         _callCount++;
+        Requests.Add(request);
 
         ToolCallBlock[]? toolCalls = null;
         string text;
+        DoneReason finishReason;
 
         if (_alwaysToolCalls != null)
         {
             toolCalls = _alwaysToolCalls;
             text = "";
+            finishReason = DoneReason.ToolCalls;
         }
         else if (_callCount == 1 && _firstResponseToolCalls != null)
         {
             toolCalls = _firstResponseToolCalls;
             text = "";
+            finishReason = DoneReason.ToolCalls;
         }
         else
         {
             text = _callCount == 1 ? _response : (_secondResponse ?? _response);
+            finishReason = _callCount == 1 ? _firstFinishReason : _secondFinishReason;
         }
 
-        return new MockLlmStream(text, toolCalls);
+        return new MockLlmStream(text, toolCalls, finishReason);
     }
 
     public Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken cancellationToken = default)
@@ -98,14 +103,17 @@ public class MockLlmStream : LlmStream
     public void Dispose() { GC.SuppressFinalize(this); }
     private readonly string _text;
     private readonly ToolCallBlock[]? _toolCalls;
+    private readonly DoneReason _finishReason;
 
     public bool IsCompleted { get; private set; }
     public bool IsAborted { get; private set; }
 
-    public MockLlmStream(string text, ToolCallBlock[]? toolCalls = null)
+    public MockLlmStream(string text, ToolCallBlock[]? toolCalls = null, DoneReason? finishReason = null)
     {
         _text = text;
         _toolCalls = toolCalls;
+        // 未显式指定时保持历史推导：有工具调用即 ToolCalls，否则 Complete
+        _finishReason = finishReason ?? (toolCalls?.Length > 0 ? DoneReason.ToolCalls : DoneReason.Complete);
     }
 
     public void Abort()
@@ -142,7 +150,7 @@ public class MockLlmStream : LlmStream
 
         yield return new DoneEvent
         {
-            Reason = _toolCalls?.Length > 0 ? DoneReason.ToolCalls : DoneReason.Complete
+            Reason = _finishReason
         };
 
         IsCompleted = true;
@@ -171,7 +179,7 @@ public class MockLlmStream : LlmStream
         {
             Model = "test-model",
             Content = content.ToArray(),
-            FinishReason = _toolCalls?.Length > 0 ? DoneReason.ToolCalls : DoneReason.Complete,
+            FinishReason = _finishReason,
             Usage = new TokenUsage { InputTokens = 10, OutputTokens = 20 }
         });
     }

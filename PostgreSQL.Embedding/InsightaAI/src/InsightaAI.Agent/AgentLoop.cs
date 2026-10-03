@@ -6,6 +6,7 @@ using InsightaAI.LLM.Abstractions;
 using InsightaAI.LLM.Models;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Text;
 using Microsoft.Extensions.Logging;
 
 namespace InsightaAI.Agent;
@@ -16,6 +17,12 @@ namespace InsightaAI.Agent;
 /// </summary>
 public sealed class AgentLoop
 {
+    /// <summary>单轮内截断续写的最大次数（防病态循环；正常 1-5 轮即完成）。</summary>
+    private const int MaxContinuations = 16;
+
+    /// <summary>连续无可见正文增量（no-progress）的最大次数，超过即止损放弃。</summary>
+    private const int MaxNoProgressRounds = 2;
+
     private readonly AgentConfig _config;
     private readonly ILlmClient _llmClient;
     private readonly ToolRegistry _toolRegistry;
@@ -146,47 +153,92 @@ public sealed class AgentLoop
             }
 
             // 累计 token 用量
-            if (response.Usage != null)
-            {
-                totalUsage = new TokenUsage
-                {
-                    InputTokens = totalUsage.InputTokens + response.Usage.InputTokens,
-                    OutputTokens = totalUsage.OutputTokens + response.Usage.OutputTokens,
-                    CacheHitTokens = totalUsage.CacheHitTokens + response.Usage.CacheHitTokens
-                };
-            }
+            totalUsage = AccumulateUsage(totalUsage, response.Usage);
 
-            // 将助手消息加入对话历史
+            // 构造助手消息（截断续写终结后再入历史，保证历史中是一条完整消息）
             var assistantMessage = new Message
             {
                 Role = MessageRole.Assistant,
                 Content = response.Content
             };
-            await context.AddMessageAsync(assistantMessage);
 
             // 检查是否有工具调用（去重：LLM 流可能重复发出同一工具名和原始参数的调用）
             var toolCalls = DeduplicateToolCalls(response.GetToolCalls());
+
+            // 截断标记独立于收尾开关：只要可见正文被输出上限截断就如实标记，
+            // 开关只控制是否续写。收尾管线终结后按最终响应更新。
+            var wasTruncated = toolCalls.Length == 0 && IsTruncatedDelivery(response);
+            if (toolCalls.Length == 0 && _config.EnableOutputContinuation
+                && (!HasVisibleText(response.Content) || response.FinishReason == DoneReason.MaxTokens))
+            {
+                // 文本收尾管线：截断续写与空文本指令重试，全部在入历史前的请求级投影内消化，
+                // 不消耗工具循环轮次，最终只合并为一条助手消息。
+                var draft = new StringBuilder();
+                AppendVisibleText(draft, response.Content);
+
+                var outcome = new TextFinalizeOutcome { FinalResponse = response };
+                await foreach (var evt in FinalizeTextResponseAsync(context, draft, outcome, cancellationToken))
+                {
+                    yield return evt;
+                }
+
+                if (outcome.Failed)
+                {
+                    // 收尾请求失败：与主循环错误路径一致（草稿不入历史，回合标记失败）
+                    stopwatch.Stop();
+                    yield return CreateFailedTurnEndEvent(context, totalUsage, stopwatch, round, outcome.ErrorMessage!);
+                    yield break;
+                }
+
+                totalUsage = AccumulateUsage(totalUsage, outcome.Usage);
+                response = outcome.FinalResponse!;
+                wasTruncated = IsTruncatedDelivery(response);
+                if (wasTruncated)
+                {
+                    _logger?.LogWarning(
+                        "Agent {AgentId} output still truncated after finalization rounds (max {Max} continuations).",
+                        _config.Id, MaxContinuations);
+                }
+
+                // 有累积正文 → 合并为一条助手消息（正文 + 最后响应的非文本块）；全空 → 原样入历史
+                if (draft.Length > 0)
+                {
+                    assistantMessage = MergeContinuationMessage(draft.ToString(), response.Content);
+                }
+            }
+
+            await context.AddMessageAsync(assistantMessage);
+
             if (toolCalls.Length == 0)
             {
+                yield return CreateRoundEndEvent(round, hasToolCalls: false);
+
                 // 空文本守卫：模型可能以纯 thinking（或空内容）结束回复——典型原因是推理
-                // 阶段耗尽输出预算被截断。此时不宣告完成：还有剩余轮次就继续循环让模型
-                // 补写正文；已到最大轮次则落入 HandleMaxRoundsExceededAsync 强制收尾。
-                // 仅记 Warning 日志，不向用户报错。
+                // 阶段耗尽输出预算被截断。仅记 Warning 日志，不向用户报错。
                 if (!HasVisibleText(response.Content))
                 {
+                    if (_config.EnableOutputContinuation)
+                    {
+                        // 收尾管线已做过指令重试（含零增长止损）仍无正文：止损收束，
+                        // 不再消耗主循环轮次空转——空消息已入历史，下一轮请求只会重演。
+                        _logger?.LogWarning(
+                            "Round {Round} of agent {AgentId} ended without visible text after finalization retries; finalizing with empty message.",
+                            round, _config.Id);
+
+                        stopwatch.Stop();
+                        yield return CreateCompletedTurnEndEvent(
+                            context, totalUsage, stopwatch, round, assistantMessage, wasTruncated);
+                        yield break;
+                    }
+
+                    // 开关关闭：保持既有行为——还有剩余轮次就继续循环让模型补写正文；
+                    // 已到最大轮次则落入 HandleMaxRoundsExceededAsync 强制收尾。
                     _logger?.LogWarning(
                         "Round {Round} of agent {AgentId} ended without visible text (thinking-only response, possible output truncation). {Action}",
                         round, _config.Id,
                         round < _config.MaxToolRounds
                             ? "Continuing with next round."
                             : "Falling back to max-rounds final answer.");
-
-                    yield return new AgentRoundEndEvent
-                    {
-                        AgentId = _config.Id,
-                        Round = round,
-                        HasToolCalls = false
-                    };
 
                     if (round < _config.MaxToolRounds)
                     {
@@ -198,30 +250,8 @@ public sealed class AgentLoop
 
                 // 无工具调用，Agent 完成
                 stopwatch.Stop();
-
-                yield return new AgentRoundEndEvent
-                {
-                    AgentId = _config.Id,
-                    Round = round,
-                    HasToolCalls = false
-                };
-
-                yield return new AgentTurnEndEvent
-                {
-                    AgentId = _config.Id,
-                    Result = new AgentResult
-                    {
-                        Status = AgentStatus.Completed,
-                        Message = assistantMessage,
-                        Usage = totalUsage,
-                        Rounds = round,
-                        DurationMs = stopwatch.ElapsedMilliseconds,
-                        EstimatedContextTokens = context.EstimateTokens(),
-                        MaxContextTokens = context.MaxContextTokens,
-                        AvailableInputTokens = context.AvailableInputTokens
-                    }
-                };
-
+                yield return CreateCompletedTurnEndEvent(
+                    context, totalUsage, stopwatch, round, assistantMessage, wasTruncated);
                 yield break;
             }
 
@@ -241,12 +271,7 @@ public sealed class AgentLoop
                 }
             }
 
-            yield return new AgentRoundEndEvent
-            {
-                AgentId = _config.Id,
-                Round = round,
-                HasToolCalls = true
-            };
+            yield return CreateRoundEndEvent(round, hasToolCalls: true);
 
             // 将工具执行结果加入对话历史
             foreach (var result in _toolCallExecutor.Results)
@@ -360,7 +385,8 @@ public sealed class AgentLoop
                 DurationMs = stopwatch.ElapsedMilliseconds,
                 EstimatedContextTokens = context.EstimateTokens(),
                 MaxContextTokens = context.MaxContextTokens,
-                AvailableInputTokens = context.AvailableInputTokens
+                AvailableInputTokens = context.AvailableInputTokens,
+                WasTruncated = finalResponse.FinishReason == DoneReason.MaxTokens
             }
         };
     }
@@ -396,6 +422,53 @@ public sealed class AgentLoop
             }
         };
 
+    /// <summary>构造成功完成的回合结束事件（正常文本完成与止损收束共用）。</summary>
+    private static AgentTurnEndEvent CreateCompletedTurnEndEvent(
+        ILoopContext context, TokenUsage usage, Stopwatch stopwatch, int round,
+        Message assistantMessage, bool wasTruncated) => new()
+        {
+            AgentId = context.AgentId,
+            Result = new AgentResult
+            {
+                Status = AgentStatus.Completed,
+                Message = assistantMessage,
+                Usage = usage,
+                Rounds = round,
+                DurationMs = stopwatch.ElapsedMilliseconds,
+                EstimatedContextTokens = context.EstimateTokens(),
+                MaxContextTokens = context.MaxContextTokens,
+                AvailableInputTokens = context.AvailableInputTokens,
+                WasTruncated = wasTruncated
+            }
+        };
+
+    private AgentRoundEndEvent CreateRoundEndEvent(int round, bool hasToolCalls) => new()
+    {
+        AgentId = _config.Id,
+        Round = round,
+        HasToolCalls = hasToolCalls
+    };
+
+    /// <summary>判断响应是否构成截断交付：可见正文被输出上限截断（空响应不算截断）。</summary>
+    private static bool IsTruncatedDelivery(LlmResponse response) =>
+        response.FinishReason == DoneReason.MaxTokens && HasVisibleText(response.Content);
+
+    /// <summary>累加增量用量；增量为 null（流式未上报）时原样返回。</summary>
+    private static TokenUsage AccumulateUsage(TokenUsage total, TokenUsage? increment)
+    {
+        if (increment == null)
+        {
+            return total;
+        }
+
+        return new TokenUsage
+        {
+            InputTokens = total.InputTokens + increment.InputTokens,
+            OutputTokens = total.OutputTokens + increment.OutputTokens,
+            CacheHitTokens = total.CacheHitTokens + increment.CacheHitTokens
+        };
+    }
+
     /// <summary>
     /// 按工具名及原始 JSON 参数文本移除重复的工具调用。
     /// </summary>
@@ -421,4 +494,161 @@ public sealed class AgentLoop
     /// <summary>判断响应是否包含非空白正文文本（thinking 与工具调用不算正文）。</summary>
     private static bool HasVisibleText(IEnumerable<ContentBlock> content) =>
         content.OfType<TextBlock>().Any(b => !string.IsNullOrWhiteSpace(b.Text));
+
+    /// <summary>
+    /// 文本收尾循环的结果载体（IAsyncEnumerable 方法无法直接返回值）。
+    /// </summary>
+    private sealed class TextFinalizeOutcome
+    {
+        /// <summary>进入收尾前的初始响应，随每次迭代更新为最近一次响应。</summary>
+        public LlmResponse? FinalResponse { get; set; }
+
+        /// <summary>收尾期间累计的 token 用量（不含初始响应）。</summary>
+        public TokenUsage? Usage { get; set; }
+
+        /// <summary>收尾请求是否失败。</summary>
+        public bool Failed { get; set; }
+
+        /// <summary>失败时的错误信息。</summary>
+        public string? ErrorMessage { get; set; }
+    }
+
+    /// <summary>
+    /// 文本收尾是否继续：无可见正文增量（no-progress）连续超限即止损；
+    /// 草稿为空时继续注入指令要求模型直接输出；草稿被截断时继续续写。
+    /// </summary>
+    private static bool ShouldContinueFinalization(
+        LlmResponse response, StringBuilder draft, int noProgressRounds, int continuations)
+    {
+        if (noProgressRounds >= MaxNoProgressRounds)
+        {
+            return false;
+        }
+
+        if (draft.Length == 0)
+        {
+            return true;
+        }
+
+        return response.FinishReason == DoneReason.MaxTokens && continuations < MaxContinuations;
+    }
+
+    /// <summary>
+    /// 文本收尾循环：在请求级快照上累积草稿，处理截断续写与空文本响应，直到模型正常结束、
+    /// 达到续写上限或连续 no-progress 止损。草稿为空时注入指令要求模型直接输出正文（不前置
+    /// assistant 块）；草稿非空时以 assistant 草稿 + 续写指令延续。每次迭代的流事件实时转发给
+    /// 消费者；结果（最终响应 / 用量 / 失败状态）写入 <paramref name="outcome"/>。
+    /// </summary>
+    private async IAsyncEnumerable<AgentEvent> FinalizeTextResponseAsync(
+        ILoopContext context,
+        StringBuilder draft,
+        TextFinalizeOutcome outcome,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var usage = new TokenUsage();
+        var continuations = 0;
+        var noProgressRounds = 0;
+        string? continuationPrompt = null;
+        string? emptyTextPrompt = null;
+
+        while (ShouldContinueFinalization(outcome.FinalResponse!, draft, noProgressRounds, continuations))
+        {
+            continuations++;
+
+            var snapshot = context.Messages.ToList();
+            var isEmptyTextRound = draft.Length == 0;
+            if (isEmptyTextRound)
+            {
+                _logger?.LogInformation(
+                    "Agent {AgentId} produced no visible text, requesting direct output ({NoProgress}/{Max}).",
+                    _config.Id, noProgressRounds + 1, MaxNoProgressRounds);
+                emptyTextPrompt ??= await PromptTemplate.RenderAsync("continue-after-empty");
+            }
+            else
+            {
+                _logger?.LogInformation(
+                    "Agent {AgentId} output hit max tokens, continuing generation ({Count}/{Max}).",
+                    _config.Id, continuations, MaxContinuations);
+                snapshot.Add(new Message
+                {
+                    Role = MessageRole.Assistant,
+                    Content = [new TextBlock { Text = draft.ToString() }]
+                });
+                continuationPrompt ??= await PromptTemplate.RenderAsync("continue-after-truncation");
+            }
+
+            snapshot.Add(Message.FromUser(isEmptyTextRound ? emptyTextPrompt! : continuationPrompt!));
+
+            // 收尾是纯文本延续：不带工具，避免中途发起工具调用导致草稿悬空
+            var finalizeRequest = new LlmRequest
+            {
+                Model = _config.Model,
+                Messages = snapshot.ToArray(),
+                Tools = [],
+                Temperature = _config.Temperature,
+                MaxTokens = _config.MaxTokens,
+                ReasoningPreference = _config.ReasoningPreference
+            };
+
+            var finalizeStream = _llmClient.Streaming(finalizeRequest);
+            ErrorEvent? finalizeError = null;
+
+            await foreach (var streamEvent in finalizeStream.WithCancellation(cancellationToken))
+            {
+                if (streamEvent is ErrorEvent errorEvent)
+                {
+                    finalizeError = errorEvent;
+                    yield return CreateAgentErrorEvent(errorEvent);
+                    continue;
+                }
+
+                yield return new AgentLlmStreamEvent
+                {
+                    AgentId = _config.Id,
+                    StreamEvent = streamEvent
+                };
+            }
+
+            var finalizeResponse = await finalizeStream.GetResponseAsync(cancellationToken);
+
+            if (finalizeError != null)
+            {
+                outcome.Failed = true;
+                outcome.ErrorMessage = finalizeError.Error.Message;
+                yield break;
+            }
+
+            if (finalizeResponse.Usage != null)
+            {
+                usage = AccumulateUsage(usage, finalizeResponse.Usage);
+            }
+
+            var lengthBefore = draft.Length;
+            AppendVisibleText(draft, finalizeResponse.Content);
+            noProgressRounds = draft.Length == lengthBefore ? noProgressRounds + 1 : 0;
+            outcome.FinalResponse = finalizeResponse;
+        }
+
+        outcome.Usage = usage;
+    }
+
+    /// <summary>把响应中的可见正文文本追加到累积草稿。</summary>
+    private static void AppendVisibleText(StringBuilder draft, ContentBlock[] content)
+    {
+        foreach (var text in content.OfType<TextBlock>())
+        {
+            draft.Append(text.Text);
+        }
+    }
+
+    /// <summary>
+    /// 合并截断续写结果为一条助手消息：累积正文文本 + 最后一次响应中的非文本块（thinking 等）。
+    /// </summary>
+    private static Message MergeContinuationMessage(string draftText, ContentBlock[] lastContent)
+    {
+        var blocks = new List<ContentBlock>(lastContent.Length + 1);
+        blocks.AddRange(lastContent.Where(b => b is not TextBlock));
+        blocks.Add(new TextBlock { Text = draftText });
+        return new Message { Role = MessageRole.Assistant, Content = blocks.ToArray() };
+    }
 }
